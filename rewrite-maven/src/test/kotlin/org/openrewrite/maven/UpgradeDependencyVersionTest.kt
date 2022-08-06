@@ -630,7 +630,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun upgradeAllManagedDependneciesToPatchReleases() = assertChanged(
+    fun upgradeAllManagedDependenciesToPatchReleases() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "*",
             "*",
@@ -695,7 +695,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
     )
 
     @Test
-    fun upgradeAllDependneciesToPatchReleases() = assertChanged(
+    fun upgradeAllDependenciesToPatchReleases() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "*",
             "*",

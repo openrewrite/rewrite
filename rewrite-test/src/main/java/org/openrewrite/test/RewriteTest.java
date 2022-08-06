@@ -322,15 +322,16 @@ public interface RewriteTest extends SourceSpecs {
         nextSourceSpec:
         for (SourceSpec<?> sourceSpec : expectedNewSources) {
             assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
-            //If the source spec defines a source path, look for a result where there is a new file at that path.
-            if (sourceSpec.sourcePath != null) {
-                //If sourceSpec defines a source path, enforce there is a result that has the same source path and
-                //the contents match the expected value.
+            // If the source spec defines a source path, look for a result where there is a new file at that path.
+            if (sourceSpec.getSourcePath() != null) {
+                // If sourceSpec defines a source path, enforce there is a result that has the same source path and
+                // the contents match the expected value.
                 for (Result result : results) {
-                    if (result.getAfter() != null && sourceSpec.sourcePath.equals(result.getAfter().getSourcePath())) {
+                    if (result.getAfter() != null && sourceSpec.getSourcePath().equals(result.getAfter().getSourcePath())) {
                         expectedNewSources.remove(sourceSpec);
                         assertThat(result.getBefore())
-                                .as("Expected a new file for the source path [" + sourceSpec.sourcePath + "] but there was an existing file already present.")
+                                .as("Expected a new file for the source path but there was an existing file already present: " +
+                                        sourceSpec.getSourcePath())
                                 .isNull();
                         String actual = result.getAfter().printAll().trim();
                         String expected = trimIndentPreserveCRLF(sourceSpec.after);
@@ -338,11 +339,11 @@ public interface RewriteTest extends SourceSpecs {
                         continue nextSourceSpec;
                     }
                 }
-                fail("Expected a new source file with the source path " + sourceSpec.sourcePath);
+                fail("Expected a new source file with the source path " + sourceSpec.getSourcePath());
             }
 
-            //If the source spec has not defined a source path, look for a result with the exact contents. This logic
-            //first looks for non-remote results.
+            // If the source spec has not defined a source path, look for a result with the exact contents. This logic
+            // first looks for non-remote results.
             for (Result result : results) {
                 if (result.getAfter() != null && !(result.getAfter() instanceof Remote)) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();

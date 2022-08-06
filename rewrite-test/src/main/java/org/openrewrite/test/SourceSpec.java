@@ -53,6 +53,11 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     protected final List<Marker> markers = new ArrayList<>();
 
+    @Nullable
+    Path getSourcePath() {
+        return sourcePath == null ? null : dir.resolve(sourcePath);
+    }
+
     protected Consumer<T> beforeRecipe = t -> {
 
     };
