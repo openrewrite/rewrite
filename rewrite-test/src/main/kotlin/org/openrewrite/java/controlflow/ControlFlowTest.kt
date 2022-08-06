@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest
 @Suppress("FunctionName", "UnusedAssignment", "UnnecessaryLocalVariable", "ConstantConditions")
 interface ControlFlowTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(ControlFlowVisualization(true))
+        spec.recipe(ControlFlowVisualization(false))
         spec.expectedCyclesThatMakeChanges(1).cycles(1)
     }
 
