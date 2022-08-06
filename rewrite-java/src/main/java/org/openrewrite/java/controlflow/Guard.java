@@ -34,7 +34,7 @@ public final class Guard {
 
     public static Optional<Guard> from(Cursor cursor) {
         if (!(cursor.getValue() instanceof Expression)) {
-            throw new IllegalArgumentException("Cursor must be on an expression");
+            throw new IllegalArgumentException("Cursor must be on an expression, but was on " + cursor.getValue());
         }
         Expression e = cursor.getValue();
         if (e instanceof J.ControlParentheses) {

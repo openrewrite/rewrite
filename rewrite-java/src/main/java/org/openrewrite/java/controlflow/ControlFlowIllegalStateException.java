@@ -16,6 +16,7 @@
 package org.openrewrite.java.controlflow;
 
 import lombok.Value;
+import org.openrewrite.Cursor;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -39,12 +40,14 @@ final class ControlFlowIllegalStateException extends IllegalStateException {
         String message;
         LinkedHashMap<String, ControlFlowNode> nodes;
         Set<ControlFlowNode> predecessors;
+        Cursor cursor;
 
         static class MessageBuilder {
             private final String message;
             // LinkedHashMap to preserve order of insertion1
             private final LinkedHashMap<String, ControlFlowNode> nodes = new LinkedHashMap<>();
             private final Set<ControlFlowNode> predecessors = new LinkedHashSet<>();
+            private Cursor cursor;
 
             private MessageBuilder(String message) {
                 this.message = message;
@@ -73,16 +76,25 @@ final class ControlFlowIllegalStateException extends IllegalStateException {
                 return this;
             }
 
+            MessageBuilder addCursor(Cursor cursor) {
+                this.cursor = cursor;
+                return this;
+            }
+
             Message build() {
-                return new Message(this.message, this.nodes, this.predecessors);
+                return new Message(this.message, this.nodes, this.predecessors, cursor);
             }
         }
 
         private String createMessage() {
             StringBuilder sb = new StringBuilder(message);
-            nodes.forEach((key, node) -> {
-                sb.append("\n\t").append(key).append(": ").append(node.getClass().getSimpleName()).append(" ").append(node.toDescriptiveString());
-            });
+            if (cursor != null) {
+                sb.append("\n\tAST: ").append((Object) cursor.getValue());
+                sb.append("\n\tCursor: ").append(cursor);
+            }
+            nodes.forEach((key, node) ->
+                    sb.append("\n\t").append(key).append(": ").append(node.getClass().getSimpleName()).append(" ").append(node.toDescriptiveString())
+            );
             if (!predecessors.isEmpty()) {
                 sb.append("\n\tPredecessors: ").append(predecessors.stream().map(ControlFlowNode::toDescriptiveString).reduce("\n\t\t", (a, b) -> a + "\n\t\t" + b));
             }

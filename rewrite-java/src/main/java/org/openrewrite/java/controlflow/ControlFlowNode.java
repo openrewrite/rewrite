@@ -210,7 +210,7 @@ public abstract class ControlFlowNode {
         Guard asGuard() {
             return Guard
                     .from(condition)
-                    .orElseThrow(() -> new ControlFlowIllegalStateException(exceptionMessageBuilder("Condition node has no guard!").thisNode(this)));
+                    .orElseThrow(() -> new ControlFlowIllegalStateException(exceptionMessageBuilder("Condition node has no guard!").thisNode(this).addCursor(condition)));
         }
 
         @Override

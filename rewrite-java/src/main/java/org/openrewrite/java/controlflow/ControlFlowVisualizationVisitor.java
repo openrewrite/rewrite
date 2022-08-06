@@ -50,8 +50,9 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.Block visitBlock(J.Block block, P p) {
+        J.Block b = super.visitBlock(block, p);
         J.MethodDeclaration methodDeclaration = getCursor().firstEnclosing(J.MethodDeclaration.class);
-        final boolean isMethodDeclaration = methodDeclaration != null && methodDeclaration.getBody() == block;
+        final boolean isMethodDeclaration = methodDeclaration != null && methodDeclaration.getBody() == b;
 
         boolean isStaticOrInitBlock = J.Block.isStaticOrInitBlock(getCursor());
         if (isMethodDeclaration || isStaticOrInitBlock) {
@@ -67,6 +68,9 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                                 .getConditionNodes()
                                 .stream()
                                 .collect(Collectors.toMap(ControlFlowNode.ConditionNode::getCondition, Function.identity()));
+                // Sanity check for unit testing purposes to ensure all control flow nodes are well-formed
+                //noinspection ConstantConditions
+                assert conditionToConditionNodes.values().stream().map(ControlFlowNode.ConditionNode::asGuard).allMatch(Objects::nonNull) : "Condition nodes must all be guards";
                 doAfterVisit(new ControlFlowMarkingVisitor<>("L", leadersToBlocks));
                 doAfterVisit(new ControlFlowMarkingVisitor<>("C", conditionToConditionNodes));
 
@@ -75,18 +79,18 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                                 " CN: " + controlFlow.getConditionNodeCount() +
                                 " EX: " + controlFlow.getExitCount();
                 if (dotFileGenerator != null) {
-                    String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : block.isStatic() ? "static block" : "init block";
+                    String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : b.isStatic() ? "static block" : "init block";
                     String dotFile = dotFileGenerator.visualizeAsDotfile(graphName, controlFlow);
                     if (isMethodDeclaration) {
                         getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
                     } else {
-                        return block.withMarkers(block.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
+                        return b.withMarkers(b.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
                     }
                 }
-                return block.withMarkers(block.getMarkers().searchResult(searchResultText));
-            }).orElseGet(() -> super.visitBlock(block, p));
+                return b.withMarkers(b.getMarkers().searchResult(searchResultText));
+            }).orElse(b);
         }
-        return super.visitBlock(block, p);
+        return b;
     }
 
     @RequiredArgsConstructor
@@ -133,7 +137,7 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                 assert b != null;
                 int number = nodeNumbers.computeIfAbsent(b, __ -> ++nodeNumber);
                 return expression.withMarkers(expression.getMarkers().searchResult(number + labelDescription(expression)));
-            }  else {
+            } else {
                 return expression;
             }
         }
