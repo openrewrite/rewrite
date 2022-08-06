@@ -1703,14 +1703,14 @@ interface ControlFlowTest : RewriteTest {
                             int y = x.get(i);
                             return y++;
                         })
-                        .forEach(ind -> /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                        .forEach(ind -> /*~~(5L)~~>*/{
                             x.set(ind, x.get(ind) + 5);
                             System.out.println(x.get(ind));
                         });
                     if (/*~~(1C (==))~~>*/x.get(0) == 10) /*~~(6L)~~>*/{
                         return -1;
                     }
-                    return /*~~(3L)~~>*/x.get(0);
+                    return /*~~(7L)~~>*/x.get(0);
                 }
             }
 
