@@ -467,10 +467,16 @@ public class ControlFlow {
             // Then the body is visited
             // Only transfer exits
             if (whileLoop.getBody() instanceof J.Empty) {
-                ControlFlowNode.ConditionNode missingOne = getControlFlowNodeMissingOneSuccessor(conditionNodes);
-                ControlFlowNode.ConditionNode missingBoth = getControlFlowNodeMissingBothSuccessors(conditionNodes);
-                missingBoth.addSuccessor(missingOne);
-                current = conditionNodes;
+                if (conditionNodes.size() == 1) {
+                    ControlFlowNode.ConditionNode conditionNode = conditionNodes.iterator().next();
+                    conditionNode.addSuccessor(conditionNode);
+                    current = Collections.singleton(conditionNode);
+                } else {
+                    ControlFlowNode.ConditionNode missingOne = getControlFlowNodeMissingOneSuccessor(conditionNodes);
+                    ControlFlowNode.ConditionNode missingBoth = getControlFlowNodeMissingBothSuccessors(conditionNodes);
+                    missingBoth.addSuccessor(missingOne);
+                    current = conditionNodes;
+                }
             } else {
                 ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringExit(conditionNodes, whileLoop.getBody(), p);
                 // Add the 'loop' in

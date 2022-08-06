@@ -47,7 +47,7 @@ public abstract class ControlFlowNode {
     }
 
     <C extends ControlFlowNode> C addSuccessor(C successor) {
-        if (this == successor) {
+        if (this == successor && !(this instanceof ConditionNode)) {
             throw new ControlFlowIllegalStateException("Cannot add a node as a successor of itself", this);
         }
         _addSuccessorInternal(successor);

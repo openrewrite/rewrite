@@ -1771,7 +1771,32 @@ interface ControlFlowTest : RewriteTest {
 
     @Test
     @Suppress("StatementWithEmptyBody")
-    fun `while loop with no body`() = rewriteRun(
+    fun `while loop with no body one conditional`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean condition();
+
+                void test() {
+                    while (condition());
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean condition();
+
+                void test() /*~~(BB: 1 CN: 1 EX: 1 | 1L)~~>*/{
+                    while (/*~~(1C)~~>*/condition());
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    @Suppress("StatementWithEmptyBody")
+    fun `while loop with no body two conditionals`() = rewriteRun(
         java(
             """
             abstract class Test {
@@ -1787,6 +1812,7 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract boolean condition();
                 abstract boolean otherCondition();
+
                 void test() /*~~(BB: 2 CN: 2 EX: 2 | 1L)~~>*/{
                     while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition());
                 }
