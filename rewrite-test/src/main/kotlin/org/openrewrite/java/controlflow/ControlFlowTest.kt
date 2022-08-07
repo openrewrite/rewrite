@@ -2127,4 +2127,158 @@ interface ControlFlowTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `example image-ui-swing`() = rewriteRun(
+        java(
+            """
+            import java.io.File;
+            import java.io.IOException;
+            import java.net.URL;
+            import java.util.jar.JarEntry;
+            import java.util.jar.JarInputStream;
+
+            class Test {
+                private String findSourceDirectory(final File gitWorkingDirectory, final URL jarURL) {
+                    try {
+                        int maxCount = 3;
+                        final JarInputStream in = new JarInputStream(jarURL.openStream());
+                        for (;;) {
+                            final JarEntry entry = in.getNextJarEntry();
+                            if (entry == null) break;
+                            String path = entry.getName();
+                            if (!path.endsWith(".class")) continue;
+                            if (--maxCount <= 0) break;
+                            final String sourceFile = "Some java source code here";
+                            if (sourceFile == null) continue;
+                            final String suffix = path.substring(0, path.lastIndexOf('/') + 1) + sourceFile;
+                            final String git = System.getProperty("imagej.updater.git.command", "git");
+                            try {
+                                path = "/user/something/something";
+                                if (path.length() <= suffix.length()) continue;
+                                if (path.endsWith("\n")) path = path.substring(0, path.length() - 1);
+                            } catch (RuntimeException e) {
+                                /* ignore */
+                                continue;
+                            }
+                            if (path.indexOf('\n') >= 0) continue; // ls-files found multiple files
+                            path = path.substring(0, path.length() - suffix.length());
+                            if ("".equals(path)) path = ".";
+                            else if (path.endsWith("/src/main/java/")) path = path.substring(0, path.length() - "/src/main/java/".length());
+                            in.close();
+                            return path;
+                        }
+                        in.close();
+                    } catch (IOException e) { /* ignore */ e.printStackTrace(); }
+                    return null;
+                }
+            }
+            """,
+            """
+            import java.io.File;
+            import java.io.IOException;
+            import java.net.URL;
+            import java.util.jar.JarEntry;
+            import java.util.jar.JarInputStream;
+
+            class Test {
+                private String findSourceDirectory(final File gitWorkingDirectory, final URL jarURL) /*~~(BB: 21 CN: 10 EX: 2 | 1L)~~>*/{
+                    try {
+                        int maxCount = 3;
+                        final JarInputStream in = new JarInputStream(jarURL.openStream());
+                        for (;;) /*~~(2L)~~>*/{
+                            final JarEntry entry = in.getNextJarEntry();
+                            if (/*~~(1C (==))~~>*/entry == null) /*~~(3L)~~>*/break;
+                            /*~~(4L)~~>*/String path = entry.getName();
+                            if (!/*~~(2C)~~>*/path.endsWith(".class")) /*~~(5L)~~>*/continue;
+                            /*~~(6L)~~>*/if (/*~~(3C (<=))~~>*/--maxCount <= 0) /*~~(7L)~~>*/break;
+                            final /*~~(8L)~~>*/String sourceFile = "Some java source code here";
+                            if (/*~~(4C (==))~~>*/sourceFile == null) /*~~(9L)~~>*/continue;
+                            final /*~~(10L)~~>*/String suffix = path.substring(0, path.lastIndexOf('/') + 1) + sourceFile;
+                            final String git = System.getProperty("imagej.updater.git.command", "git");
+                            try {
+                                path = "/user/something/something";
+                                if (/*~~(5C (<=))~~>*/path.length() <= suffix.length()) /*~~(11L)~~>*/continue;
+                                /*~~(12L)~~>*/if (/*~~(6C)~~>*/path.endsWith("\n")) /*~~(13L)~~>*/path = path.substring(0, path.length() - 1);
+                            } catch (RuntimeException e) {
+                                /* ignore */
+                                continue;
+                            }
+                            /*~~(14L)~~>*/if (/*~~(7C (>=))~~>*/path.indexOf('\n') >= 0) /*~~(15L)~~>*/continue; // ls-files found multiple files
+                            /*~~(16L)~~>*/path = path.substring(0, path.length() - suffix.length());
+                            if (/*~~(8C)~~>*/"".equals(path)) /*~~(17L)~~>*/path = ".";
+                            /*~~(18L)~~>*/else if (path.endsWith("/src/main/java/")) path = path.substring(0, path.length() - "/src/main/java/".length());
+                            /*~~(19L)~~>*/in.close();
+                            return path;
+                        }
+                        /*~~(20L)~~>*/in.close();
+                    } catch (IOException e) { /* ignore */ e.printStackTrace(); }
+                    return null;
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `while loop ending in return`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean conditional1();
+                abstract boolean conditional2();
+                int test() {
+                    while (conditional1()) {
+                        if (conditional2())
+                            continue;
+                        return 1;
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean conditional1();
+                abstract boolean conditional2();
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | 1L)~~>*/{
+                    while (/*~~(1C)~~>*/conditional1()) /*~~(2L)~~>*/{
+                        if (/*~~(2C)~~>*/conditional2())
+                            /*~~(3L)~~>*/continue;
+                        return /*~~(4L)~~>*/1;
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    fun `for each loop ending in return statement`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean conditional1();
+                int test() {
+                    for (String s : new ArrayList<String>()) {
+                        if (conditional1())
+                            continue;
+                        return 1;
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean conditional1();
+                int test() /*~~(BB: 4 CN: 2 EX: 2 | 1L)~~>*/{
+                    for (String s : new ArrayList<String>()) /*~~(2L)~~>*/{
+                        if (/*~~(1C)~~>*/conditional1())
+                            /*~~(3L)~~>*/continue;
+                        return /*~~(4L)~~>*/1;
+                    }
+                }
+            }
+            """
+        )
+    )
 }

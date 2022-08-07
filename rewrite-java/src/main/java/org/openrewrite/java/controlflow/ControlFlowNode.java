@@ -64,7 +64,7 @@ public abstract class ControlFlowNode {
     }
 
     BasicBlock addBasicBlock() {
-        return addSuccessor(new BasicBlock());
+        return addSuccessor(BasicBlock.create());
     }
 
     ConditionNode addConditionNodeTruthFirst() {
@@ -250,7 +250,7 @@ public abstract class ControlFlowNode {
      *
      * @see <a href="https://en.wikipedia.org/wiki/Basic_block">Wikipedia: Basic Block</a>
      */
-    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
+    @RequiredArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
     static final class BasicBlock extends ControlFlowNode {
         @Getter
         private ControlFlowNode successor;
