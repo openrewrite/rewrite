@@ -51,8 +51,18 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
             ControlFlowNode node = toNodeText.node;
             if (node instanceof ControlFlowNode.ConditionNode) {
                 ControlFlowNode.ConditionNode cn = (ControlFlowNode.ConditionNode) node;
-                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(cn.getTruthySuccessor())).append(" [label=\"True\", color=\"green\" fontcolor=\"green\"];");
-                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(cn.getFalsySuccessor())).append(" [label=\"False\", color=\"red\" fontcolor=\"red\"];");
+                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(cn.getTruthySuccessor()));
+                if (!cn.isAlwaysFalse()) {
+                    sb.append(" [label=\"True\", color=\"green\" fontcolor=\"green\"];");
+                } else {
+                    sb.append(" [label=\"Unreachable\", color=\"grey\" fontcolor=\"grey\" style=dashed];");
+                }
+                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(cn.getFalsySuccessor()));
+                if (!cn.isAlwaysTrue()) {
+                    sb.append(" [label=\"False\", color=\"red\" fontcolor=\"red\"];");
+                } else {
+                    sb.append(" [label=\"Unreachable\", color=\"grey\" fontcolor=\"grey\" style=dashed];");
+                }
             } else {
                 for (ControlFlowNode successor : node.getSuccessors()) {
                     sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(successor)).append(";");

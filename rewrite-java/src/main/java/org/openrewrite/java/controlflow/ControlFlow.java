@@ -554,9 +554,10 @@ public final class ControlFlow {
                 }
             };
             controlAnalysisSecondBit.visit(forLoop.getControl(), p, getCursor());
+            // Point any `continue` nodes to the condition node
+            bodyAnalysis.continueFlow.forEach(continueControlFlowNode -> continueControlFlowNode.addSuccessor(entryBlock[0].getSuccessor()));
             // Add the 'increment' statement to the basic block as the last element
             controlAnalysisSecondBit.current.forEach(controlFlowNode -> {
-                bodyAnalysis.continueFlow.forEach(continueControlFlowNode -> continueControlFlowNode.addSuccessor(controlFlowNode));
                 controlFlowNode.addSuccessor(entryBlock[0].getSuccessor());
             });
 
@@ -598,7 +599,9 @@ public final class ControlFlow {
 
             ControlFlowNode.ConditionNode conditionalEntry = controlAnalysis.currentAsBasicBlock().addConditionNodeTruthFirst();
             ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringExit(Collections.singleton(conditionalEntry), forLoop.getBody(), p);
+            // Point any `continue` nodes to the condition node
             bodyAnalysis.continueFlow.forEach(continueFlowNode -> continueFlowNode.addSuccessor(conditionalEntry));
+            // Add the iterate statement to the basic block as the last element
             bodyAnalysis.current.forEach(controlFlowNode -> controlFlowNode.addSuccessor(conditionalEntry));
             current = Stream.concat(Stream.of(conditionalEntry), bodyAnalysis.breakFlow.stream()).collect(Collectors.toSet());
             return forLoop;
