@@ -31,6 +31,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.*;
+
 @Incubating(since = "7.25.0")
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ControlFlow {
@@ -123,6 +125,9 @@ public final class ControlFlow {
         }
 
         ControlFlowNode.BasicBlock currentAsBasicBlock() {
+            if (current.isEmpty()) {
+                throw new ControlFlowIllegalStateException(exceptionMessageBuilder("No current node!").addCursor(getCursor()));
+            }
             assert !current.isEmpty() : "No current node!";
             if (current.size() == 1 && current.iterator().next() instanceof ControlFlowNode.BasicBlock) {
                 return (ControlFlowNode.BasicBlock) current.iterator().next();
@@ -539,6 +544,10 @@ public final class ControlFlow {
             ControlFlowAnalysis<P> controlAnalysisSecondBit = new ControlFlowAnalysis<P>(bodyAnalysis.current, graphType) {
                 @Override
                 public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
+                    if (current.isEmpty()) {
+                        // The for loop ended in a return statement, so we need to create a new basic block for the update
+                        current = Collections.singleton(ControlFlowNode.BasicBlock.create());
+                    }
                     // Now the update is invoked
                     if (control.getUpdate().isEmpty() || control.getUpdate().get(0) instanceof J.Empty) {
                         visit(control.getUpdate(), p);
