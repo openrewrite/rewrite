@@ -887,13 +887,13 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract int start();
                 abstract boolean theTest();
-                int test() /*~~(BB: 2 CN: 1 EX: 1 | 1L)~~>*/{
+                int test() /*~~(BB: 3 CN: 1 EX: 1 | 1L)~~>*/{
                     int x = start();
                     x++;
                     for (;;) /*~~(2L)~~>*/{
                         x += 2;
                     }
-                    return 5;
+                    return /*~~(3L)~~>*/5;
                 }
             }
             """
@@ -934,6 +934,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("UnnecessaryContinue")
     @Test
     fun `for loop nested branching with continue`() = rewriteRun(
         java(
@@ -1494,6 +1495,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("UnnecessaryBoxing", "CachedNumberConstructorCall", "deprecation", "KotlinRedundantDiagnosticSuppress")
     @Test
     fun `objects print`() = rewriteRun(
         java(
@@ -1516,6 +1518,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("StatementWithEmptyBody")
     @Test
     fun `identifies control flow with missing type information`() = rewriteRun(
         { spec -> spec.typeValidationOptions(TypeValidation.none()) },
@@ -1599,6 +1602,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("IOStreamConstructor")
     @Test
     fun `example code`() = rewriteRun(
         java(
@@ -1718,6 +1722,7 @@ interface ControlFlowTest : RewriteTest {
         )
     )
 
+    @Suppress("RedundantOperationOnEmptyContainer", "UnnecessaryContinue", "UnnecessaryLabelOnContinueStatement")
     @Test
     fun `byte-buddy minimal replica` () = rewriteRun(
         java(
@@ -2014,6 +2019,41 @@ interface ControlFlowTest : RewriteTest {
                     int doSomething();
                     int doSomethingElse();
                     int doAThirdThing();
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    @Suppress("InfiniteLoopStatement")
+    fun `for loop with continue then another conditional`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean conditional();
+                abstract String entry();
+                void test() {
+                    for (;;) {
+                        if (("/" + entry()).endsWith("/pom.xml")) continue;
+                        if (conditional()) {
+                            System.out.println("Hello!");
+                        }
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean conditional();
+                abstract String entry();
+                void test() /*~~(BB: 5 CN: 3 EX: 1 | 1L)~~>*/{
+                    for (;;) /*~~(2L)~~>*/{
+                        if (/*~~(1C)~~>*/("/" + entry()).endsWith("/pom.xml")) /*~~(3L)~~>*/continue;
+                        /*~~(4L)~~>*/if (/*~~(2C)~~>*/conditional()) /*~~(5L)~~>*/{
+                            System.out.println("Hello!");
+                        }
+                    }
                 }
             }
             """

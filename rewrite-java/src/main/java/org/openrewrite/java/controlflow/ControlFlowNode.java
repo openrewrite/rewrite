@@ -156,11 +156,11 @@ public abstract class ControlFlowNode {
             return Optional.empty();
         }
 
-        private boolean isAlwaysTrue() {
+        boolean isAlwaysTrue() {
             return asBooleanLiteralValue().orElse(false);
         }
 
-        private boolean isAlwaysFalse() {
+        boolean isAlwaysFalse() {
             return asBooleanLiteralValue().map(b -> !b).orElse(false);
         }
 
@@ -228,7 +228,14 @@ public abstract class ControlFlowNode {
 
         @Override
         String toVisualizerString() {
-            return condition.getValue().toString();
+            J condition = this.condition.getValue();
+            if (condition instanceof J.Literal) {
+                J.Literal literal = (J.Literal) condition;
+                if (literal.getValue() instanceof Boolean) {
+                    return literal.getValue().toString();
+                }
+            }
+            return condition.toString();
         }
 
         @Override
