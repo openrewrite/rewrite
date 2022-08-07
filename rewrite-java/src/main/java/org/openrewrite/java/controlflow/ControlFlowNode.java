@@ -54,9 +54,8 @@ public abstract class ControlFlowNode {
     }
 
     <C extends ControlFlowNode> C addSuccessor(C successor) {
-        if (this == successor && !(this instanceof ConditionNode)) {
-            // Self loops are allowed in one case only:
-            // while(conditional());
+        Objects.requireNonNull(successor, "successor must not be null");
+        if (this == successor) {
             throw new ControlFlowIllegalStateException("Cannot add a node as a successor of itself", this);
         }
         _addSuccessorInternal(successor);
@@ -109,6 +108,7 @@ public abstract class ControlFlowNode {
 
         private final Cursor condition;
         private final boolean truthFirst;
+
         /**
          * The successor that will be evaluated if the {@link #condition} is true.
          */

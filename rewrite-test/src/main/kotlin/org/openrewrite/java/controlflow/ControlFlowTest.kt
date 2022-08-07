@@ -110,7 +110,7 @@ interface ControlFlowTest : RewriteTest {
                     x++;
                     if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         int y = 3;
-                    } else /*~~(3L)~~>*/{
+                    } /*~~(3L)~~>*/else {
                         int y = 5;
                     }
                 }
@@ -145,7 +145,7 @@ interface ControlFlowTest : RewriteTest {
                     x++;
                     if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         int y = 3;
-                    } else /*~~(3L)~~>*/{
+                    } /*~~(3L)~~>*/else {
                         int y = 5;
                     }
                     /*~~(4L)~~>*/x++;
@@ -186,10 +186,10 @@ interface ControlFlowTest : RewriteTest {
                     if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         if (/*~~(2C (==))~~>*/x == 1) /*~~(3L)~~>*/{
                             int y = 2;
-                        } else /*~~(4L)~~>*/{
+                        } /*~~(4L)~~>*/else {
                             int y = 5;
                         }
-                    } else /*~~(5L)~~>*/{
+                    } /*~~(5L)~~>*/else {
                         int y = 5;
                     }
                     /*~~(6L)~~>*/x++;
@@ -224,7 +224,7 @@ interface ControlFlowTest : RewriteTest {
                     x++;
                     if (/*~~(1C (==))~~>*/x == 1) /*~~(2L)~~>*/{
                         return 2;
-                    } else /*~~(3L)~~>*/{
+                    } /*~~(3L)~~>*/else {
                         return 5;
                     }
                 }
@@ -949,7 +949,7 @@ interface ControlFlowTest : RewriteTest {
                         if (i > 5) {
                             if (i * 2 < 50) {
                                 index += 1;
-                            } else  {
+                            } else {
                                 continue;
                             }
                         }
@@ -967,7 +967,7 @@ interface ControlFlowTest : RewriteTest {
                         if (/*~~(2C (>))~~>*/i > 5) /*~~(4L)~~>*/{
                             if (/*~~(3C (<))~~>*/i * 2 < 50) /*~~(5L)~~>*/{
                                 index += 1;
-                            } else  /*~~(6L)~~>*/{
+                            } /*~~(6L)~~>*/else {
                                 continue;
                             }
                         }
@@ -1088,7 +1088,7 @@ interface ControlFlowTest : RewriteTest {
                         String o = n;
                         System.out.println(o);
                         String p = o;
-                    } else /*~~(3L)~~>*/{
+                    } /*~~(3L)~~>*/else {
                         System.out.println(n);
                     }
                 }
@@ -1742,7 +1742,7 @@ interface ControlFlowTest : RewriteTest {
                         }
                         if (i * 2 < 50) {
                             index += 1;
-                        } else  {
+                        } else {
                             continue top;
                         }
                     }
@@ -1764,7 +1764,7 @@ interface ControlFlowTest : RewriteTest {
                         }
                         /*~~(5L)~~>*/if (/*~~(2C (<))~~>*/i * 2 < 50) /*~~(6L)~~>*/{
                             index += 1;
-                        } else  /*~~(7L)~~>*/{
+                        } /*~~(7L)~~>*/else {
                             continue top;
                         }
                     }
@@ -1791,8 +1791,8 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract boolean condition();
 
-                void test() /*~~(BB: 1 CN: 1 EX: 1 | 1L)~~>*/{
-                    while (/*~~(1C)~~>*/condition());
+                void test() /*~~(BB: 2 CN: 1 EX: 1 | 1L)~~>*/{
+                    while (/*~~(1C)~~>*/condition())/*~~(2L)~~>*/;
                 }
             }
             """
@@ -1818,8 +1818,8 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean condition();
                 abstract boolean otherCondition();
 
-                void test() /*~~(BB: 2 CN: 2 EX: 2 | 1L)~~>*/{
-                    while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition());
+                void test() /*~~(BB: 3 CN: 2 EX: 1 | 1L)~~>*/{
+                    while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition())/*~~(3L)~~>*/;
                 }
             }
             """
@@ -1846,8 +1846,8 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean condition();
                 abstract boolean otherCondition();
                 abstract boolean thirdCondition();
-                void test() /*~~(BB: 3 CN: 3 EX: 2 | 1L)~~>*/{
-                    while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition() && /*~~(3L | 3C)~~>*/thirdCondition());
+                void test() /*~~(BB: 4 CN: 3 EX: 1 | 1L)~~>*/{
+                    while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition() && /*~~(3L | 3C)~~>*/thirdCondition())/*~~(4L)~~>*/;
                 }
             }
             """
@@ -1925,21 +1925,21 @@ interface ControlFlowTest : RewriteTest {
             import java.util.jar.JarInputStream;
             import java.util.jar.Manifest;
             class Test {
-                private String getCommit(final URL jarURL) /*~~(BB: 7 CN: 4 EX: 2 | 1L)~~>*/{
+                private String getCommit(final URL jarURL) /*~~(BB: 8 CN: 4 EX: 2 | 1L)~~>*/{
                     try {
                         final JarInputStream in = new JarInputStream(jarURL.openStream());
                         in.close();
                         Manifest manifest = in.getManifest();
                         if (/*~~(1C (==))~~>*/manifest == null)
-                            /*~~(2L)~~>*/for (;;) /*~~(3L)~~>*/{
+                            /*~~(2L)~~>*/for (;;/*~~(3L)~~>*/) /*~~(4L)~~>*/{
                                 final JarEntry entry = in.getNextJarEntry();
-                                if (/*~~(2C (==))~~>*/entry == null) return /*~~(4L)~~>*/null;
-                                /*~~(5L)~~>*/if (/*~~(3C)~~>*/entry.getName().equals("META-INF/MANIFEST.MF")) /*~~(6L)~~>*/{
+                                if (/*~~(2C (==))~~>*/entry == null) return /*~~(5L)~~>*/null;
+                                /*~~(6L)~~>*/if (/*~~(3C)~~>*/entry.getName().equals("META-INF/MANIFEST.MF")) /*~~(7L)~~>*/{
                                     manifest = new Manifest(in);
                                     break;
                                 }
                             }
-                        final /*~~(7L)~~>*/Attributes attributes = manifest.getMainAttributes();
+                        final /*~~(8L)~~>*/Attributes attributes = manifest.getMainAttributes();
                         return attributes.getValue(new Attributes.Name("Implementation-Build"));
                     } catch (IOException e) {
                         return null;
@@ -2047,12 +2047,80 @@ interface ControlFlowTest : RewriteTest {
             abstract class Test {
                 abstract boolean conditional();
                 abstract String entry();
-                void test() /*~~(BB: 5 CN: 3 EX: 1 | 1L)~~>*/{
-                    for (;;) /*~~(2L)~~>*/{
-                        if (/*~~(1C)~~>*/("/" + entry()).endsWith("/pom.xml")) /*~~(3L)~~>*/continue;
-                        /*~~(4L)~~>*/if (/*~~(2C)~~>*/conditional()) /*~~(5L)~~>*/{
+                void test() /*~~(BB: 6 CN: 3 EX: 1 | 1L)~~>*/{
+                    for (;;/*~~(2L)~~>*/) /*~~(3L)~~>*/{
+                        if (/*~~(1C)~~>*/("/" + entry()).endsWith("/pom.xml")) /*~~(4L)~~>*/continue;
+                        /*~~(5L)~~>*/if (/*~~(2C)~~>*/conditional()) /*~~(6L)~~>*/{
                             System.out.println("Hello!");
                         }
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Suppress("StatementWithEmptyBody")
+    @Test
+    fun `if with JEmpty then`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean conditional();
+                abstract boolean conditional2();
+                abstract String entry();
+                void test() {
+                    if (conditional());
+                    if (conditional2()) {
+                        System.out.println("Goodbye!");
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean conditional();
+                abstract boolean conditional2();
+                abstract String entry();
+                void test() /*~~(BB: 4 CN: 2 EX: 2 | 1L)~~>*/{
+                    if (/*~~(1C)~~>*/conditional())/*~~(2L)~~>*/;
+                    /*~~(3L)~~>*/if (/*~~(2C)~~>*/conditional2()) /*~~(4L)~~>*/{
+                        System.out.println("Goodbye!");
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Suppress("StatementWithEmptyBody")
+    @Test
+    fun `if with JEmpty then and JEmpty else`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract boolean conditional();
+                abstract boolean conditional2();
+                abstract String entry();
+                void test() {
+                    if (conditional());
+                    else;
+                    if (conditional2()) {
+                        System.out.println("Goodbye!");
+                    }
+                }
+            }
+            """,
+            """
+            abstract class Test {
+                abstract boolean conditional();
+                abstract boolean conditional2();
+                abstract String entry();
+                void test() /*~~(BB: 5 CN: 2 EX: 2 | 1L)~~>*/{
+                    if (/*~~(1C)~~>*/conditional())/*~~(2L)~~>*/;
+                    /*~~(3L)~~>*/else;
+                    /*~~(4L)~~>*/if (/*~~(2C)~~>*/conditional2()) /*~~(5L)~~>*/{
+                        System.out.println("Goodbye!");
                     }
                 }
             }

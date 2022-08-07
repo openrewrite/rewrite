@@ -17,12 +17,13 @@ package org.openrewrite.java.controlflow;
 
 import lombok.AllArgsConstructor;
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.List;
 
 @AllArgsConstructor
@@ -192,6 +193,12 @@ final class ControlFlowJavaPrinter<P> extends JavaPrinter<P> {
     }
 
     @Override
+    public J visitElse(J.If.Else elze, PrintOutputCapture<P> p) {
+        maybeEnableOrDisable(elze, p);
+        return super.visitElse(elze, p);
+    }
+
+    @Override
     public J visitInstanceOf(J.InstanceOf instanceOf, PrintOutputCapture<P> p) {
         maybeEnableOrDisable(instanceOf, p);
         return super.visitInstanceOf(instanceOf, p);
@@ -299,6 +306,24 @@ final class ControlFlowJavaPrinter<P> extends JavaPrinter<P> {
         return super.visitWhileLoop(whileLoop, p);
     }
 
+    @Override
+    public J visitEmpty(J.Empty empty, PrintOutputCapture<P> pPrintOutputCapture) {
+        J.MethodInvocation maybeParent = getCursor().firstEnclosing(J.MethodInvocation.class);
+        if (maybeParent != null && maybeParent.getArguments().contains(empty)) {
+            return super.visitEmpty(empty, pPrintOutputCapture);
+        }
+        maybeEnableOrDisable(empty, pPrintOutputCapture);
+        return super.visitEmpty(
+                empty.withPrefix(
+                        Space.build(
+                                " ",
+                                ListUtils.concat(empty.getComments(), new TextComment(true, "Empty", "", Markers.EMPTY))
+                        )
+                ),
+                pPrintOutputCapture
+        );
+    }
+
     static class ControlFlowPrintOutputCapture<P> extends PrintOutputCapture<P> {
         boolean enabled = false;
 
@@ -351,6 +376,7 @@ final class ControlFlowJavaPrinter<P> extends JavaPrinter<P> {
             castPrint(p).disable();
         }
     }
+
     private static <P> ControlFlowPrintOutputCapture<P> castPrint(PrintOutputCapture<P> print) {
         return (ControlFlowPrintOutputCapture<P>) print;
     }

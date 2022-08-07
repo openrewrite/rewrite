@@ -142,8 +142,20 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
 
-        private String labelDescription(Expression e) {
-            String tag = labelTag(e);
+        @Override
+        public J.If.Else visitElse(J.If.Else elze, P p) {
+            if (nodeToBlock.containsKey(elze)) {
+                ControlFlowNode b = nodeToBlock.get(elze);
+                assert b != null;
+                int number = nodeNumbers.computeIfAbsent(b, __ -> ++nodeNumber);
+                return elze.withMarkers(elze.getMarkers().searchResult(number + labelDescription(elze)));
+            } else {
+                return elze;
+            }
+        }
+
+        private String labelDescription(J j) {
+            String tag = labelTag(j);
             if (tag == null) {
                 return label;
             }
@@ -151,9 +163,9 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         @Nullable
-        private static String labelTag(Expression e) {
-            if (e instanceof J.Binary) {
-                J.Binary binary = (J.Binary) e;
+        private static String labelTag(J j) {
+            if (j instanceof J.Binary) {
+                J.Binary binary = (J.Binary) j;
                 switch (binary.getOperator()) {
                     case And:
                         return "&&";
