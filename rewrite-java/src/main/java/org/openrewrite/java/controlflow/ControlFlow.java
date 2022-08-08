@@ -589,6 +589,7 @@ public final class ControlFlow {
             // This "fake" allows us to preserve some fundamental assumptions about the ControlFlowNode graph,
             // in particular that a given BasicBlock only has one successor
             addCursorToBasicBlock();
+            visit(forLoop.getControl(), p);
             ControlFlowAnalysis<P> controlAnalysis = new ControlFlowAnalysis<P>(current, graphType) {
                 @Override
                 public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
