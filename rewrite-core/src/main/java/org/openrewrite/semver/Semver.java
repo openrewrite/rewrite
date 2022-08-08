@@ -60,7 +60,7 @@ public class Semver {
         if (scanner.hasNext()) {
             return scanner.next();
         }
-        return "0";
+        return version;
     }
 
     @Incubating(since = "7.16.0")
@@ -76,6 +76,6 @@ public class Semver {
                 return minor;
             }
         }
-        return "0";
+        return version;
     }
 }
