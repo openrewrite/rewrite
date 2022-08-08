@@ -60,40 +60,41 @@ interface ControlFlowDotFileViewerTest : RewriteTest  {
             public class Test {
                 /*~~(digraph main {
                 rankdir = TB;
-                0 [shape=circle, label="Start"];
-                1 [shape=box, label="    {\l        System.out.println(\"buz\");\l    } while (j++ < 10);\l}"];
-                2 [shape=diamond, label="Arrays.asList(args).iterator().hasNext()"];
-                3 [shape=box, label="System.out.println(arg);\lif (i == 5)\l                   "];
-                4 [shape=diamond, label="\"buz\".equals(arg)"];
-                5 [shape=diamond, label="\"fiz\".equals(arg)"];
-                6 [shape=diamond, label="i < 10"];
-                7 [shape=diamond, label="i == 5"];
-                8 [shape=box, label="if (\"buz\".equals(arg))\l                   "];
-                9 [shape=box, label="int j = 0;\ldo\l                   "];
-                10 [shape=diamond, label="j++ < 10"];
-                11 [shape=box, label="{\l    System.out.println(\"buz\");\l    continue;\l}"];
-                12 [shape=box, label="{\l    System.out.println(\"fiz\");\l}"];
-                13 [shape=box, label="{\l    break;\l}"];
-                14 [shape=box, label="{\l    i++;\l    for(             args)\l     "];
-                15 [shape=box, label="{\l    if (\"fiz\".equals(arg))\l                       "];
-                16 [shape=box, label="{\l    int i = 0;\l    while (i < 10)\l     "];
-                17 [shape=circle, label="End"];
+                edge [fontname=Arial];
+                0 [shape=circle, label="Start", fontname="Arial"];
+                1 [shape=box, label="    {\l        System.out.println(\"buz\");\l    } while (j++ < 10);\l}\l", fontname="Courier"];
+                2 [shape=diamond, label="Arrays.asList(args).iterator().hasNext()", fontname="Courier"];
+                3 [shape=box, label="System.out.println(arg);\lif (i == 5)\l                   \l", fontname="Courier"];
+                4 [shape=diamond, label="\"buz\".equals(arg)", fontname="Courier"];
+                5 [shape=diamond, label="\"fiz\".equals(arg)", fontname="Courier"];
+                6 [shape=diamond, label="i < 10", fontname="Courier"];
+                7 [shape=diamond, label="i == 5", fontname="Courier"];
+                8 [shape=box, label="if (\"buz\".equals(arg))\l                   \l", fontname="Courier"];
+                9 [shape=box, label="int j = 0;\ldo\l                   \l", fontname="Courier"];
+                10 [shape=diamond, label="j++ < 10", fontname="Courier"];
+                11 [shape=box, label="{\l    System.out.println(\"buz\");\l    continue;\l}\l", fontname="Courier"];
+                12 [shape=box, label="{\l    System.out.println(\"fiz\");\l}\l", fontname="Courier"];
+                13 [shape=box, label="{\l    break;\l}\l", fontname="Courier"];
+                14 [shape=box, label="{\l    i++;\l    for(             args)\l     \l", fontname="Courier"];
+                15 [shape=box, label="{\l    if (\"fiz\".equals(arg))\l                       \l", fontname="Courier"];
+                16 [shape=box, label="{\l    int i = 0;\l    while (i < 10)\l     \l", fontname="Courier"];
+                17 [shape=circle, label="End", fontname="Arial"];
                 0 -> 16;
                 1 -> 10;
-                2 -> 15 [label="True", color="green" fontcolor="green"];
+                2 -> 15 [label="True", color="darkgreen" fontcolor="darkgreen"];
                 2 -> 6 [label="False", color="red" fontcolor="red"];
                 3 -> 7;
-                4 -> 11 [label="True", color="green" fontcolor="green"];
+                4 -> 11 [label="True", color="darkgreen" fontcolor="darkgreen"];
                 4 -> 9 [label="False", color="red" fontcolor="red"];
-                5 -> 12 [label="True", color="green" fontcolor="green"];
+                5 -> 12 [label="True", color="darkgreen" fontcolor="darkgreen"];
                 5 -> 3 [label="False", color="red" fontcolor="red"];
-                6 -> 14 [label="True", color="green" fontcolor="green"];
+                6 -> 14 [label="True", color="darkgreen" fontcolor="darkgreen"];
                 6 -> 17 [label="False", color="red" fontcolor="red"];
-                7 -> 13 [label="True", color="green" fontcolor="green"];
+                7 -> 13 [label="True", color="darkgreen" fontcolor="darkgreen"];
                 7 -> 8 [label="False", color="red" fontcolor="red"];
                 8 -> 4;
                 9 -> 1;
-                10 -> 1 [label="True", color="green" fontcolor="green"];
+                10 -> 1 [label="True", color="darkgreen" fontcolor="darkgreen"];
                 10 -> 2 [label="False", color="red" fontcolor="red"];
                 11 -> 2;
                 12 -> 3;
@@ -101,6 +102,9 @@ interface ControlFlowDotFileViewerTest : RewriteTest  {
                 14 -> 2;
                 15 -> 5;
                 16 -> 6;
+                {rank="src";0};
+                {rank="sink";17};
+
             })~~>*/public static void main(String[] args) /*~~(BB: 10 CN: 6 EX: 1 | 1L)~~>*/{
                     int i = 0;
                     while (/*~~(1C (<))~~>*/i < 10) /*~~(2L)~~>*/{
