@@ -36,4 +36,21 @@ class HclCommentTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun commentCrlf() = rewriteRun(
+        hcl(
+            """
+                # test
+                /*
+                 multiline
+                */
+                resource {
+                    # test
+                    // test
+                    a = 1
+                }
+            """.replace("\r\n", "\n").replace("\n", "\r\n")
+        )
+    )
 }
