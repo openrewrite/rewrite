@@ -104,7 +104,6 @@ interface ControlFlowDotFileViewerTest : RewriteTest  {
                 16 -> 6;
                 {rank="src";0};
                 {rank="sink";17};
-
             })~~>*/public static void main(String[] args) /*~~(BB: 10 CN: 6 EX: 1 | 1L)~~>*/{
                     int i = 0;
                     while (/*~~(1C (<))~~>*/i < 10) /*~~(2L)~~>*/{
