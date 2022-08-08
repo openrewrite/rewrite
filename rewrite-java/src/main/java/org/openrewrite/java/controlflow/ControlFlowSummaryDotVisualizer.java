@@ -45,11 +45,15 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
             ControlFlowNode node = toNodeText.node;
             String nodeText = toNodeText.nodeText;
             abstractToVisualNodeMapping.put(node, i);
-            if (toNodeText.nodeText.equals("Start") && getShape(toNodeText.getNode()).equals("circle")) {
-                vizSrc = i;
-            }
-            if (toNodeText.nodeText.equals("End") && getShape(toNodeText.getNode()).equals("circle")) {
-                vizSink = i;
+            if (node instanceof ControlFlowNode.GraphTerminator) {
+                ControlFlowNode.GraphTerminator terminator = (ControlFlowNode.GraphTerminator) node;
+                if (terminator.getGraphType().equals(ControlFlowNode.GraphType.METHOD_BODY_OR_STATIC_INITIALIZER_OR_INSTANCE_INITIALIZER)) {
+                    if (node instanceof ControlFlowNode.Start) {
+                        vizSrc = i;
+                    } else if (node instanceof ControlFlowNode.End) {
+                        vizSink = i;
+                    }
+                }
             }
             final String shape = getShape(node);
             final String fontName = getFont(node);
