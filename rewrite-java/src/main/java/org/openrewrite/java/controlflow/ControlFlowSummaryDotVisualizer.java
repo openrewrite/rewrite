@@ -28,7 +28,8 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
     @Override
     public String visualizeAsDotfile(String name, ControlFlowSummary summary) {
         StringBuilder sb = new StringBuilder("digraph ").append(name).append(" {\n");
-        sb.append("    rankdir = TB;");
+        sb.append("    rankdir = TB;\n");
+        sb.append("    edge [fontname=Arial];");
         final Map<ControlFlowNode, Integer> abstractToVisualNodeMapping = new IdentityHashMap<>(summary.getAllNodes().size());
         // Create a predictable iteration order to make unit tests consistent
         List<NodeToNodeText> nodeToNodeText =
@@ -38,26 +39,39 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
                         .map(NodeToNodeText::new)
                         .sorted()
                         .collect(Collectors.toList());
+        int vizSrc = -1, vizSink = -1;
         for (int i = 0; i < nodeToNodeText.size(); i++) {
             NodeToNodeText toNodeText = nodeToNodeText.get(i);
             ControlFlowNode node = toNodeText.node;
             String nodeText = toNodeText.nodeText;
             abstractToVisualNodeMapping.put(node, i);
+            if (toNodeText.nodeText.equals("Start") && getShape(toNodeText.getNode()).equals("circle")) {
+                vizSrc = i;
+            }
+            if (toNodeText.nodeText.equals("End") && getShape(toNodeText.getNode()).equals("circle")) {
+                vizSink = i;
+            }
             final String shape = getShape(node);
-            sb.append("\n    ").append(i).append(" [shape=").append(shape).append(", label=\"").append(nodeText).append("\"];");
+            final String fontName = getFont(node);
+            sb.append("\n    ").append(i).append(" [shape=").append(shape)
+                    .append(", label=\"").append(nodeText)
+                    .append("\", fontname=\"").append(fontName)
+                    .append("\"];");
         }
 
         for (NodeToNodeText toNodeText : nodeToNodeText) {
             ControlFlowNode node = toNodeText.node;
             if (node instanceof ControlFlowNode.ConditionNode) {
                 ControlFlowNode.ConditionNode cn = (ControlFlowNode.ConditionNode) node;
-                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(cn.getTruthySuccessor()));
+                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node))
+                        .append(" -> ").append(abstractToVisualNodeMapping.get(cn.getTruthySuccessor()));
                 if (!cn.isAlwaysFalse()) {
-                    sb.append(" [label=\"True\", color=\"green\" fontcolor=\"green\"];");
+                    sb.append(" [label=\"True\", color=\"darkgreen\" fontcolor=\"darkgreen\"];");
                 } else {
                     sb.append(" [label=\"Unreachable\", color=\"grey\" fontcolor=\"grey\" style=dashed];");
                 }
-                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(cn.getFalsySuccessor()));
+                sb.append("\n    ").append(abstractToVisualNodeMapping.get(node))
+                        .append(" -> ").append(abstractToVisualNodeMapping.get(cn.getFalsySuccessor()));
                 if (!cn.isAlwaysTrue()) {
                     sb.append(" [label=\"False\", color=\"red\" fontcolor=\"red\"];");
                 } else {
@@ -65,9 +79,14 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
                 }
             } else {
                 for (ControlFlowNode successor : node.getSuccessors()) {
-                    sb.append("\n    ").append(abstractToVisualNodeMapping.get(node)).append(" -> ").append(abstractToVisualNodeMapping.get(successor)).append(";");
+                    sb.append("\n    ").append(abstractToVisualNodeMapping.get(node))
+                            .append(" -> ").append(abstractToVisualNodeMapping.get(successor)).append(";");
                 }
             }
+        }
+        if (vizSrc != -1 && vizSink != -1) {
+            sb.append("\n    {rank=\"src\";").append(vizSrc).append("};\n");
+            sb.append("    {rank=\"sink\";").append(vizSink).append("};");
         }
         sb.append('\n').append('}');
         return sb.toString();
@@ -84,7 +103,13 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
 
         NodeToNodeText(ControlFlowNode node) {
             this.node = node;
-            this.nodeText = node.toVisualizerString().replace("\"", "\\\"").replace("\n", "\\l");
+            if (node instanceof ControlFlowNode.BasicBlock) {
+                this.nodeText = node.toVisualizerString().replace("\"", "\\\"")
+                        .replace("\n", "\\l") + "\\l";
+            } else {
+                this.nodeText = node.toVisualizerString().replace("\"", "\\\"");
+            }
+
         }
 
         /**
@@ -133,6 +158,14 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
             return "diamond";
         } else {
             return "box";
+        }
+    }
+
+    private static String getFont(ControlFlowNode node) {
+        if (node instanceof ControlFlowNode.Start || node instanceof ControlFlowNode.End) {
+            return "Arial";
+        } else {
+            return "Courier";
         }
     }
 }
