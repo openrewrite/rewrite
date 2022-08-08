@@ -41,15 +41,42 @@ class CobolNistTest : RewriteTest {
     @Disabled
     @Test
     fun continuationLine() = rewriteRun(
-        cobol("""
+        cobol(
+            """
             IDENTIFICATION DIVISION.                                     
             PROGRAM-ID. communicationSection.                            
             DATA DIVISION.                                               
             WORKING-STORAGE                                              
-           -SECTION.                                                     
+           -               
+           -     SECTION.                                                
             01  CCVS-C-1.                                                
-            02 FILLER  PIC IS X(99)    VALUE IS " FEATURE PASS".          
+            02 FILLER  PIC IS X(99)      
+           -               VALUE 
+           -  IS                                             
+           -   " FEATURE PASS"
+           -     .                                           
             02 FILLER                     PIC X(20)    VALUE SPACE.      
-        """.trimIndent())
+        """.trimIndent()
+        )
+    )
+
+    @Disabled
+    @Test
+    fun continuationStringLiteral() = rewriteRun(
+        cobol(
+            """
+             IDENTIFICATION  DIVISION.                                        
+             PROGRAM-ID. MIXEDCONTLINES.                                      
+             PROCEDURE DIVISION.                                              
+                     IF  SOME-DAT                                             
+                         DISPLAY '-------------------------------------------' 
+            -                    '-------------------------------------'       
+            -                                                 
+            -'---------------------------------------------------------'      
+            -                    '-------------------------------------'      
+                     END-IF.                                                  
+                 EXIT.                                                        
+            """.trimIndent()
+        )
     )
 }

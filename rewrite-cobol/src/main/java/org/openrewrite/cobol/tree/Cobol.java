@@ -173,13 +173,13 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String not;
+        CobolWord not;
 
         @Nullable
         RelationalOperator relationalOperator;
 
         @Nullable
-        String leftParen;
+        CobolWord leftParen;
 
         Cobol arithmeticExpression;
 
@@ -187,7 +187,7 @@ public interface Cobol extends Tree {
         Cobol abbreviation;
 
         @Nullable
-        String rightParen;
+        CobolWord rightParen;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -195,98 +195,32 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Accept implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String accept;
-
-        @Getter
-        @With
+        CobolWord accept;
         Identifier identifier;
-
-        @Getter
-        @With
         Cobol operation;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onExceptionClause;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notOnExceptionClause;
 
         @Nullable
-        CobolLeftPadded<String> endAccept;
+        CobolWord endAccept;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitAccept(this, p);
-        }
-
-        @Nullable
-        public String getEndAccept() {
-            return endAccept == null ? null : endAccept.getElement();
-        }
-
-        public Accept withEndAccept(@Nullable String endAccept) {
-            if (endAccept == null) {
-                return this.endAccept == null ? this : new Accept(id, prefix, markers, accept, identifier, operation, onExceptionClause, notOnExceptionClause, null);
-            }
-            return getPadding().withEndAccept(CobolLeftPadded.withElement(this.endAccept, endAccept));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Accept t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndAccept() {
-                return t.endAccept;
-            }
-
-            public Accept withEndAccept(@Nullable CobolLeftPadded<String> endAccept) {
-                return t.endAccept == endAccept ? t : new Accept(t.padding, t.id, t.prefix, t.markers, t.accept, t.identifier, t.operation, t.onExceptionClause, t.notOnExceptionClause, endAccept);
-            }
         }
     }
 
@@ -299,7 +233,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -316,7 +250,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String from;
+        CobolWord from;
 
         Identifier mnemonicName;
 
@@ -335,7 +269,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -352,7 +286,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -370,7 +304,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -378,89 +312,28 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Add implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String add;
-
-        @Getter
-        @With
+        CobolWord add;
         Cobol operation;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onSizeError;
 
         @Nullable
-        CobolLeftPadded<String> endAdd;
+        CobolWord endAdd;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitAdd(this, p);
-        }
-
-        @Nullable
-        public String getEndAdd() {
-            return endAdd == null ? null : endAdd.getElement();
-        }
-
-        public Add withEndAdd(@Nullable String endAdd) {
-            if (endAdd == null) {
-                return this.endAdd == null ? this : new Add(id, prefix, markers, add, operation, onSizeError, null);
-            }
-            return getPadding().withEndAdd(CobolLeftPadded.withElement(this.endAdd, endAdd));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Add t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndAdd() {
-                return t.endAdd;
-            }
-
-            public Add withEndAdd(@Nullable CobolLeftPadded<String> endAdd) {
-                return t.endAdd == endAdd ? t : new Add(t.padding, t.id, t.prefix, t.markers, t.add, t.operation, t.onSizeError, endAdd);
-            }
         }
     }
 
@@ -599,20 +472,20 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
-        CobolLeftPadded<String> dot;
+        CobolLeftPadded<CobolWord> dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitAlteredGoTo(this, p);
         }
 
-        public String getDot() {
+        public CobolWord getDot() {
             return dot.getElement();
         }
 
-        public AlteredGoTo withDot(String dot) {
+        public AlteredGoTo withDot(CobolWord dot) {
             //noinspection ConstantConditions
             return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
@@ -636,115 +509,35 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final AlteredGoTo t;
 
-            public CobolLeftPadded<String> getDot() {
+            public CobolLeftPadded<CobolWord> getDot() {
                 return t.dot;
             }
 
-            public AlteredGoTo withDot(CobolLeftPadded<String> dot) {
+            public AlteredGoTo withDot(CobolLeftPadded<CobolWord> dot) {
                 return t.dot == dot ? t : new AlteredGoTo(t.padding, t.id, t.prefix, t.markers, t.words, dot);
             }
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class AlphabetClause implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        @Getter
-        @With
-        Identifier name;
+        CobolWord alphabet;
+        Name name;
 
         @Nullable
-        CobolLeftPadded<String> standard;
-
-        @Nullable
-        CobolContainer<AlphabetLiteral> literals;
+        List<Cobol> words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitAlphabetClause(this, p);
-        }
-
-        @Nullable
-        public String getStandard() {
-            return standard == null ? null : standard.getElement();
-        }
-
-        public AlphabetClause withStandard(@Nullable String standard) {
-            if (standard == null) {
-                return this.standard == null ? this : new AlphabetClause(id, prefix, markers, words, name, null, literals);
-            }
-            return getPadding().withStandard(CobolLeftPadded.withElement(this.standard, standard));
-        }
-
-        public List<Cobol.AlphabetLiteral> getLiterals() {
-            return literals.getElements();
-        }
-
-        public AlphabetClause withLiterals(List<Cobol.AlphabetLiteral> literals) {
-            return getPadding().withLiterals(this.literals.getPadding().withElements(CobolRightPadded.withElements(
-                    this.literals.getPadding().getElements(), literals)));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final AlphabetClause t;
-
-            @Nullable
-            public CobolLeftPadded<String> getStandard() {
-                return t.standard;
-            }
-
-            public AlphabetClause withStandard(@Nullable CobolLeftPadded<String> standard) {
-                return t.standard == standard ? t : new AlphabetClause(t.padding, t.id, t.prefix, t.markers, t.words, t.name, standard, t.literals);
-            }
-
-            @Nullable
-            public CobolContainer<Cobol.AlphabetLiteral> getLiterals() {
-                return t.literals;
-            }
-
-            public AlphabetClause withLiterals(@Nullable CobolContainer<Cobol.AlphabetLiteral> literals) {
-                return t.literals == literals ? t : new AlphabetClause(t.padding, t.id, t.prefix, t.markers, t.words, t.name, t.standard, literals);
-            }
         }
     }
 
@@ -836,7 +629,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Literal literal;
 
         @Override
@@ -870,7 +663,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Literal> literals;
 
@@ -926,13 +719,13 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String alternateWords;
+        CobolWord alternateWords;
         QualifiedDataName qualifiedDataName;
 
         @Nullable
         PasswordClause passwordClause;
 
-        String duplicates;
+        CobolWord duplicates;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -950,7 +743,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         ProcedureName from;
-        String words;
+        CobolWord words;
         ProcedureName to;
 
         @Override
@@ -968,7 +761,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         List<AlterProceedTo> alterProceedTo;
 
         @Override
@@ -1002,7 +795,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String logicalOperator;
+        CobolWord logicalOperator;
 
         @Getter
         @Nullable
@@ -1087,7 +880,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -1105,13 +898,13 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String firstWords;
+        CobolWord firstWords;
         CobolWord integerLiteral;
 
         @Nullable
         BlockContainsTo blockContainsTo;
 
-        String lastWords;
+        CobolWord lastWords;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -1128,7 +921,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String to;
+        CobolWord to;
         CobolWord integerLiteral;
 
         @Override
@@ -1162,7 +955,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> entries;
 
@@ -1234,7 +1027,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String cd;
+        CobolWord cd;
 
         @Getter
         @With
@@ -1242,7 +1035,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> inputs;
 
@@ -1314,7 +1107,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String cd;
+        CobolWord cd;
 
         @Getter
         @With
@@ -1322,7 +1115,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> outputs;
 
@@ -1394,7 +1187,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String cd;
+        CobolWord cd;
 
         @Getter
         @With
@@ -1402,7 +1195,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> initialIOs;
 
@@ -1449,109 +1242,40 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Call implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String call;
-
-        @Getter
-        @With
+        CobolWord call;
         Name identifier;
 
-        @Getter
         @Nullable
-        @With
         CallPhrase callUsingPhrase;
 
-        @Getter
         @Nullable
-        @With
         CallGivingPhrase callGivingPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onOverflowPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onExceptionClause;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notOnExceptionClause;
 
         @Nullable
-        CobolLeftPadded<String> endCall;
+        CobolWord endCall;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitCall(this, p);
-        }
-
-        @Nullable
-        public String getEndCall() {
-            return endCall == null ? null : endCall.getElement();
-        }
-
-        public Call withEndCall(@Nullable String endCall) {
-            if (endCall == null) {
-                return this.endCall == null ? this : new Call(id, prefix, markers, call, identifier, callUsingPhrase, callGivingPhrase, onOverflowPhrase, onExceptionClause, notOnExceptionClause, null);
-            }
-            return getPadding().withEndCall(CobolLeftPadded.withElement(this.endCall, endCall));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Call t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndCall() {
-                return t.endCall;
-            }
-
-            public Call withEndCall(@Nullable CobolLeftPadded<String> endCall) {
-                return t.endCall == endCall ? t : new Call(t.padding, t.id, t.prefix, t.markers, t.call, t.identifier, t.callUsingPhrase, t.callGivingPhrase, t.onOverflowPhrase, t.onExceptionClause, t.notOnExceptionClause, endCall);
-            }
         }
     }
 
@@ -1580,7 +1304,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> parameters;
 
@@ -1709,7 +1433,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name identifier;
 
         @Override
@@ -1727,7 +1451,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         Name identifier;
@@ -1763,7 +1487,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String cancel;
+        CobolWord cancel;
 
         CobolContainer<CancelCall> cancelCalls;
 
@@ -1824,7 +1548,7 @@ public interface Cobol extends Tree {
         Name libraryName;
 
         @Nullable
-        String by;
+        CobolWord by;
 
         @Nullable
         Identifier identifier;
@@ -1838,88 +1562,27 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class ChannelClause implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        @Getter
-        @With
+        CobolWord words;
         Literal literal;
 
         @Nullable
-        CobolLeftPadded<String> is;
+        CobolWord is;
 
-        @Getter
-        @With
         Identifier mnemonicName;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitChannelClause(this, p);
-        }
-
-        @Nullable
-        public String getIs() {
-            return is == null ? null : is.getElement();
-        }
-
-        public ChannelClause withIs(@Nullable String is) {
-            if (is == null) {
-                return this.is == null ? this : new ChannelClause(id, prefix, markers, words, literal, null, mnemonicName);
-            }
-            return getPadding().withIs(CobolLeftPadded.withElement(this.is, is));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ChannelClause t;
-
-            @Nullable
-            public CobolLeftPadded<String> getIs() {
-                return t.is;
-            }
-
-            public ChannelClause withIs(@Nullable CobolLeftPadded<String> is) {
-                return t.is == is ? t : new ChannelClause(t.padding, t.id, t.prefix, t.markers, t.words, t.literal, is, t.mnemonicName);
-            }
         }
     }
 
@@ -1948,7 +1611,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String clazz;
+        CobolWord clazz;
 
         @Getter
         @With
@@ -1956,7 +1619,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<ClassClauseThrough> throughs;
 
@@ -2035,7 +1698,7 @@ public interface Cobol extends Tree {
         Name name;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         @Nullable
         Name className;
@@ -2071,7 +1734,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String close;
+        CobolWord close;
 
         CobolContainer<CloseFile> closeFiles;
 
@@ -2147,7 +1810,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -2164,7 +1827,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -2197,7 +1860,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> closePortFileIOUsing;
 
@@ -2253,7 +1916,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -2270,8 +1933,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String associatedData;
-
+        CobolWord associatedData;
         Identifier identifier;
 
         @Override
@@ -2289,8 +1951,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
-
+        CobolWord words;
         Identifier identifier;
 
         @Override
@@ -2302,7 +1963,7 @@ public interface Cobol extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    public class CobolWord implements Literal, Identifier {
+    class CobolWord implements Literal, Identifier {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2341,7 +2002,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Identifier> alphabetName;
 
@@ -2407,7 +2068,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord alphabetName;
 
         @Override
@@ -2425,7 +2086,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Identifier alphabetName;
 
         @Override
@@ -2443,7 +2104,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord fileName;
 
         @Override
@@ -2477,13 +2138,13 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String compute;
+        CobolWord compute;
 
         CobolContainer<Roundable> roundables;
 
         @Getter
         @With
-        String equalWord;
+        CobolWord equalWord;
 
         @Getter
         @With
@@ -2499,7 +2160,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String endCompute;
+        CobolWord endCompute;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -2555,7 +2216,7 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String not;
+        CobolWord not;
 
         Cobol simpleCondition;
 
@@ -2778,7 +2439,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String leftParen;
+        CobolWord leftParen;
 
         @Getter
         @With
@@ -2786,7 +2447,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String rightParen;
+        CobolWord rightParen;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -2819,7 +2480,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> paragraphs;
 
@@ -2875,7 +2536,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -2908,14 +2569,14 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
         Literal literal;
 
         @Nullable
-        CobolLeftPadded<String> pictureSymbol;
+        CobolLeftPadded<CobolWord> pictureSymbol;
 
         @Getter
         @Nullable
@@ -2928,11 +2589,11 @@ public interface Cobol extends Tree {
         }
 
         @Nullable
-        public String getPictureSymbol() {
+        public CobolWord getPictureSymbol() {
             return pictureSymbol == null ? null : pictureSymbol.getElement();
         }
 
-        public CurrencyClause withPictureSymbol(@Nullable String pictureSymbol) {
+        public CurrencyClause withPictureSymbol(@Nullable CobolWord pictureSymbol) {
             if (pictureSymbol == null) {
                 return this.pictureSymbol == null ? this : new CurrencyClause(id, prefix, markers, words, literal, null, pictureSymbolLiteral);
             }
@@ -2959,11 +2620,11 @@ public interface Cobol extends Tree {
             private final CurrencyClause t;
 
             @Nullable
-            public CobolLeftPadded<String> getPictureSymbol() {
+            public CobolLeftPadded<CobolWord> getPictureSymbol() {
                 return t.pictureSymbol;
             }
 
-            public CurrencyClause withPictureSymbol(@Nullable CobolLeftPadded<String> pictureSymbol) {
+            public CurrencyClause withPictureSymbol(@Nullable CobolLeftPadded<CobolWord> pictureSymbol) {
                 return t.pictureSymbol == pictureSymbol ? t : new CurrencyClause(t.padding, t.id, t.prefix, t.markers, t.words, t.literal, pictureSymbol, t.pictureSymbolLiteral);
             }
         }
@@ -2994,7 +2655,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<DataBaseSectionEntry> entries;
 
@@ -3050,10 +2711,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String db;
-
+        CobolWord db;
         Literal from;
-        String invoke;
+        CobolWord invoke;
         Literal to;
 
         @Override
@@ -3087,7 +2747,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<DataDivisionSection> sections;
 
@@ -3159,28 +2819,18 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String level;
+        CobolWord level;
 
+        @Getter
         @Nullable
-        CobolLeftPadded<String> name;
+        @With
+        CobolWord name;
 
         CobolContainer<Cobol> clauses;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitDataDescriptionEntry(this, p);
-        }
-
-        @Nullable
-        public String getName() {
-            return name == null ? null : name.getElement();
-        }
-
-        public DataDescriptionEntry withName(@Nullable String name) {
-            if (name == null) {
-                return this.name == null ? this : new DataDescriptionEntry(id, prefix, markers, level, null, clauses);
-            }
-            return getPadding().withName(CobolLeftPadded.withElement(this.name, name));
         }
 
         public List<Cobol> getClauses() {
@@ -3210,15 +2860,6 @@ public interface Cobol extends Tree {
         @RequiredArgsConstructor
         public static class Padding {
             private final DataDescriptionEntry t;
-
-            @Nullable
-            public CobolLeftPadded<String> getName() {
-                return t.name;
-            }
-
-            public DataDescriptionEntry withName(@Nullable CobolLeftPadded<String> name) {
-                return t.name == name ? t : new DataDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.level, name, t.clauses);
-            }
 
             public CobolContainer<Cobol> getClauses() {
                 return t.clauses;
@@ -3255,7 +2896,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Picture> pictures;
 
@@ -3327,7 +2968,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Name> dataName;
 
@@ -3383,7 +3024,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String redefines;
+        CobolWord redefines;
         CobolWord dataName;
 
         @Override
@@ -3401,7 +3042,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String redefines;
+        CobolWord redefines;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3418,7 +3059,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String redefines;
+        CobolWord redefines;
         Literal literal;
 
         @Override
@@ -3436,7 +3077,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3453,7 +3094,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3470,7 +3111,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3487,7 +3128,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3504,7 +3145,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         Parenthesized parenthesized;
@@ -3524,7 +3165,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -3542,7 +3183,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3559,7 +3200,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         List<Cobol> cobols;
 
         @Override
@@ -3577,7 +3218,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3610,7 +3251,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String occurs;
+        CobolWord occurs;
 
         @Getter
         @With
@@ -3622,7 +3263,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String times;
+        CobolWord times;
 
         @Getter
         @Nullable
@@ -3685,7 +3326,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -3719,7 +3360,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<CobolWord> indexNames;
 
@@ -3791,7 +3432,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<QualifiedDataName> qualifiedDataNames;
 
@@ -3847,7 +3488,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String to;
+        CobolWord to;
         CobolWord integerLiteral;
 
         @Override
@@ -3865,7 +3506,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String aligned;
+        CobolWord aligned;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3882,7 +3523,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3899,7 +3540,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3916,11 +3557,11 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String renames;
+        CobolWord renames;
 
         QualifiedDataName fromName;
 
-        String through;
+        CobolWord through;
 
         @Nullable
         QualifiedDataName toName;
@@ -3940,7 +3581,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3957,7 +3598,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3974,7 +3615,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -3991,7 +3632,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -4008,7 +3649,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -4025,7 +3666,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -4042,7 +3683,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -4050,99 +3691,34 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Delete implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String delete;
-
-        @Getter
-        @With
+        CobolWord delete;
         Name fileName;
 
-        @Getter
         @Nullable
-        @With
-        String record;
+        CobolWord record;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase invalidKey;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notInvalidKey;
 
         @Nullable
-        CobolLeftPadded<String> endDelete;
+        CobolWord endDelete;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitDelete(this, p);
-        }
-
-        @Nullable
-        public String getEndDelete() {
-            return endDelete == null ? null : endDelete.getElement();
-        }
-
-        public Delete withEndDelete(@Nullable String endDelete) {
-            if (endDelete == null) {
-                return this.endDelete == null ? this : new Delete(id, prefix, markers, delete, fileName, record, invalidKey, notInvalidKey, null);
-            }
-            return getPadding().withEndDelete(CobolLeftPadded.withElement(this.endDelete, endDelete));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Delete t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndDelete() {
-                return t.endDelete;
-            }
-
-            public Delete withEndDelete(@Nullable CobolLeftPadded<String> endDelete) {
-                return t.endDelete == endDelete ? t : new Delete(t.padding, t.id, t.prefix, t.markers, t.delete, t.fileName, t.record, t.invalidKey, t.notInvalidKey, endDelete);
-            }
         }
     }
 
@@ -4155,7 +3731,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -4189,7 +3765,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String firstWords;
+        CobolWord firstWords;
 
         @Getter
         @With
@@ -4197,7 +3773,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String secondWords;
+        CobolWord secondWords;
 
         CobolContainer<CobolWord> indexNames;
 
@@ -4253,14 +3829,14 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String disable;
-        String type;
+        CobolWord disable;
+        CobolWord type;
         Name cdName;
 
         @Nullable
-        String with;
+        CobolWord with;
 
-        String key;
+        CobolWord key;
         Name keyName;
 
         @Override
@@ -4278,7 +3854,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String display;
+        CobolWord display;
         List<Name> operands;
 
         @Override
@@ -4287,103 +3863,35 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Divide implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String divide;
-
-        @Getter
-        @With
+        CobolWord divide;
         Name name;
-
-        @Getter
-        @With
         Cobol action;
 
-        @Getter
         @Nullable
-        @With
         DivideRemainder divideRemainder;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onSizeErrorPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notOnSizeErrorPhrase;
 
         @Nullable
-        CobolLeftPadded<String> endDivide;
+        CobolWord endDivide;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitDivide(this, p);
-        }
-
-        @Nullable
-        public String getEndDivide() {
-            return endDivide == null ? null : endDivide.getElement();
-        }
-
-        public Divide withEndDivide(@Nullable String endDivide) {
-            if (endDivide == null) {
-                return this.endDivide == null ? this : new Divide(id, prefix, markers, divide, name, action, divideRemainder, onSizeErrorPhrase, notOnSizeErrorPhrase, null);
-            }
-            return getPadding().withEndDivide(CobolLeftPadded.withElement(this.endDivide, endDivide));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Divide t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndDivide() {
-                return t.endDivide;
-            }
-
-            public Divide withEndDivide(@Nullable CobolLeftPadded<String> endDivide) {
-                return t.endDivide == endDivide ? t : new Divide(t.padding, t.id, t.prefix, t.markers, t.divide, t.name, t.action, t.divideRemainder, t.onSizeErrorPhrase, t.notOnSizeErrorPhrase, endDivide);
-            }
         }
     }
 
@@ -4412,7 +3920,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String into;
+        CobolWord into;
 
         CobolContainer<Roundable> roundable;
 
@@ -4468,7 +3976,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
         Name name;
 
         @Nullable
@@ -4505,7 +4013,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String giving;
+        CobolWord giving;
 
         CobolContainer<Roundable> roundable;
 
@@ -4561,7 +4069,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String remainder;
+        CobolWord remainder;
         Name name;
 
         @Override
@@ -4579,14 +4087,14 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String enable;
-        String type;
+        CobolWord enable;
+        CobolWord type;
         Name cdName;
 
         @Nullable
-        String with;
+        CobolWord with;
 
-        String key;
+        CobolWord key;
         Name keyName;
 
         @Override
@@ -4604,7 +4112,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name programName;
 
         @Override
@@ -4638,7 +4146,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String entry;
+        CobolWord entry;
 
         @Getter
         @With
@@ -4716,7 +4224,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> body;
 
@@ -4788,7 +4296,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String evaluate;
+        CobolWord evaluate;
 
         @Getter
         @With
@@ -4805,7 +4313,10 @@ public interface Cobol extends Tree {
         @With
         StatementPhrase whenOther;
 
-        CobolLeftPadded<String> endPhrase;
+        @Getter
+        @Nullable
+        @With
+        CobolWord endPhrase;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -4828,15 +4339,6 @@ public interface Cobol extends Tree {
         public Evaluate withWhenPhrase(List<Cobol.EvaluateWhenPhrase> whenPhrase) {
             return getPadding().withWhenPhrase(this.whenPhrase.getPadding().withElements(CobolRightPadded.withElements(
                     this.whenPhrase.getPadding().getElements(), whenPhrase)));
-        }
-
-        public String getEndPhrase() {
-            return endPhrase.getElement();
-        }
-
-        public Evaluate withEndPhrase(String endPhrase) {
-            //noinspection ConstantConditions
-            return getPadding().withEndPhrase(CobolLeftPadded.withElement(this.endPhrase, endPhrase));
         }
 
         public Padding getPadding() {
@@ -4875,14 +4377,6 @@ public interface Cobol extends Tree {
             public Evaluate withWhenPhrase(@Nullable CobolContainer<Cobol.EvaluateWhenPhrase> whenPhrase) {
                 return t.whenPhrase == whenPhrase ? t : new Evaluate(t.padding, t.id, t.prefix, t.markers, t.evaluate, t.select, t.alsoSelect, whenPhrase, t.whenOther, t.endPhrase);
             }
-
-            public CobolLeftPadded<String> getEndPhrase() {
-                return t.endPhrase;
-            }
-
-            public Evaluate withEndPhrase(CobolLeftPadded<String> endPhrase) {
-                return t.endPhrase == endPhrase ? t : new Evaluate(t.padding, t.id, t.prefix, t.markers, t.evaluate, t.select, t.alsoSelect, t.whenPhrase, t.whenOther, endPhrase);
-            }
         }
     }
 
@@ -4895,7 +4389,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String also;
+        CobolWord also;
         Cobol select;
 
         @Override
@@ -4913,7 +4407,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String also;
+        CobolWord also;
 
         EvaluateCondition condition;
 
@@ -4934,7 +4428,7 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         @Nullable
         Cobol condition;
@@ -4957,7 +4451,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String through;
+        CobolWord through;
         Cobol value;
 
         @Override
@@ -4977,7 +4471,7 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String not;
+        CobolWord not;
 
         Cobol value;
 
@@ -5015,7 +4509,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String when;
+        CobolWord when;
 
         @Getter
         @With
@@ -5386,7 +4880,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Identifier> operands;
 
@@ -5442,7 +4936,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -5459,7 +4953,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -5467,81 +4961,29 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class FileControlParagraph implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
 
-        @Getter
-        @With
         Markers markers;
 
-        @Getter
-        @With
-        String fileControl;
+        CobolWord fileControl;
 
         @Nullable
-        @Getter
-        @With
         List<Cobol> controlEntries;
 
         @Nullable
-        CobolLeftPadded<String> dot;
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitFileControlParagraph(this, p);
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public FileControlParagraph withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final FileControlParagraph t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public FileControlParagraph withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new FileControlParagraph(t.padding, t.id, t.prefix, t.markers, t.fileControl, t.controlEntries, dot);
-            }
         }
     }
 
@@ -5645,7 +5087,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
@@ -5728,7 +5170,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<FileDescriptionEntry> fileDescriptionEntry;
 
@@ -5800,7 +5242,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<QualifiedDataName> qualifiedDataNames;
 
@@ -5873,7 +5315,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String function;
+        CobolWord function;
 
         @Getter
         @With
@@ -5938,7 +5380,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String generate;
+        CobolWord generate;
         QualifiedDataName reportName;
 
         @Override
@@ -5956,7 +5398,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -5990,7 +5432,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         Cobol statement;
 
@@ -6028,7 +5470,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @Nullable
@@ -6079,160 +5521,52 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class IdentificationDivision implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        CobolLeftPadded<ProgramIdParagraph> programIdParagraph;
+        CobolWord words;
+        ProgramIdParagraph programIdParagraph;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitIdentificationDivision(this, p);
         }
-
-        public Cobol.ProgramIdParagraph getProgramIdParagraph() {
-            return programIdParagraph.getElement();
-        }
-
-        public IdentificationDivision withProgramIdParagraph(Cobol.ProgramIdParagraph programIdParagraph) {
-            //noinspection ConstantConditions
-            return getPadding().withProgramIdParagraph(CobolLeftPadded.withElement(this.programIdParagraph, programIdParagraph));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final IdentificationDivision t;
-
-            public CobolLeftPadded<Cobol.ProgramIdParagraph> getProgramIdParagraph() {
-                return t.programIdParagraph;
-            }
-
-            public IdentificationDivision withProgramIdParagraph(CobolLeftPadded<Cobol.ProgramIdParagraph> programIdParagraph) {
-                return t.programIdParagraph == programIdParagraph ? t : new IdentificationDivision(t.padding, t.id, t.prefix, t.markers, t.words, programIdParagraph);
-            }
-        }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class If implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
 
-        @Getter
-        @With
         Markers markers;
 
-        @Getter
-        @With
-        String word;
+        CobolWord word;
 
-        @Getter
-        @With
         Condition condition;
 
-        @Getter
-        @With
         IfThen ifThen;
 
-        @Getter
         @Nullable
-        @With
         IfElse ifElse;
 
-        CobolLeftPadded<String> endIf;
+        @Nullable
+        CobolWord endIf;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitIf(this, p);
-        }
-
-        public String getEndIf() {
-            return endIf.getElement();
-        }
-
-        public If withEndIf(String endIf) {
-            //noinspection ConstantConditions
-            return getPadding().withEndIf(CobolLeftPadded.withElement(this.endIf, endIf));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final If t;
-
-            public CobolLeftPadded<String> getEndIf() {
-                return t.endIf;
-            }
-
-            public If withEndIf(CobolLeftPadded<String> endIf) {
-                return t.endIf == endIf ? t : new If(t.padding, t.id, t.prefix, t.markers, t.word, t.condition, t.ifThen, t.ifElse, endIf);
-            }
         }
     }
 
@@ -6261,12 +5595,12 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String word;
+        CobolWord word;
 
         @Getter
         @Nullable
         @With
-        String nextSentence;
+        CobolWord nextSentence;
 
         @Nullable
         CobolContainer<Statement> statements;
@@ -6340,12 +5674,12 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String word;
+        CobolWord word;
 
         @Getter
         @Nullable
         @With
-        String nextSentence;
+        CobolWord nextSentence;
 
         @Nullable
         CobolContainer<Statement> statements;
@@ -6403,7 +5737,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -6421,7 +5755,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -6439,7 +5773,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -6457,7 +5791,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -6475,7 +5809,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -6493,7 +5827,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -6526,7 +5860,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String initialize;
+        CobolWord initialize;
 
         CobolContainer<Identifier> identifiers;
 
@@ -6603,7 +5937,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String replacing;
+        CobolWord replacing;
 
         CobolContainer<InitializeReplacingBy> initializeReplacingBy;
 
@@ -6659,7 +5993,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name identifier;
 
         @Override
@@ -6693,7 +6027,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String initiate;
+        CobolWord initiate;
 
         CobolContainer<QualifiedDataName> reportNames;
 
@@ -6765,7 +6099,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Nullable
         CobolContainer<Cobol> paragraphs;
@@ -6823,7 +6157,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String inspect;
+        CobolWord inspect;
         Identifier identifier;
         Cobol phrase;
 
@@ -6932,7 +6266,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String word;
+        CobolWord word;
 
         CobolContainer<InspectAllLeading> leadings;
 
@@ -6988,7 +6322,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name identifier;
 
         @Override
@@ -7006,7 +6340,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String by;
+        CobolWord by;
         Name identifier;
 
         @Override
@@ -7040,7 +6374,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String character;
+        CobolWord character;
 
         @Nullable
         CobolContainer<InspectBeforeAfter> inspections;
@@ -7114,7 +6448,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String converting;
+        CobolWord converting;
 
         @Getter
         @With
@@ -7200,7 +6534,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String word;
+        CobolWord word;
 
         CobolContainer<Cobol> inspects;
 
@@ -7272,7 +6606,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String word;
+        CobolWord word;
 
         CobolContainer<InspectReplacingAllLeading> inspections;
 
@@ -7422,7 +6756,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String word;
+        CobolWord word;
 
         @Getter
         @With
@@ -7500,7 +6834,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String word;
+        CobolWord word;
 
         CobolContainer<Cobol> inspections;
 
@@ -7572,7 +6906,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String tallying;
+        CobolWord tallying;
 
         CobolContainer<InspectFor> inspectFors;
 
@@ -7644,7 +6978,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String tallying;
+        CobolWord tallying;
 
         CobolContainer<InspectFor> inspectFors;
         CobolContainer<InspectReplacingPhrase> replacingPhrases;
@@ -7718,7 +7052,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String to;
+        CobolWord to;
         Name identifier;
 
         @Override
@@ -7752,9 +7086,11 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String iOControl;
+        CobolWord iOControl;
 
-        CobolLeftPadded<String> dot;
+        @Getter
+        @With
+        CobolWord dot;
 
         @Getter
         @Nullable
@@ -7764,7 +7100,7 @@ public interface Cobol extends Tree {
         @Getter
         @Nullable
         @With
-        String fileNameDot;
+        CobolWord fileNameDot;
 
         @Nullable
         CobolContainer<Cobol> clauses;
@@ -7772,15 +7108,6 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitIoControlParagraph(this, p);
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public IoControlParagraph withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public List<Cobol> getClauses() {
@@ -7810,14 +7137,6 @@ public interface Cobol extends Tree {
         @RequiredArgsConstructor
         public static class Padding {
             private final IoControlParagraph t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public IoControlParagraph withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new IoControlParagraph(t.padding, t.id, t.prefix, t.markers, t.iOControl, dot, t.fileName, t.fileNameDot, t.clauses);
-            }
 
             @Nullable
             public CobolContainer<Cobol> getClauses() {
@@ -7855,7 +7174,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Nullable
         CobolContainer<CobolWord> dataNames;
@@ -7913,7 +7232,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -7930,12 +7249,12 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String attribute;
+        CobolWord attribute;
 
         @Nullable
         LibraryAttributeFunction libraryAttributeFunction;
 
-        String words;
+        CobolWord words;
 
         @Nullable
         LibraryAttributeParameter libraryAttributeParameter;
@@ -7958,7 +7277,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name literal;
 
         @Override
@@ -7976,7 +7295,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name literal;
 
         @Override
@@ -7994,7 +7313,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name literal;
 
         @Override
@@ -8012,11 +7331,11 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String ld;
+        CobolWord ld;
 
         CobolWord libraryName;
 
-        String export;
+        CobolWord export;
 
         @Nullable
         LibraryAttributeClauseFormat1 libraryAttributeClauseFormat1;
@@ -8055,7 +7374,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String lb;
+        CobolWord lb;
 
         @Getter
         @With
@@ -8063,7 +7382,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String export;
+        CobolWord export;
 
         @Getter
         @Nullable
@@ -8131,7 +7450,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String entryProcedure;
+        CobolWord entryProcedure;
         CobolWord programName;
 
         @Nullable
@@ -8152,7 +7471,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String entryProcedure;
+        CobolWord entryProcedure;
         CobolWord programName;
 
         @Nullable
@@ -8182,7 +7501,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
         Name literal;
 
         @Override
@@ -8200,7 +7519,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String giving;
+        CobolWord giving;
         CobolWord dataName;
 
         @Override
@@ -8234,7 +7553,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String using;
+        CobolWord using;
 
         CobolContainer<CobolWord> names;
 
@@ -8307,7 +7626,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String with;
+        CobolWord with;
 
         CobolContainer<CobolWord> names;
 
@@ -8364,7 +7683,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -8381,7 +7700,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -8414,7 +7733,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
@@ -8422,7 +7741,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String lines;
+        CobolWord lines;
 
         @Nullable
         CobolContainer<Cobol> linageAt;
@@ -8480,7 +7799,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -8498,7 +7817,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -8516,7 +7835,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -8550,7 +7869,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<DataDescriptionEntry> dataDescriptions;
 
@@ -8623,11 +7942,11 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
-        String localData;
+        CobolWord localData;
 
         @Getter
         @With
@@ -8760,7 +8079,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Powers powers;
 
         @Override
@@ -8794,7 +8113,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
@@ -8918,7 +8237,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<QualifiedDataName> qualifiedDataName;
 
@@ -8990,7 +8309,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Name> name;
 
@@ -9056,7 +8375,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -9090,7 +8409,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Name> fileNames;
 
@@ -9146,7 +8465,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         ProcedureName procedureName;
 
         @Nullable
@@ -9167,7 +8486,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         ProcedureName procedureName;
 
         @Override
@@ -9201,7 +8520,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<MergeGiving> mergeGiving;
 
@@ -9260,7 +8579,7 @@ public interface Cobol extends Tree {
         Name name;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -9277,7 +8596,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -9295,7 +8614,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -9313,7 +8632,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -9331,7 +8650,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol moveToStatement;
 
         @Override
@@ -9437,7 +8756,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
@@ -9513,7 +8832,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> filePositions;
 
@@ -9572,7 +8891,7 @@ public interface Cobol extends Tree {
         CobolWord fileName;
 
         @Nullable
-        String position;
+        CobolWord position;
 
         @Nullable
         CobolWord integerLiteral;
@@ -9583,102 +8902,33 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Multiply implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String words;
-
-        @Getter
-        @With
+        CobolWord words;
         Name multiplicand;
-
-        @Getter
-        @With
-        String by;
-
-        @Getter
-        @With
+        CobolWord by;
         Cobol multiply;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onSizeErrorPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notOnSizeErrorPhrase;
 
         @Nullable
-        CobolLeftPadded<String> endMultiply;
+        CobolWord endMultiply;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitMultiply(this, p);
-        }
-
-        @Nullable
-        public String getEndMultiply() {
-            return endMultiply == null ? null : endMultiply.getElement();
-        }
-
-        public Multiply withEndMultiply(@Nullable String endMultiply) {
-            if (endMultiply == null) {
-                return this.endMultiply == null ? this : new Multiply(id, prefix, markers, words, multiplicand, by, multiply, onSizeErrorPhrase, notOnSizeErrorPhrase, null);
-            }
-            return getPadding().withEndMultiply(CobolLeftPadded.withElement(this.endMultiply, endMultiply));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Multiply t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndMultiply() {
-                return t.endMultiply;
-            }
-
-            public Multiply withEndMultiply(@Nullable CobolLeftPadded<String> endMultiply) {
-                return t.endMultiply == endMultiply ? t : new Multiply(t.padding, t.id, t.prefix, t.markers, t.words, t.multiplicand, t.by, t.multiply, t.onSizeErrorPhrase, t.notOnSizeErrorPhrase, endMultiply);
-            }
         }
     }
 
@@ -9832,7 +9082,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -9840,95 +9090,27 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class ObjectComputer implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        CobolRightPadded<String> words;
+        CobolWord words;
 
         @Nullable
-        CobolRightPadded<ObjectComputerDefinition> computer;
+        ObjectComputerDefinition computer;
+
+        @Nullable
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitObjectComputer(this, p);
-        }
-
-        public String getWords() {
-            return words.getElement();
-        }
-
-        public ObjectComputer withWords(String words) {
-            //noinspection ConstantConditions
-            return getPadding().withWords(CobolRightPadded.withElement(this.words, words));
-        }
-
-        @Nullable
-        public Cobol.ObjectComputerDefinition getComputer() {
-            return computer == null ? null : computer.getElement();
-        }
-
-        public ObjectComputer withComputer(@Nullable Cobol.ObjectComputerDefinition computer) {
-            if (computer == null) {
-                return this.computer == null ? this : new ObjectComputer(id, prefix, markers, words, null);
-            }
-            return getPadding().withComputer(CobolRightPadded.withElement(this.computer, computer));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ObjectComputer t;
-
-            public CobolRightPadded<String> getWords() {
-                return t.words;
-            }
-
-            public ObjectComputer withWords(CobolRightPadded<String> words) {
-                return t.words == words ? t : new ObjectComputer(t.padding, t.id, t.prefix, t.markers, words, t.computer);
-            }
-
-            @Nullable
-            public CobolRightPadded<Cobol.ObjectComputerDefinition> getComputer() {
-                return t.computer;
-            }
-
-            public ObjectComputer withComputer(@Nullable CobolRightPadded<Cobol.ObjectComputerDefinition> computer) {
-                return t.computer == computer ? t : new ObjectComputer(t.padding, t.id, t.prefix, t.markers, t.words, computer);
-            }
         }
     }
 
@@ -9957,7 +9139,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String computerName;
+        CobolWord computerName;
 
         CobolContainer<Cobol> specifications;
 
@@ -10013,7 +9195,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Identifier mnemonicName;
 
         @Override
@@ -10047,7 +9229,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> open;
 
@@ -10119,7 +9301,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Openable> openInput;
 
@@ -10178,7 +9360,7 @@ public interface Cobol extends Tree {
         Name fileName;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10211,7 +9393,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Name> fileNames;
 
@@ -10267,7 +9449,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10284,7 +9466,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -10303,7 +9485,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataName;
 
         @Override
@@ -10321,7 +9503,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol statement;
 
         @Override
@@ -10363,7 +9545,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10420,7 +9602,7 @@ public interface Cobol extends Tree {
         ProcedureName procedureName;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         @Nullable
         ProcedureName throughProcedure;
@@ -10445,7 +9627,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         Name value;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10468,7 +9650,7 @@ public interface Cobol extends Tree {
         @Nullable
         PerformTestClause performTestClause;
 
-        String words;
+        CobolWord words;
         Condition condition;
 
         @Override
@@ -10522,7 +9704,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
@@ -10602,7 +9784,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol expression;
 
         @Override
@@ -10620,7 +9802,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol from;
 
         @Override
@@ -10638,7 +9820,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10763,7 +9945,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String plusMinusChar;
+        CobolWord plusMinusChar;
 
         @Getter
         @With
@@ -10826,7 +10008,7 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String power;
+        CobolWord power;
 
         Cobol expression;
 
@@ -10861,7 +10043,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @Nullable
@@ -10873,7 +10055,9 @@ public interface Cobol extends Tree {
         @With
         ProcedureDivisionGivingClause procedureDivisionGivingClause;
 
-        CobolLeftPadded<String> dot;
+        @Getter
+        @With
+        CobolWord dot;
 
         @Getter
         @Nullable
@@ -10885,15 +10069,6 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitProcedureDivision(this, p);
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public ProcedureDivision withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public Cobol.ProcedureDivisionBody getBody() {
@@ -10923,14 +10098,6 @@ public interface Cobol extends Tree {
         @RequiredArgsConstructor
         public static class Padding {
             private final ProcedureDivision t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ProcedureDivision withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ProcedureDivision(t.padding, t.id, t.prefix, t.markers, t.words, t.procedureDivisionUsingClause, t.procedureDivisionGivingClause, dot, t.procedureDeclaratives, t.body);
-            }
 
             public CobolLeftPadded<Cobol.ProcedureDivisionBody> getBody() {
                 return t.body;
@@ -10967,15 +10134,17 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String declaratives;
+        CobolWord declaratives;
 
         CobolContainer<ProcedureDeclarative> procedureDeclarative;
 
         @Getter
         @With
-        String endDeclaratives;
+        CobolWord endDeclaratives;
 
-        CobolLeftPadded<String> dot;
+        @Getter
+        @With
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -10989,15 +10158,6 @@ public interface Cobol extends Tree {
         public ProcedureDeclaratives withProcedureDeclarative(List<Cobol.ProcedureDeclarative> procedureDeclarative) {
             return getPadding().withProcedureDeclarative(this.procedureDeclarative.getPadding().withElements(CobolRightPadded.withElements(
                     this.procedureDeclarative.getPadding().getElements(), procedureDeclarative)));
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public ProcedureDeclaratives withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public Padding getPadding() {
@@ -11025,14 +10185,6 @@ public interface Cobol extends Tree {
 
             public ProcedureDeclaratives withProcedureDeclarative(CobolContainer<Cobol.ProcedureDeclarative> procedureDeclarative) {
                 return t.procedureDeclarative == procedureDeclarative ? t : new ProcedureDeclaratives(t.padding, t.id, t.prefix, t.markers, t.declaratives, procedureDeclarative, t.endDeclaratives, t.dot);
-            }
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ProcedureDeclaratives withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ProcedureDeclaratives(t.padding, t.id, t.prefix, t.markers, t.declaratives, t.procedureDeclarative, t.endDeclaratives, dot);
             }
         }
     }
@@ -11127,79 +10279,23 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class ProcedureSection implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         ProcedureSectionHeader procedureSectionHeader;
-
-        CobolLeftPadded<String> dot;
-
-        @Getter
-        @With
+        CobolWord dot;
         Paragraphs paragraphs;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitProcedureSection(this, p);
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public ProcedureSection withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ProcedureSection t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ProcedureSection withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ProcedureSection(t.padding, t.id, t.prefix, t.markers, t.procedureSectionHeader, dot, t.paragraphs);
-            }
         }
     }
 
@@ -11213,7 +10309,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         Name sectionName;
-        String section;
+        CobolWord section;
         Name identifier;
 
         @Override
@@ -11231,7 +10327,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name dataName;
 
         @Override
@@ -11249,7 +10345,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         List<Cobol> procedureDivisionUsingParameter;
 
         @Override
@@ -11269,7 +10365,7 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         List<ProcedureDivisionByReference> procedureDivisionByReference;
 
@@ -11290,7 +10386,7 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         Name reference;
 
@@ -11309,7 +10405,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         List<Name> phrases;
 
@@ -11419,7 +10515,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Nullable
         CobolContainer<Cobol> libraryDescriptionEntries;
@@ -11582,8 +10678,10 @@ public interface Cobol extends Tree {
         @With
         Name paragraphName;
 
+        @Getter
         @Nullable
-        CobolLeftPadded<String> dot;
+        @With
+        CobolWord dot;
 
         @Getter
         @Nullable
@@ -11596,18 +10694,6 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitParagraph(this, p);
-        }
-
-        @Nullable
-        public String getDot() {
-            return dot == null ? null : dot.getElement();
-        }
-
-        public Paragraph withDot(@Nullable String dot) {
-            if (dot == null) {
-                return this.dot == null ? this : new Paragraph(id, prefix, markers, paragraphName, null, alteredGoTo, sentences);
-            }
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public List<Cobol.Sentence> getSentences() {
@@ -11639,15 +10725,6 @@ public interface Cobol extends Tree {
             private final Paragraph t;
 
             @Nullable
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public Paragraph withDot(@Nullable CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new Paragraph(t.padding, t.id, t.prefix, t.markers, t.paragraphName, dot, t.alteredGoTo, t.sentences);
-            }
-
-            @Nullable
             public CobolContainer<Cobol.Sentence> getSentences() {
                 return t.sentences;
             }
@@ -11666,9 +10743,9 @@ public interface Cobol extends Tree {
         UUID id;
         Space prefix;
         Markers markers;
-        String leftParen;
+        CobolWord leftParen;
         List<Cobol> contents;
-        String rightParen;
+        CobolWord rightParen;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -11826,7 +10903,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         MultDivs multDivs;
 
         @Override
@@ -11860,15 +10937,19 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String programId;
+        CobolWord programId;
 
         CobolLeftPadded<Name> programName;
 
+        @Getter
         @Nullable
-        CobolLeftPadded<String> programAttributes;
+        @With
+        CobolWord programAttributes;
 
+        @Getter
         @Nullable
-        CobolLeftPadded<String> dot;
+        @With
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -11882,30 +10963,6 @@ public interface Cobol extends Tree {
         public ProgramIdParagraph withProgramName(Name programName) {
             //noinspection ConstantConditions
             return getPadding().withProgramName(CobolLeftPadded.withElement(this.programName, programName));
-        }
-
-        @Nullable
-        public String getProgramAttributes() {
-            return programAttributes == null ? null : programAttributes.getElement();
-        }
-
-        public ProgramIdParagraph withProgramAttributes(@Nullable String programAttributes) {
-            if (programAttributes == null) {
-                return this.programAttributes == null ? this : new ProgramIdParagraph(id, prefix, markers, programId, programName, null, dot);
-            }
-            return getPadding().withProgramAttributes(CobolLeftPadded.withElement(this.programAttributes, programAttributes));
-        }
-
-        @Nullable
-        public String getDot() {
-            return dot == null ? null : dot.getElement();
-        }
-
-        public ProgramIdParagraph withDot(@Nullable String dot) {
-            if (dot == null) {
-                return this.dot == null ? this : new ProgramIdParagraph(id, prefix, markers, programId, programName, programAttributes, null);
-            }
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public Padding getPadding() {
@@ -11933,24 +10990,6 @@ public interface Cobol extends Tree {
 
             public ProgramIdParagraph withProgramName(CobolLeftPadded<Name> programName) {
                 return t.programName == programName ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, programName, t.programAttributes, t.dot);
-            }
-
-            @Nullable
-            public CobolLeftPadded<String> getProgramAttributes() {
-                return t.programAttributes;
-            }
-
-            public ProgramIdParagraph withProgramAttributes(@Nullable CobolLeftPadded<String> programAttributes) {
-                return t.programAttributes == programAttributes ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, t.programName, programAttributes, t.dot);
-            }
-
-            @Nullable
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ProgramIdParagraph withDot(@Nullable CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ProgramIdParagraph(t.padding, t.id, t.prefix, t.markers, t.programId, t.programName, t.programAttributes, dot);
             }
         }
     }
@@ -12207,7 +11246,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String linageCounter;
+        CobolWord linageCounter;
         InFile inFile;
 
         @Override
@@ -12243,9 +11282,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name fileName;
-        String nextRecord;
+        CobolWord nextRecord;
 
         @Nullable
         ReadInto readInto;
@@ -12268,7 +11307,7 @@ public interface Cobol extends Tree {
         @Nullable
         StatementPhrase notAtEndPhrase;
 
-        String endRead;
+        CobolWord endRead;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12285,7 +11324,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Identifier identifier;
 
         @Override
@@ -12303,7 +11342,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12320,7 +11359,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -12338,7 +11377,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String receive;
+        CobolWord receive;
         Cobol fromOrInto;
 
         @Nullable
@@ -12347,7 +11386,7 @@ public interface Cobol extends Tree {
         @Nullable
         StatementPhrase notOnExceptionClause;
 
-        String endReceive;
+        CobolWord endReceive;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12384,7 +11423,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String from;
+        CobolWord from;
 
         @Getter
         @With
@@ -12444,7 +11483,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         CobolWord dataName;
@@ -12465,7 +11504,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         CobolWord cdName;
-        String words;
+        CobolWord words;
         Identifier identifier;
 
         @Nullable
@@ -12489,7 +11528,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name value;
 
         @Override
@@ -12507,7 +11546,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String record;
+        CobolWord record;
         Cobol clause;
 
         @Override
@@ -12525,9 +11564,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String contains;
+        CobolWord contains;
         CobolWord integerLiteral;
-        String characters;
+        CobolWord characters;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12544,7 +11583,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         List<Cobol> fromClause;
         List<Cobol> qualifiedDataName;
 
@@ -12563,10 +11602,10 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String contains;
+        CobolWord contains;
         CobolWord integerLiteral;
         RecordContainsTo recordContainsTo;
-        String characters;
+        CobolWord characters;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12583,7 +11622,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String to;
+        CobolWord to;
         CobolWord integerLiteral;
 
         @Override
@@ -12601,7 +11640,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         Name name;
@@ -12621,7 +11660,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord mode;
 
         @Override
@@ -12639,13 +11678,13 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String recordWords;
+        CobolWord recordWords;
         QualifiedDataName qualifiedDataName;
 
         @Nullable
         PasswordClause passwordClause;
 
-        String duplicates;
+        CobolWord duplicates;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12662,14 +11701,14 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String leftParen;
+        CobolWord leftParen;
         ArithmeticExpression characterPosition;
-        String colon;
+        CobolWord colon;
 
         @Nullable
         ArithmeticExpression length;
 
-        String rightParen;
+        CobolWord rightParen;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12686,7 +11725,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12759,7 +11798,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         ArithmeticExpression arithmeticExpression;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12776,7 +11815,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -12794,9 +11833,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String release;
+        CobolWord release;
         QualifiedDataName recordName;
-        String from;
+        CobolWord from;
 
         @Nullable
         QualifiedDataName qualifiedDataName;
@@ -12816,9 +11855,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name fileName;
-        String record;
+        CobolWord record;
         @Nullable
         ReturnInto into;
 
@@ -12827,7 +11866,7 @@ public interface Cobol extends Tree {
         @Nullable
         StatementPhrase notAtEndPhrase;
 
-        String endReturn;
+        CobolWord endReturn;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -12844,7 +11883,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String into;
+        CobolWord into;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -12878,7 +11917,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Name> reportName;
 
@@ -12997,290 +12036,102 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class ReportDescriptionEntry implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String rd;
-
-        @Getter
-        @With
+        CobolWord rd;
         QualifiedDataName qualifiedDataName;
 
-        @Getter
         @Nullable
-        @With
         ReportDescriptionGlobalClause reportDescriptionGlobalClause;
 
-        @Getter
         @Nullable
-        @With
         ReportDescriptionGlobalClause reportDescriptionPageLimitClause;
 
-        @Getter
         @Nullable
-        @With
         ReportDescriptionGlobalClause reportDescriptionHeadingClause;
 
-        @Getter
         @Nullable
-        @With
         ReportDescriptionGlobalClause reportDescriptionFirstDetailClause;
 
-        @Getter
         @Nullable
-        @With
         ReportDescriptionGlobalClause reportDescriptionLastDetailClause;
 
-        @Getter
         @Nullable
-        @With
         ReportDescriptionGlobalClause reportDescriptionFootingClause;
 
-        CobolLeftPadded<String> dot;
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitReportDescriptionEntry(this, p);
         }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public ReportDescriptionEntry withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ReportDescriptionEntry t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ReportDescriptionEntry withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ReportDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.rd, t.qualifiedDataName, t.reportDescriptionGlobalClause, t.reportDescriptionPageLimitClause, t.reportDescriptionHeadingClause, t.reportDescriptionFirstDetailClause, t.reportDescriptionLastDetailClause, t.reportDescriptionFootingClause, dot);
-            }
-        }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class ReportGroupDescriptionEntryFormat1 implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         CobolWord integerLiteral;
-
-        @Getter
-        @With
         CobolWord dataName;
 
-        @Getter
         @Nullable
-        @With
         ReportGroupLineNumberClause groupLineNumberClause;
 
-        @Getter
         @Nullable
-        @With
         ReportGroupNextGroupClause groupNextGroupClause;
 
-        @Getter
-        @With
         ReportGroupTypeClause groupTypeClause;
 
-        @Getter
         @Nullable
-        @With
         ReportGroupUsageClause groupUsageClause;
 
-        CobolLeftPadded<String> dot;
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitReportGroupDescriptionEntryFormat1(this, p);
         }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public ReportGroupDescriptionEntryFormat1 withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ReportGroupDescriptionEntryFormat1 t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ReportGroupDescriptionEntryFormat1 withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ReportGroupDescriptionEntryFormat1(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, t.groupLineNumberClause, t.groupNextGroupClause, t.groupTypeClause, t.groupUsageClause, dot);
-            }
-        }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class ReportGroupDescriptionEntryFormat2 implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         CobolWord integerLiteral;
 
-        @Getter
         @Nullable
-        @With
         CobolWord dataName;
 
-        @Getter
         @Nullable
-        @With
         ReportGroupLineNumberClause reportGroupLineNumberClause;
 
-        @Getter
-        @With
         ReportGroupUsageClause groupUsageClause;
 
-        CobolLeftPadded<String> dot;
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitReportGroupDescriptionEntryFormat2(this, p);
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public ReportGroupDescriptionEntryFormat2 withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ReportGroupDescriptionEntryFormat2 t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ReportGroupDescriptionEntryFormat2 withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ReportGroupDescriptionEntryFormat2(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, t.reportGroupLineNumberClause, t.groupUsageClause, dot);
-            }
         }
     }
 
@@ -13319,7 +12170,9 @@ public interface Cobol extends Tree {
         @Nullable
         CobolContainer<Cobol> clauses;
 
-        CobolLeftPadded<String> dot;
+        @Getter
+        @With
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13333,15 +12186,6 @@ public interface Cobol extends Tree {
         public ReportGroupDescriptionEntryFormat3 withClauses(List<Cobol> clauses) {
             return getPadding().withClauses(this.clauses.getPadding().withElements(CobolRightPadded.withElements(
                     this.clauses.getPadding().getElements(), clauses)));
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public ReportGroupDescriptionEntryFormat3 withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
         }
 
         public Padding getPadding() {
@@ -13371,14 +12215,6 @@ public interface Cobol extends Tree {
             public ReportGroupDescriptionEntryFormat3 withClauses(@Nullable CobolContainer<Cobol> clauses) {
                 return t.clauses == clauses ? t : new ReportGroupDescriptionEntryFormat3(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, clauses, t.dot);
             }
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public ReportGroupDescriptionEntryFormat3 withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new ReportGroupDescriptionEntryFormat3(t.padding, t.id, t.prefix, t.markers, t.integerLiteral, t.dataName, t.clauses, dot);
-            }
         }
     }
 
@@ -13391,7 +12227,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol clause;
 
         @Override
@@ -13410,7 +12246,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         CobolWord integerLiteral;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13427,7 +12263,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String plus;
+        CobolWord plus;
         CobolWord integerLiteral;
 
         @Override
@@ -13445,7 +12281,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol clause;
 
         @Override
@@ -13463,7 +12299,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String nextPage;
+        CobolWord nextPage;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13480,7 +12316,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String plus;
+        CobolWord plus;
         CobolWord integerLiteral;
 
         @Override
@@ -13498,7 +12334,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol type;
 
         @Override
@@ -13516,7 +12352,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13533,7 +12369,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name literal;
 
         @Override
@@ -13551,7 +12387,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13568,7 +12404,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13585,7 +12421,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13602,7 +12438,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13619,7 +12455,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         Name dataName;
@@ -13639,7 +12475,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         Name dataName;
@@ -13659,9 +12495,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         List<Cobol> identifiers;
-        String upon;
+        CobolWord upon;
         List<Cobol> dataNames;
 
         @Override
@@ -13679,7 +12515,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name identifier;
 
         @Override
@@ -13697,7 +12533,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13714,7 +12550,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         Name dataName;
@@ -13734,7 +12570,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         PictureString pictureString;
 
         @Override
@@ -13752,7 +12588,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13769,7 +12605,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13786,7 +12622,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name dataName;
 
         @Override
@@ -13804,7 +12640,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13821,9 +12657,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String firstWords;
+        CobolWord firstWords;
         Name integerLiteral;
-        String secondWords;
+        CobolWord secondWords;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13840,7 +12676,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name dataName;
 
         @Override
@@ -13858,7 +12694,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name dataName;
 
         @Override
@@ -13876,7 +12712,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name dataName;
 
         @Override
@@ -13894,7 +12730,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name dataName;
 
         @Override
@@ -13912,7 +12748,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -13945,7 +12781,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<Cobol> descriptions;
 
@@ -14019,15 +12855,15 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String rerun;
+        CobolWord rerun;
 
         @Nullable
-        String on;
+        CobolWord on;
 
         @Nullable
         CobolWord name;
 
-        String every;
+        CobolWord every;
 
         Cobol action;
 
@@ -14047,7 +12883,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         CobolWord integerLiteral;
-        String clockUnits;
+        CobolWord clockUnits;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14064,7 +12900,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String records;
+        CobolWord records;
         CobolWord fileName;
 
         @Override
@@ -14083,7 +12919,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         CobolWord integerLiteral;
-        String records;
+        CobolWord records;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14117,7 +12953,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14125,95 +12961,33 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Rewrite implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
+        CobolWord rewrite;
 
-        @Getter
-        @With
-        String rewrite;
-
-        @Getter
         @Nullable
-        @With
         QualifiedDataName recordName;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase invalidKeyPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notInvalidKeyPhrase;
 
         @Nullable
-        CobolLeftPadded<String> endRewrite;
+        CobolWord endRewrite;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitRewrite(this, p);
-        }
-
-        @Nullable
-        public String getEndRewrite() {
-            return endRewrite == null ? null : endRewrite.getElement();
-        }
-
-        public Rewrite withEndRewrite(@Nullable String endRewrite) {
-            if (endRewrite == null) {
-                return this.endRewrite == null ? this : new Rewrite(id, prefix, markers, rewrite, recordName, invalidKeyPhrase, notInvalidKeyPhrase, null);
-            }
-            return getPadding().withEndRewrite(CobolLeftPadded.withElement(this.endRewrite, endRewrite));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Rewrite t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndRewrite() {
-                return t.endRewrite;
-            }
-
-            public Rewrite withEndRewrite(@Nullable CobolLeftPadded<String> endRewrite) {
-                return t.endRewrite == endRewrite ? t : new Rewrite(t.padding, t.id, t.prefix, t.markers, t.rewrite, t.recordName, t.invalidKeyPhrase, t.notInvalidKeyPhrase, endRewrite);
-            }
         }
     }
 
@@ -14226,7 +13000,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String from;
+        CobolWord from;
         Name identifier;
 
         @Override
@@ -14235,80 +13009,24 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Roundable implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         Identifier identifier;
 
         @Nullable
-        CobolLeftPadded<String> rounded;
+        CobolWord rounded;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitRoundable(this, p);
-        }
-
-        @Nullable
-        public String getRounded() {
-            return rounded == null ? null : rounded.getElement();
-        }
-
-        public Roundable withRounded(@Nullable String rounded) {
-            if (rounded == null) {
-                return this.rounded == null ? this : new Roundable(id, prefix, markers, identifier, null);
-            }
-            return getPadding().withRounded(CobolLeftPadded.withElement(this.rounded, rounded));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Roundable t;
-
-            @Nullable
-            public CobolLeftPadded<String> getRounded() {
-                return t.rounded;
-            }
-
-            public Roundable withRounded(@Nullable CobolLeftPadded<String> rounded) {
-                return t.rounded == rounded ? t : new Roundable(t.padding, t.id, t.prefix, t.markers, t.identifier, rounded);
-            }
         }
     }
 
@@ -14337,7 +13055,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<CobolWord> fileNames;
 
@@ -14409,7 +13127,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<ScreenDescriptionEntry> descriptions;
 
@@ -14481,28 +13199,18 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
+        @Getter
         @Nullable
-        CobolLeftPadded<String> name;
+        @With
+        CobolWord name;
 
         CobolContainer<Cobol> clauses;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitScreenDescriptionEntry(this, p);
-        }
-
-        @Nullable
-        public String getName() {
-            return name == null ? null : name.getElement();
-        }
-
-        public ScreenDescriptionEntry withName(@Nullable String name) {
-            if (name == null) {
-                return this.name == null ? this : new ScreenDescriptionEntry(id, prefix, markers, words, null, clauses);
-            }
-            return getPadding().withName(CobolLeftPadded.withElement(this.name, name));
         }
 
         public List<Cobol> getClauses() {
@@ -14533,15 +13241,6 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final ScreenDescriptionEntry t;
 
-            @Nullable
-            public CobolLeftPadded<String> getName() {
-                return t.name;
-            }
-
-            public ScreenDescriptionEntry withName(@Nullable CobolLeftPadded<String> name) {
-                return t.name == name ? t : new ScreenDescriptionEntry(t.padding, t.id, t.prefix, t.markers, t.words, name, t.clauses);
-            }
-
             public CobolContainer<Cobol> getClauses() {
                 return t.clauses;
             }
@@ -14561,7 +13260,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String auto;
+        CobolWord auto;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14578,9 +13277,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String background;
+        CobolWord background;
 
-        String is;
+        CobolWord is;
         Name value;
 
         @Override
@@ -14598,7 +13297,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String bell;
+        CobolWord bell;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14615,7 +13314,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14633,7 +13332,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14650,7 +13349,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String blink;
+        CobolWord blink;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14667,7 +13366,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name value;
 
         @Override
@@ -14685,7 +13384,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name value;
 
         @Override
@@ -14703,7 +13402,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14720,7 +13419,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name value;
 
         @Override
@@ -14738,7 +13437,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String from;
+        CobolWord from;
         Name value;
 
         @Nullable
@@ -14759,7 +13458,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14776,7 +13475,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14793,7 +13492,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14810,7 +13509,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String light;
+        CobolWord light;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14827,7 +13526,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name value;
 
         @Override
@@ -14845,7 +13544,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         PictureString pictureString;
 
         @Override
@@ -14864,7 +13563,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Nullable
@@ -14885,9 +13584,9 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String occurs;
+        CobolWord occurs;
         CobolWord integer;
-        String times;
+        CobolWord times;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14904,7 +13603,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String required;
+        CobolWord required;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14921,7 +13620,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14938,7 +13637,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -14955,7 +13654,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name value;
 
         @Override
@@ -14973,7 +13672,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String to;
+        CobolWord to;
         Identifier identifier;
 
         @Override
@@ -14991,7 +13690,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String underline;
+        CobolWord underline;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -15008,7 +13707,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -15025,7 +13724,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String using;
+        CobolWord using;
         Identifier identifier;
 
         @Override
@@ -15043,7 +13742,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name value;
 
         @Override
@@ -15061,7 +13760,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -15094,7 +13793,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Getter
         @With
@@ -15114,7 +13813,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String endSearch;
+        CobolWord endSearch;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -15168,7 +13867,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String varying;
+        CobolWord varying;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -15202,7 +13901,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String when;
+        CobolWord when;
 
         @Getter
         @With
@@ -15210,7 +13909,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String nextSentence;
+        CobolWord nextSentence;
         CobolContainer<Statement> statements;
 
         @Override
@@ -15265,7 +13964,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord fileName;
 
         @Override
@@ -15283,7 +13982,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String send;
+        CobolWord send;
         Cobol statement;
 
         @Nullable
@@ -15336,7 +14035,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
 
         @Nullable
         Cobol target;
@@ -15357,7 +14056,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         Name name;
-        String lines;
+        CobolWord lines;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -15366,74 +14065,22 @@ public interface Cobol extends Tree {
     }
 
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Sentence implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         List<Statement> statements;
-        CobolLeftPadded<String> dot;
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitSentence(this, p);
-        }
-
-        public String getDot() {
-            return dot.getElement();
-        }
-
-        public Sentence withDot(String dot) {
-            //noinspection ConstantConditions
-            return getPadding().withDot(CobolLeftPadded.withElement(this.dot, dot));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Sentence t;
-
-            public CobolLeftPadded<String> getDot() {
-                return t.dot;
-            }
-
-            public Sentence withDot(CobolLeftPadded<String> dot) {
-                return t.dot == dot ? t : new Sentence(t.padding, t.id, t.prefix, t.markers, t.statements, dot);
-            }
         }
     }
 
@@ -15462,7 +14109,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String set;
+        CobolWord set;
 
         @Nullable
         CobolContainer<SetTo> to;
@@ -15626,7 +14273,10 @@ public interface Cobol extends Tree {
         Markers markers;
 
         CobolContainer<Identifier> to;
-        CobolLeftPadded<String> operation;
+
+        @Getter
+        @With
+        CobolWord operation;
 
         @Getter
         @With
@@ -15644,15 +14294,6 @@ public interface Cobol extends Tree {
         public SetUpDown withTo(List<Identifier> to) {
             return getPadding().withTo(this.to.getPadding().withElements(CobolRightPadded.withElements(
                     this.to.getPadding().getElements(), to)));
-        }
-
-        public String getOperation() {
-            return operation.getElement();
-        }
-
-        public SetUpDown withOperation(String operation) {
-            //noinspection ConstantConditions
-            return getPadding().withOperation(CobolLeftPadded.withElement(this.operation, operation));
         }
 
         public Padding getPadding() {
@@ -15681,183 +14322,51 @@ public interface Cobol extends Tree {
             public SetUpDown withTo(CobolContainer<Identifier> to) {
                 return t.to == to ? t : new SetUpDown(t.padding, t.id, t.prefix, t.markers, to, t.operation, t.value);
             }
-
-            public CobolLeftPadded<String> getOperation() {
-                return t.operation;
-            }
-
-            public SetUpDown withOperation(CobolLeftPadded<String> operation) {
-                return t.operation == operation ? t : new SetUpDown(t.padding, t.id, t.prefix, t.markers, t.to, operation, t.value);
-            }
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class SourceComputer implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        CobolRightPadded<String> words;
+        CobolWord words;
 
         @Nullable
-        CobolRightPadded<SourceComputerDefinition> computer;
+        SourceComputerDefinition computer;
+
+        @Nullable
+        CobolWord dot;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitSourceComputer(this, p);
         }
-
-        public String getWords() {
-            return words.getElement();
-        }
-
-        public SourceComputer withWords(String words) {
-            //noinspection ConstantConditions
-            return getPadding().withWords(CobolRightPadded.withElement(this.words, words));
-        }
-
-        @Nullable
-        public Cobol.SourceComputerDefinition getComputer() {
-            return computer == null ? null : computer.getElement();
-        }
-
-        public SourceComputer withComputer(@Nullable Cobol.SourceComputerDefinition computer) {
-            if (computer == null) {
-                return this.computer == null ? this : new SourceComputer(id, prefix, markers, words, null);
-            }
-            return getPadding().withComputer(CobolRightPadded.withElement(this.computer, computer));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final SourceComputer t;
-
-            public CobolRightPadded<String> getWords() {
-                return t.words;
-            }
-
-            public SourceComputer withWords(CobolRightPadded<String> words) {
-                return t.words == words ? t : new SourceComputer(t.padding, t.id, t.prefix, t.markers, words, t.computer);
-            }
-
-            @Nullable
-            public CobolRightPadded<Cobol.SourceComputerDefinition> getComputer() {
-                return t.computer;
-            }
-
-            public SourceComputer withComputer(@Nullable CobolRightPadded<Cobol.SourceComputerDefinition> computer) {
-                return t.computer == computer ? t : new SourceComputer(t.padding, t.id, t.prefix, t.markers, t.words, computer);
-            }
-        }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class SourceComputerDefinition implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String computerName;
+        CobolWord computerName;
 
         @Nullable
-        CobolLeftPadded<String> debuggingMode;
+        CobolWord debuggingMode;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitSourceComputerDefinition(this, p);
-        }
-
-        @Nullable
-        public String getDebuggingMode() {
-            return debuggingMode == null ? null : debuggingMode.getElement();
-        }
-
-        public SourceComputerDefinition withDebuggingMode(@Nullable String debuggingMode) {
-            if (debuggingMode == null) {
-                return this.debuggingMode == null ? this : new SourceComputerDefinition(id, prefix, markers, computerName, null);
-            }
-            return getPadding().withDebuggingMode(CobolLeftPadded.withElement(this.debuggingMode, debuggingMode));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final SourceComputerDefinition t;
-
-            @Nullable
-            public CobolLeftPadded<String> getDebuggingMode() {
-                return t.debuggingMode;
-            }
-
-            public SourceComputerDefinition withDebuggingMode(@Nullable CobolLeftPadded<String> debuggingMode) {
-                return t.debuggingMode == debuggingMode ? t : new SourceComputerDefinition(t.padding, t.id, t.prefix, t.markers, t.computerName, debuggingMode);
-            }
         }
     }
 
@@ -15886,7 +14395,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         @Nullable
         CobolContainer<Cobol> clauses;
@@ -15961,7 +14470,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String sort;
+        CobolWord sort;
 
         @Getter
         @With
@@ -16094,7 +14603,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<CobolWord> alphabetNames;
 
@@ -16161,7 +14670,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord procedureName;
 
         @Nullable
@@ -16198,7 +14707,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<CobolWord> names;
 
@@ -16256,7 +14765,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         CobolWord fileName;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -16264,99 +14773,34 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Start implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String start;
-
-        @Getter
-        @With
+        CobolWord start;
         CobolWord fileName;
 
-        @Getter
         @Nullable
-        @With
         StartKey startKey;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase invalidKeyPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notInvalidKeyPhrase;
 
         @Nullable
-        CobolLeftPadded<String> endStart;
+        CobolWord endStart;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitStart(this, p);
-        }
-
-        @Nullable
-        public String getEndStart() {
-            return endStart == null ? null : endStart.getElement();
-        }
-
-        public Start withEndStart(@Nullable String endStart) {
-            if (endStart == null) {
-                return this.endStart == null ? this : new Start(id, prefix, markers, start, fileName, startKey, invalidKeyPhrase, notInvalidKeyPhrase, null);
-            }
-            return getPadding().withEndStart(CobolLeftPadded.withElement(this.endStart, endStart));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Start t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndStart() {
-                return t.endStart;
-            }
-
-            public Start withEndStart(@Nullable CobolLeftPadded<String> endStart) {
-                return t.endStart == endStart ? t : new Start(t.padding, t.id, t.prefix, t.markers, t.start, t.fileName, t.startKey, t.invalidKeyPhrase, t.notInvalidKeyPhrase, endStart);
-            }
         }
     }
 
@@ -16369,7 +14813,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -16403,7 +14847,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String phrase;
+        CobolWord phrase;
 
         CobolContainer<Statement> statement;
 
@@ -16459,7 +14903,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol statement;
 
         @Override
@@ -16516,8 +14960,10 @@ public interface Cobol extends Tree {
         @With
         StatementPhrase notOnOverflowPhrase;
 
+        @Getter
         @Nullable
-        CobolLeftPadded<String> endString;
+        @With
+        CobolWord endString;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -16531,18 +14977,6 @@ public interface Cobol extends Tree {
         public StringStatement withStringSendingPhrases(List<Cobol> stringSendingPhrases) {
             return getPadding().withStringSendingPhrases(this.stringSendingPhrases.getPadding().withElements(CobolRightPadded.withElements(
                     this.stringSendingPhrases.getPadding().getElements(), stringSendingPhrases)));
-        }
-
-        @Nullable
-        public String getEndString() {
-            return endString == null ? null : endString.getElement();
-        }
-
-        public StringStatement withEndString(@Nullable String endString) {
-            if (endString == null) {
-                return this.endString == null ? this : new StringStatement(id, prefix, markers, string, stringSendingPhrases, stringIntoPhrase, stringWithPointerPhrase, onOverflowPhrase, notOnOverflowPhrase, null);
-            }
-            return getPadding().withEndString(CobolLeftPadded.withElement(this.endString, endString));
         }
 
         public Padding getPadding() {
@@ -16570,15 +15004,6 @@ public interface Cobol extends Tree {
 
             public StringStatement withStringSendingPhrases(CobolContainer<Cobol> stringSendingPhrases) {
                 return t.stringSendingPhrases == stringSendingPhrases ? t : new StringStatement(t.padding, t.id, t.prefix, t.markers, t.string, stringSendingPhrases, t.stringIntoPhrase, t.stringWithPointerPhrase, t.onOverflowPhrase, t.notOnOverflowPhrase, t.endString);
-            }
-
-            @Nullable
-            public CobolLeftPadded<String> getEndString() {
-                return t.endString;
-            }
-
-            public StringStatement withEndString(@Nullable CobolLeftPadded<String> endString) {
-                return t.endString == endString ? t : new StringStatement(t.padding, t.id, t.prefix, t.markers, t.string, t.stringSendingPhrases, t.stringIntoPhrase, t.stringWithPointerPhrase, t.onOverflowPhrase, t.notOnOverflowPhrase, endString);
             }
         }
     }
@@ -16610,7 +15035,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
         Name identifier;
 
         @Override
@@ -16628,7 +15053,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String word;
+        CobolWord word;
         Name identifier;
 
         @Override
@@ -16646,7 +15071,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String into;
+        CobolWord into;
         Identifier identifier;
 
         @Override
@@ -16664,7 +15089,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -16695,94 +15120,31 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Subtract implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         CobolWord substract;
-
-        @Getter
-        @With
         Cobol operation;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onSizeErrorPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notOnSizeErrorPhrase;
 
         @Nullable
-        CobolLeftPadded<String> endSubtract;
+        CobolWord endSubtract;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitSubtract(this, p);
-        }
-
-        @Nullable
-        public String getEndSubtract() {
-            return endSubtract == null ? null : endSubtract.getElement();
-        }
-
-        public Subtract withEndSubtract(@Nullable String endSubtract) {
-            if (endSubtract == null) {
-                return this.endSubtract == null ? this : new Subtract(id, prefix, markers, substract, operation, onSizeErrorPhrase, notOnSizeErrorPhrase, null);
-            }
-            return getPadding().withEndSubtract(CobolLeftPadded.withElement(this.endSubtract, endSubtract));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Subtract t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndSubtract() {
-                return t.endSubtract;
-            }
-
-            public Subtract withEndSubtract(@Nullable CobolLeftPadded<String> endSubtract) {
-                return t.endSubtract == endSubtract ? t : new Subtract(t.padding, t.id, t.prefix, t.markers, t.substract, t.operation, t.onSizeErrorPhrase, t.notOnSizeErrorPhrase, endSubtract);
-            }
         }
     }
 
@@ -17039,28 +15401,32 @@ public interface Cobol extends Tree {
         @With
         Markers markers;
 
-        CobolContainer<Identifier> symbols;
-        CobolContainer<Literal> literals;
+        CobolContainer<CobolWord> symbols;
+
+        @Nullable
+        CobolWord words;
+
+        CobolContainer<CobolWord> literals;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitSymbolicCharacter(this, p);
         }
 
-        public List<Identifier> getSymbols() {
+        public List<CobolWord> getSymbols() {
             return symbols.getElements();
         }
 
-        public SymbolicCharacter withSymbols(List<Identifier> symbols) {
+        public SymbolicCharacter withSymbols(List<CobolWord> symbols) {
             return getPadding().withSymbols(this.symbols.getPadding().withElements(CobolRightPadded.withElements(
                     this.symbols.getPadding().getElements(), symbols)));
         }
 
-        public List<Literal> getLiterals() {
+        public List<CobolWord> getLiterals() {
             return literals.getElements();
         }
 
-        public SymbolicCharacter withLiterals(List<Literal> literals) {
+        public SymbolicCharacter withLiterals(List<CobolWord> literals) {
             return getPadding().withLiterals(this.literals.getPadding().withElements(CobolRightPadded.withElements(
                     this.literals.getPadding().getElements(), literals)));
         }
@@ -17084,20 +15450,20 @@ public interface Cobol extends Tree {
         public static class Padding {
             private final SymbolicCharacter t;
 
-            public CobolContainer<Identifier> getSymbols() {
+            public CobolContainer<CobolWord> getSymbols() {
                 return t.symbols;
             }
 
-            public SymbolicCharacter withSymbols(CobolContainer<Identifier> symbols) {
-                return t.symbols == symbols ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, symbols, t.literals);
+            public SymbolicCharacter withSymbols(CobolContainer<CobolWord> symbols) {
+                return t.symbols == symbols ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, symbols, t.words, t.literals);
             }
 
-            public CobolContainer<Literal> getLiterals() {
+            public CobolContainer<CobolWord> getLiterals() {
                 return t.literals;
             }
 
-            public SymbolicCharacter withLiterals(CobolContainer<Literal> literals) {
-                return t.literals == literals ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, t.symbols, literals);
+            public SymbolicCharacter withLiterals(CobolContainer<CobolWord> literals) {
+                return t.literals == literals ? t : new SymbolicCharacter(t.padding, t.id, t.prefix, t.markers, t.symbols, t.words, literals);
             }
         }
     }
@@ -17127,12 +15493,14 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<SymbolicCharacter> symbols;
 
+        @Getter
         @Nullable
-        CobolLeftPadded<String> inAlphabet;
+        @With
+        CobolWord inAlphabet;
 
         @Getter
         @Nullable
@@ -17151,18 +15519,6 @@ public interface Cobol extends Tree {
         public SymbolicCharactersClause withSymbols(List<Cobol.SymbolicCharacter> symbols) {
             return getPadding().withSymbols(this.symbols.getPadding().withElements(CobolRightPadded.withElements(
                     this.symbols.getPadding().getElements(), symbols)));
-        }
-
-        @Nullable
-        public String getInAlphabet() {
-            return inAlphabet == null ? null : inAlphabet.getElement();
-        }
-
-        public SymbolicCharactersClause withInAlphabet(@Nullable String inAlphabet) {
-            if (inAlphabet == null) {
-                return this.inAlphabet == null ? this : new SymbolicCharactersClause(id, prefix, markers, words, symbols, null, alphabetName);
-            }
-            return getPadding().withInAlphabet(CobolLeftPadded.withElement(this.inAlphabet, inAlphabet));
         }
 
         public Padding getPadding() {
@@ -17191,15 +15547,6 @@ public interface Cobol extends Tree {
             public SymbolicCharactersClause withSymbols(CobolContainer<Cobol.SymbolicCharacter> symbols) {
                 return t.symbols == symbols ? t : new SymbolicCharactersClause(t.padding, t.id, t.prefix, t.markers, t.words, symbols, t.inAlphabet, t.alphabetName);
             }
-
-            @Nullable
-            public CobolLeftPadded<String> getInAlphabet() {
-                return t.inAlphabet;
-            }
-
-            public SymbolicCharactersClause withInAlphabet(@Nullable CobolLeftPadded<String> inAlphabet) {
-                return t.inAlphabet == inAlphabet ? t : new SymbolicCharactersClause(t.padding, t.id, t.prefix, t.markers, t.words, t.symbols, inAlphabet, t.alphabetName);
-            }
         }
     }
 
@@ -17212,7 +15559,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -17230,7 +15577,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -17248,7 +15595,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -17266,7 +15613,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -17284,7 +15631,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -17302,7 +15649,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         CobolWord dataDescName;
 
         @Override
@@ -17406,108 +15753,38 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class UnString implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String unstring;
-
-        @Getter
-        @With
+        CobolWord unstring;
         UnstringSendingPhrase unstringSendingPhrase;
-
-        @Getter
-        @With
         UnstringIntoPhrase unstringIntoPhrase;
 
-        @Getter
         @Nullable
-        @With
         UnstringWithPointerPhrase unstringWithPointerPhrase;
 
-        @Getter
         @Nullable
-        @With
         UnstringTallyingPhrase unstringTallyingPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase onOverflowPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notOnOverflowPhrase;
 
         @Nullable
-        CobolLeftPadded<String> endUnstring;
+        CobolWord endUnstring;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitUnString(this, p);
-        }
-
-        @Nullable
-        public String getEndUnstring() {
-            return endUnstring == null ? null : endUnstring.getElement();
-        }
-
-        public UnString withEndUnstring(@Nullable String endUnstring) {
-            if (endUnstring == null) {
-                return this.endUnstring == null ? this : new UnString(id, prefix, markers, unstring, unstringSendingPhrase, unstringIntoPhrase, unstringWithPointerPhrase, unstringTallyingPhrase, onOverflowPhrase, notOnOverflowPhrase, null);
-            }
-            return getPadding().withEndUnstring(CobolLeftPadded.withElement(this.endUnstring, endUnstring));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final UnString t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndUnstring() {
-                return t.endUnstring;
-            }
-
-            public UnString withEndUnstring(@Nullable CobolLeftPadded<String> endUnstring) {
-                return t.endUnstring == endUnstring ? t : new UnString(t.padding, t.id, t.prefix, t.markers, t.unstring, t.unstringSendingPhrase, t.unstringIntoPhrase, t.unstringWithPointerPhrase, t.unstringTallyingPhrase, t.onOverflowPhrase, t.notOnOverflowPhrase, endUnstring);
-            }
         }
     }
 
@@ -17599,7 +15876,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -17617,7 +15894,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Name name;
 
         @Override
@@ -17651,7 +15928,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String into;
+        CobolWord into;
 
         CobolContainer<UnstringInto> unstringIntos;
 
@@ -17730,7 +16007,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Identifier identifier;
 
         @Override
@@ -17748,7 +16025,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Identifier identifier;
 
         @Override
@@ -17766,7 +16043,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -17784,7 +16061,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         QualifiedDataName qualifiedDataName;
 
         @Override
@@ -17802,7 +16079,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String use;
+        CobolWord use;
         Cobol clause;
 
         @Override
@@ -17820,7 +16097,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         UseAfterOn useAfterOn;
 
         @Override
@@ -17855,7 +16132,7 @@ public interface Cobol extends Tree {
         @Getter
         @Nullable
         @With
-        String afterOn;
+        CobolWord afterOn;
 
         @Nullable
         CobolContainer<Name> fileNames;
@@ -17929,7 +16206,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<UseDebugOn> useDebugs;
 
@@ -17987,7 +16264,7 @@ public interface Cobol extends Tree {
         Markers markers;
 
         @Nullable
-        String words;
+        CobolWord words;
 
         @Nullable
         Name name;
@@ -18001,44 +16278,24 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class ValuedObjectComputerClause implements Cobol {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         Type type;
+        CobolWord words;
 
-        @Getter
-        @With
-        String words;
-
-        @Getter
         @Nullable
-        @With
         Cobol value;
 
         @Nullable
-        CobolLeftPadded<String> units;
+        CobolWord units;
 
         public enum Type {
             Memory,
@@ -18050,47 +16307,6 @@ public interface Cobol extends Tree {
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitValuedObjectComputerClause(this, p);
-        }
-
-        @Nullable
-        public String getUnits() {
-            return units == null ? null : units.getElement();
-        }
-
-        public ValuedObjectComputerClause withUnits(@Nullable String units) {
-            if (units == null) {
-                return this.units == null ? this : new ValuedObjectComputerClause(id, prefix, markers, type, words, value, null);
-            }
-            return getPadding().withUnits(CobolLeftPadded.withElement(this.units, units));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final ValuedObjectComputerClause t;
-
-            @Nullable
-            public CobolLeftPadded<String> getUnits() {
-                return t.units;
-            }
-
-            public ValuedObjectComputerClause withUnits(@Nullable CobolLeftPadded<String> units) {
-                return t.units == units ? t : new ValuedObjectComputerClause(t.padding, t.id, t.prefix, t.markers, t.type, t.words, t.value, units);
-            }
         }
     }
 
@@ -18119,7 +16335,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String valueOf;
+        CobolWord valueOf;
 
         CobolContainer<ValuePair> valuePairs;
 
@@ -18176,7 +16392,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         CobolWord systemName;
-        String is;
+        CobolWord is;
         Name name;
 
         @Override
@@ -18210,7 +16426,7 @@ public interface Cobol extends Tree {
 
         @Getter
         @With
-        String words;
+        CobolWord words;
 
         CobolContainer<DataDescriptionEntry> dataDescriptions;
 
@@ -18257,114 +16473,43 @@ public interface Cobol extends Tree {
         }
     }
 
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
     class Write implements Statement {
-        @Nullable
-        @NonFinal
-        transient WeakReference<Padding> padding;
 
-        @Getter
         @EqualsAndHashCode.Include
-        @With
         UUID id;
 
-        @Getter
-        @With
         Space prefix;
-
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
-        String write;
-
-        @Getter
-        @With
+        CobolWord write;
         QualifiedDataName recordName;
 
-        @Getter
         @Nullable
-        @With
         WriteFromPhrase writeFromPhrase;
 
-        @Getter
         @Nullable
-        @With
         WriteAdvancingPhrase writeAdvancingPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase writeAtEndOfPagePhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase writeNotAtEndOfPagePhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase invalidKeyPhrase;
 
-        @Getter
         @Nullable
-        @With
         StatementPhrase notInvalidKeyPhrase;
 
         @Nullable
-        CobolLeftPadded<String> endWrite;
+        CobolWord endWrite;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
             return v.visitWrite(this, p);
-        }
-
-        @Nullable
-        public String getEndWrite() {
-            return endWrite == null ? null : endWrite.getElement();
-        }
-
-        public Write withEndWrite(@Nullable String endWrite) {
-            if (endWrite == null) {
-                return this.endWrite == null ? this : new Write(id, prefix, markers, write, recordName, writeFromPhrase, writeAdvancingPhrase, writeAtEndOfPagePhrase, writeNotAtEndOfPagePhrase, invalidKeyPhrase, notInvalidKeyPhrase, null);
-            }
-            return getPadding().withEndWrite(CobolLeftPadded.withElement(this.endWrite, endWrite));
-        }
-
-        public Padding getPadding() {
-            Padding p;
-            if (this.padding == null) {
-                p = new Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final Write t;
-
-            @Nullable
-            public CobolLeftPadded<String> getEndWrite() {
-                return t.endWrite;
-            }
-
-            public Write withEndWrite(@Nullable CobolLeftPadded<String> endWrite) {
-                return t.endWrite == endWrite ? t : new Write(t.padding, t.id, t.prefix, t.markers, t.write, t.recordName, t.writeFromPhrase, t.writeAdvancingPhrase, t.writeAtEndOfPagePhrase, t.writeNotAtEndOfPagePhrase, t.invalidKeyPhrase, t.notInvalidKeyPhrase, endWrite);
-            }
         }
     }
 
@@ -18377,7 +16522,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String from;
+        CobolWord from;
         Name name;
 
         @Override
@@ -18395,7 +16540,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String words;
+        CobolWord words;
         Cobol writeBy;
 
         @Override
@@ -18413,7 +16558,7 @@ public interface Cobol extends Tree {
 
         Space prefix;
         Markers markers;
-        String page;
+        CobolWord page;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
@@ -18431,7 +16576,7 @@ public interface Cobol extends Tree {
         Space prefix;
         Markers markers;
         Name name;
-        String words;
+        CobolWord words;
 
         @Override
         public <P> Cobol acceptCobol(CobolVisitor<P> v, P p) {
