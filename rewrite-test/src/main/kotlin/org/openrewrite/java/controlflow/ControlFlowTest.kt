@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.controlflow
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.TypeValidation
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -2275,6 +2277,25 @@ interface ControlFlowTest : RewriteTest {
                         if (/*~~(1C)~~>*/conditional1())
                             /*~~(3L)~~>*/continue;
                         return /*~~(4L)~~>*/1;
+                    }
+                }
+            }
+            """
+        )
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2128")
+    @Disabled("This test is broken")
+    fun `ternary within the iterator for a for each loop`() = rewriteRun(
+        java(
+            """
+            abstract class Test {
+                abstract String[] array();
+
+                void test(boolean condition) {
+                    for (String s : condition ? array() : new String[] { "Hello!" }) {
+                        System.out.println(s);
                     }
                 }
             }
