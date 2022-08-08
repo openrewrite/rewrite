@@ -70,7 +70,7 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
                 sb.append("\n    ").append(abstractToVisualNodeMapping.get(node))
                         .append(" -> ").append(abstractToVisualNodeMapping.get(cn.getTruthySuccessor()));
                 if (!cn.isAlwaysFalse()) {
-                    sb.append(" [label=\"True\", color=\"darkgreen\" fontcolor=\"darkgreen\"];");
+                    sb.append(" [label=\"True\", color=\"green\" fontcolor=\"green\"];");
                 } else {
                     sb.append(" [label=\"Unreachable\", color=\"grey\" fontcolor=\"grey\" style=dashed];");
                 }
