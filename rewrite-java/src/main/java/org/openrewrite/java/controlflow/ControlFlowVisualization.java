@@ -30,6 +30,7 @@ public class ControlFlowVisualization extends Recipe {
             example = "true"
     )
     boolean includeDotfile;
+    boolean darkMode;
 
     @Override
     public String getDisplayName() {
@@ -43,6 +44,8 @@ public class ControlFlowVisualization extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ControlFlowVisualizationVisitor<>(includeDotfile ? ControlFlowDotFileGenerator.create() : null);
+        return new ControlFlowVisualizationVisitor<>(
+                includeDotfile ? ControlFlowDotFileGenerator.create() : null,
+                darkMode);
     }
 }

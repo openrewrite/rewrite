@@ -26,10 +26,15 @@ import java.util.stream.Collectors;
 
 final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerator {
     @Override
-    public String visualizeAsDotfile(String name, ControlFlowSummary summary) {
+    public String visualizeAsDotfile(String name, boolean darkMode, ControlFlowSummary summary) {
         StringBuilder sb = new StringBuilder("digraph ").append(name).append(" {\n");
         sb.append("    rankdir = TB;\n");
         sb.append("    edge [fontname=Arial];");
+        if (darkMode) {
+            sb.append("\n    graph [bgcolor=black];\n" +
+                    "    node [color=white, fontcolor=whitesmoke];\n" +
+                    "    edge [fontname=Arial; color=whitesmoke];");
+        }
         final Map<ControlFlowNode, Integer> abstractToVisualNodeMapping = new IdentityHashMap<>(summary.getAllNodes().size());
         // Create a predictable iteration order to make unit tests consistent
         List<NodeToNodeText> nodeToNodeText =
@@ -70,7 +75,12 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
                 sb.append("\n    ").append(abstractToVisualNodeMapping.get(node))
                         .append(" -> ").append(abstractToVisualNodeMapping.get(cn.getTruthySuccessor()));
                 if (!cn.isAlwaysFalse()) {
-                    sb.append(" [label=\"True\", color=\"green\" fontcolor=\"green\"];");
+                    sb.append(" [label=\"True\", ");
+                    if (darkMode) {
+                        sb.append("color=\"darkgreen\" fontcolor=\"darkgreen\"];");
+                    } else {
+                        sb.append("color=\"green3\" fontcolor=\"green3\"];");
+                    }
                 } else {
                     sb.append(" [label=\"Unreachable\", color=\"grey\" fontcolor=\"grey\" style=dashed];");
                 }
