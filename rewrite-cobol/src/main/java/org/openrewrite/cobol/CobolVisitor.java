@@ -892,6 +892,15 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return e;
     }
 
+    public Cobol visitEndKeyClause(Cobol.EndKeyClause endKeyClause, P p) {
+        Cobol.EndKeyClause e = endKeyClause;
+        e = e.withPrefix(visitSpace(e.getPrefix(), p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withWords((Cobol.CobolWord) visit(e.getWords(), p));
+        e = e.withName((Cobol.CobolWord) visit(e.getName(), p));
+        return e;
+    }
+
     public Cobol visitEndProgram(Cobol.EndProgram endProgram, P p) {
         Cobol.EndProgram e = endProgram;
         e = e.withPrefix(visitSpace(e.getPrefix(), p));

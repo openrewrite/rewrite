@@ -550,6 +550,11 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.EndKeyClause visitEndKeyClause(Cobol.EndKeyClause endKeyClause, P p) {
+        return (Cobol.EndKeyClause) super.visitEndKeyClause(endKeyClause, p);
+    }
+
+    @Override
     public Cobol.EndProgram visitEndProgram(Cobol.EndProgram endProgram, P p) {
         return (Cobol.EndProgram) super.visitEndProgram(endProgram, p);
     }

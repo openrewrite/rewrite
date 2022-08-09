@@ -1511,7 +1511,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitEndKeyClause(CobolParser.EndKeyClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.EndKeyClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.END(), ctx.KEY(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override

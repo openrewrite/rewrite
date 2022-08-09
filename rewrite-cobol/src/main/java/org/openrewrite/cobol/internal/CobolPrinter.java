@@ -930,6 +930,14 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return enable;
     }
 
+    public Cobol visitEndKeyClause(Cobol.EndKeyClause endKeyClause, PrintOutputCapture<P> p) {
+        visitSpace(endKeyClause.getPrefix(), p);
+        visitMarkers(endKeyClause.getMarkers(), p);
+        visit(endKeyClause.getWords(), p);
+        visit(endKeyClause.getName(), p);
+        return endKeyClause;
+    }
+
     public Cobol visitEndProgram(Cobol.EndProgram endProgram, PrintOutputCapture<P> p) {
         visitSpace(endProgram.getPrefix(), p);
         visitMarkers(endProgram.getMarkers(), p);
