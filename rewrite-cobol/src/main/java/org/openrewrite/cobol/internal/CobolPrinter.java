@@ -2744,6 +2744,13 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return reportGroupTypePageFooting;
     }
 
+    public Cobol visitReportGroupTypePageHeading(Cobol.ReportGroupTypePageHeading reportGroupTypePageHeading, PrintOutputCapture<P> p) {
+        visitSpace(reportGroupTypePageHeading.getPrefix(), p);
+        visitMarkers(reportGroupTypePageHeading.getMarkers(), p);
+        visit(reportGroupTypePageHeading.getWords(), p);
+        return reportGroupTypePageHeading;
+    }
+
     public Cobol visitReportGroupTypeReportFooting(Cobol.ReportGroupTypeReportFooting reportGroupTypeReportFooting, PrintOutputCapture<P> p) {
         visitSpace(reportGroupTypeReportFooting.getPrefix(), p);
         visitMarkers(reportGroupTypeReportFooting.getMarkers(), p);

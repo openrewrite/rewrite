@@ -2667,6 +2667,14 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return r;
     }
 
+    public Cobol visitReportGroupTypePageHeading(Cobol.ReportGroupTypePageHeading reportGroupTypePageHeading, P p) {
+        Cobol.ReportGroupTypePageHeading r = reportGroupTypePageHeading;
+        r = r.withPrefix(visitSpace(r.getPrefix(), p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withWords((Cobol.CobolWord) visit(r.getWords(), p));
+        return r;
+    }
+
     public Cobol visitReportGroupTypeReportHeading(Cobol.ReportGroupTypeReportHeading reportGroupTypeReportHeading, P p) {
         Cobol.ReportGroupTypeReportHeading r = reportGroupTypeReportHeading;
         r = r.withPrefix(visitSpace(r.getPrefix(), p));
@@ -3762,4 +3770,5 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         Space after = visitSpace(right.getAfter(), p);
         return (after == right.getAfter() && t == right.getElement()) ? right : new CobolRightPadded<>(t, after, right.getMarkers());
     }
+
 }

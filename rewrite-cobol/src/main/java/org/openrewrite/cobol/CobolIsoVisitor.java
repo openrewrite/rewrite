@@ -1610,6 +1610,11 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.ReportGroupTypePageHeading visitReportGroupTypePageHeading(Cobol.ReportGroupTypePageHeading reportGroupTypePageHeading, P p) {
+        return (Cobol.ReportGroupTypePageHeading) super.visitReportGroupTypePageHeading(reportGroupTypePageHeading, p);
+    }
+
+    @Override
     public Cobol.ReportGroupTypeReportFooting visitReportGroupTypeReportFooting(Cobol.ReportGroupTypeReportFooting reportGroupTypeReportFooting, P p) {
         return (Cobol.ReportGroupTypeReportFooting) super.visitReportGroupTypeReportFooting(reportGroupTypeReportFooting, p);
     }

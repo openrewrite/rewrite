@@ -4259,7 +4259,12 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitReportGroupTypePageHeading(CobolParser.ReportGroupTypePageHeadingContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.ReportGroupTypePageHeading(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.PAGE(), ctx.HEADING(), ctx.PH())
+        );
     }
 
     @Override
