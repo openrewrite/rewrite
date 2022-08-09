@@ -24,6 +24,9 @@ import org.openrewrite.hcl.tree.HclLeftPadded;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
@@ -51,14 +54,11 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
                 HclLeftPadded<Hcl.Attribute.Type> type = a.getPadding().getType();
 
                 if (Boolean.TRUE.equals(style.getBodyContent().getColumnarAlignment())) {
+                    List<Hcl.Attribute> groupAttributes = attributesInGroup(block, attribute);
+
                     int rightMostColumnOfAttributeKey = 0;
-                    for (BodyContent bodyContent : block.getBody()) {
-                        if (bodyContent instanceof Hcl.Attribute) {
-                            Hcl.Attribute sibling = (Hcl.Attribute) bodyContent;
-                            if (sibling.getType().equals(Hcl.Attribute.Type.Assignment)) {
-                                rightMostColumnOfAttributeKey = Math.max(rightMostColumnOfAttributeKey, endColumn(sibling));
-                            }
-                        }
+                    for (final Hcl.Attribute sibling : groupAttributes) {
+                        rightMostColumnOfAttributeKey = Math.max(rightMostColumnOfAttributeKey, endColumn(sibling));
                     }
 
                     rightMostColumnOfAttributeKey = Math.max(rightMostColumnOfAttributeKey, endColumn(a));
@@ -73,6 +73,30 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         }
 
         return a;
+    }
+
+    // find group of attributes (attributes with no extra newlines) containing given attribute
+    private List<Hcl.Attribute> attributesInGroup(Hcl.Block block, Hcl.Attribute attribute) {
+        List<Hcl.Attribute> groupAttributes = new ArrayList<>();
+        boolean segmentFound = false;
+        for (BodyContent bodyContent : block.getBody()) {
+            if (bodyContent instanceof Hcl.Attribute) {
+                Hcl.Attribute sibling = (Hcl.Attribute) bodyContent;
+                if (sibling.getType().equals(Hcl.Attribute.Type.Assignment)) {
+                    if (sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2) {
+                        if (segmentFound) {
+                            break;
+                        }
+                        groupAttributes.clear();
+                    }
+                    if (sibling.getId() == attribute.getId()) {
+                        segmentFound = true;
+                    }
+                    groupAttributes.add(sibling);
+                }
+            }
+        }
+        return groupAttributes;
     }
 
     private int endColumn(Hcl.Attribute attribute) {

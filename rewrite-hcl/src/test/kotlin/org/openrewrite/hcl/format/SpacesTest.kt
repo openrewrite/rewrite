@@ -77,6 +77,54 @@ class SpacesTest : HclRecipeTest {
         """
     )
 
+    @Test
+    fun attributeGroups() = assertChanged(
+        before = """
+            resource "custom_resource" {
+              size = 1
+              x = 1
+              
+              longerattribute = "long"
+              y = 2
+            }
+        """,
+        after = """
+            resource "custom_resource" {
+              size = 1
+              x    = 1
+              
+              longerattribute = "long"
+              y               = 2
+            }
+        """
+    )
+
+    @Test
+    fun noAttributeGroups() = assertChanged(
+        before = """
+            resource "custom_resource" {
+              size   = 1
+
+              x = 1
+              
+              longerattribute   = "long"
+
+              y = 2
+            }
+        """,
+        after = """
+            resource "custom_resource" {
+              size = 1
+
+              x = 1
+              
+              longerattribute = "long"
+
+              y = 2
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/974")
     @Test
     fun lineHashComment() = assertChanged(
