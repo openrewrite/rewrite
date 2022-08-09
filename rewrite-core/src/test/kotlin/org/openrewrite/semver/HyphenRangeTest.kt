@@ -43,7 +43,7 @@ class HyphenRangeTest {
         assertThat(hyphenRange.isValid("1.0", "1.2.3.0.RELEASE")).isTrue
         assertThat(hyphenRange.isValid("1.0", "1.2.3")).isTrue
         assertThat(hyphenRange.isValid("1.0", "1.2.3.0")).isTrue
-        assertThat(hyphenRange.isValid("1.0", "1.2.3.0.0")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.2.3.0.0")).isTrue
         assertThat(hyphenRange.isValid("1.0", "2.3.4")).isTrue
         assertThat(hyphenRange.isValid("1.0", "2.3.4.0")).isTrue
         assertThat(hyphenRange.isValid("1.0", "2.3.4.1")).isFalse
@@ -62,7 +62,7 @@ class HyphenRangeTest {
         assertThat(hyphenRange.isValid("1.0", "1.1.9.9")).isFalse
         assertThat(hyphenRange.isValid("1.0", "1.2.0")).isTrue
         assertThat(hyphenRange.isValid("1.0", "1.2.0.0")).isTrue
-        assertThat(hyphenRange.isValid("1.0", "1.2.0.0.0")).isFalse
+        assertThat(hyphenRange.isValid("1.0", "1.2.0.0.0")).isTrue
         assertThat(hyphenRange.isValid("1.0", "2.0.0")).isTrue
         assertThat(hyphenRange.isValid("1.0", "2.0.0.0")).isTrue
         assertThat(hyphenRange.isValid("1.0", "2.0.1")).isFalse

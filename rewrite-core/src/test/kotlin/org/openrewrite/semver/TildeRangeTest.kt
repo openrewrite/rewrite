@@ -49,7 +49,7 @@ class TildeRangeTest {
 
         assertThat(tildeRange.isValid("1.0", "1.2.3.5")).isTrue
         assertThat(tildeRange.isValid("1.0", "1.2.3.0")).isFalse
-        assertThat(tildeRange.isValid("1.0", "1.2.3.5.0")).isFalse
+        assertThat(tildeRange.isValid("1.0", "1.2.3.5.0")).isTrue
         assertThat(tildeRange.isValid("1.0", "1.2.3")).isFalse
         assertThat(tildeRange.isValid("1.0", "1.2.4")).isFalse
         assertThat(tildeRange.isValid("1.0", "1.2.4.0")).isFalse
