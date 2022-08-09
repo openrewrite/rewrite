@@ -13,7 +13,7 @@ dependencies {
 
     implementation("de.danielbechler:java-object-diff:latest.release")
 
-    implementation("io.quarkus.gizmo:gizmo:latest.release")
+    implementation("io.quarkus.gizmo:gizmo:1.0.+")
 
     api("com.fasterxml.jackson.core:jackson-databind:latest.release")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
