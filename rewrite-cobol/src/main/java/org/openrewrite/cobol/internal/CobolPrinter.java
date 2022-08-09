@@ -3340,6 +3340,14 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return stop;
     }
 
+    public Cobol visitStopStatementGiving(Cobol.StopStatementGiving stopStatementGiving, PrintOutputCapture<P> p) {
+        visitSpace(stopStatementGiving.getPrefix(), p);
+        visitMarkers(stopStatementGiving.getMarkers(), p);
+        visit(stopStatementGiving.getWords(), p);
+        visit(stopStatementGiving.getName(), p);
+        return stopStatementGiving;
+    }
+
     public Cobol visitStringDelimitedByPhrase(Cobol.StringDelimitedByPhrase stringDelimitedByPhrase, PrintOutputCapture<P> p) {
         visitSpace(stringDelimitedByPhrase.getPrefix(), p);
         visitMarkers(stringDelimitedByPhrase.getMarkers(), p);

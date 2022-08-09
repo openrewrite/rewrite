@@ -5218,15 +5218,23 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Cobol.Stop visitStopStatement(CobolParser.StopStatementContext ctx) {
-        if (ctx.literal() != null || ctx.stopStatementGiving() != null) {
-            throw new UnsupportedOperationException("Implement me");
-        }
         return new Cobol.Stop(
                 randomId(),
                 prefix(ctx),
                 Markers.EMPTY,
                 words(ctx.STOP(), ctx.RUN()),
-                null
+                visit(ctx.literal(), ctx.stopStatementGiving())
+        );
+    }
+
+    @Override
+    public Object visitStopStatementGiving(CobolParser.StopStatementGivingContext ctx) {
+        return new Cobol.StopStatementGiving(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.RUN(), ctx.GIVING(), ctx.RETURNING()),
+                visit(ctx.identifier(), ctx.integerLiteral())
         );
     }
 

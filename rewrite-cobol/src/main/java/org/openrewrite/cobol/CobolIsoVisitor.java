@@ -2148,4 +2148,9 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     public Cobol.ReportDescriptionFirstDetailClause visitReportDescriptionFirstDetailClause(Cobol.ReportDescriptionFirstDetailClause reportDescriptionFirstDetailClause, P p) {
         return (Cobol.ReportDescriptionFirstDetailClause) super.visitReportDescriptionFirstDetailClause(reportDescriptionFirstDetailClause, p);
     }
+
+    @Override
+    public Cobol.StopStatementGiving visitStopStatementGiving(Cobol.StopStatementGiving stopStatementGiving, P p) {
+        return (Cobol.StopStatementGiving) super.visitStopStatementGiving(stopStatementGiving, p);
+    }
 }

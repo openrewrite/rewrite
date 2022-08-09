@@ -3231,6 +3231,14 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return s;
     }
 
+    public Cobol visitStopStatementGiving(Cobol.StopStatementGiving stopStatementGiving, P p) {
+        Cobol.StopStatementGiving s = stopStatementGiving;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withWords((Cobol) visit(s.getWords(), p));
+        return s;
+    }
+
     public Cobol visitStringDelimitedByPhrase(Cobol.StringDelimitedByPhrase stringDelimitedByPhrase, P p) {
         Cobol.StringDelimitedByPhrase s = stringDelimitedByPhrase;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
