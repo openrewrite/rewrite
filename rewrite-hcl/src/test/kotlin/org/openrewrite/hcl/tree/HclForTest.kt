@@ -27,6 +27,13 @@ class HclForTest : RewriteTest {
                 a = [ for v in ["a", "b"] : v ]
                 b = [ for i, v in ["a", "b"] : i ]
                 c = [for i, v in ["a", "b", "c"]: v if 0]
+                d = [
+                  for i, v in ["a", "b", "c"]: v if 0
+                ]
+                e = [
+                  for i, v in ["a", "b", "c"]: v 
+                  if 0
+                ]
             """
         )
     )
@@ -37,8 +44,15 @@ class HclForTest : RewriteTest {
             """
                 a = { for i, v in ["a", "b"]: v => i }
                 b = { for i, v in ["a", "a", "b"]: k => v }
-                c = { for i, v in ["a", "a", "b"]: v => i... }
+                c = {
+                  for i, v in ["a", "a", "b"]: v => i... 
+                }
+                d = {
+                  for i, v in ["a", "a", "b"]: v => i...
+                  if 0
+                }
             """
         )
     )
+
 }
