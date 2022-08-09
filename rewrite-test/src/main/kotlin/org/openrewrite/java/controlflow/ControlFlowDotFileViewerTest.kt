@@ -75,7 +75,7 @@ interface ControlFlowDotFileViewerTest : RewriteTest  {
                 11 [shape=box, label="{\l    System.out.println(\"buz\");\l    continue;\l}\l", fontname="Courier"];
                 12 [shape=box, label="{\l    System.out.println(\"fiz\");\l}\l", fontname="Courier"];
                 13 [shape=box, label="{\l    break;\l}\l", fontname="Courier"];
-                14 [shape=box, label="{\l    i++;\l    for(             args)\l     \l", fontname="Courier"];
+                14 [shape=box, label="{\l    i++;\l    for(String arg : args)\l     \l", fontname="Courier"];
                 15 [shape=box, label="{\l    if (\"fiz\".equals(arg))\l                       \l", fontname="Courier"];
                 16 [shape=box, label="{\l    int i = 0;\l    while (i < 10)\l     \l", fontname="Courier"];
                 17 [shape=circle, label="End", fontname="Arial"];

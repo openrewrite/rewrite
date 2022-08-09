@@ -17,9 +17,11 @@ package org.openrewrite.semver
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.util.*
 
 class LatestPatchTest {
     private val latestPatch = LatestPatch(null)
+    private val latestMetadataPatch = LatestPatch("-fred")
 
     @Test
     fun isValid() {
@@ -32,8 +34,66 @@ class LatestPatchTest {
     }
 
     @Test
+    fun upgrade() {
+        var upgrade = latestPatch.upgrade("2.10.10.3.24", Arrays.asList("2.10.0"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestPatch.upgrade("2.10.10.3.24", Arrays.asList("2.11.0"))
+        assertThat(upgrade.isPresent).isFalse()
+        upgrade = latestPatch.upgrade("2.10.10.3.24", Arrays.asList("2.10.9"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestPatch.upgrade("2.10.10.3.24", Arrays.asList("2.10.11"))
+        assertThat(upgrade.isPresent).isTrue()
+        assertThat(upgrade.get()).isEqualTo("2.10.11")
+
+        upgrade = latestPatch.upgrade("2.10.10.3.24", Arrays.asList("2.10.10.3.23"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestPatch.upgrade("2.10.10.3.24", Arrays.asList("2.10.10.2.25"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestPatch.upgrade("2.10.10.3.24", Arrays.asList("2.10.10.3.25"))
+        assertThat(upgrade.isPresent).isTrue()
+        assertThat(upgrade.get()).isEqualTo("2.10.10.3.25")
+    }
+
+    @Test
     fun compare() {
         assertThat(latestPatch.compare("1.0", "1.0.1", "1.0.2")).isLessThan(0)
         assertThat(latestPatch.compare("1.0", "1.0.0.1", "1.0.1")).isLessThan(0)
     }
+
+    @Test
+    fun metadataValid() {
+        assertThat(latestMetadataPatch.isValid("1.0.0-fred", "1.0.4-fred")).isTrue
+        assertThat(latestMetadataPatch.isValid("1.0-fred", "1.0.1-fred")).isTrue
+        assertThat(latestMetadataPatch.isValid("1.0.0-fred", "1.0.4-not-fred")).isFalse
+    }
+
+    @Test
+    fun metadataUpgrade() {
+        var upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", Arrays.asList("2.10.0-fred"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", Arrays.asList("2.11.0-fred"))
+        assertThat(upgrade.isPresent).isFalse()
+        upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", Arrays.asList("2.10.9-fred"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", Arrays.asList("2.10.11-fred"))
+        assertThat(upgrade.isPresent).isTrue()
+        assertThat(upgrade.get()).isEqualTo("2.10.11-fred")
+
+        upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", Arrays.asList("2.10.10.3.23-fred"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", Arrays.asList("2.10.10.2.25-fred"))
+        assertThat(upgrade.isPresent).isFalse()
+
+        upgrade = latestMetadataPatch.upgrade("2.10.10.3.24-fred", Arrays.asList("2.10.10.3.25-fred"))
+        assertThat(upgrade.isPresent).isTrue()
+        assertThat(upgrade.get()).isEqualTo("2.10.10.3.25-fred")
+    }
+
 }

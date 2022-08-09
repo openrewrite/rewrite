@@ -8,7 +8,7 @@ plugins {
 apply(plugin = "nebula.integtest-standalone")
 
 val integTestImplementation = configurations.getByName("integTestImplementation")
-
+val rocksDbVersion = "7.4.3" // https://github.com/facebook/rocksdb/issues/10448
 dependencies {
     api(project(":rewrite-xml"))
     api("org.jetbrains:annotations:latest.release")
@@ -34,7 +34,7 @@ dependencies {
 
     compileOnly("guru.nidi:graphviz-java:latest.release")
 
-    compileOnly("org.rocksdb:rocksdbjni:latest.release")
+    compileOnly("org.rocksdb:rocksdbjni:$rocksDbVersion")
     compileOnly(project(":rewrite-yaml"))
     compileOnly(project(":rewrite-properties"))
 
@@ -51,7 +51,7 @@ dependencies {
     integTestImplementation("org.apache.maven:maven-aether-provider:latest.release")
     integTestImplementation("org.apache.maven:maven-core:latest.release")
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.9+")
-    integTestImplementation("org.rocksdb:rocksdbjni:latest.release")
+    integTestImplementation("org.rocksdb:rocksdbjni:$rocksDbVersion")
 
     integTestImplementation(project(":rewrite-java-11"))
     integTestImplementation(project(":rewrite-properties"))
@@ -66,7 +66,7 @@ dependencies {
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-11"))
-    testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
+    testRuntimeOnly("org.rocksdb:rocksdbjni:$rocksDbVersion")
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 }
 

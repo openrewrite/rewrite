@@ -19,7 +19,7 @@ import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Scanner;
 import java.util.regex.Matcher;
 
 import static java.lang.Integer.parseInt;
@@ -39,8 +39,8 @@ public class LatestRelease implements VersionComparator {
             return false;
         }
         return metadataPattern == null ||
-                (StringUtils.isBlank(metadataPattern) && matcher.group(5) == null) ||
-                (matcher.group(5) != null && matcher.group(5).matches(metadataPattern));
+                (StringUtils.isBlank(metadataPattern) && matcher.group(6) == null) ||
+                (matcher.group(6) != null && matcher.group(6).matches(metadataPattern));
     }
 
     static String normalizeVersion(String version) {
@@ -52,9 +52,9 @@ public class LatestRelease implements VersionComparator {
 
         long versionParts = countVersionParts(version);
 
-        if (versionParts < 2) {
+        if (versionParts <= 2) {
             String[] versionAndMetadata = version.split("(?=[-+])");
-            for (; versionParts < 2; versionParts++) {
+            for (; versionParts <= 2; versionParts++) {
                 versionAndMetadata[0] += ".0";
             }
             version = versionAndMetadata[0] + (versionAndMetadata.length > 1 ?
@@ -65,16 +65,17 @@ public class LatestRelease implements VersionComparator {
     }
 
     static long countVersionParts(String version) {
-        AtomicBoolean beforeMetadata = new AtomicBoolean(true);
-        return version.chars()
-                .filter(c -> {
-                    if (c == '-' || c == '+') {
-                        beforeMetadata.set(false);
-                    }
-                    return beforeMetadata.get();
-                })
-                .filter(c -> c == '.')
-                .count();
+        long count = 0;
+        Scanner scanner = new Scanner(version);
+        scanner.useDelimiter("[.\\-$]");
+        while (scanner.hasNext()) {
+            String part = scanner.next();
+            if (part.isEmpty() || !Character.isDigit(part.charAt(0))) {
+                break;
+            }
+            count++;
+        }
+        return count;
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -110,19 +111,24 @@ public class LatestRelease implements VersionComparator {
         String normalized1 = metadataPattern == null ? nv1.toString() : nv1.toString().replace(metadataPattern, "");
         String normalized2 = metadataPattern == null ? nv2.toString() : nv1.toString().replace(metadataPattern, "");
 
-        for (int i = 1; i < nv1.length(); i++) {
-            String v1Part = v1Gav.group(i);
-            String v2Part = v2Gav.group(i);
-            if (v1Part == null) {
-                return v2Part == null ? normalized1.compareTo(normalized2) : -1;
-            } else if (v2Part == null) {
-                return 1;
-            }
+        try {
+            for (int i = 1; i <= Math.max(vp1, vp2); i++) {
+                String v1Part = v1Gav.group(i);
+                String v2Part = v2Gav.group(i);
+                if (v1Part == null) {
+                    return v2Part == null ? normalized1.compareTo(normalized2) : -1;
+                } else if (v2Part == null) {
+                    return 1;
+                }
 
-            int diff = parseInt(v1Part) - parseInt(v2Part);
-            if (diff != 0) {
-                return diff;
+                int diff = parseInt(v1Part) - parseInt(v2Part);
+                if (diff != 0) {
+                    return diff;
+                }
             }
+        } catch (IllegalStateException exception) {
+            //Provide a better error message if an error is thrown while getting groups from the regular expression.
+            throw new IllegalStateException("Illegal State while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]");
         }
 
         return normalized1.compareTo(normalized2);
