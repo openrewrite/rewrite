@@ -510,6 +510,16 @@ public class CobolIsoVisitor<P> extends CobolVisitor<P> {
     }
 
     @Override
+    public Cobol.DisplayAt visitDisplayAt(Cobol.DisplayAt displayAt, P p) {
+        return (Cobol.DisplayAt) super.visitDisplayAt(displayAt, p);
+    }
+
+    @Override
+    public Cobol.DisplayUpon visitDisplayUpon(Cobol.DisplayUpon displayUpon, P p) {
+        return (Cobol.DisplayUpon) super.visitDisplayUpon(displayUpon, p);
+    }
+
+    @Override
     public Cobol.Divide visitDivide(Cobol.Divide divide, P p) {
         return (Cobol.Divide) super.visitDivide(divide, p);
     }

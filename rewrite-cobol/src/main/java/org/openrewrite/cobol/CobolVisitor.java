@@ -826,6 +826,23 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return d;
     }
 
+    public Cobol visitDisplayAt(Cobol.DisplayAt displayAt, P p) {
+        Cobol.DisplayAt d = displayAt;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withAt((Cobol.CobolWord) visit(d.getAt(), p));
+        return d;
+    }
+
+    public Cobol visitDisplayUpon(Cobol.DisplayUpon displayUpon, P p) {
+        Cobol.DisplayUpon d = displayUpon;
+        d = d.withPrefix(visitSpace(d.getPrefix(), p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withUpon((Cobol.CobolWord) visit(d.getUpon(), p));
+        d = d.withName((Cobol.CobolWord) visit(d.getName(), p));
+        return d;
+    }
+
     public Cobol visitDivide(Cobol.Divide divide, P p) {
         Cobol.Divide d = divide;
         d = d.withPrefix(visitSpace(d.getPrefix(), p));

@@ -858,6 +858,22 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return display;
     }
 
+    public Cobol visitDisplayAt(Cobol.DisplayAt displayAt, PrintOutputCapture<P> p) {
+        visitSpace(displayAt.getPrefix(), p);
+        visitMarkers(displayAt.getMarkers(), p);
+        visit(displayAt.getAt(), p);
+        visit(displayAt.getName(), p);
+        return displayAt;
+    }
+
+    public Cobol visitDisplayUpon(Cobol.DisplayUpon displayUpon, PrintOutputCapture<P> p) {
+        visitSpace(displayUpon.getPrefix(), p);
+        visitMarkers(displayUpon.getMarkers(), p);
+        visit(displayUpon.getUpon(), p);
+        visit(displayUpon.getName(), p);
+        return displayUpon;
+    }
+
     public Cobol visitDivide(Cobol.Divide divide, PrintOutputCapture<P> p) {
         visitSpace(divide.getPrefix(), p);
         visitMarkers(divide.getMarkers(), p);
