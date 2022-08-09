@@ -5213,7 +5213,13 @@ public class CobolParserVisitor extends CobolBaseVisitor<Object> {
 
     @Override
     public Object visitStatusKeyClause(CobolParser.StatusKeyClauseContext ctx) {
-        throw new UnsupportedOperationException("Implement me");
+        return new Cobol.StatusKeyClause(
+                randomId(),
+                prefix(ctx),
+                Markers.EMPTY,
+                words(ctx.STATUS(), ctx.KEY(), ctx.IS()),
+                (Cobol.CobolWord) visit(ctx.dataDescName())
+        );
     }
 
     @Override

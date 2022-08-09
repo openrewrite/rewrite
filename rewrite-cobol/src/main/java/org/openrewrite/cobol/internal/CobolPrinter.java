@@ -3332,6 +3332,14 @@ public class CobolPrinter<P> extends CobolVisitor<PrintOutputCapture<P>> {
         return statementPhrase;
     }
 
+    public Cobol visitStatusKeyClause(Cobol.StatusKeyClause statusKeyClause, PrintOutputCapture<P> p) {
+        visitSpace(statusKeyClause.getPrefix(), p);
+        visitMarkers(statusKeyClause.getMarkers(), p);
+        visit(statusKeyClause.getWords(), p);
+        visit(statusKeyClause.getName(), p);
+        return statusKeyClause;
+    }
+
     public Cobol visitStop(Cobol.Stop stop, PrintOutputCapture<P> p) {
         visitSpace(stop.getPrefix(), p);
         visitMarkers(stop.getMarkers(), p);

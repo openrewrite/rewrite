@@ -3223,6 +3223,15 @@ public class CobolVisitor<P> extends TreeVisitor<Cobol, P> {
         return s;
     }
 
+    public Cobol visitStatusKeyClause(Cobol.StatusKeyClause statusKeyClause, P p) {
+        Cobol.StatusKeyClause s = statusKeyClause;
+        s = s.withPrefix(visitSpace(s.getPrefix(), p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        s = s.withWords((Cobol.CobolWord) visit(s.getWords(), p));
+        s = s.withName((Cobol.CobolWord) visit(s.getName(), p));
+        return s;
+    }
+
     public Cobol visitStop(Cobol.Stop stop, P p) {
         Cobol.Stop s = stop;
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
