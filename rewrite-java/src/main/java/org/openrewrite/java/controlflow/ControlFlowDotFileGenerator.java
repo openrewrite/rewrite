@@ -16,7 +16,7 @@
 package org.openrewrite.java.controlflow;
 
 interface ControlFlowDotFileGenerator {
-    String visualizeAsDotfile(String name, ControlFlowSummary summary);
+    String visualizeAsDotfile(String name, boolean darkMode, ControlFlowSummary summary);
 
     enum Type {
         DOT {

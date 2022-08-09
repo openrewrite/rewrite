@@ -38,6 +38,8 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final ControlFlowDotFileGenerator dotFileGenerator;
 
+    private final boolean darkMode;
+
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
@@ -80,7 +82,7 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                                 " EX: " + controlFlow.getExitCount();
                 if (dotFileGenerator != null) {
                     String graphName = methodDeclaration != null ? methodDeclaration.getSimpleName() : b.isStatic() ? "static block" : "init block";
-                    String dotFile = dotFileGenerator.visualizeAsDotfile(graphName, controlFlow);
+                    String dotFile = dotFileGenerator.visualizeAsDotfile(graphName, darkMode, controlFlow);
                     if (isMethodDeclaration) {
                         getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
                     } else {
