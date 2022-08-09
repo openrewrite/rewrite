@@ -201,18 +201,25 @@ public class UpgradeDependencyVersion extends Recipe {
             @Nullable
             private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) {
                 GroupArtifact ga = new GroupArtifact(groupId, artifactId);
-                List<String> artifactVersions = availableVersions.computeIfAbsent(ga,
-                        k -> {
-                            MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                            List<String> versions = new ArrayList<>();
-                            for (String v : mavenMetadata.getVersioning().getVersions()) {
-                                if (versionComparator.isValid(version, v)) {
-                                    versions.add(v);
+                try {
+                    List<String> artifactVersions = availableVersions.computeIfAbsent(ga,
+                            k -> {
+                                MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                                List<String> versions = new ArrayList<>();
+                                for (String v : mavenMetadata.getVersioning().getVersions()) {
+                                    if (versionComparator.isValid(version, v)) {
+                                        versions.add(v);
+                                    }
                                 }
-                            }
-                            return versions;
-                        });
-                return versionComparator.upgrade(version, artifactVersions).orElse(null);
+                                return versions;
+                            });
+                    return versionComparator.upgrade(version, artifactVersions).orElse(null);
+                } catch (IllegalStateException e) {
+                    //This can happen when we encounter exotic version. Pass the error to the error handler and
+                    //in the spirit of "do no harm", return null.
+                    ctx.getOnError().accept(e);
+                    return null;
+                }
             }
         };
     }

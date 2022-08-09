@@ -111,19 +111,24 @@ public class LatestRelease implements VersionComparator {
         String normalized1 = metadataPattern == null ? nv1.toString() : nv1.toString().replace(metadataPattern, "");
         String normalized2 = metadataPattern == null ? nv2.toString() : nv1.toString().replace(metadataPattern, "");
 
-        for (int i = 1; i <= Math.max(vp1, vp2); i++) {
-            String v1Part = v1Gav.group(i);
-            String v2Part = v2Gav.group(i);
-            if (v1Part == null) {
-                return v2Part == null ? normalized1.compareTo(normalized2) : -1;
-            } else if (v2Part == null) {
-                return 1;
-            }
+        try {
+            for (int i = 1; i <= Math.max(vp1, vp2); i++) {
+                String v1Part = v1Gav.group(i);
+                String v2Part = v2Gav.group(i);
+                if (v1Part == null) {
+                    return v2Part == null ? normalized1.compareTo(normalized2) : -1;
+                } else if (v2Part == null) {
+                    return 1;
+                }
 
-            int diff = parseInt(v1Part) - parseInt(v2Part);
-            if (diff != 0) {
-                return diff;
+                int diff = parseInt(v1Part) - parseInt(v2Part);
+                if (diff != 0) {
+                    return diff;
+                }
             }
+        } catch (IllegalStateException exception) {
+            //Provide a better error message if an error is thrown while getting groups from the regular expression.
+            throw new IllegalStateException("Illegal State while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]");
         }
 
         return normalized1.compareTo(normalized2);
