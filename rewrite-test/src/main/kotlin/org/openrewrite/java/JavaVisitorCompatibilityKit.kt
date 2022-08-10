@@ -232,6 +232,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindMethodsTck : FindMethodsTest
 
     @Nested
+    inner class FindRepeatableAnnotationsTck : FindRepeatableAnnotationsTest
+
+    @Nested
     inner class DeimplementInterfaceTck : DeimplementInterfaceTest
 
     @Nested
@@ -530,6 +533,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class UnwrapParenthesesTck : UnwrapParenthesesTest
+
+    @Nested
+    inner class UnwrapRepeatableAnnotationsTck : UnwrapRepeatableAnnotationsTest
 
     @Nested
     inner class UseDiamondOperatorTck : UseDiamondOperatorTest
