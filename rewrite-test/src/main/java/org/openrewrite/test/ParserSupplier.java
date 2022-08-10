@@ -25,8 +25,7 @@ import java.util.function.Supplier;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public
-class ParserSupplier implements Supplier<Parser<?>> {
+public class ParserSupplier implements Supplier<Parser<?>> {
     @EqualsAndHashCode.Include
     private final Class<? extends SourceFile> sourceFileType;
 
