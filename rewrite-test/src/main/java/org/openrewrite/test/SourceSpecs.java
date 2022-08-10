@@ -17,7 +17,6 @@ package org.openrewrite.test;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.SourceFile;
-import org.openrewrite.cobol.tree.Cobol;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.lang.Nullable;
@@ -42,29 +41,6 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
 
     default SourceSpecs dir(String dir, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
         return new Dir(dir, spec, sources);
-    }
-
-    default SourceSpecs cobol(@Nullable String before) {
-        return cobol(before, s -> {
-        });
-    }
-
-    default SourceSpecs cobol(@Nullable String before, Consumer<SourceSpec<Cobol.CompilationUnit>> spec) {
-        SourceSpec<Cobol.CompilationUnit> cobol = new SourceSpec<>(Cobol.CompilationUnit.class, null, before, null);
-        spec.accept(cobol);
-        return cobol;
-    }
-
-    default SourceSpecs cobol(@Nullable String before, String after) {
-        return cobol(before, after, s -> {
-        });
-    }
-
-    default SourceSpecs cobol(@Nullable String before, String after,
-                             Consumer<SourceSpec<Cobol.CompilationUnit>> spec) {
-        SourceSpec<Cobol.CompilationUnit> cobol = new SourceSpec<>(Cobol.CompilationUnit.class, null, before, after);
-        spec.accept(cobol);
-        return cobol;
     }
 
     default SourceSpecs java(@Language("java") @Nullable String before) {

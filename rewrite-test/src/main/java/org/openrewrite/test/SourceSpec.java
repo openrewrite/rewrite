@@ -16,6 +16,7 @@
 package org.openrewrite.test;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
@@ -28,6 +29,7 @@ import java.util.function.Consumer;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@Getter
 public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @EqualsAndHashCode.Include
     final UUID id = UUID.randomUUID();

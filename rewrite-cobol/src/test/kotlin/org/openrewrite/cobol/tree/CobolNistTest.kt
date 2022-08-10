@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.cobol.CobolVisitor
+import org.openrewrite.cobol.test.CobolTest
 import org.openrewrite.test.RecipeSpec
-import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
 
-class CobolNistTest : RewriteTest {
+class CobolNistTest : CobolTest {
 
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(toRecipe {

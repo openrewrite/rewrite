@@ -18,8 +18,6 @@ package org.openrewrite.test;
 import org.assertj.core.api.SoftAssertions;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
-import org.openrewrite.cobol.CobolParser;
-import org.openrewrite.cobol.tree.Cobol;
 import org.openrewrite.config.Environment;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.groovy.GroovyParser;
@@ -105,6 +103,43 @@ public interface RewriteTest extends SourceSpecs {
         );
     }
 
+    default ParserSupplier parserSupplierFor(SourceSpec<?> sourceSpec) {
+        if (Quark.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(Quark.class, sourceSpec.dsl, QuarkParser::new);
+        } else if (J.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(J.CompilationUnit.class, sourceSpec.dsl, () -> JavaParser.fromJavaVersion()
+                            .logCompilationWarningsAndErrors(true)
+                            .build());
+        } else if (Xml.Document.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(Xml.Document.class, sourceSpec.dsl, () -> {
+                        if ("maven".equals(sourceSpec.dsl)) {
+                            return MavenParser.builder().build();
+                        }
+                        return new XmlParser();
+                    });
+        } else if (G.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(G.CompilationUnit.class, sourceSpec.dsl, () -> {
+                        if ("gradle".equals(sourceSpec.dsl)) {
+                            return new GradleParser(GroovyParser.builder());
+                        }
+                        return GroovyParser.builder().build();
+                    });
+        } else if (Yaml.Documents.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(Yaml.Documents.class, sourceSpec.dsl, YamlParser::new);
+        } else if (Json.Document.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(Json.Document.class, sourceSpec.dsl, JsonParser::new);
+        } else if (Hcl.ConfigFile.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(Hcl.ConfigFile.class, sourceSpec.dsl, () -> HclParser.builder().build());
+        } else if (Proto.Document.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(Proto.Document.class, sourceSpec.dsl, ProtoParser::new);
+        } else if (PlainText.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(PlainText.class, sourceSpec.dsl, PlainTextParser::new);
+        } else if (Properties.File.class.equals(sourceSpec.sourceFileType)) {
+            return new ParserSupplier(Properties.File.class, sourceSpec.dsl, PropertiesParser::new);
+        }
+        throw new IllegalArgumentException("Unable to determine what sort of parser to use for SourceFile type: " + sourceSpec.sourceFileType);
+    }
+
     default void rewriteRun(Consumer<RecipeSpec> spec, SourceSpec<?>... sourceSpecs) {
         RecipeSpec testClassSpec = RecipeSpec.defaults();
         defaults(testClassSpec);
@@ -174,63 +209,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             // ----- default parsers for each SourceFile type -------------------------
-            if (Quark.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Quark.class, sourceSpec.dsl, QuarkParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (J.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(J.CompilationUnit.class, sourceSpec.dsl, () -> JavaParser.fromJavaVersion()
-                                .logCompilationWarningsAndErrors(true)
-                                .build()),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Xml.Document.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Xml.Document.class, sourceSpec.dsl, () -> {
-                            if ("maven".equals(sourceSpec.dsl)) {
-                                return MavenParser.builder().build();
-                            }
-                            return new XmlParser();
-                        }),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (G.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(G.CompilationUnit.class, sourceSpec.dsl, () -> {
-                            if ("gradle".equals(sourceSpec.dsl)) {
-                                return new GradleParser(GroovyParser.builder());
-                            }
-                            return GroovyParser.builder().build();
-                        }),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Yaml.Documents.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Yaml.Documents.class, sourceSpec.dsl, YamlParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Json.Document.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Json.Document.class, sourceSpec.dsl, JsonParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Hcl.ConfigFile.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Hcl.ConfigFile.class, sourceSpec.dsl, () -> HclParser.builder().build()),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Proto.Document.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Proto.Document.class, sourceSpec.dsl, ProtoParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (PlainText.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(PlainText.class, sourceSpec.dsl, PlainTextParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Properties.File.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Properties.File.class, sourceSpec.dsl, PropertiesParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Cobol.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Cobol.CompilationUnit.class, sourceSpec.dsl, CobolParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            }
+            sourceSpecsByParser.computeIfAbsent(parserSupplierFor(sourceSpec), p -> new ArrayList<>()).add(sourceSpec);
         }
 
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new HashMap<>(sourceSpecs.length);

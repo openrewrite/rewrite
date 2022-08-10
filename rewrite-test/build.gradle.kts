@@ -4,7 +4,6 @@ plugins {
 }
 
 dependencies {
-    api(project(":rewrite-cobol"))
     api(project(":rewrite-core"))
     api(project(":rewrite-gradle"))
     api(project(":rewrite-groovy"))
