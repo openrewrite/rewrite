@@ -5,7 +5,6 @@ plugins {
 
 dependencies {
     api(project(":rewrite-core"))
-    api(project(":rewrite-java"))
 
     api("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 

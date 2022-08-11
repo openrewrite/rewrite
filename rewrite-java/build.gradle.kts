@@ -26,6 +26,7 @@ dependencies {
     compileOnly("com.puppycrawl.tools:checkstyle:9.+") { // Pinned to 9.+ because 10.x does not support Java 8: https://checkstyle.sourceforge.io/#JRE_and_JDK
         isTransitive = false
     }
+    compileOnly(project(":rewrite-test"))
     implementation("commons-lang:commons-lang:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 

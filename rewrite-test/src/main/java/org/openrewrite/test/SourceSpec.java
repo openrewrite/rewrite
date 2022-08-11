@@ -94,27 +94,6 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return this;
     }
 
-    public Java java() {
-        return new Java();
-    }
-
-    public class Java {
-        public Java version(int version) {
-            markers(SourceSpecMarkers.javaVersion(version));
-            return this;
-        }
-
-        public Java project(String projectName) {
-            markers(SourceSpecMarkers.javaProject(projectName));
-            return this;
-        }
-
-        public Java sourceSet(String sourceSet) {
-            sourceSetName = sourceSet;
-            return this;
-        }
-    }
-
     @Override
     public Iterator<SourceSpec<?>> iterator() {
         return new Iterator<SourceSpec<?>>() {
