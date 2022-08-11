@@ -27,8 +27,6 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations:latest.release")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:latest.release")
 
-    implementation("org.slf4j:slf4j-api:1.7.+")
-
     // needed by AddDependency
     implementation(project(":rewrite-java"))
 
