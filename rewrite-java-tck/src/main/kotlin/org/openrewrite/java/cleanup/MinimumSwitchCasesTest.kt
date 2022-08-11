@@ -19,10 +19,11 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
-import org.openrewrite.java.TypeValidation
+import org.openrewrite.test.TypeValidation
 
 @Suppress("SwitchStatementWithTooFewBranches", "ConstantConditions")
 interface MinimumSwitchCasesTest : RewriteTest {

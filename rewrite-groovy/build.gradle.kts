@@ -22,5 +22,6 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation(project(":rewrite-java-tck"))
     testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
 }

@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.MethodMatcher
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J

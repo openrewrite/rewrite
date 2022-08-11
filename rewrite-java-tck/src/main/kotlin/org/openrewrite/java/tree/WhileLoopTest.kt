@@ -17,7 +17,6 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaTreeTest
 
 interface WhileLoopTest : JavaTreeTest {
 

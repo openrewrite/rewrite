@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.TypeValidation
 
 /**
  * Produces a report about missing type attributions within a CompilationUnit.
@@ -57,9 +58,12 @@ class TypeValidator {
             cu: J.CompilationUnit,
             options: ValidationOptions = defaultOptions
         ) {
-            TypeValidation().identifiers(options.identifiers).methodInvocations(options.methodInvocations)
-                .methodDeclarations(options.methodDeclarations).classDeclarations(options.classDeclarations)
-                .assertValidTypes(cu)
+            Assertions.assertValidTypes(TypeValidation()
+                .identifiers(options.identifiers)
+                .methodInvocations(options.methodInvocations)
+                .methodDeclarations(options.methodDeclarations)
+                .classDeclarations(options.classDeclarations),
+                cu)
         }
     }
 

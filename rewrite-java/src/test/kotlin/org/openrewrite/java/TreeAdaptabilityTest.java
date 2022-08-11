@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.java;
 
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -26,13 +26,13 @@ import org.openrewrite.text.PlainTextVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("unchecked")
-public class TreeVisitorTest implements RewriteTest {
+public class TreeAdaptabilityTest implements RewriteTest {
 
     @Test
     void adaptParameterizedPlainTextTreeVisitor() {
         //noinspection rawtypes
         assertThat(new PlainTextVisitor() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
-        assertThat(new TreeVisitor<PlainText, Integer>() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
+        Assertions.assertThat(new TreeVisitor<PlainText, Integer>() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
         assertThat(new TreeVisitor<PlainText, Integer>() {}.isAdaptableTo(PlainTextVisitor.class)).isTrue();
     }
 

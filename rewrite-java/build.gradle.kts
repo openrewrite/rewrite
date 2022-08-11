@@ -27,6 +27,8 @@ dependencies {
         isTransitive = false
     }
     compileOnly(project(":rewrite-test"))
+    compileOnly("org.junit.jupiter:junit-jupiter-api:latest.release")
+    compileOnly("org.assertj:assertj-core:latest.release")
     implementation("commons-lang:commons-lang:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 

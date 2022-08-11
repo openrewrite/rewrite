@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.PathUtils
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest

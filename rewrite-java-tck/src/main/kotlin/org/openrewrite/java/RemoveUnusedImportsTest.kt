@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.test.RecipeSpec

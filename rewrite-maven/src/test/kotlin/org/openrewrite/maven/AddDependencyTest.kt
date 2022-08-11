@@ -20,7 +20,9 @@ import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.*
 import org.openrewrite.java.JavaParser
+import org.openrewrite.maven.Assertions.pomXml
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import java.nio.file.Path

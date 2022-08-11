@@ -18,6 +18,8 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.SourceSpecs
+import org.openrewrite.test.SourceSpecs.text
 
 class SetFilePermissionsTest : RewriteTest {
 

@@ -17,8 +17,9 @@ package org.openrewrite.java.controlflow
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaIsoVisitor
-import org.openrewrite.java.TypeValidation
+import org.openrewrite.test.TypeValidation
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest

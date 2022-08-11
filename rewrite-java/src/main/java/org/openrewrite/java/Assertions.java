@@ -1,3 +1,18 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
@@ -7,16 +22,20 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.ParserSupplier;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.test.SourceSpecs.dir;
 
@@ -44,16 +63,38 @@ public class Assertions {
                 J.CompilationUnit.class, null, javaParserSupplier(), before, null,
                 (after, testMethodSpec, testClassSpec) -> {
                     if (after instanceof JavaSourceFile) {
-                        TypeValidation typeValidation = testMethodSpec.typeValidation != null ? testMethodSpec.typeValidation : testClassSpec.typeValidation;
+                        TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ? testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
                         if (typeValidation == null) {
                             typeValidation = new TypeValidation();
                         }
-                        typeValidation.assertValidTypes((JavaSourceFile) after);
+                        assertValidTypes(typeValidation, (JavaSourceFile) after);
                     }
                 }
         );
         spec.accept(java);
         return java;
+    }
+
+    public static void assertValidTypes(TypeValidation typeValidation, J sf) {
+        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()) {
+            List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
+            missingTypeResults = missingTypeResults.stream()
+                    .filter(missingType -> {
+                        if (typeValidation.identifiers() && missingType.getJ() instanceof J.Identifier) {
+                            return true;
+                        } else if (typeValidation.classDeclarations() && missingType.getJ() instanceof J.ClassDeclaration) {
+                            return true;
+                        } else if (typeValidation.methodInvocations() && missingType.getJ() instanceof J.MethodInvocation) {
+                            return true;
+                        } else
+                            return typeValidation.methodDeclarations() && missingType.getJ() instanceof J.MethodDeclaration;
+                    })
+                    .collect(Collectors.toList());
+            if (!missingTypeResults.isEmpty()) {
+                throw new IllegalStateException("AST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
+                        .collect(Collectors.joining("\n\n")));
+            }
+        }
     }
 
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after) {

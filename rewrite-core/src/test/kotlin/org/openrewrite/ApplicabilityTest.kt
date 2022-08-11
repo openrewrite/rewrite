@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.SourceSpec
+import org.openrewrite.test.SourceSpecs
+import org.openrewrite.test.SourceSpecs.text
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
 

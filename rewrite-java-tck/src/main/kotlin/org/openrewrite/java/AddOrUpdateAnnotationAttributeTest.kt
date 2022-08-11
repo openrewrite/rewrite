@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.test.RewriteTest
 
 

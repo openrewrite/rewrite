@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import java.nio.file.Paths

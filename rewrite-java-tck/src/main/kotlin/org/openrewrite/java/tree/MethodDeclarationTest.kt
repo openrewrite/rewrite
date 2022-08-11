@@ -19,9 +19,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaTreeTest
-import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
-import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.Class
+import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.CompilationUnit
 import java.util.stream.Collectors
 
 interface MethodDeclarationTest : JavaTreeTest {

@@ -21,10 +21,10 @@ import org.openrewrite.Issue
 import org.openrewrite.java.Java11Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaParserResolver
-import org.openrewrite.java.JavaTreeTest
 
 @ExtendWith(JavaParserResolver::class)
-class TryCatchJava11Test: JavaTreeTest, Java11Test {
+class TryCatchJava11Test : JavaTreeTest, Java11Test {
+
 
     @Issue("https://github.com/openrewrite/rewrite/issues/763")
     @Test

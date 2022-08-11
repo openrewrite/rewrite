@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J

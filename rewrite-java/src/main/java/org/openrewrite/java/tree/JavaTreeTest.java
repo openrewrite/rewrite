@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.tree;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.BeforeEach;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaVisitor;
 
 import java.util.Arrays;
 

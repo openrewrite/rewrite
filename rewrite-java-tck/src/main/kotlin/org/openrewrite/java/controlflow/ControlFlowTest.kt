@@ -18,7 +18,8 @@ package org.openrewrite.java.controlflow
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.java.TypeValidation
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.TypeValidation
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 

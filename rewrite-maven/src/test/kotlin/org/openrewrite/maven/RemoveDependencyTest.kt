@@ -18,6 +18,7 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.maven.Assertions.pomXml
 import org.openrewrite.maven.tree.MavenResolutionResult
 import org.openrewrite.maven.tree.Scope
 import org.openrewrite.test.RewriteTest

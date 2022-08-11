@@ -23,8 +23,7 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaTreeTest
-import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.CompilationUnit
 
 interface AnnotationTest : JavaTreeTest {
 

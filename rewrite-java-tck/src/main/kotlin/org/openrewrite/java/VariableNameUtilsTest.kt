@@ -23,6 +23,7 @@ import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe

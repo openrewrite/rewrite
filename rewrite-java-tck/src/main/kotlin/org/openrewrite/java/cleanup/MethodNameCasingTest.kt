@@ -19,10 +19,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
-import org.openrewrite.java.TypeValidation
+import org.openrewrite.test.TypeValidation
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RewriteTest
 
@@ -78,7 +79,7 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
 
     @Test
     fun changeMethodDeclaration() = assertChanged(
-        
+
         before = """
             class Test {
                 void MyMethod_with_über() {

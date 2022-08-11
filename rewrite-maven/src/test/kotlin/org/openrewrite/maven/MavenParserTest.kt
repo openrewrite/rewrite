@@ -26,6 +26,8 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Parser
+import org.openrewrite.java.Assertions.mavenProject
+import org.openrewrite.maven.Assertions.pomXml
 import org.openrewrite.maven.tree.License
 import org.openrewrite.maven.tree.Scope
 import org.openrewrite.test.RewriteTest

@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.SourceSpecs
+import org.openrewrite.test.SourceSpecs.text
 
 class AppendToTextFileTest : RewriteTest {
     @Test

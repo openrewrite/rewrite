@@ -18,6 +18,7 @@ package org.openrewrite.java.tree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RewriteTest
 

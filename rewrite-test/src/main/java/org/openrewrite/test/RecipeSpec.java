@@ -15,11 +15,11 @@
  */
 package org.openrewrite.test;
 
+import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.TypeValidation;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.quark.QuarkParser;
 
@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Consumer;
 
+@Getter
 public class RecipeSpec {
     public static RecipeSpec defaults() {
         return new RecipeSpec();

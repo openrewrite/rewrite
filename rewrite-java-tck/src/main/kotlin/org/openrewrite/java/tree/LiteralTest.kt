@@ -18,8 +18,7 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaTreeTest
-import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.Block
 
 interface LiteralTest : JavaTreeTest {
 

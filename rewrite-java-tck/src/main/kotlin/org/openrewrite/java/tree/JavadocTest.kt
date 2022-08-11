@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaTreeTest
-import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.CompilationUnit
 
 @Suppress("JavadocDeclaration")
 interface JavadocTest : JavaTreeTest {
