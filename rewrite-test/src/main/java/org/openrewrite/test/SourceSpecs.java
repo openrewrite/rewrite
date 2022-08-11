@@ -26,43 +26,43 @@ import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
 public interface SourceSpecs extends Iterable<SourceSpec<?>> {
-    default SourceSpecs dir(String dir, SourceSpecs... sources) {
+    static SourceSpecs dir(String dir, SourceSpecs... sources) {
         return dir(dir, s -> {
         }, sources);
     }
 
-    default SourceSpecs dir(String dir, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
+    static SourceSpecs dir(String dir, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
         return new Dir(dir, spec, sources);
     }
 
-    default SourceSpecs other(@Nullable String before) {
+    static SourceSpecs other(@Nullable String before) {
         return other(before, s -> {
         });
     }
 
-    default SourceSpecs other(@Nullable String before, Consumer<SourceSpec<Quark>> spec) {
+    static SourceSpecs other(@Nullable String before, Consumer<SourceSpec<Quark>> spec) {
         SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, new ParserSupplier(Quark.class, "other", QuarkParser::new), before, null);
         spec.accept(quark);
         return quark;
     }
 
-    default SourceSpecs text(@Nullable String before) {
+    static SourceSpecs text(@Nullable String before) {
         return text(before, s -> {
         });
     }
 
-    default SourceSpecs text(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
+    static SourceSpecs text(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
         SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, new ParserSupplier(PlainText.class, "text", PlainTextParser::new), before, null);
         spec.accept(text);
         return text;
     }
 
-    default SourceSpecs text(@Nullable String before, String after) {
+    static SourceSpecs text(@Nullable String before, String after) {
         return text(before, after, s -> {
         });
     }
 
-    default SourceSpecs text(@Nullable String before, String after,
+    static SourceSpecs text(@Nullable String before, String after,
                              Consumer<SourceSpec<PlainText>> spec) {
         SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, new ParserSupplier(PlainText.class, "text", PlainTextParser::new), before, after);
         spec.accept(text);

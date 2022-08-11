@@ -319,13 +319,7 @@ public interface RewriteTest extends SourceSpecs {
                         String actual = result.getAfter().printAll();
                         String expected = trimIndentPreserveCRLF(expectedAfter);
                         assertThat(actual).isEqualTo(expected);
-                        if (result.getAfter() instanceof JavaSourceFile) {
-                            TypeValidation typeValidation = testMethodSpec.typeValidation != null ? testMethodSpec.typeValidation : testClassSpec.typeValidation;
-                            if (typeValidation == null) {
-                                typeValidation = new TypeValidation();
-                            }
-                            typeValidation.assertValidTypes((JavaSourceFile) result.getAfter());
-                        }
+                        specForSourceFile.getValue().eachResult.accept(result.getAfter());
                     } else if (expectedAfter == null && result.getAfter() != null) {
                         if (result.diff().isEmpty()) {
                             fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");

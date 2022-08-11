@@ -18,6 +18,7 @@ package org.openrewrite.test;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -25,7 +26,10 @@ import org.openrewrite.marker.Marker;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -42,13 +46,32 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final ParserSupplier parserSupplier;
 
     @Nullable
-    protected String sourceSetName;
-
-    @Nullable
     final String before;
 
     @Nullable
     final String after;
+
+    final EachResult eachResult;
+
+    public interface EachResult {
+        void after(SourceFile sourceFile, RecipeSpec testMethodSpec, RecipeSpec testClassSpec);
+    }
+
+    public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
+                      ParserSupplier parserSupplier, @Nullable String before, @Nullable String after) {
+        this.sourceFileType = sourceFileType;
+        this.dsl = dsl;
+        this.parserSupplier = parserSupplier;
+        this.sourceSetName = sourceSetName;
+        this.before = before;
+        this.after = after;
+        this.eachResult = (s, methodSpec, classSpec) -> {
+        };
+    }
+
+    @Setter
+    @Nullable
+    protected String sourceSetName;
 
     protected Path dir = Paths.get("");
 
