@@ -56,7 +56,7 @@ class HclForTest : RewriteTest {
     )
 
     @Test
-    fun rm() = rewriteRun(
+    fun forEach() = rewriteRun(
         hcl(
             """
                 resource "aws_iam_user" "the-accounts" {

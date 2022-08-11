@@ -25,8 +25,7 @@ include(
     "rewrite-xml",
     "rewrite-yaml",
     "rewrite-test",
-    "rewrite-bom",
-    "rewrite-benchmarks"
+    "rewrite-bom"
 )
 
 plugins {
