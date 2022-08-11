@@ -62,7 +62,11 @@ public class SpacesVisitor<P> extends HclIsoVisitor<P> {
 
     @Override
     public Hcl.Block visitBlock(Hcl.Block block, P p) {
-        return super.visitBlock(block.withOpen(block.getOpen().withWhitespace(" ")), p);
+        Hcl.Block b = super.visitBlock(block, p);
+        if (block.getType() != null) {
+             b = b.withOpen(block.getOpen().withWhitespace(" "));
+        }
+        return b;
     }
 
     @Nullable

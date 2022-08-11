@@ -100,6 +100,72 @@ class SpacesTest : HclRecipeTest {
     )
 
     @Test
+    fun attributeGroupMultilineValue() = assertChanged(
+        before = """
+            variable myvar {
+              description = "Sample Variable"
+              type = object({
+                string_var = "value"
+                string_var_2 = "value"
+                multiline_var = object({
+                  x = string
+                  foo = string
+                  
+                  y = string
+                })
+                another_string_var = "value"
+                another_string_var_2 = "value"
+              })
+            }
+        """,
+        after = """ 
+            variable myvar {
+              description = "Sample Variable"
+              type = object({
+                string_var   = "value"
+                string_var_2 = "value"
+                multiline_var = object({
+                  x   = string
+                  foo = string
+                  
+                  y = string
+                })
+                another_string_var   = "value"
+                another_string_var_2 = "value"
+              })
+            }
+        """
+    )
+
+    @Test
+    fun rm() = assertChanged(
+        before = """
+local {
+  elasticache = {
+    node_type           = "cache.t2.micro"
+    num_node_groups     = 1
+    parameter_group_map = {
+      active-defrag-cycle-max = "60"
+      activedefrag            = "yes"
+      cluster-enabled         = "yes"
+    }
+    replicas_per_node_group       = 1
+    replication_group_description = "Elasticache replication group"
+    replication_group_id          = "elasticache-cluster"
+  }
+}
+        """.trimIndent(),
+        after = """
+            data "aws_subnet" "account_subnet" {
+              for_each = toset(
+                data.aws_subnets.account_subnet_list.ids
+              )
+              id = each.value
+            }
+        """.trimIndent()
+    )
+
+    @Test
     fun noAttributeGroups() = assertChanged(
         before = """
             resource "custom_resource" {

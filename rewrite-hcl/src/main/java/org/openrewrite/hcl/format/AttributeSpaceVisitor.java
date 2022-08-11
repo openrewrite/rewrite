@@ -21,10 +21,13 @@ import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.HclLeftPadded;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
@@ -77,25 +80,37 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
 
     // find group of attributes (attributes with no extra newlines) containing given attribute
     private List<Hcl.Attribute> attributesInGroup(Hcl.Block block, Hcl.Attribute attribute) {
+        boolean isAttributeMultiline = attribute.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
+       if (isAttributeMultiline) {
+            return Collections.singletonList(attribute);
+        }
+
         List<Hcl.Attribute> groupAttributes = new ArrayList<>();
-        boolean segmentFound = false;
+        boolean groupFound = false;
+        Hcl.Attribute perviousSibling = null;
         for (BodyContent bodyContent : block.getBody()) {
             if (bodyContent instanceof Hcl.Attribute) {
                 Hcl.Attribute sibling = (Hcl.Attribute) bodyContent;
                 if (sibling.getType().equals(Hcl.Attribute.Type.Assignment)) {
-                    if (sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2) {
-                        if (segmentFound) {
+                    boolean siblingPrefixHasNewLines = sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2;
+                    boolean siblingIsMultiline = sibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
+                    boolean previousSiblingIsMultiline = perviousSibling != null && perviousSibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
+                    boolean newGroup  = siblingPrefixHasNewLines || previousSiblingIsMultiline || siblingIsMultiline;
+                    if (newGroup) {
+                        if (groupFound) {
                             break;
                         }
                         groupAttributes.clear();
                     }
                     if (sibling.getId() == attribute.getId()) {
-                        segmentFound = true;
+                        groupFound = true;
                     }
                     groupAttributes.add(sibling);
+                    perviousSibling = sibling;
                 }
             }
         }
+        
         return groupAttributes;
     }
 
