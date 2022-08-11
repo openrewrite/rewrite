@@ -20,6 +20,7 @@ package org.openrewrite.groovy
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.groovy.Assertions.groovy
 import org.openrewrite.groovy.tree.G
 import org.openrewrite.java.JavaVisitor
 import org.openrewrite.java.asFullyQualified

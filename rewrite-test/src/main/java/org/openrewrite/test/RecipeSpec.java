@@ -20,6 +20,10 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.TypeValidation;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.quark.QuarkParser;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -68,7 +72,8 @@ public class RecipeSpec {
     };
 
     // The before and after here don't mean anything
-    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, "", null);
+    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null,
+            new ParserSupplier(Quark.class, null, QuarkParser::new), "", null);
 
     /**
      * Configuration that applies to all source file inputs.

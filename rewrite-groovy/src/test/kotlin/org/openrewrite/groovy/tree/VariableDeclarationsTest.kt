@@ -18,6 +18,7 @@ package org.openrewrite.groovy.tree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.groovy.Assertions.groovy
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RewriteTest
 

@@ -17,6 +17,7 @@ package org.openrewrite.hcl
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.hcl.Assertions.hcl
 import org.openrewrite.hcl.tree.Hcl
 import org.openrewrite.test.RewriteTest
 

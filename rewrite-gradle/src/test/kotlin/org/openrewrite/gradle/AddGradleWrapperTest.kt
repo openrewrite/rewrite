@@ -18,7 +18,10 @@ package org.openrewrite.gradle
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.PathUtils
+import org.openrewrite.gradle.Assertions.buildGradle
 import org.openrewrite.gradle.util.GradleWrapper.WRAPPER_JAR_LOCATION
+import org.openrewrite.maven.Assertions.pomXml
+import org.openrewrite.properties.Assertions.properties
 import org.openrewrite.remote.Remote
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest

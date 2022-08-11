@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.search
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.hcl.Assertions.hcl
 import org.openrewrite.test.RewriteTest
 
 class FindContentTest : RewriteTest {

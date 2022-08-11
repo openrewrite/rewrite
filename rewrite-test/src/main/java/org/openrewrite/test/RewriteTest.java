@@ -19,11 +19,6 @@ import org.assertj.core.api.SoftAssertions;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
-import org.openrewrite.gradle.GradleParser;
-import org.openrewrite.groovy.GroovyParser;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.hcl.HclParser;
-import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -32,25 +27,9 @@ import org.openrewrite.java.TypeValidation;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.json.JsonParser;
-import org.openrewrite.json.tree.Json;
-import org.openrewrite.maven.MavenExecutionContextView;
-import org.openrewrite.maven.MavenParser;
-import org.openrewrite.maven.MavenSettings;
-import org.openrewrite.properties.PropertiesParser;
-import org.openrewrite.properties.tree.Properties;
-import org.openrewrite.protobuf.ProtoParser;
-import org.openrewrite.protobuf.tree.Proto;
 import org.openrewrite.quark.Quark;
-import org.openrewrite.quark.QuarkParser;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.scheduling.DirectScheduler;
-import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextParser;
-import org.openrewrite.xml.XmlParser;
-import org.openrewrite.xml.tree.Xml;
-import org.openrewrite.yaml.YamlParser;
-import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -172,59 +151,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             // ----- default parsers for each SourceFile type -------------------------
-            if (Quark.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Quark.class, sourceSpec.dsl, QuarkParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (J.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(J.CompilationUnit.class, sourceSpec.dsl, () -> JavaParser.fromJavaVersion()
-                                .logCompilationWarningsAndErrors(true)
-                                .build()),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Xml.Document.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Xml.Document.class, sourceSpec.dsl, () -> {
-                            if ("maven".equals(sourceSpec.dsl)) {
-                                return MavenParser.builder().build();
-                            }
-                            return new XmlParser();
-                        }),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (G.CompilationUnit.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(G.CompilationUnit.class, sourceSpec.dsl, () -> {
-                            if ("gradle".equals(sourceSpec.dsl)) {
-                                return new GradleParser(GroovyParser.builder());
-                            }
-                            return GroovyParser.builder().build();
-                        }),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Yaml.Documents.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Yaml.Documents.class, sourceSpec.dsl, YamlParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Json.Document.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Json.Document.class, sourceSpec.dsl, JsonParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Hcl.ConfigFile.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Hcl.ConfigFile.class, sourceSpec.dsl, () -> HclParser.builder().build()),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Proto.Document.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Proto.Document.class, sourceSpec.dsl, ProtoParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (PlainText.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(PlainText.class, sourceSpec.dsl, PlainTextParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            } else if (Properties.File.class.equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(Properties.File.class, sourceSpec.dsl, PropertiesParser::new),
-                        p -> new ArrayList<>()).add(sourceSpec);
-            }
+            sourceSpecsByParser.computeIfAbsent(sourceSpec.getParserSupplier(), p -> new ArrayList<>()).add(sourceSpec);
         }
 
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new HashMap<>(sourceSpecs.length);
@@ -458,15 +385,15 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        if (MavenSettings.readFromDiskEnabled()) {
-            for (SourceSpec<?> sourceSpec : sourceSpecs) {
-                if ("maven".equals(sourceSpec.dsl)) {
-                    MavenExecutionContextView.view(executionContext)
-                            .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(executionContext));
-                    break;
-                }
-            }
-        }
+//        if (MavenSettings.readFromDiskEnabled()) {
+//            for (SourceSpec<?> sourceSpec : sourceSpecs) {
+//                if ("maven".equals(sourceSpec.dsl)) {
+//                    MavenExecutionContextView.view(executionContext)
+//                            .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(executionContext));
+//                    break;
+//                }
+//            }
+//        }
 
         return executionContext;
     }

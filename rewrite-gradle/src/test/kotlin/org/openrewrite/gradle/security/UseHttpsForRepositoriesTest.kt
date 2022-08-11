@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.security
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.gradle.Assertions.buildGradle
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 

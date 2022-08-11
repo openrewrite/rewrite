@@ -17,6 +17,7 @@ package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.hcl.Assertions.hcl
 import org.openrewrite.test.RewriteTest
 
 class HclBlockTest : RewriteTest {

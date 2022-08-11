@@ -21,12 +21,6 @@ configurations.all {
     resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
 }
 
-if(name != "rewrite-test") {
-    tasks.named<KotlinCompile>("compileKotlin").configure {
-        enabled = false
-    }
-}
-
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions {
         jvmTarget = "1.8"
@@ -66,7 +60,7 @@ tasks.named<Test>("test").configure {
 
     // recently failed tests will get selected, so let's DISABLE for the nightly
     // scheduled builds and releases
-    predictiveSelection {
-        enabled.set(!releasing && !nightly)
-    }
+//    predictiveSelection {
+//        enabled.set(!releasing && !nightly)
+//    }
 }
