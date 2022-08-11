@@ -263,7 +263,7 @@ class EnvironmentTest : RewriteTest {
                 .build()
                 .activateRecipes("org.openrewrite.text.ChangeTextToJon"))
         },
-        plainText(
+        text(
             "some text that isn't jon",
             "Hello Jon!"
         )
@@ -277,7 +277,7 @@ class EnvironmentTest : RewriteTest {
                 .build()
                 .activateRecipes("org.openrewrite.text.HelloKotlin"))
         },
-        plainText(
+        text(
             "some text",
             "Hello Kotlin"
         )

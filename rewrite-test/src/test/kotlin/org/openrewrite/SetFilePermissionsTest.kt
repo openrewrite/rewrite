@@ -32,7 +32,7 @@ class SetFilePermissionsTest : RewriteTest {
                     assertThat(it.after!!.fileAttributes!!.isExecutable).isTrue
                 }
             }},
-        plainText("", "") { spec -> spec.path("test.txt") }
+        text("", "") { spec -> spec.path("test.txt") }
     )
 
     @Test
@@ -46,7 +46,7 @@ class SetFilePermissionsTest : RewriteTest {
                     assertThat(it.after!!.fileAttributes!!.isExecutable).isTrue
                 }
             }},
-        plainText("", "") { spec -> spec.path("test.txt") }
+        text("", "") { spec -> spec.path("test.txt") }
     )
 
     @Test
@@ -60,8 +60,6 @@ class SetFilePermissionsTest : RewriteTest {
                     assertThat(it.after!!.fileAttributes!!.isExecutable).isFalse
                 }
             }},
-        plainText("", "") { spec -> spec.path("test.txt") }
+        text("", "") { spec -> spec.path("test.txt") }
     )
-
-
 }
