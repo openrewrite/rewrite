@@ -14,8 +14,8 @@ lexer grammar HCLLexer;
     private Stack<String> heredocIdentifier = new Stack<String>();
 }
 
-FOR_BRACE             : '{' (WS|NEWLINE)* 'for';
-FOR_BRACK             : '[' (WS|NEWLINE)* 'for';
+FOR_BRACE             : '{' (WS|NEWLINE)* 'for' WS;
+FOR_BRACK             : '[' (WS|NEWLINE)* 'for' WS;
 
 IF              : 'if';
 IN              : 'in';

@@ -55,4 +55,16 @@ class HclForTest : RewriteTest {
         )
     )
 
+    @Test
+    fun forEach() = rewriteRun(
+        hcl(
+            """
+                resource "aws_iam_user" "the-accounts" {
+                  for_each = toset( ["Todd", "James", "Alice", "Dottie"] )
+                  name     = each.key
+                }
+            """
+        )
+    )
+
 }
