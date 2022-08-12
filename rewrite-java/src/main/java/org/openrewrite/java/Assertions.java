@@ -16,8 +16,10 @@
 package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -25,10 +27,8 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.test.ParserSupplier;
-import org.openrewrite.test.SourceSpec;
-import org.openrewrite.test.SourceSpecs;
-import org.openrewrite.test.TypeValidation;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.test.*;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,32 +47,20 @@ public class Assertions {
     private Assertions() {
     }
 
-    public static SourceSpecs java(@Language("java") @Nullable String before) {
-        return java(before, s -> {
-        });
+    static void customizeExecutionContext(ExecutionContext ctx) {
+        ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
     }
 
-    private static ParserSupplier javaParserSupplier() {
-        return new ParserSupplier(J.CompilationUnit.class, "java", () -> JavaParser.fromJavaVersion()
-                .logCompilationWarningsAndErrors(true)
-                .build());
-    }
-
-    public static SourceSpecs java(@Language("java") @Nullable String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
-        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(
-                J.CompilationUnit.class, null, javaParserSupplier(), before, null,
-                (after, testMethodSpec, testClassSpec) -> {
-                    if (after instanceof JavaSourceFile) {
-                        TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ? testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
-                        if (typeValidation == null) {
-                            typeValidation = new TypeValidation();
-                        }
-                        assertValidTypes(typeValidation, (JavaSourceFile) after);
-                    }
-                }
-        );
-        spec.accept(java);
-        return java;
+    // validateTypes and assertValidTypes can be merged into a single function once JavaRecipeTest is removed
+    static SourceFile validateTypes(SourceFile after, RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+        if (after instanceof JavaSourceFile) {
+            TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ? testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
+            if (typeValidation == null) {
+                typeValidation = new TypeValidation();
+            }
+            assertValidTypes(typeValidation, (JavaSourceFile) after);
+        }
+        return after;
     }
 
     public static void assertValidTypes(TypeValidation typeValidation, J sf) {
@@ -97,6 +85,27 @@ public class Assertions {
         }
     }
 
+    public static SourceSpecs java(@Language("java") @Nullable String before) {
+        return java(before, s -> {
+        });
+    }
+
+    private static final ParserSupplier javaParserSupplier = new ParserSupplier(J.CompilationUnit.class, "java",
+            () -> JavaParser.fromJavaVersion()
+                .logCompilationWarningsAndErrors(true)
+                .build());
+
+    public static SourceSpecs java(@Language("java") @Nullable String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
+        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(
+                J.CompilationUnit.class, null, javaParserSupplier, before, null,
+                Assertions::validateTypes,
+                Assertions::customizeExecutionContext
+        );
+        spec.accept(java);
+        return java;
+    }
+
+
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after) {
         return java(before, after, s -> {
         });
@@ -104,7 +113,7 @@ public class Assertions {
 
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after,
                                    Consumer<SourceSpec<J.CompilationUnit>> spec) {
-        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParserSupplier(), before, after);
+        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParserSupplier, before, after);
         spec.accept(java);
         return java;
     }

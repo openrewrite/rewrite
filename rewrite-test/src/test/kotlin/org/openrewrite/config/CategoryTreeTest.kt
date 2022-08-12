@@ -47,17 +47,17 @@ class CategoryTreeTest {
 
     @Test
     fun getRecipesInArtificialCorePackage() {
-        assertThat(categoryTree.getCategory("org", "openrewrite", "java", "core")?.recipes ?: emptyList()).isNotEmpty
+        assertThat(categoryTree.getCategory("org", "openrewrite", "core")?.recipes ?: emptyList()).isNotEmpty
     }
 
     @Test
     fun getRecipe() {
-        assertThat(categoryTree.getRecipe("org.openrewrite.java.ChangeMethodName")).isNotNull
+        assertThat(categoryTree.getRecipe("org.openrewrite.DeleteSourceFiles")).isNotNull
     }
 
     @Test
     fun getRecipeGroup() {
-        assertThat(categoryTree.getRecipeGroup("org.openrewrite.java.ChangeMethodName") ?: -1).isEqualTo(1)
+        assertThat(categoryTree.getRecipeGroup("org.openrewrite.DeleteSourceFiles") ?: -1).isEqualTo(1)
     }
 
     private fun printTree(categoryTree: CategoryTree<*>, level: Int) {

@@ -22,6 +22,7 @@ import org.openrewrite.config.Environment;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SourceSet;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.scheduling.DirectScheduler;
@@ -131,6 +132,9 @@ public interface RewriteTest extends SourceSpecs {
         } else {
             executionContext = defaultExecutionContext(sourceSpecs);
         }
+        for(SourceSpec<?> s : sourceSpecs) {
+            s.customizeExecutionContext.accept(executionContext);
+        }
 
         Map<ParserSupplier, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
 
@@ -189,13 +193,15 @@ public interface RewriteTest extends SourceSpecs {
                 sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
                         sourceFile.getMarkers().getMarkers(), nextSpec.markers)));
 
-                // Update the default 'main' JavaSourceSet Marker added by the JavaParser with the specs sourceSetName
-//                sourceFile = sourceFile.withMarkers((sourceFile.getMarkers().withMarkers(ListUtils.map(sourceFile.getMarkers().getMarkers(), m -> {
-//                    if (m instanceof JavaSourceSet) {
-//                        m = ((JavaSourceSet) m).withName(nextSpec.sourceSetName);
-//                    }
-//                    return m;
-//                }))));
+                // Update the default 'main' SourceSet Marker added by the JavaParser with the specs sourceSetName
+                if(nextSpec.sourceSetName != null) {
+                    sourceFile = sourceFile.withMarkers((sourceFile.getMarkers().withMarkers(ListUtils.map(sourceFile.getMarkers().getMarkers(), m -> {
+                        if (m instanceof SourceSet) {
+                            m = ((SourceSet) m).withName(nextSpec.sourceSetName);
+                        }
+                        return m;
+                    }))));
+                }
 
                 // Validate that printing a parsed AST yields the same source text
                 int j = 0;
@@ -314,7 +320,7 @@ public interface RewriteTest extends SourceSpecs {
                         String actual = result.getAfter().printAll();
                         String expected = trimIndentPreserveCRLF(expectedAfter);
                         assertThat(actual).isEqualTo(expected);
-                        specForSourceFile.getValue().eachResult.after(result.getAfter(), testMethodSpec, testClassSpec);
+                        specForSourceFile.getValue().eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                     } else if (expectedAfter == null && result.getAfter() != null) {
                         if (result.diff().isEmpty()) {
                             fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
@@ -364,27 +370,7 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
-        ExecutionContext executionContext = new InMemoryExecutionContext(
-                t -> fail("Failed to run parse sources or recipe", t));
-//
-//        for (SourceSpec<?> spec : sourceSpecs) {
-//            if (J.CompilationUnit.class.equals(spec.sourceFileType)) {
-//                executionContext.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
-//                break;
-//            }
-//        }
-
-//        if (MavenSettings.readFromDiskEnabled()) {
-//            for (SourceSpec<?> sourceSpec : sourceSpecs) {
-//                if ("maven".equals(sourceSpec.dsl)) {
-//                    MavenExecutionContextView.view(executionContext)
-//                            .setMavenSettings(MavenSettings.readMavenSettingsFromDisk(executionContext));
-//                    break;
-//                }
-//            }
-//        }
-
-        return executionContext;
+        return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
     }
 
     @NotNull

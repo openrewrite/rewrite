@@ -16,6 +16,8 @@
 package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.test.ParserSupplier;
 import org.openrewrite.test.SourceSpec;
@@ -29,13 +31,21 @@ public class Assertions {
 
     static final ParserSupplier parserSupplier = new ParserSupplier(Xml.Document.class, "maven", () -> MavenParser.builder().build());
 
+    static void customizeExecutionContext(ExecutionContext ctx) {
+        if(MavenSettings.readFromDiskEnabled()) {
+            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+            mctx.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(mctx));
+        }
+    }
+
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before) {
         return pomXml(before, s -> {
         });
     }
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", parserSupplier, before, null);
+        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", parserSupplier, before,
+                null, SourceSpec.EachResult.noop, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;
@@ -48,7 +58,8 @@ public class Assertions {
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, @Language("xml") String after,
                                Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", parserSupplier, before, after);
+        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", parserSupplier, before,
+                after, SourceSpec.EachResult.noop, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;

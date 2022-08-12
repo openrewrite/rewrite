@@ -36,8 +36,8 @@ class RecipeSchedulerTest : RewriteTest {
             text(
                     "hello",
                     "~~(org.openrewrite.BoomException: boom\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:47)\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:45))~~>hello"
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:49)\n" +
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:47))~~>hello"
             )
     )
 }
