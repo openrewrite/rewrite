@@ -84,7 +84,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     // ensure there is always at least one Document, even in an empty yaml file
                     if (docs.getDocuments().isEmpty()) {
                         return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
-                                false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null), null)));
+                                false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
                     }
                     return docs;
                 })
@@ -152,7 +152,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 fmt,
                                 Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
-                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null),
+                                new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
                                 null
                         );
                         lastEnd = event.getEndMark().getIndex();
@@ -161,6 +161,21 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case MappingStart: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
+
+                        MappingStartEvent mappingStartEvent = (MappingStartEvent)event;
+                        Yaml.Anchor anchor = null;
+                        if (mappingStartEvent.getAnchor() != null) {
+                            anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
+                            anchors.put(mappingStartEvent.getAnchor(), anchor);
+
+                            lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
+                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
+                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
+                            if (dashPrefixIndex > -1) {
+                                fmt = fmt.substring(0, dashPrefixIndex);
+                            }
+                        }
+
                         String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
                         String startBracePrefix = null;
                         int openingBraceIndex = commentAwareIndexOf('{', fullPrefix);
@@ -169,7 +184,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             startBracePrefix = fullPrefix.substring(startIndex, openingBraceIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
-                        blockStack.push(new MappingBuilder(fmt,startBracePrefix));
+                        blockStack.push(new MappingBuilder(fmt,startBracePrefix, anchor));
                         break;
                     }
                     case Scalar: {
@@ -184,18 +199,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
                         Yaml.Anchor anchor = null;
                         if (scalar.getAnchor() != null) {
-                            String whitespaceAndScalar = reader.prefix(
-                                    lastEnd + fmt.length() + scalar.getAnchor().length() + 1,
-                                    event.getEndMark().getIndex());
-
-                            StringBuilder postFix = new StringBuilder();
-                            for (char c : whitespaceAndScalar.toCharArray()) {
-                                if (c != ' ' && c != '\t') {
-                                    break;
-                                }
-                                postFix.append(c);
-                            }
-                            anchor = new Yaml.Anchor(randomId(), "", postFix.toString(), Markers.EMPTY, scalar.getAnchor());
+                            anchor = buildYamlAnchor(reader, lastEnd, fmt, scalar.getAnchor(), event.getEndMark().getIndex(), true);
                             anchors.put(scalar.getAnchor(), anchor);
                         }
 
@@ -278,7 +282,21 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
 
-                        String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
+                        SequenceStartEvent sse = (SequenceStartEvent)event;
+                        Yaml.Anchor anchor = null;
+                        if (sse.getAnchor() != null) {
+                            anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), event.getEndMark().getIndex(), false);
+                            anchors.put(sse.getAnchor(), anchor);
+
+                            lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
+                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
+                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
+                            if (dashPrefixIndex > -1) {
+                                fmt = fmt.substring(0, dashPrefixIndex);
+                            }
+                        }
+
+                        String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
                         String startBracketPrefix = null;
                         int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
                         if (openingBracketIndex != -1) {
@@ -286,7 +304,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
-                        blockStack.push(new SequenceBuilder(fmt, startBracketPrefix));
+                        blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
                         break;
                     }
                     case Alias: {
@@ -306,7 +324,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             documents.add(
                                     new Yaml.Document(
                                             randomId(), fmt, Markers.EMPTY, false,
-                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null),
+                                            new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
                                             new Yaml.Document.End(randomId(), "", Markers.EMPTY, false)
                                     ));
                         }
@@ -321,6 +339,27 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private Yaml.Anchor buildYamlAnchor(FormatPreservingReader reader, int lastEnd, String eventPrefix, String anchorKey, int eventEndIndex, boolean isForScalar) {
+        int anchorLength = isForScalar ? anchorKey.length() + 1 : anchorKey.length();
+        String whitespaceAndScalar = reader.prefix(
+                lastEnd + eventPrefix.length() + anchorLength, eventEndIndex);
+
+        StringBuilder postFix = new StringBuilder();
+        for (char c : whitespaceAndScalar.toCharArray()) {
+            if (c != ' ' && c != '\t') {
+                break;
+            }
+            postFix.append(c);
+        }
+
+        int prefixStart = commentAwareIndexOf(':', eventPrefix);
+        String prefix = "";
+        if (!isForScalar) {
+            prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
+        }
+        return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY,anchorKey);
     }
 
     /**
@@ -368,14 +407,18 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         @Nullable
         private final String startBracePrefix;
 
+        @Nullable
+        private final Yaml.Anchor anchor;
+
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
         private Yaml.Scalar key;
 
-        private MappingBuilder(String prefix, @Nullable String startBracePrefix) {
+        private MappingBuilder(String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
             this.prefix = prefix;
             this.startBracePrefix = startBracePrefix;
+            this.anchor = anchor;
         }
 
         @Override
@@ -406,7 +449,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
         @Override
         public MappingWithPrefix build() {
-            return new MappingWithPrefix(prefix, startBracePrefix, entries, null);
+            return new MappingWithPrefix(prefix, startBracePrefix, entries, null, anchor);
         }
     }
 
@@ -415,11 +458,15 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         @Nullable
         private final String startBracketPrefix;
 
+        @Nullable
+        private final Yaml.Anchor anchor;
+
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix) {
+        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, @Nullable Yaml.Anchor anchor) {
             this.prefix = prefix;
             this.startBracketPrefix = startBracketPrefix;
+            this.anchor = anchor;
         }
 
         @Override
@@ -445,7 +492,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
         @Override
         public SequenceWithPrefix build() {
-            return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null);
+            return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null, anchor);
         }
     }
 
@@ -453,8 +500,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     private static class MappingWithPrefix extends Yaml.Mapping {
         private String prefix;
 
-        public MappingWithPrefix(String prefix, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix) {
-            super(randomId(), Markers.EMPTY, startBracePrefix, entries, endBracePrefix);
+        public MappingWithPrefix(String prefix, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix, @Nullable Anchor anchor) {
+            super(randomId(), Markers.EMPTY, startBracePrefix, entries, endBracePrefix, anchor);
             this.prefix = prefix;
         }
 
@@ -469,8 +516,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     private static class SequenceWithPrefix extends Yaml.Sequence {
         private String prefix;
 
-        public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix) {
-            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix);
+        public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor) {
+            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor);
             this.prefix = prefix;
         }
 
@@ -494,7 +541,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                     sequenceWithPrefix.getMarkers(),
                                     sequenceWithPrefix.getOpeningBracketPrefix(),
                                     ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
-                                    sequenceWithPrefix.getClosingBracketPrefix()
+                                    sequenceWithPrefix.getClosingBracketPrefix(),
+                                    sequenceWithPrefix.getAnchor()
                             ), p);
                 }
                 return super.visitSequence(sequence, p);
@@ -505,7 +553,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 if (mapping instanceof MappingWithPrefix) {
                     MappingWithPrefix mappingWithPrefix = (MappingWithPrefix) mapping;
                     return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(),
-                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), null), p);
+                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), null, mappingWithPrefix.getAnchor()), p);
                 }
                 return super.visitMapping(mapping, p);
             }

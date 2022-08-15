@@ -247,6 +247,9 @@ public interface Yaml extends Tree {
         @Nullable
         String closingBracePrefix;
 
+        @Nullable
+        Anchor anchor;
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitMapping(this, p);
@@ -255,7 +258,7 @@ public interface Yaml extends Tree {
         @Override
         public Mapping copyPaste() {
             return new Mapping(randomId(), Markers.EMPTY, openingBracePrefix, entries.stream().map(Entry::copyPaste)
-                    .collect(toList()), closingBracePrefix);
+                    .collect(toList()), closingBracePrefix, anchor);
         }
 
         /**
@@ -329,6 +332,9 @@ public interface Yaml extends Tree {
         @Nullable
         String closingBracketPrefix;
 
+        @Nullable
+        Anchor anchor;
+
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitSequence(this, p);
@@ -337,7 +343,7 @@ public interface Yaml extends Tree {
         @Override
         public Sequence copyPaste() {
             return new Sequence(randomId(), Markers.EMPTY, openingBracketPrefix,
-                    entries.stream().map(Entry::copyPaste).collect(toList()), closingBracketPrefix);
+                    entries.stream().map(Entry::copyPaste).collect(toList()), closingBracketPrefix, anchor);
         }
 
         @Override
