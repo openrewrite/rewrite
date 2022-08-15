@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
@@ -54,6 +55,30 @@ interface JavadocTest : JavaTreeTest {
                 }
             }
         """.trimIndent()
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2139")
+    @Disabled
+    fun javadocEndingOnSameLine(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            package an.example.error;
+                        
+            import java.util.ArrayList;
+            import java.util.List;
+            
+            public class Test {
+            
+                /**
+                 * A doc
+                 *
+                 * **/
+                public void aMethod() throws Exception, RuntimeException{
+                }
+            }
+        """
     )
 
     @Test
