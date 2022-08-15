@@ -21,6 +21,9 @@ import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.SourceSpec
+import org.openrewrite.test.SourceSpecs
+import org.openrewrite.test.SourceSpecs.text
 import org.openrewrite.text.PlainText
 import java.net.URI
 import java.nio.file.Paths
@@ -263,7 +266,7 @@ class EnvironmentTest : RewriteTest {
                 .build()
                 .activateRecipes("org.openrewrite.text.ChangeTextToJon"))
         },
-        plainText(
+        text(
             "some text that isn't jon",
             "Hello Jon!"
         )
@@ -277,7 +280,7 @@ class EnvironmentTest : RewriteTest {
                 .build()
                 .activateRecipes("org.openrewrite.text.HelloKotlin"))
         },
-        plainText(
+        text(
             "some text",
             "Hello Kotlin"
         )

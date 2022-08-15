@@ -29,6 +29,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.writeText

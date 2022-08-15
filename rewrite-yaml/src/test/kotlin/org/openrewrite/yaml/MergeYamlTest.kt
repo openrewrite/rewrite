@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
 import org.openrewrite.test.RewriteTest
+import org.openrewrite.yaml.Assertions.yaml
 import java.nio.file.Path
 
 class MergeYamlTest : YamlRecipeTest, RewriteTest {

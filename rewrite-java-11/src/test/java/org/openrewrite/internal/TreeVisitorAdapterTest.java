@@ -20,12 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.UncaughtVisitorException;
-import org.openrewrite.groovy.GroovyParser;
-import org.openrewrite.groovy.GroovyVisitor;
-import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -59,17 +55,6 @@ public class TreeVisitorAdapterTest {
                 new FindUncaughtVisitorException(e.get()), JavaVisitor.class);
 
         jv.visitNonNull(cu, 0);
-    }
-
-    @Test
-    void usesMethod() {
-        G.CompilationUnit cu = GroovyParser.builder().build().parse("class Test {}").get(0);
-
-        //noinspection unchecked
-        GroovyVisitor<Integer> gv = TreeVisitorAdapter.adapt(
-                new UsesMethod<>("java.util.List add(..)"), GroovyVisitor.class);
-
-        gv.visitNonNull(cu, 0);
     }
 }
 

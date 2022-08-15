@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.*
-import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.Block
 
 @ExtendWith(JavaParserResolver::class)
 class VariableDeclarationsJava11Test : JavaTreeTest, Java11Test {

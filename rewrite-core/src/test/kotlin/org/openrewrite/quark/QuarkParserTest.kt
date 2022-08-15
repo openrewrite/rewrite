@@ -24,6 +24,9 @@ import org.openrewrite.SourceFile
 import org.openrewrite.TreeVisitor
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.RewriteTest.toRecipe
+import org.openrewrite.test.SourceSpecs
+import org.openrewrite.test.SourceSpecs.other
+import org.openrewrite.test.SourceSpecs.text
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.readText

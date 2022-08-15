@@ -5,16 +5,6 @@ plugins {
 
 dependencies {
     api(project(":rewrite-core"))
-    api(project(":rewrite-gradle"))
-    api(project(":rewrite-groovy"))
-    api(project(":rewrite-hcl"))
-    api(project(":rewrite-java"))
-    api(project(":rewrite-json"))
-    api(project(":rewrite-maven"))
-    api(project(":rewrite-properties"))
-    api(project(":rewrite-protobuf"))
-    api(project(":rewrite-xml"))
-    api(project(":rewrite-yaml"))
 
     api("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
@@ -51,9 +41,4 @@ dependencies {
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
     testCompileOnly("org.projectlombok:lombok:1.18.24")
     annotationProcessor("org.projectlombok:lombok:1.18.24")
-}
-
-tasks.withType<Javadoc> {
-    isFailOnError = false
-    exclude("org/openrewrite/java/**")
 }

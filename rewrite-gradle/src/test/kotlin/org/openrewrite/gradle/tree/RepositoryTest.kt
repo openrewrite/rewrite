@@ -17,6 +17,7 @@ package org.openrewrite.gradle.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.gradle.Assertions.buildGradle
 import org.openrewrite.test.RewriteTest
 
 class RepositoryTest : RewriteTest {

@@ -15,11 +15,13 @@
  */
 package org.openrewrite.test;
 
+import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.TypeValidation;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.quark.QuarkParser;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -30,6 +32,7 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Consumer;
 
+@Getter
 public class RecipeSpec {
     public static RecipeSpec defaults() {
         return new RecipeSpec();
@@ -68,7 +71,8 @@ public class RecipeSpec {
     };
 
     // The before and after here don't mean anything
-    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, "", null);
+    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null,
+            new ParserSupplier(Quark.class, null, QuarkParser::new), "", null);
 
     /**
      * Configuration that applies to all source file inputs.

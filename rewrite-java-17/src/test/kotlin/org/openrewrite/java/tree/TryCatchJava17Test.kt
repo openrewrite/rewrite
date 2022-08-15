@@ -21,7 +21,6 @@ import org.openrewrite.Issue
 import org.openrewrite.java.Java17Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaParserResolver
-import org.openrewrite.java.JavaTreeTest
 
 @ExtendWith(JavaParserResolver::class)
 class TryCatchJava17Test: JavaTreeTest, Java17Test {

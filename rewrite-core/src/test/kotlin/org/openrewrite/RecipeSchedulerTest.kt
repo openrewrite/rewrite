@@ -18,6 +18,8 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.SourceSpecs
+import org.openrewrite.test.SourceSpecs.text
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
 
@@ -34,8 +36,8 @@ class RecipeSchedulerTest : RewriteTest {
             text(
                     "hello",
                     "~~(org.openrewrite.BoomException: boom\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:47)\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:45))~~>hello"
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:49)\n" +
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:47))~~>hello"
             )
     )
 }

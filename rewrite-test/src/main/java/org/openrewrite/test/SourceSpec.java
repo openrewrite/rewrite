@@ -16,7 +16,10 @@
 package org.openrewrite.test;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -28,6 +31,7 @@ import java.util.function.Consumer;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@Getter
 public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @EqualsAndHashCode.Include
     final UUID id = UUID.randomUUID();
@@ -37,14 +41,41 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @Nullable
     final String dsl;
 
-    @Nullable
-    protected String sourceSetName;
+    final ParserSupplier parserSupplier;
 
     @Nullable
     final String before;
 
     @Nullable
     final String after;
+
+    /**
+     * Apply a function to each SourceFile after recipe execution.
+     * Useful for validating the AST or its metadata.
+     */
+    final EachResult eachResult;
+
+    public interface EachResult {
+        EachResult noop = (sourceFile, testMethodSpec, testClassSpec) -> sourceFile;
+        SourceFile accept(SourceFile sourceFile, RecipeSpec testMethodSpec, RecipeSpec testClassSpec);
+    }
+
+    final Consumer<ExecutionContext> customizeExecutionContext;
+
+    public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
+                      ParserSupplier parserSupplier, @Nullable String before, @Nullable String after) {
+        this.sourceFileType = sourceFileType;
+        this.dsl = dsl;
+        this.parserSupplier = parserSupplier;
+        this.before = before;
+        this.after = after;
+        this.eachResult = EachResult.noop;
+        this.customizeExecutionContext = (ctx) -> {};
+    }
+
+    @Setter
+    @Nullable
+    protected String sourceSetName;
 
     protected Path dir = Paths.get("");
 
@@ -88,27 +119,6 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     public SourceSpec<T> afterRecipe(Consumer<T> afterRecipe) {
         this.afterRecipe = afterRecipe;
         return this;
-    }
-
-    public Java java() {
-        return new Java();
-    }
-
-    public class Java {
-        public Java version(int version) {
-            markers(SourceSpecMarkers.javaVersion(version));
-            return this;
-        }
-
-        public Java project(String projectName) {
-            markers(SourceSpecMarkers.javaProject(projectName));
-            return this;
-        }
-
-        public Java sourceSet(String sourceSet) {
-            sourceSetName = sourceSet;
-            return this;
-        }
     }
 
     @Override

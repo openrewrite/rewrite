@@ -16,6 +16,7 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.maven.Assertions.pomXml
 import org.openrewrite.test.RewriteTest
 
 class AddCommentToXmlTagTest : RewriteTest {

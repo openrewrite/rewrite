@@ -28,7 +28,7 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SourceSet;
 
 import java.nio.file.Path;
 import java.util.*;
@@ -38,7 +38,7 @@ import static org.openrewrite.Tree.randomId;
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With
-public class JavaSourceSet implements Marker {
+public class JavaSourceSet implements SourceSet {
     @EqualsAndHashCode.Include
     UUID id;
 

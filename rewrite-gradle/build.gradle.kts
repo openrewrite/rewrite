@@ -14,7 +14,9 @@ repositories {
 
 dependencies {
     api(project(":rewrite-groovy"))
-
+    compileOnly(project(":rewrite-test"))
+    compileOnly(platform(kotlin("bom")))
+    compileOnly(kotlin("stdlib"))
     implementation(project(":rewrite-properties"))
 
     runtimeOnly("org.codehaus.groovy:groovy-ant:latest.release")
@@ -36,6 +38,7 @@ dependencies {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
     }
+    testImplementation(project(":rewrite-maven"))
 
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly("org.gradle:gradle-core-api:latest.release")

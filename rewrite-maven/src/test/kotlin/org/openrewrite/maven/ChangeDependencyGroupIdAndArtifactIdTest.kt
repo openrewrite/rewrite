@@ -17,6 +17,7 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.maven.Assertions.pomXml
 import org.openrewrite.test.RewriteTest
 import java.nio.file.Paths
 

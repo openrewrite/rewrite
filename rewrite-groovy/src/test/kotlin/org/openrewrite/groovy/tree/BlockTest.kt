@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.groovy.Assertions.groovy
 import org.openrewrite.test.RewriteTest
 
 class BlockTest : RewriteTest {

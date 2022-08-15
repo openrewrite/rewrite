@@ -17,8 +17,7 @@ package org.openrewrite.hcl.format
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.hcl.HclRecipeTest
+import org.openrewrite.hcl.Assertions.hcl
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 

@@ -16,7 +16,7 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
-
+    testImplementation(project(":rewrite-java-tck"))
 }
 
 tasks.withType<JavaCompile> {

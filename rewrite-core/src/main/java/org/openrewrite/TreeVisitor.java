@@ -76,7 +76,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return true;
     }
 
-    protected void setCursor(@Nullable Cursor cursor) {
+    public void setCursor(@Nullable Cursor cursor) {
         this.cursor = cursor;
     }
 

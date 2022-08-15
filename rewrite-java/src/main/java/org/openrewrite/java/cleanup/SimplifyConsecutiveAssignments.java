@@ -23,7 +23,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.TypeValidation;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;

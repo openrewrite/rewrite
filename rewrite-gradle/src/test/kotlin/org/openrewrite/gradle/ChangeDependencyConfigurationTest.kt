@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
+import org.openrewrite.gradle.Assertions.buildGradle
 import org.openrewrite.test.RewriteTest
 
 class ChangeDependencyConfigurationTest : RewriteTest {

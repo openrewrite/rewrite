@@ -15,6 +15,7 @@ include(
     "rewrite-groovy",
     "rewrite-hcl",
     "rewrite-java",
+    "rewrite-java-tck",
     "rewrite-java-8",
     "rewrite-java-11",
     "rewrite-java-17",

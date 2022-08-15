@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 import org.junit.jupiter.api.Test
+import org.openrewrite.groovy.Assertions.groovy
 import org.openrewrite.test.RewriteTest
 
 @Suppress("GroovyEmptyStatementBody", "GroovyInfiniteLoopStatement")
