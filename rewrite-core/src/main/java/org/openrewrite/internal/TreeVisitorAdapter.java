@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.quarkus.gizmo.*;
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 
@@ -62,11 +63,31 @@ public class TreeVisitorAdapter {
                         FieldCreator delegateField = creator.getFieldCreator("delegate", delegateType);
                         delegateField.setModifiers(Modifier.PRIVATE);
 
-                        MethodCreator setDelegate = creator.getMethodCreator("setDelegate", adaptTo, delegateType);
+                        MethodCreator setDelegate = creator.getMethodCreator("setDelegate", void.class, delegateType);
                         setDelegate.setModifiers(Modifier.PUBLIC);
                         setDelegate.writeInstanceField(delegateField.getFieldDescriptor(), setDelegate.getThis(),
                                 setDelegate.getMethodParam(0));
-                        setDelegate.returnValue(setDelegate.getThis());
+                        setDelegate.invokeSpecialMethod(
+                                MethodDescriptor.ofMethod(adaptTo, "setCursor", void.class, Cursor.class),
+                                setDelegate.getThis(),
+                                setDelegate.invokeVirtualMethod(MethodDescriptor.ofMethod(delegateType, "getCursor", Cursor.class),
+                                        setDelegate.getMethodParam(0))
+                        );
+                        setDelegate.returnValue(null);
+
+                        MethodCreator setCursor = creator.getMethodCreator("setCursor", void.class, Cursor.class);
+                        setCursor.setModifiers(Modifier.PUBLIC);
+                        setCursor.invokeSpecialMethod(
+                                MethodDescriptor.ofMethod(adaptTo, "setCursor", void.class, Cursor.class),
+                                setCursor.getThis(),
+                                setCursor.getMethodParam(0)
+                        );
+                        setCursor.invokeVirtualMethod(
+                                MethodDescriptor.ofMethod(delegateType, "setCursor", void.class, Cursor.class),
+                                setCursor.readInstanceField(delegateField.getFieldDescriptor(), setCursor.getThis()),
+                                setCursor.getMethodParam(0)
+                        );
+                        setCursor.returnValue(null);
 
                         for (Method method : delegate.getClass().getDeclaredMethods()) {
                             if (method.getName().startsWith("visit") || method.getName().equals("preVisit") || method.getName().equals("postVisit")) {

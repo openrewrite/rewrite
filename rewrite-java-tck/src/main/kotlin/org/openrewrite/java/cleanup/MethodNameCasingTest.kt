@@ -15,10 +15,12 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
