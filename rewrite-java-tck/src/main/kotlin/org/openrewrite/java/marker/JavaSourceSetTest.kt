@@ -31,13 +31,11 @@ import java.util.stream.Collectors
 
 interface JavaSourceSetTest {
 
-    // This test uses a lot of memory and examines the "fullTypeInformation" code path that we don't actually take anywhere right now
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1636")
     @Test
     fun buildJavaSourceSet() {
         val typeCache = JavaTypeCache()
-        val jss = JavaSourceSet.build("main", emptyList(), typeCache, true)
+        val jss = JavaSourceSet.build("main", emptyList(), typeCache, false)
         val typesBySignature = jss.classpath.associateBy { it.toString() }
         assertThat(typesBySignature["java.lang.Object"]).isInstanceOf(JavaType.Class::class.java)
         assertThat(typesBySignature["java.util.List"]).isInstanceOf(JavaType.Class::class.java)
