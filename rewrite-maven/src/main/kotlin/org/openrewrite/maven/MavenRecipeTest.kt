@@ -31,11 +31,13 @@ interface MavenRecipeTest : RecipeTest<Xml.Document> {
 
     override val executionContext: ExecutionContext
         get() {
-        return MavenExecutionContextView.view(super.executionContext)
-            .also { if (MavenSettings.readFromDiskEnabled()) {
-                it.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(it))
-            }}
-    }
+            return MavenExecutionContextView.view(super.executionContext)
+                .also {
+                    if (MavenSettings.readFromDiskEnabled()) {
+                        it.setMavenSettings(MavenSettings.readMavenSettingsFromDisk(it))
+                    }
+                }
+        }
 
     fun assertChanged(
         parser: MavenParser = this.parser,

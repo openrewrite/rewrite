@@ -57,10 +57,4 @@ tasks.named<Test>("test").configure {
 
     val nightly = System.getenv("GITHUB_WORKFLOW") == "nightly-ci"
     logger.info("This ${if(nightly) "is" else "is not"} a nightly build")
-
-    // recently failed tests will get selected, so let's DISABLE for the nightly
-    // scheduled builds and releases
-//    predictiveSelection {
-//        enabled.set(!releasing && !nightly)
-//    }
 }

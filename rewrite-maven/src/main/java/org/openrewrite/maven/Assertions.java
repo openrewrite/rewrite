@@ -27,7 +27,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.function.Consumer;
 
 public class Assertions {
-    private Assertions() {}
+    private Assertions() {
+    }
 
     static final ParserSupplier parserSupplier = new ParserSupplier(Xml.Document.class, "maven", () -> MavenParser.builder().build());
 

@@ -31,7 +31,6 @@ public class Assertions {
 
     static final ParserSupplier parserSupplier = new ParserSupplier(Json.Document.class, "xml", JsonParser::new);
 
-
     public static SourceSpecs json(@Language("json") @Nullable String before) {
         return json(before, s -> {
         });

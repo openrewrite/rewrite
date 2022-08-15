@@ -31,6 +31,8 @@ import java.util.stream.Collectors
 
 interface JavaSourceSetTest {
 
+    // This test uses a lot of memory and examines the "fullTypeInformation" code path that we don't actually take anywhere right now
+    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/1636")
     @Test
     fun buildJavaSourceSet() {
@@ -63,7 +65,7 @@ interface JavaSourceSetTest {
         assertThat(shaded[0]).isInstanceOf(JavaType.ShallowClass::class.java)
     }
 
-    // This test uses a lot of memory and examines a code path that we don't actually take anywhere right now
+    // This test uses a lot of memory and examines the "fullTypeInformation" path that we don't actually take anywhere right now
     @Disabled
     @Test
     fun doesNotDuplicateTypesInCache() {
