@@ -445,7 +445,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
 
     @Suppress("CodeBlock2Expr")
     @Test
-    fun `do not change a return statement when the return expression is not a MethodCall`() = assertUnchanged(
+    fun returnExpressionIsNotAMethodInvocation() = assertUnchanged(
         before = """
             class T {
                 public void killBatchJob() {
@@ -460,7 +460,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
     )
 
     @Test
-    fun `Lamda body is Identifier having null type`() = assertUnchanged(
+    fun lamdaBodyIsIdentifierWithNullType() = assertUnchanged(
         before = """
             import java.util.function.Supplier;
             
