@@ -20,12 +20,31 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface UnnecessaryThrowsTest : JavaRecipeTest {
+interface UnnecessaryThrowsTest : JavaRecipeTest, RewriteTest {
     override val recipe: Recipe
         get() = UnnecessaryThrows()
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(UnnecessaryThrows())
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2144")
+    @Test
+    fun genericException(jp: JavaParser) = rewriteRun(
+            { spec -> spec.parser(jp) },
+            java("""
+                class Test {
+                    public <E extends Exception> void accept(Class<E> e) throws E {
+                    }
+                }
+            """)
+    )
 
     @Test
     fun unnecessaryThrows(jp: JavaParser) = assertChanged(

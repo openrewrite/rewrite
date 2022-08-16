@@ -154,7 +154,7 @@ public class UnnecessaryThrows extends Recipe {
                 if (exception.getType() == null || exception.getType() instanceof JavaType.Unknown) {
                     return Collections.emptySet();
                 }
-                if (!TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.lang.RuntimeException"), exception.getType())) {
+                if (exception.getType() instanceof JavaType.FullyQualified && !TypeUtils.isAssignableTo(JavaType.ShallowClass.build("java.lang.RuntimeException"), exception.getType())) {
                     candidates.add(TypeUtils.asFullyQualified(exception.getType()));
                 }
             }
