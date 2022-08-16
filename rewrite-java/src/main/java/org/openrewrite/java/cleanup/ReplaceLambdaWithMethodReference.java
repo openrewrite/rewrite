@@ -145,7 +145,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
             private boolean methodArgumentsMatchLambdaParameters(J.MethodInvocation method, J.Lambda lambda) {
                 List<Expression> methodArgs = method.getArguments();
                 List<J> lambdaParameters = lambda.getParameters().getParameters();
-                if (methodArgs.size() > lambdaParameters.size()) {
+                if (methodArgs.size() != lambdaParameters.size()) {
                     return false;
                 }
                 for (int i = 0; i < lambdaParameters.size(); i++) {
