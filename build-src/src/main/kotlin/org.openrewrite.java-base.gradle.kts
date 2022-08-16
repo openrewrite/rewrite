@@ -41,6 +41,7 @@ tasks.named<Test>("test").configure {
     useJUnitPlatform {
         excludeTags("debug")
     }
+    maxHeapSize = "2g"
     jvmArgs = listOf(
         "-XX:+UnlockDiagnosticVMOptions",
         "-XX:+ShowHiddenFrames"
