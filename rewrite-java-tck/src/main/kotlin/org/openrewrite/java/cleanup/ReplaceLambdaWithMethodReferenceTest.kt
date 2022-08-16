@@ -458,4 +458,17 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun `Lamda body is Identifier having null type`() = assertUnchanged(
+        before = """
+            import java.util.function.Supplier;
+            
+            class M<T> {
+                Supplier<T> getTheResult(Optional<T> result) {
+                    return () -> result;
+                }
+            }
+        """
+    )
 }
