@@ -201,12 +201,8 @@ public class MavenPomDownloader {
         // First try to match the requested download with one of the project POMs.
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                    gav.getArtifactId().equals(projectPom.getArtifactId())) {
-                // In a real project you'd never expect there to be more than one project pom with the same group/artifact but different version numbers
-                // But in unit tests that supply all of the poms as "project" poms like these, there might be more than one entry
-                if (gav.getVersion().equals(projectPom.getVersion())) {
-                    return projectPom;
-                }
+                    gav.getArtifactId().equals(projectPom.getArtifactId()) &&
+                    gav.getVersion().equals(projectPom.getVersion())) {
                 return projectPom;
             }
         }
