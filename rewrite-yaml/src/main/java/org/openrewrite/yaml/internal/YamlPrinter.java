@@ -63,6 +63,9 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence, PrintOutputCapture<P> p) {
         visitMarkers(sequence.getMarkers(), p);
+        if (sequence.getAnchor() != null) {
+            visit(sequence.getAnchor(), p);
+        }
         if(sequence.getOpeningBracketPrefix() != null) {
             p.out.append(sequence.getOpeningBracketPrefix()).append('[');
         }
@@ -87,6 +90,9 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, PrintOutputCapture<P> p) {
         visitMarkers(mapping.getMarkers(), p);
+        if (mapping.getAnchor() != null) {
+            visit(mapping.getAnchor(), p);
+        }
         if (mapping.getOpeningBracePrefix() != null) {
             p.out.append(mapping.getOpeningBracePrefix()).append('{');
         }
@@ -134,6 +140,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     public Yaml visitAnchor(Yaml.Anchor anchor, PrintOutputCapture<P> p) {
         visitMarkers(anchor.getMarkers(), p);
+        p.out.append(anchor.getPrefix());
         p.out.append("&");
         p.out.append(anchor.getKey());
         p.out.append(anchor.getPostfix());

@@ -229,13 +229,25 @@ class MappingTest: YamlParserTest {
           - end: end
     """)
 
+    @Test
+    fun scalarEntryValue() = assertRoundTrip("""
+         foo:
+          - start: start
+          - buz: &anchor ooo
+          - fuz: *anchor
+          - end: end
+    """)
+
     @Disabled
     @Test
     fun scalarKeyAnchorInBrackets() = assertRoundTrip("""
         foo: [start: start, &anchor buz: buz, *anchor: baz, end: end]
     """)
+    @Test
+    fun scalarEntryValueAnchorInBrackets() = assertRoundTrip("""
+        foo: [start: start, &anchor buz: buz, baz: *anchor, end: end]
+    """)
 
-    @Disabled
     @Test
     fun sequenceAnchor() = assertRoundTrip("""
         defaults: &defaults
@@ -244,14 +256,25 @@ class MappingTest: YamlParserTest {
         key: *defaults
     """)
 
-    @Disabled
+    @Test
+    fun sequenceAnchorFlowStyle() = assertRoundTrip("""
+        defaults: &defaults [A:1, B:2] # comment
+        key: *defaults
+    """)
+    @Test
+    fun sequenceAnchorWithComments() = assertRoundTrip("""
+        defaults: &defaults # sequence start comment
+          - A: 1 # A comment
+          - B: 2 # B comment
+        key: *defaults
+    """)
+
     @Test
     fun sequenceAnchorInBrackets() = assertRoundTrip("""
       defaults: &defaults [A: 1, B: 2]
       mapping: *defaults
     """)
 
-    @Disabled
     @Test
     fun mappingAnchor() = assertRoundTrip("""
         defaults: &defaults
