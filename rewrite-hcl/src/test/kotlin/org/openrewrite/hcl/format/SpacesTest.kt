@@ -77,6 +77,92 @@ class SpacesTest : HclRecipeTest {
         """
     )
 
+    @Test
+    fun attributeGroups() = assertChanged(
+        before = """
+            resource "custom_resource" {
+              size = 1
+              x = 1
+              
+              longerattribute = "long"
+              y = 2
+            }
+        """,
+        after = """
+            resource "custom_resource" {
+              size = 1
+              x    = 1
+              
+              longerattribute = "long"
+              y               = 2
+            }
+        """
+    )
+
+    @Test
+    fun attributeGroupMultilineValue() = assertChanged(
+        before = """
+            variable myvar {
+              description = "Sample Variable"
+              type = object({
+                string_var = "value"
+                string_var_2 = "value"
+                multiline_var = object({
+                  x = string
+                  foo = string
+                  
+                  y = string
+                })
+                another_string_var = "value"
+                another_string_var_2 = "value"
+              })
+            }
+        """,
+        after = """ 
+            variable myvar {
+              description = "Sample Variable"
+              type = object({
+                string_var   = "value"
+                string_var_2 = "value"
+                multiline_var = object({
+                  x   = string
+                  foo = string
+                  
+                  y = string
+                })
+                another_string_var   = "value"
+                another_string_var_2 = "value"
+              })
+            }
+        """
+    )
+
+    @Test
+    fun noAttributeGroups() = assertChanged(
+        before = """
+            resource "custom_resource" {
+              size   = 1
+
+              x = 1
+              
+              longerattribute   = "long"
+
+              y = 2
+            }
+        """,
+        after = """
+            resource "custom_resource" {
+              size = 1
+
+              x = 1
+              
+              longerattribute = "long"
+
+              y = 2
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/974")
     @Test
     fun lineHashComment() = assertChanged(
