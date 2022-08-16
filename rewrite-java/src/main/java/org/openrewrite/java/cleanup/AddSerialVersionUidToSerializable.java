@@ -66,7 +66,8 @@ public class AddSerialVersionUidToSerializable extends Recipe {
 
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
-                if (!implementsSerializable(getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType())) {
+                J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                if (enclosingClass == null || !implementsSerializable(enclosingClass.getType())) {
                     return multiVariable;
                 }
                 J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
