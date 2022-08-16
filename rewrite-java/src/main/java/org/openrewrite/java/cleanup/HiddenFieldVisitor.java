@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.style.HiddenFieldStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -133,9 +134,12 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
             if (v.isScope(targetVariable)) {
                 String nextName = nextName(v.getSimpleName());
-                J.CompilationUnit enclosingCU = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+                JavaSourceFile enclosingCU = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
                 Cursor parentScope = getCursorToParentScope(getCursor());
-                J.ClassDeclaration enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+                J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                if(enclosingClass == null) {
+                    return v;
+                }
                 while (// don't use a variable name of any existing variable "downstream" of the renamed variable's scope
                         !FindNameShadows.find(parentScope.getValue(), v.withName(v.getName().withSimpleName(nextName)), enclosingClass, hiddenFieldStyle).isEmpty() ||
                                 // don't use a variable name of any existing variables already defined in the "upstream" cursor path of the renamed variable's scope

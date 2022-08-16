@@ -29,6 +29,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -76,18 +77,22 @@ public class MethodNameCasing extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
                 if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
-                    return super.visitCompilationUnit(cu, executionContext);
+                    return super.visitJavaSourceFile(cu, executionContext);
                 }
                 return cu;
             }
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+                J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                if(enclosingClass == null) {
+                    return method;
+                }
                 if (method.getMethodType() != null &&
-                        getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType() != null &&
+                        enclosingClass.getType() != null &&
                         !method.isConstructor() &&
                         !TypeUtils.isOverride(method.getMethodType()) &&
                         !standardMethodName.matcher(method.getSimpleName()).matches()) {

@@ -17,11 +17,12 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 public class FormatFirstClassPrefix<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-        J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+        JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         if (classDecl == cu.getClasses().get(0)) {
             return autoFormat(classDecl, classDecl.getName(), p, getCursor().getParentOrThrow());
         }

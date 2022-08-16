@@ -39,7 +39,10 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = variable;
-        J.ClassDeclaration enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+        J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+        if(enclosingClass == null) {
+            return v;
+        }
         if (variable.isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
                 variable.getSimpleName().equals(hasName)) {
             v = v.withName(v.getName().withSimpleName(toName));

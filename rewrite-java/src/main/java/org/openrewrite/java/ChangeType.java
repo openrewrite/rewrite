@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -261,7 +262,7 @@ public class ChangeType extends Recipe {
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             if (method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
                 if (method.getMethodType().getDeclaringType().isAssignableFrom(originalType)) {
-                    J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+                    JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
 
                     for (J.Import anImport : cu.getImports()) {
                         if (anImport.isStatic() && anImport.getQualid().getTarget().getType() != null) {

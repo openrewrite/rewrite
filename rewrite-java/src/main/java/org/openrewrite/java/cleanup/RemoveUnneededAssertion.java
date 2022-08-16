@@ -25,6 +25,7 @@ import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.util.function.BiPredicate;
 
@@ -56,15 +57,16 @@ public class RemoveUnneededAssertion extends Recipe {
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
+
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 doAfterVisit(new UsesMethod<>(JUNIT_JUPITER_ASSERT_TRUE_MATCHER));
                 doAfterVisit(new UsesMethod<>(JUNIT_JUPITER_ASSERT_FALSE_MATCHER));
                 doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_TRUE_MATCHER));
                 doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_FALSE_MATCHER));
                 doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_MESSAGE_TRUE_MATCHER));
                 doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_MESSAGE_FALSE_MATCHER));
-                return super.visitCompilationUnit(cu, executionContext);
+                return super.visitJavaSourceFile(cu, executionContext);
             }
 
             @Override

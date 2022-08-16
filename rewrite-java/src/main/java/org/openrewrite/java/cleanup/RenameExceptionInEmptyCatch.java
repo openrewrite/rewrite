@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.*;
@@ -49,10 +50,10 @@ public class RenameExceptionInEmptyCatch extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 Map<Cursor, Set<String>> variableScopes = new LinkedHashMap<>();
                 executionContext.putMessage("VARIABLES_KEY", variableScopes);
-                return super.visitCompilationUnit(cu, executionContext);
+                return super.visitJavaSourceFile(cu, executionContext);
             }
 
             @Override

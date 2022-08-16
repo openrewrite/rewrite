@@ -44,7 +44,10 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
-        J.ClassDeclaration classDecl = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+        J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
+        if(classDecl == null) {
+            return m;
+        }
         if (methodMatcher.matches(method, classDecl)) {
             J.Modifier.Type currentMethodAccessLevel = m.getModifiers().stream()
                     .map(J.Modifier::getType)

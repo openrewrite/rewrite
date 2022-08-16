@@ -21,10 +21,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.NoMissingTypes;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -68,7 +65,10 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                         !method.isConstructor() &&
                         method.getAllAnnotations().isEmpty()) {
 
-                    J.ClassDeclaration classDeclaration = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+                    J.ClassDeclaration classDeclaration = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                    if(classDeclaration == null) {
+                        return m;
+                    }
                     if (TypeUtils.isAssignableTo("java.io.Serializable", classDeclaration.getType())) {
                         switch (m.getSimpleName()) {
                             case "readObject":
@@ -79,7 +79,7 @@ public class RemoveUnusedPrivateMethods extends Recipe {
                         }
                     }
 
-                    J.CompilationUnit cu = getCursor().firstEnclosingOrThrow(J.CompilationUnit.class);
+                    JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
                     for (JavaType.Method usedMethodType : cu.getTypesInUse().getUsedMethods()) {
                         if (methodType.getName().equals(usedMethodType.getName()) && methodType.equals(usedMethodType)) {
                             return m;

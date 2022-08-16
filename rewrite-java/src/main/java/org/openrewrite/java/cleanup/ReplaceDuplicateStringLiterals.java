@@ -28,6 +28,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 
 import java.time.Duration;
@@ -74,10 +75,10 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
 
             @Override
-            public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
                 if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
-                    return super.visitCompilationUnit(cu, executionContext);
+                    return super.visitJavaSourceFile(cu, executionContext);
                 }
                 return cu;
             }
