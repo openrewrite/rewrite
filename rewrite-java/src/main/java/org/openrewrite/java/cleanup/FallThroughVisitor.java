@@ -71,11 +71,11 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
         public J.Case visitCase(J.Case caze, P p) {
             J.Case c = super.visitCase(caze, p);
             if (scope.isScope(c) &&
-                    c.getStatements().stream().noneMatch(J.Break.class::isInstance) &&
-                    c.getStatements().stream()
-                            .reduce((s1, s2) -> s2)
-                            .map(s -> !(s instanceof J.Block))
-                            .orElse(true)) {
+                c.getStatements().stream().noneMatch(J.Break.class::isInstance) &&
+                c.getStatements().stream()
+                        .reduce((s1, s2) -> s2)
+                        .map(s -> !(s instanceof J.Block))
+                        .orElse(true)) {
                 List<Statement> statements = new ArrayList<>(c.getStatements());
                 J.Break breakToAdd = autoFormat(
                         new J.Break(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null),
@@ -91,11 +91,11 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
         public J.Block visitBlock(J.Block block, P p) {
             J.Block b = super.visitBlock(block, p);
             if (getCursor().isScopeInPath(scope) &&
-                    b.getStatements().stream().noneMatch(J.Break.class::isInstance) &&
-                    b.getStatements().stream()
-                            .reduce((s1, s2) -> s2)
-                            .map(s -> !(s instanceof J.Block))
-                            .orElse(true)) {
+                b.getStatements().stream().noneMatch(J.Break.class::isInstance) &&
+                b.getStatements().stream()
+                        .reduce((s1, s2) -> s2)
+                        .map(s -> !(s instanceof J.Block))
+                        .orElse(true)) {
                 List<Statement> statements = b.getStatements();
                 J.Break breakToAdd = autoFormat(
                         new J.Break(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null),
@@ -141,10 +141,10 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
                 return trees.stream()
                         .reduce((s1, s2) -> s2) // last statement
                         .map(s -> s instanceof J.Return ||
-                                s instanceof J.Break ||
-                                s instanceof J.Continue ||
-                                s instanceof J.Throw ||
-                                ((J) s).getComments().stream().anyMatch(HAS_RELIEF_PATTERN_COMMENT)
+                                  s instanceof J.Break ||
+                                  s instanceof J.Continue ||
+                                  s instanceof J.Throw ||
+                                  ((J) s).getComments().stream().anyMatch(HAS_RELIEF_PATTERN_COMMENT)
                         ).orElse(false);
             }
 
@@ -153,6 +153,10 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
                 J.Switch s = super.visitSwitch(switzh, ctx);
                 List<Statement> statements = s.getCases().getStatements();
                 for (int i = 0; i < statements.size() - 1; i++) {
+                    if (!(statements.get(i) instanceof J.Case)) {
+                        continue;
+                    }
+
                     J.Case caze = (J.Case) statements.get(i);
                     /*
                      * {@code i + 1} because a last-line comment for a J.Case gets attached as a prefix comment in the next case

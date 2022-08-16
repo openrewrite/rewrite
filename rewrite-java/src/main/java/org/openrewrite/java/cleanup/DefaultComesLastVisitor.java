@@ -72,7 +72,7 @@ public class DefaultComesLastVisitor<P> extends JavaIsoVisitor<P> {
             for (int i = defaultCaseIndex + 1; i < cases.size(); i++) {
                 J.Case aCase = cases.get(i);
                 if (defaultCase != null && defaultCase.getStatements().isEmpty() &&
-                        aCase.getStatements().isEmpty() && !foundNonEmptyCase) {
+                    aCase.getStatements().isEmpty() && !foundNonEmptyCase) {
                     casesGroupedWithDefault.add(aCase);
                 } else {
                     if (defaultCase != null && defaultCase.getStatements().isEmpty() && !foundNonEmptyCase) {
@@ -97,7 +97,7 @@ public class DefaultComesLastVisitor<P> extends JavaIsoVisitor<P> {
             J.Case lastNotGroupedWithDefault = fixedCases.get(fixedCases.size() - 1);
             if (!lastNotGroupedWithDefault.getStatements().stream().reduce((s1, s2) -> s2)
                     .map(stat -> stat instanceof J.Break || stat instanceof J.Continue ||
-                            stat instanceof J.Return || stat instanceof J.Throw)
+                                 stat instanceof J.Return || stat instanceof J.Throw)
                     .orElse(false)) {
 
                 // add a break statement since this case is now no longer last and would fall through
@@ -153,7 +153,13 @@ public class DefaultComesLastVisitor<P> extends JavaIsoVisitor<P> {
     private boolean isDefaultCaseLastOrNotPresent(J.Switch switzh) {
         J.Case defaultCase = null;
         J.Case prior = null;
-        for (J.Case aCase : switzh.getCases().getStatements().stream().map(J.Case.class::cast).collect(Collectors.toList())) {
+        for (Statement aCaseStmt : switzh.getCases().getStatements()) {
+            if (!(aCaseStmt instanceof J.Case)) {
+                continue;
+            }
+
+            J.Case aCase = (J.Case) aCaseStmt;
+
             if (defaultCase != null) {
                 // default case was not last
                 return false;
