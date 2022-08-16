@@ -460,13 +460,20 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
     )
 
     @Test
-    fun lamdaBodyIsIdentifierWithNullType() = assertUnchanged(
+    fun labmdaReturnsFunctionalInterface() = assertUnchanged(
+        dependsOn = arrayOf("""
+            package abc;
+            @FunctionalInterface
+            public interface MyFunction {
+                String get();
+            }
+        """),
         before = """
-            import java.util.function.Supplier;
+            package abc;
             
-            class M<T> {
-                Supplier<T> getTheResult(Optional<T> result) {
-                    return () -> result;
+            class M {
+                MyFunction getFunction(String fcn) {
+                    return () -> fcn;
                 }
             }
         """
