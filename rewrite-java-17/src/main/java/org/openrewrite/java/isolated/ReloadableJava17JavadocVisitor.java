@@ -347,9 +347,14 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     if (!part.isEmpty()) {
                         body.add(new Javadoc.Text(randomId(), Markers.EMPTY, part));
                     }
-                    int pos = Collections.min(lineBreaks.keySet());
-                    body.add(lineBreaks.get(pos));
-                    lineBreaks.remove(pos);
+                    // Add trailing linebreaks if they exist.
+                    if (!lineBreaks.isEmpty()) {
+                        int pos = Collections.min(lineBreaks.keySet());
+                        if (lineBreaks.containsKey(pos)) {
+                            body.add(lineBreaks.get(pos));
+                            lineBreaks.remove(pos);
+                        }
+                    }
                 }
             } else {
                 // The Javadoc ends with trailing whitespace.

@@ -57,30 +57,6 @@ interface JavadocTest : JavaTreeTest {
     )
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/2139")
-    @Disabled
-    fun javadocEndingOnSameLine(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        CompilationUnit,
-        """
-            package an.example.error;
-                        
-            import java.util.ArrayList;
-            import java.util.List;
-            
-            public class Test {
-            
-                /**
-                 * A doc
-                 *
-                 * **/
-                public void aMethod() throws Exception, RuntimeException{
-                }
-            }
-        """
-    )
-
-    @Test
     fun singleLineJavadocText(jp: JavaParser) = assertParsePrintAndProcess(
         jp,
         CompilationUnit,
@@ -1138,6 +1114,22 @@ interface JavadocTest : JavaTreeTest {
               *       Line 1
               */
             class Test<T> {}
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2139")
+    @Test
+    fun javaDocEndsOnSameLine(jp: JavaParser) = assertParsePrintAndProcess(
+        jp,
+        CompilationUnit,
+        """
+            class Test {
+                /**
+                 * Javadoc
+                 *
+                 * **/
+                void method() {}
+            }
         """.trimIndent()
     )
 
