@@ -124,16 +124,15 @@ public interface RewriteTest extends SourceSpecs {
         RecipeSchedulerCheckingExpectedCycles recipeSchedulerCheckingExpectedCycles =
                 new RecipeSchedulerCheckingExpectedCycles(DirectScheduler.common(), expectedCyclesThatMakeChanges);
 
-        ExecutionContext executionContext;
-        if (testMethodSpec.getExecutionContext() != null) {
-            executionContext = testMethodSpec.getExecutionContext();
-        } else if (testClassSpec.getExecutionContext() != null) {
-            executionContext = testClassSpec.getExecutionContext();
-        } else {
-            executionContext = defaultExecutionContext(sourceSpecs);
-        }
+        ExecutionContext executionContext = defaultExecutionContext();
         for(SourceSpec<?> s : sourceSpecs) {
-            s.customizeExecutionContext.accept(executionContext);
+            s.getCustomizeExecutionContext().accept(executionContext);
+        }
+
+        if (testMethodSpec.getCustomizeExecutionContext() != null) {
+            testMethodSpec.getCustomizeExecutionContext().accept(executionContext);
+        } else if (testClassSpec.getCustomizeExecutionContext() != null) {
+            testClassSpec.getCustomizeExecutionContext().accept(executionContext);
         }
 
         Map<ParserSupplier, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
@@ -369,7 +368,7 @@ public interface RewriteTest extends SourceSpecs {
         }, sources);
     }
 
-    default ExecutionContext defaultExecutionContext(SourceSpec<?>[] sourceSpecs) {
+    default ExecutionContext defaultExecutionContext() {
         return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
     }
 

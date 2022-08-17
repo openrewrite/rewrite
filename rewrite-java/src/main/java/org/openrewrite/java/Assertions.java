@@ -19,7 +19,6 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -27,7 +26,6 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.test.*;
 
 import java.util.Collections;
@@ -114,7 +112,15 @@ public class Assertions {
 
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after,
                                    Consumer<SourceSpec<J.CompilationUnit>> spec) {
-        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParserSupplier, before, after);
+        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(
+                J.CompilationUnit.class,
+                null,
+                javaParserSupplier,
+                before,
+                after,
+                Assertions::validateTypes,
+                Assertions::customizeExecutionContext
+                );
         spec.accept(java);
         return java;
     }

@@ -48,7 +48,7 @@ public class RecipeSpec {
     List<Parser<?>> parsers = new ArrayList<>();
 
     @Nullable
-    ExecutionContext executionContext;
+    Consumer<ExecutionContext> customizeExecutionContext;
 
     @Nullable
     Path relativeTo;
@@ -102,8 +102,8 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec executionContext(ExecutionContext executionContext) {
-        this.executionContext = executionContext;
+    public RecipeSpec customizeExecutionContext(Consumer<ExecutionContext> customizeExecutionContext) {
+        this.customizeExecutionContext = customizeExecutionContext;
         return this;
     }
 
@@ -152,7 +152,7 @@ public class RecipeSpec {
     }
 
     @Nullable
-    ExecutionContext getExecutionContext() {
-        return executionContext;
+    Consumer<ExecutionContext> getCustomizeExecutionContext() {
+        return customizeExecutionContext;
     }
 }

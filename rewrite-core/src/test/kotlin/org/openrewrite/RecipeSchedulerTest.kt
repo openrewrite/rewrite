@@ -18,26 +18,27 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.test.RewriteTest
-import org.openrewrite.test.SourceSpecs
 import org.openrewrite.test.SourceSpecs.text
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
 
 class RecipeSchedulerTest : RewriteTest {
+    override fun defaultExecutionContext(): ExecutionContext {
+        return InMemoryExecutionContext()
+    }
 
     @Test
     fun exceptionsCauseResult() = rewriteRun(
             { spec ->
                 spec
-                        .executionContext(InMemoryExecutionContext())
                         .recipe(BoomRecipe())
                         .afterRecipe { results -> assertThat(results[0].recipeErrors).isNotEmpty() }
             },
             text(
                     "hello",
                     "~~(org.openrewrite.BoomException: boom\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:49)\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:47))~~>hello"
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:50)\n" +
+                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:48))~~>hello"
             )
     )
 }

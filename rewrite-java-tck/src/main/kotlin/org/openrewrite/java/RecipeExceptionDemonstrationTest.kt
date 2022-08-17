@@ -18,11 +18,15 @@ package org.openrewrite.java
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.test.RewriteTest
 
 interface RecipeExceptionDemonstrationTest : RewriteTest {
+    override fun defaultExecutionContext(): ExecutionContext {
+        return InMemoryExecutionContext()
+    }
 
     @BeforeEach
     fun beforeEach() {
@@ -40,7 +44,6 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
             spec
                 .recipe(RecipeExceptionDemonstration("java.util.List add(..)"))
                 .parser(jp)
-                .executionContext(InMemoryExecutionContext())
         },
         java(
             """
