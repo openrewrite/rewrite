@@ -552,7 +552,7 @@ public class ResolvedPom {
                                     .getResolutionListener()
                                     .clear();
                             return resolveDependencies(scope, requirements, downloader, ctx);
-                        } else {
+                        } else if (contains(dependencies, ga)) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
                             continue;
@@ -622,6 +622,15 @@ public class ResolvedPom {
         }
 
         return dependencies;
+    }
+
+    private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga) {
+        for (ResolvedDependency it : dependencies) {
+            if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Scope getDependencyScope(Dependency d2, ResolvedPom containingPom) {
