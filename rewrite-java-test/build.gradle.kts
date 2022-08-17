@@ -1,10 +1,11 @@
 plugins {
     id("org.openrewrite.java-library")
+    id("org.openrewrite.maven-publish")
 }
+
 
 dependencies {
     implementation(project(":rewrite-java"))
-    implementation(project(":rewrite-java-test"))
     implementation(project(":rewrite-test"))
 
     implementation("org.assertj:assertj-core:latest.release")
@@ -12,6 +13,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 }
+
 
 tasks.withType<Javadoc> {
     isFailOnError = false
