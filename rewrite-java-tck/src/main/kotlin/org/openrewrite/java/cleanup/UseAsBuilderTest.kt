@@ -23,43 +23,53 @@ import org.openrewrite.test.RewriteTest
 
 interface UseAsBuilderTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(UseAsBuilder("org.openrewrite.java.JavaParser.Builder", true,
-            "org.openrewrite.java.JavaParser fromJavaVersion()"))
+        spec.recipe(UseAsBuilder("Buildable.Builder", true,
+                "Buildable builder()"))
     }
 
     @Suppress("rawtypes")
     @Test
     fun useAsBuilder(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec ->
-            spec.parser(jp.classpath(JavaParser.runtimeClasspath()).build())
-        },
-        java(
-            """
-                import org.openrewrite.java.JavaParser;
-                class Test {
-                    void test() {
-                        int a = 0;
-                        JavaParser.Builder builder = JavaParser.fromJavaVersion();
-                        String b = "rewrite-java";
-                        int c = 0;
-                        builder = builder.classpath(b);
-                        int d = 0;
+            java(
+                """
+                    class Buildable {
+                        public static Builder builder() {
+                            return new Builder();
+                        }
+                    
+                        public static class Builder {
+                            public Builder option(String option) {
+                                return this;
+                            }
+                        }
                     }
-                }
-            """,
-            """
-                import org.openrewrite.java.JavaParser;
-                class Test {
-                    void test() {
-                        int a = 0;
-                        String b = "rewrite-java";
-                        int c = 0;
-                        JavaParser.Builder builder = JavaParser.fromJavaVersion()
-                                .classpath(b);
-                        int d = 0;
+                """
+            ),
+            java(
+                """
+                    class Test {
+                        void test() {
+                            int a = 0;
+                            Buildable.Builder builder = Buildable.builder();
+                            String b = "rewrite-java";
+                            int c = 0;
+                            builder = builder.option(b);
+                            int d = 0;
+                        }
                     }
-                }
-            """
-        )
+                """,
+                """
+                    class Test {
+                        void test() {
+                            int a = 0;
+                            String b = "rewrite-java";
+                            int c = 0;
+                            Buildable.Builder builder = Buildable.builder()
+                                    .option(b);
+                            int d = 0;
+                        }
+                    }
+                """
+            )
     )
 }
