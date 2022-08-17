@@ -113,15 +113,6 @@ interface MethodMatcherTest {
     }
 
     @Test
-    fun matchesSuperclassArgumentTypes(jp: JavaParser) {
-        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
-        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
-        // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
-        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
-    }
-
-    @Test
     fun matchesMethodSymbolsWithVarargs(jp: JavaParser) {
         argRegex("A foo(String, Object...)").matches("String,Object[]")
     }
