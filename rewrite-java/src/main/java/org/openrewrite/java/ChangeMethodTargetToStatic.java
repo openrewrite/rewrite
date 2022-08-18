@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -31,6 +33,7 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 
 @Value
+@AllArgsConstructor(onConstructor_ = @JsonCreator)
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToStatic extends Recipe {
 
@@ -61,6 +64,19 @@ public class ChangeMethodTargetToStatic extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
+    @Option(displayName = "Match unknown types",
+            description = "When enabled, include method invocations which appear to match if full type information is missing. " +
+            "Using matchUnknownTypes can improve recipe resiliency for an AST with missing type information, but " +
+            "also increases the risk of false-positive matches on unrelated method invocations.",
+            required = false)
+    @Nullable
+    Boolean matchUnknownTypes;
+
+    public ChangeMethodTargetToStatic(String methodPattern, String fullyQualifiedTargetTypeName,
+            @Nullable String returnType, @Nullable Boolean matchOverrides) {
+        this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false);
+    }
+
     @Override
     public String getDisplayName() {
         return "Change method target to static";
@@ -78,15 +94,18 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides));
+        return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides),
+                Boolean.TRUE.equals(matchUnknownTypes));
     }
 
     private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
+        private final boolean matchUnknownTypes;
         private final JavaType.FullyQualified classType = JavaType.ShallowClass.build(fullyQualifiedTargetTypeName);
 
-        public ChangeMethodTargetToStaticVisitor(MethodMatcher methodMatcher) {
+        public ChangeMethodTargetToStaticVisitor(MethodMatcher methodMatcher, boolean matchUnknownTypes) {
             this.methodMatcher = methodMatcher;
+            this.matchUnknownTypes = matchUnknownTypes;
         }
 
         @Override
@@ -96,7 +115,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
             boolean isSameReceiverType = method.getSelect() != null &&
                     TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
 
-            if ((!isStatic || !isSameReceiverType) && methodMatcher.matches(method)) {
+            if ((!isStatic || !isSameReceiverType) && methodMatcher.matches(method, matchUnknownTypes)) {
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());
@@ -112,9 +131,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     }
                 }
                 if (m.getSelect() == null) {
-                    maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName());
+                    maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName(), !matchUnknownTypes);
                 } else {
-                    maybeAddImport(fullyQualifiedTargetTypeName);
+                    maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
                     m = method.withSelect(
                             new J.Identifier(randomId(),
                                     method.getSelect() == null ?

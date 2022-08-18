@@ -175,12 +175,21 @@ public class MethodMatcher {
     }
 
     public boolean matches(@Nullable J.MethodInvocation method) {
+        return matches(method, false);
+    }
+
+    /**
+     * Prefer {@link #matches(J.MethodInvocation)}, which uses the default `false` behavior for matchUnknownTypes.
+     * Using matchUnknownTypes can improve Visitor resiliency for an AST with missing type information, but
+     * also increases the risk of false-positive matches on unrelated MethodInvocation instances.
+     */
+    public boolean matches(@Nullable J.MethodInvocation method, boolean matchUnknownTypes) {
         if(method == null) {
             return false;
         }
 
         if (method.getMethodType() == null) {
-            return false;
+            return matchUnknownTypes && matchesAllowingUnknownTypes(method);
         }
 
         if (!matchesTargetType(method.getMethodType().getDeclaringType()) || !methodNamePattern.matcher(method.getSimpleName()).matches()) {
@@ -196,6 +205,44 @@ public class MethodMatcher {
         }
 
         return argumentPattern.matcher(joiner.toString()).matches();
+    }
+
+    private boolean matchesAllowingUnknownTypes(J.MethodInvocation method) {
+        if (!methodNamePattern.matcher(method.getSimpleName()).matches()) {
+            return false;
+        }
+
+        if (method.getSelect() != null
+                && method.getSelect() instanceof J.Identifier
+                && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+            return false;
+        }
+
+        final String argumentSignature = argumentsFromExpressionTypes(method);
+        final Pattern relaxedArgumentPattern = Pattern.compile(
+                argumentPattern.pattern().replaceAll("((?:[a-zA-Z0-9]+\\.?)+)",
+                        "($1|" + JavaType.Unknown.getInstance().getFullyQualifiedName() + ")"));
+        return relaxedArgumentPattern.matcher(argumentSignature).matches();
+    }
+
+    private boolean matchesSelectBySimpleNameAlone(J.Identifier select) {
+        return targetTypePattern.matcher(select.getSimpleName()).matches()
+            || Pattern.compile(targetTypePattern.toString()
+                        .replaceAll(".*" + Pattern.quote(StringUtils.aspectjNameToPattern(".")), "")
+                        .replaceAll(".*" + Pattern.quote(StringUtils.aspectjNameToPattern("..")), ""))
+                .matcher(select.getSimpleName()).matches();
+    }
+
+    private String argumentsFromExpressionTypes(J.MethodInvocation method) {
+        StringJoiner joiner = new StringJoiner(",");
+        for (Expression expr : method.getArguments()) {
+            final JavaType exprType = expr.getType();
+            String s = exprType == null
+                    ? JavaType.Unknown.getInstance().getFullyQualifiedName()
+                    : typePattern(exprType);
+            joiner.add(s);
+        }
+        return joiner.toString();
     }
 
     public boolean matches(J.NewClass constructor) {
@@ -263,6 +310,9 @@ public class MethodMatcher {
     @Nullable
     private static String typePattern(JavaType type) {
         if (type instanceof JavaType.Primitive) {
+            if (type.equals(JavaType.Primitive.String)) {
+                return ((JavaType.Primitive) type).getClassName();
+            }
             return ((JavaType.Primitive) type).getKeyword();
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
