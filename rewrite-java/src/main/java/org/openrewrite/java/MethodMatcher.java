@@ -256,7 +256,7 @@ public class MethodMatcher {
      * @param fieldAccess A J.FieldAccess that hopefully has the same fully qualified type as this matcher.
      */
     public boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess) {
-        String hopefullyFullyQualifiedMethod = this.getTargetTypePattern().pattern() + "." + this.getMethodNamePattern().pattern();
+        String hopefullyFullyQualifiedMethod = this.getTargetTypePattern().pattern().replaceAll(Pattern.quote(StringUtils.aspectjNameToPattern(".")), ".") + "." + this.getMethodNamePattern().pattern();
         return fieldAccess.isFullyQualifiedClassReference(hopefullyFullyQualifiedMethod);
     }
 
