@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class InstanceOfTest implements RewriteTest {
+public class InstanceOfExtensionsTest implements RewriteTest {
 
     @Test
     void patternMatch() {
