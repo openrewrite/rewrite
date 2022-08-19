@@ -81,7 +81,11 @@ public class MavenParser implements Parser<Xml.Document> {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
-            Pom pom = RawPom.parse(source.getSource(), null).toPom(source.getPath(), null);
+            Path pomPath = (relativeTo == null) ?
+                    source.getPath() :
+                    relativeTo.relativize(source.getPath());
+            Pom pom = RawPom.parse(source.getSource(), null)
+                    .toPom(pomPath, null);
             if (relativeTo != null) {
                 if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
@@ -95,7 +99,7 @@ public class MavenParser implements Parser<Xml.Document> {
                     .iterator().next();
 
             projectPoms.put(xml, pom);
-            projectPomsByPath.put(source.getPath(), pom);
+            projectPomsByPath.put(pomPath, pom);
         }
 
         List<Xml.Document> parsed = new ArrayList<>();
