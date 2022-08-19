@@ -39,25 +39,25 @@ import static java.util.Collections.singletonList;
 @Disabled("Test disabled until we can solve how to load the tests in a classloader that allows access to internal types.")
 public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(
-            Java17TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"));
+      Java17TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"));
 
     private static final JCTree.JCCompilationUnit cu = ReloadableJava17Parser.builder()
-            .logCompilationWarningsAndErrors(true)
-            .build()
-            .parseInputsToCompilerAst(
-                    singletonList(new Parser.Input(Paths.get("JavaTypeGoat.java"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
-                    new InMemoryExecutionContext(Throwable::printStackTrace))
-            .entrySet()
-            .iterator()
-            .next()
-            .getValue();
+      .logCompilationWarningsAndErrors(true)
+      .build()
+      .parseInputsToCompilerAst(
+        singletonList(new Parser.Input(Paths.get("JavaTypeGoat.java"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
+        new InMemoryExecutionContext(Throwable::printStackTrace))
+      .entrySet()
+      .iterator()
+      .next()
+      .getValue();
 
     @Override
     public String fieldSignature(String field) {
         return new TreeScanner<String, Integer>() {
             @Override
             public String visitVariable(VariableTree node, Integer integer) {
-                if(node.getName().toString().equals(field)) {
+                if (node.getName().toString().equals(field)) {
                     return signatureBuilder().variableSignature(((JCTree.JCVariableDecl) node).sym);
                 }
                 //noinspection ConstantConditions
@@ -78,7 +78,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public String visitMethod(MethodTree node, Integer p) {
                 JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
-                if(method.getName().toString().equals(methodName)) {
+                if (method.getName().toString().equals(methodName)) {
                     return signatureBuilder().methodSignature(method.type, method.sym);
                 }
                 //noinspection ConstantConditions
@@ -99,7 +99,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public String visitMethod(MethodTree node, Integer p) {
                 JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
-                if(method.name.toString().equals("<init>")) {
+                if (method.name.toString().equals("<init>")) {
                     return signatureBuilder().methodSignature(method.type, method.sym);
                 }
                 //noinspection ConstantConditions
@@ -120,7 +120,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public Type visitMethod(MethodTree node, Integer p) {
                 JCTree.JCMethodDecl method = (JCTree.JCMethodDecl) node;
-                if(method.getName().toString().equals(methodName)) {
+                if (method.getName().toString().equals(methodName)) {
                     List<JCTree.JCVariableDecl> params = method.getParameters();
                     return params.iterator().next().type;
                 }
@@ -142,7 +142,7 @@ public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             @Override
             public Type visitClass(ClassTree node, Integer integer) {
                 JCTree.JCClassDecl clazz = (JCTree.JCClassDecl) node;
-                if(innerClassSimpleName.equals(clazz.getSimpleName().toString())) {
+                if (innerClassSimpleName.equals(clazz.getSimpleName().toString())) {
                     return clazz.type;
                 }
                 return super.visitClass(node, integer);
