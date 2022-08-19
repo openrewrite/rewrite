@@ -96,4 +96,12 @@ public class Pom {
         return new ResolvedPom(this, activeProfiles, emptyMap(), emptyList(), initialRepositories, emptyList(), emptyList()).resolve(ctx, downloader);
     }
 
+    @Nullable
+    public String getValue(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        return ResolvedPom.placeholderHelper.replacePlaceholders(value, this.properties::get);
+    }
+
 }

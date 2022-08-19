@@ -45,7 +45,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Getter
 public class ResolvedPom {
 
-    private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
+    public static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final ResolvedPom SUPER_POM = new ResolvedPom(
