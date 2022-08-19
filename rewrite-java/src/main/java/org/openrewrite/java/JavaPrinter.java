@@ -604,6 +604,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitMarkers(instanceOf.getMarkers(), p);
         visitRightPadded(instanceOf.getPadding().getExpr(), JRightPadded.Location.INSTANCEOF, "instanceof", p);
         visit(instanceOf.getClazz(), p);
+        visit(instanceOf.getPattern(), p);
         return instanceOf;
     }
 

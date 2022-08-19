@@ -708,10 +708,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitInstanceOf(InstanceOfTree node, Space fmt) {
+        JavaType type = typeMapping.type(node);
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
-                typeMapping.type(node));
+                node.getPattern() instanceof JCBindingPattern b ?
+                        new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, b.getVariable().getName().toString(),
+                                type, null) : null,
+                type);
     }
 
     @Override

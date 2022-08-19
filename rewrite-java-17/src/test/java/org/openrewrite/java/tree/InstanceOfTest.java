@@ -13,46 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.openrewrite.java.JavaParserResolver;
-import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-@ExtendWith(JavaParserResolver.class)
-class UseDiamondOperatorWithVarTest implements RewriteTest {
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new UseDiamondOperator());
-    }
+public class InstanceOfTest implements RewriteTest {
 
-    @SuppressWarnings("Convert2Diamond")
     @Test
-    void doNotConvertVar() {
+    void patternMatch() {
         rewriteRun(
           java(
             """
                   import java.util.*;
                   class Test {
-                      void test() {
-                          var ls1 = new ArrayList<String>();
-                          List<String> ls2 = new ArrayList<String>();
+                    public void match(Collection<?> c) {
+                          if (c instanceof List l) {
+                              System.out.println("List");
+                          } else if (c instanceof Set s) {
+                              System.out.println("Set");
+                          }
                       }
                   }
               """,
-            """
-                  import java.util.*;
-                  class Test {
-                      void test() {
-                          var ls1 = new ArrayList<String>();
-                          List<String> ls2 = new ArrayList<>();
-                      }
-                  }
-              """
+            spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
+                @Override
+                public J visitInstanceOf(J.InstanceOf instanceOf, Integer integer) {
+                    assertThat(instanceOf.getPattern()).isNotNull();
+                    return instanceOf;
+                }
+            }.visit(cu, 0))
           )
         );
     }

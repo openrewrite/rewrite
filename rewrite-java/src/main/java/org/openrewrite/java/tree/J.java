@@ -2527,6 +2527,11 @@ public interface J extends Tree {
         @Getter
         J clazz;
 
+        @Nullable
+        @With
+        @Getter
+        J pattern;
+
         @With
         @Nullable
         @Getter
@@ -2571,7 +2576,7 @@ public interface J extends Tree {
             }
 
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
-                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.type);
+                return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
         }
 

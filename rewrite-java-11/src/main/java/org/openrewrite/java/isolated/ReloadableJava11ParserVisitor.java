@@ -712,6 +712,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
+                null,
                 typeMapping.type(node));
     }
 
