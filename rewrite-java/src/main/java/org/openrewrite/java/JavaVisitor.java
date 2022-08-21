@@ -100,10 +100,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      * @param fullyQualifiedName Fully-qualified name of the class.
      */
     public void maybeAddImport(String fullyQualifiedName) {
-        AddImport<P> op = new AddImport<>(fullyQualifiedName, null, true);
-        if (!getAfterVisit().contains(op)) {
-            doAfterVisit(op);
-        }
+        maybeAddImport(fullyQualifiedName, null, true);
     }
 
     /**
@@ -115,7 +112,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      * @param statik             The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
      */
     public void maybeAddImport(String fullyQualifiedName, String statik) {
-        AddImport<P> op = new AddImport<>(fullyQualifiedName, statik, true);
+        maybeAddImport(fullyQualifiedName, statik, true);
+    }
+
+    public void maybeAddImport(String fullyQualifiedName, boolean onlyIfReferenced) {
+        maybeAddImport(fullyQualifiedName, null, onlyIfReferenced);
+    }
+
+    public void maybeAddImport(String fullyQualifiedName, @Nullable String statik, boolean onlyIfReferenced) {
+        AddImport<P> op = new AddImport<>(fullyQualifiedName, statik, onlyIfReferenced);
         if (!getAfterVisit().contains(op)) {
             doAfterVisit(op);
         }

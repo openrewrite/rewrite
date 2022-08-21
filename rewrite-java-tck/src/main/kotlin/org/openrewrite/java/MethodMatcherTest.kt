@@ -17,13 +17,14 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestFactory
 import org.openrewrite.Issue
-import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
-@Suppress("ClassInitializerMayBeStatic")
+@Suppress("ClassInitializerMayBeStatic", "JUnitMalformedDeclaration")
 interface MethodMatcherTest {
     fun typeRegex(signature: String) = MethodMatcher(signature).targetTypePattern.toRegex()
     fun nameRegex(signature: String) = MethodMatcher(signature).methodNamePattern.toRegex()
@@ -110,15 +111,6 @@ interface MethodMatcherTest {
         assertTrue(argRegex("A foo(..)").matches(""))
         assertTrue(argRegex("A foo(..)").matches("int"))
         assertTrue(argRegex("A foo(..)").matches("int,int"))
-    }
-
-    @Test
-    fun matchesSuperclassArgumentTypes(jp: JavaParser) {
-        assertTrue(MethodMatcher("Object equals(Object)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
-        assertFalse(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.ShallowClass.build("java.lang.String")))
-        // ensuring subtypes do not match parents, regardless of matchOverrides
-        assertFalse(MethodMatcher("String equals(String)", true).matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
-        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.ShallowClass.build("java.lang.Object")))
     }
 
     @Test
@@ -293,5 +285,118 @@ interface MethodMatcherTest {
     fun wildcardType(jp: JavaParser) {
         assertTrue(MethodMatcher("*..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
         assertTrue(MethodMatcher("javax..* build()").matchesTargetType(JavaType.ShallowClass.build("javax.ws.rs.core.Response")))
+    }
+
+    @Test
+    fun siteExample(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            package com.yourorg;
+
+            class Foo {
+                void bar(int i, String s) {}
+                void other() {
+                    bar(0, "");
+                }
+            }
+        """
+        ).first()
+        val classDecl = cu.classes.first()
+        val methodDecl = classDecl.body.statements[1] as J.MethodDeclaration
+        val fooMethod = methodDecl.body!!.statements[0] as J.MethodInvocation
+        assertTrue(MethodMatcher("com.yourorg.Foo bar(int, String)").matches(fooMethod))
+    }
+
+    @Test
+    fun matchUnknownTypesNoSelect(jp: JavaParser) {
+        val mi = "assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesQualifiedStaticMethod(jp: JavaParser) {
+        val mi = "Assert.assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesPackageQualifiedStaticMethod(jp: JavaParser) {
+        val mi = "org.junit.Assert.assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesWildcardReceiverType(jp: JavaParser) {
+        val mi = "Assert.assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("*..* assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesFullWildcardReceiverType(jp: JavaParser) {
+        val mi = "Assert.assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("* assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesExplicitPackageWildcardReceiverType(jp: JavaParser) {
+        val mi = "Assert.assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("org.junit.* assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesRejectsMismatchedMethodName(jp: JavaParser) {
+        val mi = "Assert.assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertFalse(MethodMatcher("org.junit.Assert assertFalse(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesRejectsStaticSelectMismatch(jp: JavaParser) {
+        val mi = "Assert.assertTrue(Foo.bar());".asMethodInvocation(jp)
+        assertFalse(MethodMatcher("org.junit.FooAssert assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesRejectsTooManyArguments(jp: JavaParser) {
+        val mi = """Assert.assertTrue(Foo.bar(), "message");""".asMethodInvocation(jp)
+        assertFalse(MethodMatcher("org.junit.Assert assertTrue(boolean)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesRejectsTooFewArguments(jp: JavaParser) {
+        val mi = """Assert.assertTrue(Foo.bar());""".asMethodInvocation(jp)
+        assertFalse(MethodMatcher("org.junit.Assert assertTrue(boolean, String)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesRejectsMismatchingKnownArgument(jp: JavaParser) {
+        val mi = """Assert.assertTrue(Foo.bar(), "message");""".asMethodInvocation(jp)
+        assertFalse(MethodMatcher("org.junit.Assert assertTrue(boolean, int)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesWildcardArguments(jp: JavaParser) {
+        val mi = """Assert.assertTrue(Foo.bar(), "message");""".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("org.junit.Assert assertTrue(..)").matches(mi, true))
+    }
+
+    @Test
+    fun matchUnknownTypesSingleWildcardArgument(jp: JavaParser) {
+        val mi = """Assert.assertTrue(Foo.bar(), "message");""".asMethodInvocation(jp)
+        assertTrue(MethodMatcher("org.junit.Assert assertTrue(*, String)").matches(mi, true))
+    }
+
+    fun String.asMethodInvocation(jp: JavaParser): J.MethodInvocation {
+        val cu = jp.parse(
+            """
+                class MyTest {
+                    void test() {
+                        $this
+                    }
+                }
+            """,
+        ).first()
+        val classDecl = cu.classes.first()
+        val testMethod = classDecl.body.statements[0] as J.MethodDeclaration
+        return testMethod.body!!.statements[0] as J.MethodInvocation
     }
 }

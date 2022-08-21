@@ -26,6 +26,7 @@ import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
+import java.util.regex.Matcher;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.copyOfRange;
@@ -548,7 +549,7 @@ public class StringUtils {
                 .replace("$", "\\$")
                 .replace("[", "\\[")
                 .replace("]", "\\]")
-                .replaceAll("([^.]*)\\.([^.]*)", "$1\\.$2")
+                .replaceAll("(?:([^.]+)|^)\\.(?:([^.]+)|$)", "$1" + Matcher.quoteReplacement("[.$]") + "$2")
                 .replace("*", "[^.]*")
                 .replace("..", "\\.(.+\\.)?");
     }
