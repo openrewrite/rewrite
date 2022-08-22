@@ -77,7 +77,7 @@ recipeList:
   - org.openrewrite.java.cleanup.UnnecessaryExplicitTypeArguments
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
   - org.openrewrite.java.cleanup.UnnecessaryPrimitiveAnnotations
-  - org.openrewrite.java.cleanup.UnnecessaryThrows
+#  - org.openrewrite.java.cleanup.UnnecessaryThrows
 #  - org.openrewrite.java.cleanup.UseCollectionInterfaces
   - org.openrewrite.java.cleanup.UseDiamondOperator
   - org.openrewrite.java.cleanup.UseJavaStyleArrayDeclarations
