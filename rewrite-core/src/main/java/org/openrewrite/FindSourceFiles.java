@@ -17,8 +17,12 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.apache.tools.ant.DirectoryScanner;
+import org.apache.tools.ant.types.selectors.SelectorUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 
@@ -49,9 +53,9 @@ public class FindSourceFiles extends Recipe {
             public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
-                    Path sourcePath = sourceFile.getSourcePath();
-                    PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher("glob:" + filePattern);
-                    if (pathMatcher.matches(sourcePath)) {
+                    String sourcePath = sourceFile.getSourcePath().toString();
+                    if (StringUtils.matchesGlob(sourcePath.matches("^\\.?[/\\\\]") ? sourcePath :
+                            "./" + sourcePath, filePattern)) {
                         return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());
                     }
                 }

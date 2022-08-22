@@ -51,7 +51,7 @@ dependencies {
     testRuntimeOnly("org.gradle:gradle-resources:latest.release")
     testRuntimeOnly("org.gradle:gradle-testing-base:latest.release")
     testRuntimeOnly("org.gradle:gradle-testing-jvm:latest.release")
-    testRuntimeOnly(project(":rewrite-java-11"))
+    testRuntimeOnly(project(":rewrite-java-17"))
 }
 
 tasks.withType<ShadowJar> {

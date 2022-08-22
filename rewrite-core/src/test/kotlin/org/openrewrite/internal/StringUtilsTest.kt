@@ -17,7 +17,11 @@ package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.internal.StringUtils.*
+import java.net.URI
+import java.nio.file.spi.FileSystemProvider
 
 class StringUtilsTest {
     @Test
@@ -207,13 +211,13 @@ class StringUtilsTest {
         """)).isTrue
 
         assertThat(containsOnlyWhitespaceAndComments("a")).isFalse
-        assertThat(containsOnlyWhitespaceAndComments(            """
+        assertThat(containsOnlyWhitespaceAndComments("""
             // hello
             goodbye
         """)).isFalse
         assertThat(containsOnlyWhitespaceAndComments("a//")).isFalse
         assertThat(containsOnlyWhitespaceAndComments(
-            """
+                """
             /*
             */
             a
@@ -250,10 +254,10 @@ class StringUtilsTest {
 
     @Test
     fun globMatching() {
-        assertThat(matchesGlob("expression", "expr*")).isTrue()
-        assertThat(matchesGlob("some/xpath", "some/*")).isTrue()
-        assertThat(matchesGlob("some/xpath/expression", "some/**")).isTrue()
-        assertThat(matchesGlob("//some/xpath/expression", "**/xpath/*")).isTrue()
+        assertThat(matchesGlob("expression", "expr*")).isTrue
+        assertThat(matchesGlob("some/xpath", "some/*")).isTrue
+        assertThat(matchesGlob("some/xpath/expression", "some/**")).isTrue
+        assertThat(matchesGlob("//some/xpath/expression", "**/xpath/*")).isTrue
     }
 
     @Test

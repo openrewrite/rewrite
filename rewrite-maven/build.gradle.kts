@@ -55,7 +55,7 @@ dependencies {
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.9+")
     integTestImplementation("org.rocksdb:rocksdbjni:$rocksDbVersion")
 
-    integTestImplementation(project(":rewrite-java-11"))
+    integTestImplementation(project(":rewrite-java-17"))
     integTestImplementation(project(":rewrite-properties"))
     integTestImplementation(project(":rewrite-xml"))
     integTestImplementation(project(":rewrite-yaml"))
@@ -68,7 +68,7 @@ dependencies {
     testImplementation("guru.nidi:graphviz-java:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
-    testRuntimeOnly(project(":rewrite-java-11"))
+    testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:$rocksDbVersion")
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 }

@@ -15,28 +15,30 @@
  */
 package org.openrewrite.internal;
 
+import org.apache.tools.ant.DirectoryScanner;
+import org.apache.tools.ant.types.selectors.SelectorUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.stream.Stream;
 
-import static java.util.Arrays.copyOfRange;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
 public class StringUtils {
-    private final static FileSystem FS = FileSystems.getDefault();
-
     private StringUtils() {
     }
 
@@ -47,9 +49,9 @@ public class StringUtils {
 
     /**
      * Detects a common minimal indent of all the input lines and removes the indent from each line.
-     *
+     * <p>
      * This is modeled after Kotlin's trimIndent and is useful for pruning the indent from multi-line text blocks.
-     *
+     * <p>
      * Note: Blank lines do not affect the detected indent level.
      *
      * @param text A string that have a common indention
@@ -433,30 +435,22 @@ public class StringUtils {
         if ("*".equals(globPattern)) {
             return true;
         }
-        if (null == globPattern) {
+        if (globPattern == null) {
             return false;
         }
-        if (null == value) {
+        if (value == null) {
             value = "";
         }
-        PathMatcher pm = FS.getPathMatcher("glob:" + globPattern);
-        Path path = Paths.get("");
-        if (value.contains("/")) {
-            String[] parts = value.split("/");
-            if (parts.length > 1) {
-                for (int i = 0, len = parts.length; i < len; i++) {
-                    path = Paths.get("", copyOfRange(parts, i, parts.length));
-                    if (!isBlank(parts[i])) {
-                        break;
-                    }
-                }
-            } else {
-                path = Paths.get(parts[0]);
-            }
-        } else {
-            path = Paths.get(value);
-        }
-        return pm.matches(path);
+
+        return SelectorUtils.match(
+                globPattern
+                        .replace('/', File.separatorChar)
+                        .replace('\\', File.separatorChar),
+                value
+                        .replace('/', File.separatorChar)
+                        .replace('\\', File.separatorChar),
+                false
+        );
     }
 
     public static String indent(String text) {
@@ -555,10 +549,10 @@ public class StringUtils {
     }
 
     /**
-     * @see <a href="https://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring#Java_-_O(n)_storage"></a>
      * @param s1 first string
      * @param s2 second string
      * @return length of the longest substring common to both strings
+     * @see <a href="https://en.wikibooks.org/wiki/Algorithm_Implementation/Strings/Longest_common_substring#Java_-_O(n)_storage"></a>
      */
     public static int greatestCommonSubstringLength(String s1, String s2) {
         if (s1.isEmpty() || s2.isEmpty()) {
@@ -611,7 +605,7 @@ public class StringUtils {
         int delimIndex = cursor;
         for (; delimIndex < source.length(); delimIndex++) {
             if (inSingleLineComment) {
-                if(source.charAt(delimIndex) == '\n') {
+                if (source.charAt(delimIndex) == '\n') {
                     inSingleLineComment = false;
                 }
             } else {

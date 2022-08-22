@@ -17,23 +17,30 @@ package org.openrewrite
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.text.PlainText
-import org.openrewrite.text.PlainTextParser
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.SourceSpecs.text
 import java.nio.file.Path
 
-class FindSourceFilesTest : RecipeTest<PlainText> {
-    override val parser: Parser<PlainText>
-        get() = PlainTextParser()
-
-    override val recipe: Recipe
-        get() = FindSourceFiles("**/hello.txt")
+class FindSourceFilesTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(FindSourceFiles("**/hello.txt"))
+    }
 
     @Test
-    fun findMatchingFile(@TempDir tempDir: Path) = assertChangedBase(
-        before = tempDir.resolve("a/b/hello.txt").apply {
-            toFile().parentFile.mkdirs()
-            toFile().writeText("hello world")
-        }.toFile(),
-        after = "~~>hello world"
+    fun findMatchingFile(@TempDir tempDir: Path) = rewriteRun(
+        text("hello world!", "~~>hello world!") { spec -> spec.path("a/b/hello.txt") }
+    )
+
+    @Test
+    fun starStarMatchesAtRoot(@TempDir tempDir: Path) = rewriteRun(
+        text("hello world!", "~~>hello world!") { spec -> spec.path("hello.txt") },
+        text("hello world!", "~~>hello world!") { spec -> spec.path("./hello.txt") }
+    )
+
+    @Test
+    fun windows(@TempDir tempDir: Path) = rewriteRun(
+        text("hello world!", "~~>hello world!") { spec -> spec.path("C:\\Windows\\hello.txt") },
+        text("hello world!", "~~>hello world!") { spec -> spec.path("\\Windows\\hello.txt") }
     )
 }
