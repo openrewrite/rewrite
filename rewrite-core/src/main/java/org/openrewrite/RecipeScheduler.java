@@ -330,10 +330,16 @@ public interface RecipeScheduler {
 
             RecipeRunStats nextStats = null;
             for (RecipeRunStats called : runStats.getCalled()) {
-                if(called.recipe == r) {
+                if (called.recipe == r) {
                     nextStats = called;
                     break;
                 }
+            }
+
+            // when doNext is called conditionally inside of a recipe visitor
+            if (nextStats == null) {
+                nextStats = new RecipeRunStats(r);
+                runStats.getCalled().add(nextStats);
             }
 
             afterWidened = scheduleVisit(requireNonNull(nextStats), nextStack, afterWidened,
