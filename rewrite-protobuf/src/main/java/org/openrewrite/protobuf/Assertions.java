@@ -20,7 +20,6 @@ import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.protobuf.tree.Proto;
 import org.openrewrite.test.DslParserBuilder;
-import org.openrewrite.test.ParserSupplier;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
