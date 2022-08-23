@@ -37,13 +37,16 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.named<Test>("test").configure {
+    retry {
+        maxRetries.set(4)
+    }
     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).takeIf { it > 0 } ?: 1
     useJUnitPlatform {
         excludeTags("debug")
     }
     jvmArgs = listOf(
-        "-XX:+UnlockDiagnosticVMOptions",
-        "-XX:+ShowHiddenFrames"
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-XX:+ShowHiddenFrames"
     )
     testLogging {
         showExceptions = true
@@ -53,8 +56,8 @@ tasks.named<Test>("test").configure {
     }
 
     val releasing = project.hasProperty("releasing")
-    logger.info("This ${if(releasing) "is" else "is not"} a release build")
+    logger.info("This ${if (releasing) "is" else "is not"} a release build")
 
     val nightly = System.getenv("GITHUB_WORKFLOW") == "nightly-ci"
-    logger.info("This ${if(nightly) "is" else "is not"} a nightly build")
+    logger.info("This ${if (nightly) "is" else "is not"} a nightly build")
 }

@@ -58,7 +58,6 @@ class MethodDeclarationTest : RewriteTest {
         groovy(
             """
                 static int accept(Map m) {
-                    List l
                     return 0
                 }
             """
