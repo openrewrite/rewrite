@@ -98,10 +98,9 @@ public class Assertions {
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext
         );
-        spec.accept(java);
+        acceptSpec(spec, java);
         return java;
     }
-
 
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after) {
         return java(before, after, s -> {
@@ -113,8 +112,17 @@ public class Assertions {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParser, before, after,
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext);
-        spec.accept(java);
+        acceptSpec(spec, java);
         return java;
+    }
+
+    private static void acceptSpec(Consumer<SourceSpec<J.CompilationUnit>> spec, SourceSpec<J.CompilationUnit> java) {
+        Consumer<J.CompilationUnit> userSuppliedAfterRecipe = java.getAfterRecipe();
+        java.afterRecipe(cu -> {
+            J.clearCaches();
+            userSuppliedAfterRecipe.accept(cu);
+        });
+        spec.accept(java);
     }
 
     public static SourceSpecs mavenProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
