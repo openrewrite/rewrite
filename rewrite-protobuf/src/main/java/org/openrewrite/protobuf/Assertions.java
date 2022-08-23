@@ -30,7 +30,7 @@ public class Assertions {
     private Assertions() {
     }
 
-    private static final DslParserBuilder protobufParser = new DslParserBuilder("protobuf", new DslParserBuilder(Proto.Document.class) {
+    private static final DslParserBuilder protobufParser = new DslParserBuilder("protobuf", new Parser.Builder(Proto.Document.class) {
         @Override
         public Parser<?> build() {
             return new ProtoParser();
