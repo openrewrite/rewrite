@@ -1120,7 +1120,7 @@ interface ChangeTypeTest : JavaRecipeTest {
             InMemoryExecutionContext()
         )
 
-        val results = ChangeType("a.b.Original", "x.y.Target", false).run(sources)
+        val results = ChangeType("a.b.Original", "x.y.Target", false).run(sources).results
 
         // similarity index doesn't matter
         // language=diff
@@ -1159,7 +1159,7 @@ interface ChangeTypeTest : JavaRecipeTest {
             InMemoryExecutionContext()
         )
 
-        val results = ChangeType("a.b.Original", "x.y.Original", false).run(sources)
+        val results = ChangeType("a.b.Original", "x.y.Original", false).run(sources).results
 
         // similarity index doesn't matter
         // language=diff
@@ -1199,7 +1199,7 @@ interface ChangeTypeTest : JavaRecipeTest {
             InMemoryExecutionContext()
         )
 
-        val results = ChangeType("a.b.C${'$'}Original", "x.y.C${'$'}Target", false).run(sources)
+        val results = ChangeType("a.b.C${'$'}Original", "x.y.C${'$'}Target", false).run(sources).results
 
         // similarity index doesn't matter
         // language=diff
@@ -1300,7 +1300,7 @@ interface ChangeTypeTest : JavaRecipeTest {
             InMemoryExecutionContext()
         )
 
-        val results = ChangeType("a.b.C${'$'}D${'$'}Original", "x.y.C${'$'}D${'$'}Target", false).run(sources)
+        val results = ChangeType("a.b.C${'$'}D${'$'}Original", "x.y.C${'$'}D${'$'}Target", false).run(sources).results
 
         // similarity index doesn't matter
         // language=diff

@@ -111,7 +111,7 @@ interface RecipeTest<T : SourceFile> {
             recipeSchedulerCheckingExpectedCycles,
             cycles,
             expectedCyclesThatMakeChanges + 1
-        )
+        ).results
 
         results = results.filter { it.before == sources.first() }
         if (results.isEmpty()) {
@@ -176,7 +176,7 @@ interface RecipeTest<T : SourceFile> {
             .run(
                 sources,
                 executionContext
-            )
+            ).results
 
         results.filter { result -> result.before == source }
             .forEach { result ->
@@ -209,13 +209,14 @@ interface RecipeTest<T : SourceFile> {
         }
 
         override fun <S : SourceFile?> scheduleVisit(
+            runStats: RecipeRunStats,
             recipeStack: Stack<Recipe>,
             before: MutableList<S>,
             ctx: ExecutionContext,
             recipeThatDeletedSourceFile: MutableMap<UUID, Stack<Recipe>>
         ): MutableList<S> {
             ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges)
-            val afterList = delegate.scheduleVisit(recipeStack, before, ctx, recipeThatDeletedSourceFile)
+            val afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, recipeThatDeletedSourceFile)
             if (afterList !== before) {
                 cyclesThatResultedInChanges = cyclesThatResultedInChanges.inc()
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&

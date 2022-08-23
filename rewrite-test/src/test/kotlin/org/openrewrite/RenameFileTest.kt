@@ -40,7 +40,7 @@ class RenameFileTest: RecipeTest<PlainText> {
             InMemoryExecutionContext()
         )
 
-        val results = recipe.run(sources)
+        val results = recipe.run(sources).results
 
         // similarity index doesn't matter
         assertThat(results.joinToString("") { it.diff() }).isEqualTo("""

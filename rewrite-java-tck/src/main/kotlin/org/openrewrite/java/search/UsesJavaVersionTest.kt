@@ -66,7 +66,7 @@ interface UsesJavaVersionTest : JavaRecipeTest {
     fun invalidJavaVersion(jp: JavaParser) {
         val sourceFiles = sourceFilesWithJavaVersion()
         val recipe = toRecipe { UsesJavaVersion(-1, Int.MAX_VALUE) }
-        val result = recipe.run(sourceFiles, executionContext)
+        val result = recipe.run(sourceFiles, executionContext).results
         assertThat(result).isNotNull
         assertThat(result.isEmpty()).isTrue
     }
@@ -76,7 +76,7 @@ interface UsesJavaVersionTest : JavaRecipeTest {
     fun findJavaVersion(jp: JavaParser) {
         val sourceFiles = sourceFilesWithJavaVersion()
         val recipe = toRecipe { UsesJavaVersion(getJavaVersion().majorVersion) }
-        val result = recipe.run(sourceFiles, executionContext)
+        val result = recipe.run(sourceFiles, executionContext).results
         assertThat(result).isNotNull
         assertThat(result.isNotEmpty())
         assertThat(result[0].after!!.markers.markers.map {

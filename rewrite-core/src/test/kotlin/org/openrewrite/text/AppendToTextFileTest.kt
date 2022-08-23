@@ -29,10 +29,10 @@ class AppendToTextFileTest : RewriteTest {
             spec
                 .recipe(AppendToTextFile("file.txt", "content", "preamble", true, "leave"))
                 .expectedCyclesThatMakeChanges(1)
-                .afterRecipe { resultList ->
-                    resultList.let {
-                        assertEquals(1, resultList.size)
-                        val actualSourceFile = resultList[0].after!!
+                .afterRecipe { run ->
+                    run.results.let {
+                        assertEquals(1, it.size)
+                        val actualSourceFile = it[0].after!!
                         val actualPlaintext = actualSourceFile as PlainText
                         assertEquals("file.txt", actualSourceFile.sourcePath.toString())
                         assertEquals(
@@ -57,10 +57,10 @@ class AppendToTextFileTest : RewriteTest {
                     .doNext(AppendToTextFile("file.txt", "content", "preamble", true, "leave"))
             )
             .expectedCyclesThatMakeChanges(1)
-            .afterRecipe { resultList ->
-                resultList.let {
-                    assertEquals(1, resultList.size)
-                    val actualSourceFile = resultList[0].after!!
+            .afterRecipe { run ->
+                run.results.let {
+                    assertEquals(1, it.size)
+                    val actualSourceFile = it[0].after!!
                     val actualPlaintext = actualSourceFile as PlainText
                     assertEquals("file.txt", actualSourceFile.sourcePath.toString())
                     assertEquals(

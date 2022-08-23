@@ -67,7 +67,7 @@ public class RecipeSpec {
     Consumer<List<SourceFile>> beforeRecipe = s -> {
     };
 
-    Consumer<List<Result>> afterRecipe = r -> {
+    Consumer<RecipeRun> afterRecipe = r -> {
     };
 
     // The before and after here don't mean anything
@@ -122,7 +122,7 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec afterRecipe(Consumer<List<Result>> afterRecipe) {
+    public RecipeSpec afterRecipe(Consumer<RecipeRun> afterRecipe) {
         this.afterRecipe = afterRecipe;
         return this;
     }

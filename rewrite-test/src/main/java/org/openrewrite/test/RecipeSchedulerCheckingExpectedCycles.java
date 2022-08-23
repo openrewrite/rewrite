@@ -16,10 +16,7 @@
 package org.openrewrite.test;
 
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.RecipeScheduler;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.quark.Quark;
 
 import java.util.List;
@@ -45,10 +42,10 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
     }
 
     @Override
-    public <S extends SourceFile> List<S> scheduleVisit(Stack<Recipe> recipeStack, List<S> before,
+    public <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats, Stack<Recipe> recipeStack, List<S> before,
                                                         ExecutionContext ctx, Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
         ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges);
-        List<S> afterList = delegate.scheduleVisit(recipeStack, before, ctx, recipeThatDeletedSourceFile);
+        List<S> afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, recipeThatDeletedSourceFile);
         if (afterList != before) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&

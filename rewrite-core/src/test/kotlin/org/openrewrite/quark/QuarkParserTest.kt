@@ -70,8 +70,8 @@ class QuarkParserTest : RewriteTest {
                         }
                     }
                 })
-                .afterRecipe { results ->
-                    results.forEach {
+                .afterRecipe { run ->
+                    run.results.forEach {
                         val git = Git.init().setDirectory(tempDir.toFile()).call()
                         git.apply().setPatch(it.diff().byteInputStream()).call()
                     }

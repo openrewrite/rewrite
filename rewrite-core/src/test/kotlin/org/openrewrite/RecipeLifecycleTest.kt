@@ -67,7 +67,7 @@ class RecipeLifecycleTest {
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
                 before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")
-        }.run(emptyList())
+        }.run(emptyList()).results
 
         assertThat(results).isEmpty()
     }
@@ -82,7 +82,7 @@ class RecipeLifecycleTest {
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
                 before + PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")
-        }.run(emptyList())
+        }.run(emptyList()).results
 
         assertThat(results.map { it.recipeDescriptorsThatMadeChanges.map { r -> r.name }.first() }
             .distinct()).containsExactly("test.GeneratingRecipe")
@@ -99,7 +99,7 @@ class RecipeLifecycleTest {
 
             override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
                 emptyList<SourceFile>()
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test"))).results
 
         assertThat(results.map {
             it.recipeDescriptorsThatMadeChanges.map { r -> r.name }.first()
@@ -122,7 +122,7 @@ class RecipeLifecycleTest {
 
             }
 
-        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")))
+        }.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test"))).results
 
         assertThat(results.map {
             it.recipeDescriptorsThatMadeChanges.map { r -> r.name }.first()
@@ -191,7 +191,7 @@ class RecipeLifecycleTest {
             doNext(noChangeRecipe())
             doNext(testRecipe("Change2"))
         }
-        val results = recipe.run(sources, InMemoryExecutionContext { throw it })
+        val results = recipe.run(sources, InMemoryExecutionContext { throw it }).results
         assertThat(results.size)
             .isEqualTo(1)
         assertThat(results.first().recipeDescriptorsThatMadeChanges.map { it.name })
@@ -223,7 +223,7 @@ class RecipeLifecycleTest {
                 .doNext(testRecipe("F")))
             doNext(noChangeRecipe())
         }
-        val results = recipe.run(sources, InMemoryExecutionContext { throw it })
+        val results = recipe.run(sources, InMemoryExecutionContext { throw it }).results
         assertThat(results.size).isEqualTo(1)
 
         val recipeDescriptors = results[0].recipeDescriptorsThatMadeChanges

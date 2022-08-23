@@ -58,7 +58,7 @@ interface ExtractInterfaceTest : JavaRecipeTest {
                     ExtractInterface.extract(b as JavaSourceFile, "org.openrewrite.interfaces.ITest")
                 }
             }
-        }.run(cus)
+        }.run(cus).results
 
         assertThat(results[0].after!!.printAll()).isEqualTo(
             //language=java

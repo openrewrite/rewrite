@@ -46,7 +46,7 @@ object RewriteJavaProjectOnDisk {
         val parser: JavaParser = JavaParser.fromJavaVersion().build()
 
         val sourceFiles: List<SourceFile> = parser.parse(paths, srcDir, InMemoryExecutionContext())
-        recipe.run(sourceFiles).map {
+        recipe.run(sourceFiles).results.map {
             println(it.diff())
             if(System.getenv("rewrite.autofix")?.equals("true") == true) {
                 it.after!!.sourcePath.toFile().writeText(it.after!!.printAll(), Charsets.UTF_8)

@@ -43,7 +43,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             """.trimIndent()
         );
 
-        val after = UpdateSourcePositions().run(cu)[0].after!!
+        val after = UpdateSourcePositions().run(cu).results[0].after!!
 
         val withLineAndColumn = after.print(
             object : JavaPrinter<Int>() {
@@ -87,7 +87,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             """.trimIndent()
         )
 
-        val after = UpdateSourcePositions().run(cu)[0].after!!
+        val after = UpdateSourcePositions().run(cu).results[0].after!!
 
         val withOffsetAndLength = after.print(
             object : JavaPrinter<Int>() {
@@ -152,7 +152,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
 
         val cu = jp.parse(source);
 
-        val after = UpdateSourcePositions().run(cu)[0].after!!
+        val after = UpdateSourcePositions().run(cu).results[0].after!!
 
         assertThat(after.printAll()).isEqualTo(source);
 
@@ -234,7 +234,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
 
         val cu = jp.parse(source);
 
-        val after = UpdateSourcePositions().run(cu)[0].after!!
+        val after = UpdateSourcePositions().run(cu).results[0].after!!
 
         assertThat(after.printAll()).isEqualTo(source);
 

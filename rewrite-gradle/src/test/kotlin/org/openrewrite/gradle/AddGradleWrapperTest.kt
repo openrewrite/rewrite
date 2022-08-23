@@ -62,18 +62,18 @@ class AddGradleWrapperTest : RewriteTest {
     @Test
     fun addWrapper() = rewriteRun(
         { spec ->
-            spec.afterRecipe { results ->
+            spec.afterRecipe { run ->
                 val gradleSh =
-                    results.map { it.after }.filterIsInstance<PlainText>().first { it.sourcePath.endsWith("gradlew") }
+                    run.results.map { it.after }.filterIsInstance<PlainText>().first { it.sourcePath.endsWith("gradlew") }
                 assertThat(gradleSh.text).isNotBlank
                 assertThat(gradleSh.fileAttributes!!.isExecutable).isTrue
 
-                val gradleBat = results.map { it.after }.filterIsInstance<PlainText>()
+                val gradleBat = run.results.map { it.after }.filterIsInstance<PlainText>()
                     .first { it.sourcePath.endsWith("gradlew.bat") }
                 assertThat(gradleBat.text).isNotBlank
                 assertThat(gradleBat.fileAttributes!!.isExecutable).isTrue
 
-                val gradleWrapperJar = results.map { it.after }.filterIsInstance<Remote>()
+                val gradleWrapperJar = run.results.map { it.after }.filterIsInstance<Remote>()
                     .first { it.sourcePath.endsWith("gradle-wrapper.jar") }
                 assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
                 assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
@@ -91,8 +91,8 @@ class AddGradleWrapperTest : RewriteTest {
     @Test
     fun addWrapperWhenIncomplete() = rewriteRun(
         { spec ->
-            spec.afterRecipe { results ->
-                val gradleWrapperJar = results.map { it.after }.filterIsInstance<Remote>()
+            spec.afterRecipe { run ->
+                val gradleWrapperJar = run.results.map { it.after }.filterIsInstance<Remote>()
                     .first { it.sourcePath.endsWith("gradle-wrapper.jar") }
                 assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.sourcePath, WRAPPER_JAR_LOCATION))
                 assertThat(gradleWrapperJar.uri).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"))
@@ -106,7 +106,7 @@ class AddGradleWrapperTest : RewriteTest {
     @Test
     fun addWrapperToGradleKotlin() = rewriteRun(
         { spec ->
-            spec.afterRecipe { results -> results.isNotEmpty() }.expectedCyclesThatMakeChanges(1)
+            spec.afterRecipe { run -> run.results.isNotEmpty() }.expectedCyclesThatMakeChanges(1)
         },
         other("") { spec -> spec.path("build.gradle.kts") }
     )
@@ -114,7 +114,7 @@ class AddGradleWrapperTest : RewriteTest {
     @Test
     fun dontAddWrapperToMavenProject() = rewriteRun(
         { spec ->
-            spec.afterRecipe { results -> results.isEmpty() }
+            spec.afterRecipe { run -> run.results.isEmpty() }
         },
         pomXml(
             """

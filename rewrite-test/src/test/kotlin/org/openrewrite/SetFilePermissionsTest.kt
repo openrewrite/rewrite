@@ -27,8 +27,8 @@ class SetFilePermissionsTest : RewriteTest {
     fun `Revoke read permissions`() = rewriteRun(
         {spec ->
             spec.recipe(SetFilePermissions("test.txt", false, true, true))
-            spec.afterRecipe { results ->
-                results.forEach {
+            spec.afterRecipe { run ->
+                run.results.forEach {
                     assertThat(it.after!!.fileAttributes!!.isReadable).isFalse
                     assertThat(it.after!!.fileAttributes!!.isWritable).isTrue
                     assertThat(it.after!!.fileAttributes!!.isExecutable).isTrue
@@ -41,8 +41,8 @@ class SetFilePermissionsTest : RewriteTest {
     fun `Revoke write permissions`() = rewriteRun(
         {spec ->
             spec.recipe(SetFilePermissions("test.txt", true, false, true))
-            spec.afterRecipe { results ->
-                results.forEach {
+            spec.afterRecipe { run ->
+                run.results.forEach {
                     assertThat(it.after!!.fileAttributes!!.isReadable).isTrue
                     assertThat(it.after!!.fileAttributes!!.isWritable).isFalse
                     assertThat(it.after!!.fileAttributes!!.isExecutable).isTrue
@@ -55,8 +55,8 @@ class SetFilePermissionsTest : RewriteTest {
     fun `Revoke executable permissions`() = rewriteRun(
         {spec ->
             spec.recipe(SetFilePermissions("test.txt", true, true, false))
-            spec.afterRecipe { results ->
-                results.forEach {
+            spec.afterRecipe { run ->
+                run.results.forEach {
                     assertThat(it.after!!.fileAttributes!!.isReadable).isTrue
                     assertThat(it.after!!.fileAttributes!!.isWritable).isTrue
                     assertThat(it.after!!.fileAttributes!!.isExecutable).isFalse

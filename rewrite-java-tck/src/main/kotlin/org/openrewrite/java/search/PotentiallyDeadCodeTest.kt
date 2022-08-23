@@ -47,7 +47,7 @@ interface PotentiallyDeadCodeTest : JavaRecipeTest {
             """.trimIndent()
         )
 
-        val results = PotentiallyDeadCode().run(cu)
+        val results = PotentiallyDeadCode().run(cu).results
 
         //language=csv
         assertThat(results[0].after!!.printAll()).isEqualTo("""

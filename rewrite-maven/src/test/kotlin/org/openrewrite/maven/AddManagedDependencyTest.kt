@@ -64,7 +64,7 @@ class AddManagedDependencyTest {
                         </project>
                     """.trimIndent()
                     )
-                )
+                ).results
         ).isEmpty()
     }
 
@@ -102,7 +102,7 @@ class AddManagedDependencyTest {
                         </project>
                     """.trimIndent()
                     )
-                )
+                ).results
         assertThat(results).hasSize(1)
         assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
             """
@@ -194,7 +194,7 @@ class AddManagedDependencyTest {
                                     maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(Tree.randomId()) })
                                 } else maven
                             }
-            )
+            ).results
         assertThat(results).hasSize(2)
         assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
             """
@@ -280,7 +280,7 @@ class AddManagedDependencyTest {
             """.trimIndent()
         )
         val results = addManagedDependency(true, null)
-            .run( mavenParser.parse(listOf(parent, child), tempDir, InMemoryExecutionContext())
+            .run(mavenParser.parse(listOf(parent, child), tempDir, InMemoryExecutionContext())
                             .map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
                             .mapIndexed { n, maven ->
                                 if (n == 0) {
@@ -288,7 +288,7 @@ class AddManagedDependencyTest {
                                     maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(Tree.randomId()) })
                                 } else maven
                             }
-            )
+            ).results
         assertThat(results).hasSize(1)
         assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
             """

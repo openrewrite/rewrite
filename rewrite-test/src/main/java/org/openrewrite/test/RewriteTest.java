@@ -228,7 +228,7 @@ public interface RewriteTest extends SourceSpecs {
         testClassSpec.beforeRecipe.accept(beforeSourceFiles);
         testMethodSpec.beforeRecipe.accept(beforeSourceFiles);
 
-        List<Result> results = recipe.run(
+        RecipeRun recipeRun = recipe.run(
                 beforeSourceFiles,
                 executionContext,
                 recipeSchedulerCheckingExpectedCycles,
@@ -236,8 +236,8 @@ public interface RewriteTest extends SourceSpecs {
                 expectedCyclesThatMakeChanges + 1
         );
 
-        testMethodSpec.afterRecipe.accept(results);
-        testClassSpec.afterRecipe.accept(results);
+        testMethodSpec.afterRecipe.accept(recipeRun);
+        testClassSpec.afterRecipe.accept(recipeRun);
 
         Collection<SourceSpec<?>> expectedNewSources = Collections.newSetFromMap(new IdentityHashMap<>());
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
@@ -246,7 +246,6 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-
         nextSourceSpec:
         for (SourceSpec<?> sourceSpec : expectedNewSources) {
             assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
@@ -254,7 +253,7 @@ public interface RewriteTest extends SourceSpecs {
             if (sourceSpec.getSourcePath() != null) {
                 // If sourceSpec defines a source path, enforce there is a result that has the same source path and
                 // the contents match the expected value.
-                for (Result result : results) {
+                for (Result result : recipeRun.getResults()) {
                     if (result.getAfter() != null && sourceSpec.getSourcePath().equals(result.getAfter().getSourcePath())) {
                         expectedNewSources.remove(sourceSpec);
                         assertThat(result.getBefore())
@@ -272,7 +271,7 @@ public interface RewriteTest extends SourceSpecs {
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
             // first looks for non-remote results.
-            for (Result result : results) {
+            for (Result result : recipeRun.getResults()) {
                 if (result.getAfter() != null && !(result.getAfter() instanceof Remote)) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll().trim();
@@ -291,7 +290,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             // we tried to avoid it, and now we'll try to match against remotes...
-            for (Result result : results) {
+            for (Result result : recipeRun.getResults()) {
                 if (result.getAfter() instanceof Remote) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll();
@@ -313,8 +312,7 @@ public interface RewriteTest extends SourceSpecs {
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             String expectedAfter = specForSourceFile.getValue().after;
-            for (Result result : results) {
-
+            for (Result result : recipeRun.getResults()) {
                 if (result.getBefore() == specForSourceFile.getKey()) {
                     if (expectedAfter != null && result.getAfter() != null) {
                         String actual = result.getAfter().printAll();

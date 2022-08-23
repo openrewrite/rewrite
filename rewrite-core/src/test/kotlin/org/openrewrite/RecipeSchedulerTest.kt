@@ -31,7 +31,7 @@ class RecipeSchedulerTest : RewriteTest {
                 spec
                         .executionContext(InMemoryExecutionContext())
                         .recipe(BoomRecipe())
-                        .afterRecipe { results -> assertThat(results[0].recipeErrors).isNotEmpty() }
+                        .afterRecipe { run -> assertThat(run.results[0].recipeErrors).isNotEmpty() }
             },
             text(
                     "hello",

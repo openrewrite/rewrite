@@ -50,6 +50,7 @@ class UpdateGradleWrapperTest {
 
         val result = UpdateGradleWrapper("7.4.2", null)
             .run(listOf(gradleWrapperProps, gradlew, gradlewBat, gradleWrapperJarQuark))
+            .results
             .map { it.after }
         assertThat(result.size).isEqualTo(4)
 
@@ -93,6 +94,7 @@ class UpdateGradleWrapperTest {
 
         val result = UpdateGradleWrapper("7.4.2", null)
             .run(listOf(gradleWrapperProps, gradlew, gradlewBat, gradleWrapperJarQuark))
+            .results
             .map { it.after }
         assertThat(result.size).isEqualTo(4)
 

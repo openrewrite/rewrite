@@ -351,7 +351,7 @@ class ManageDependenciesTest : MavenRecipeTest {
                         maven.withMarkers(maven.markers.compute(javaProject) { j, _ -> j.withId(Tree.randomId()) })
                     } else maven
                 }
-            )
+            ).results
         Assertions.assertThat(results).hasSize(2)
         Assertions.assertThat(results[0].after!!.printAllTrimmed()).isEqualTo(
             """

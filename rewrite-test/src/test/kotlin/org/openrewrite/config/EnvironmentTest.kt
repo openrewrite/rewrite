@@ -55,7 +55,7 @@ class EnvironmentTest : RewriteTest {
         val recipe = env.activateRecipes("test.ChangeTextToHello")
         assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
 
-        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null,false, null, null,"hello")))
+        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null,false, null, null,"hello"))).results
         assertThat(results).hasSize(1)
     }
 
@@ -109,7 +109,7 @@ class EnvironmentTest : RewriteTest {
         val recipe = env.activateRecipes("test.TextMigration")
         assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
 
-        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY,null, false, null, null,"hello")))
+        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY,null, false, null, null,"hello"))).results
         assertThat(results).hasSize(1)
     }
 
@@ -148,7 +148,7 @@ class EnvironmentTest : RewriteTest {
         val recipe = env.activateRecipes("test.TextMigration")
         assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
 
-        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "hello")))
+        val results = recipe.run(listOf(PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "hello"))).results
         assertThat(results).hasSize(1)
     }
 

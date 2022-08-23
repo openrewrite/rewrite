@@ -54,11 +54,13 @@ public interface RecipeScheduler {
         return ListUtils.map(input, (j, in) -> futures[j].join());
     }
 
-    default List<Result> scheduleRun(Recipe recipe,
-                                     List<? extends SourceFile> before,
-                                     ExecutionContext ctx,
-                                     int maxCycles,
-                                     int minCycles) {
+    default RecipeRun scheduleRun(Recipe recipe,
+                                  List<? extends SourceFile> before,
+                                  ExecutionContext ctx,
+                                  int maxCycles,
+                                  int minCycles) {
+        RecipeRun recipeRun = new RecipeRun(new RecipeRunStats(recipe), emptyList());
+
         Set<UUID> sourceFileIds = new HashSet<>();
         before = ListUtils.map(before, sourceFile -> {
             if (!sourceFileIds.add(sourceFile.getId())) {
@@ -83,7 +85,7 @@ public interface RecipeScheduler {
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
-            after = scheduleVisit(recipeStack, acc, ctxWithWatch, recipeThatDeletedSourceFile);
+            after = scheduleVisit(recipeRun.getStats(), recipeStack, acc, ctxWithWatch, recipeThatDeletedSourceFile);
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
@@ -92,7 +94,7 @@ public interface RecipeScheduler {
         }
 
         if (after == before) {
-            return emptyList();
+            return recipeRun;
         }
 
         Map<UUID, SourceFile> sourceFileIdentities = new HashMap<>();
@@ -145,13 +147,15 @@ public interface RecipeScheduler {
             }
         }
 
-        return results;
+        return recipeRun.withResults(results);
     }
 
-    default <S extends SourceFile> List<S> scheduleVisit(Stack<Recipe> recipeStack,
+    default <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats,
+                                                         Stack<Recipe> recipeStack,
                                                          List<S> before,
                                                          ExecutionContext ctx,
                                                          Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
+        runStats.calls.incrementAndGet();
         long startTime = System.nanoTime();
         Recipe recipe = recipeStack.peek();
         ctx.putCurrentRecipe(recipe);
@@ -185,83 +189,88 @@ public interface RecipeScheduler {
         }
 
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
-        List<S> after = !recipe.validate(ctx).isValid() ?
-                before :
-                mapAsync(before, s -> {
-                    Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
-                    Timer.Sample sample = Timer.start();
+        List<S> after;
+        if (!recipe.validate(ctx).isValid()) {
+            after = before;
+        } else {
+            long getVisitorStartTime = System.nanoTime();
+            after = mapAsync(before, s -> {
+                Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
+                Timer.Sample sample = Timer.start();
 
-                    S afterFile = s;
+                S afterFile = s;
 
-                    try {
-                        if (recipe.getSingleSourceApplicableTest() != null) {
-                            if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
-                                sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
-                                return s;
-                            }
-                        }
-
-                        for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
-                            if (singleSourceApplicableTest.visit(s, ctx) == s) {
-                                sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
-                                return s;
-                            }
-                        }
-
-                        Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
-                        if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
-                            if (thrownErrorOnTimeout.compareAndSet(false, true)) {
-                                RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                                ctx.getOnError().accept(t);
-                                ctx.getOnTimeout().accept(t, ctx);
-                            }
-                            sample.stop(MetricsHelper.successTags(timer, "timeout").register(Metrics.globalRegistry));
+                try {
+                    if (recipe.getSingleSourceApplicableTest() != null) {
+                        if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
+                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
                             return s;
                         }
+                    }
 
-                        if (ctx.getMessage(PANIC) != null) {
-                            sample.stop(MetricsHelper.successTags(timer, "panic").register(Metrics.globalRegistry));
+                    for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
+                        if (singleSourceApplicableTest.visit(s, ctx) == s) {
+                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
                             return s;
                         }
+                    }
 
-                        TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+                    Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
+                    if (duration.compareTo(ctx.getRunTimeout(before.size())) > 0) {
+                        if (thrownErrorOnTimeout.compareAndSet(false, true)) {
+                            RecipeTimeoutException t = new RecipeTimeoutException(recipe);
+                            ctx.getOnError().accept(t);
+                            ctx.getOnTimeout().accept(t, ctx);
+                        }
+                        sample.stop(MetricsHelper.successTags(timer, "timeout").register(Metrics.globalRegistry));
+                        return s;
+                    }
+
+                    if (ctx.getMessage(PANIC) != null) {
+                        sample.stop(MetricsHelper.successTags(timer, "panic").register(Metrics.globalRegistry));
+                        return s;
+                    }
+
+                    TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+
+                    //noinspection unchecked
+                    afterFile = (S) visitor.visitSourceFile(s, ctx);
+
+                    if (visitor.isAcceptable(s, ctx)) {
+                        //noinspection unchecked
+                        afterFile = (S) visitor.visit(afterFile, ctx);
+                    }
+                } catch (Throwable t) {
+                    if (t instanceof UncaughtVisitorException) {
+                        UncaughtVisitorException vt = (UncaughtVisitorException) t;
 
                         //noinspection unchecked
-                        afterFile = (S) visitor.visitSourceFile(s, ctx);
-
-                        if (visitor.isAcceptable(s, ctx)) {
-                            //noinspection unchecked
-                            afterFile = (S) visitor.visit(afterFile, ctx);
-                        }
-                    } catch (Throwable t) {
-                        if (t instanceof UncaughtVisitorException) {
-                            UncaughtVisitorException vt = (UncaughtVisitorException) t;
-
-                            //noinspection unchecked
-                            afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull(afterFile), 0);
-                        }
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ctx.getOnError().accept(t);
+                        afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull(afterFile), 0);
                     }
+                    sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
+                    ctx.getOnError().accept(t);
+                }
 
-                    if (afterFile != null && afterFile != s) {
-                        List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
-                        recipeStackList.add(recipeStack);
-                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
-                                new RecipesThatMadeChanges(randomId(), recipeStackList),
-                                (r1, r2) -> {
-                                    r1.getRecipes().addAll(r2.getRecipes());
-                                    return r1;
-                                }));
-                        sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
-                    } else if (afterFile == null) {
-                        recipeThatDeletedSourceFile.put(requireNonNull(s).getId(), recipeStack);
-                        sample.stop(MetricsHelper.successTags(timer, "deleted").register(Metrics.globalRegistry));
-                    } else {
-                        sample.stop(MetricsHelper.successTags(timer, "unchanged").register(Metrics.globalRegistry));
-                    }
-                    return afterFile;
-                });
+                if (afterFile != null && afterFile != s) {
+                    List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+                    recipeStackList.add(recipeStack);
+                    afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
+                            new RecipesThatMadeChanges(randomId(), recipeStackList),
+                            (r1, r2) -> {
+                                r1.getRecipes().addAll(r2.getRecipes());
+                                return r1;
+                            }));
+                    sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
+                } else if (afterFile == null) {
+                    recipeThatDeletedSourceFile.put(requireNonNull(s).getId(), recipeStack);
+                    sample.stop(MetricsHelper.successTags(timer, "deleted").register(Metrics.globalRegistry));
+                } else {
+                    sample.stop(MetricsHelper.successTags(timer, "unchanged").register(Metrics.globalRegistry));
+                }
+                return afterFile;
+            });
+            runStats.ownGetVisitor.addAndGet(System.nanoTime() - getVisitorStartTime);
+        }
 
         // The type of the list is widened at this point, since a source file type may be generated that isn't
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
@@ -269,8 +278,10 @@ public interface RecipeScheduler {
 
         List<SourceFile> afterWidened;
         try {
+            long ownVisitStartTime = System.nanoTime();
             //noinspection unchecked
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+            runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
             ctx.getOnError().accept(t);
             return before;
@@ -317,8 +328,21 @@ public interface RecipeScheduler {
             nextStack.addAll(recipeStack);
             nextStack.push(r);
 
-            afterWidened = scheduleVisit(nextStack, afterWidened, ctx, recipeThatDeletedSourceFile);
+            RecipeRunStats nextStats = null;
+            for (RecipeRunStats called : runStats.getCalled()) {
+                if(called.recipe == r) {
+                    nextStats = called;
+                    break;
+                }
+            }
+
+            afterWidened = scheduleVisit(requireNonNull(nextStats), nextStack, afterWidened,
+                    ctx, recipeThatDeletedSourceFile);
         }
+
+        long totalTime = System.nanoTime() - startTime;
+        runStats.max.compareAndSet(Math.min(runStats.max.get(), totalTime), totalTime);
+        runStats.cumulative.addAndGet(totalTime);
 
         //noinspection unchecked
         return (List<S>) afterWidened;

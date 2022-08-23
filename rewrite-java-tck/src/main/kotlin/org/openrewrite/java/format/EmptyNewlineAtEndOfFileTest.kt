@@ -37,7 +37,7 @@ interface EmptyNewlineAtEndOfFileTest {
     fun usesCRLF(jp: JavaParser.Builder<*, *>) {
         assertThat(EmptyNewlineAtEndOfFile().run(
             jp.styles(generalFormat(true)).build()
-                .parse("class Test {}"))[0].after!!.printAll()).isEqualTo(
+                .parse("class Test {}")).results[0].after!!.printAll()).isEqualTo(
             "class Test {}\r\n"
         )
     }
@@ -45,7 +45,7 @@ interface EmptyNewlineAtEndOfFileTest {
     @Test
     fun autodetectCRLF(jp: JavaParser.Builder<*, *>) {
         assertThat(EmptyNewlineAtEndOfFile().run(
-            jp.build().parse("class Test {\r\n}"))[0].after!!.printAll()).isEqualTo(
+            jp.build().parse("class Test {\r\n}")).results[0].after!!.printAll()).isEqualTo(
             "class Test {\r\n}\r\n"
         )
     }
@@ -53,7 +53,7 @@ interface EmptyNewlineAtEndOfFileTest {
     @Test
     fun autodetectLF(jp: JavaParser.Builder<*, *>) {
         assertThat(EmptyNewlineAtEndOfFile().run(
-            jp.build().parse("class Test {\n}"))[0].after!!.printAll()).isEqualTo(
+            jp.build().parse("class Test {\n}")).results[0].after!!.printAll()).isEqualTo(
             "class Test {\n}\n"
         )
     }
@@ -62,7 +62,7 @@ interface EmptyNewlineAtEndOfFileTest {
     fun noComments(jp: JavaParser.Builder<*, *>) {
         assertThat(EmptyNewlineAtEndOfFile().run(
             jp.styles(generalFormat(false)).build()
-                .parse("class Test {}"))[0].after!!.printAll()).isEqualTo(
+                .parse("class Test {}")).results[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 
@@ -74,7 +74,7 @@ interface EmptyNewlineAtEndOfFileTest {
     fun comments(jp: JavaParser.Builder<*, *>) {
         assertThat(EmptyNewlineAtEndOfFile().run(
             jp.styles(generalFormat(false)).build()
-                .parse("class Test {}\n/*comment*/"))[0].after!!.printAll()).isEqualTo(
+                .parse("class Test {}\n/*comment*/")).results[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 /*comment*/
@@ -87,7 +87,7 @@ interface EmptyNewlineAtEndOfFileTest {
     fun multipleLinesToOne(jp: JavaParser.Builder<*, *>) {
         assertThat(EmptyNewlineAtEndOfFile().run(
             jp.styles(generalFormat(false)).build()
-                .parse("class Test {}\n\n"))[0].after!!.printAll()).isEqualTo(
+                .parse("class Test {}\n\n")).results[0].after!!.printAll()).isEqualTo(
             """
                 class Test {}
                 

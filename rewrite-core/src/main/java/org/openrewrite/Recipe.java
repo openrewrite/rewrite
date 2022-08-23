@@ -266,24 +266,23 @@ public abstract class Recipe implements Cloneable {
         return before;
     }
 
-    public final List<Result> run(List<? extends SourceFile> before) {
+    public final RecipeRun run(List<? extends SourceFile> before) {
         return run(before, new InMemoryExecutionContext());
     }
 
-    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx) {
+    public final RecipeRun run(List<? extends SourceFile> before, ExecutionContext ctx) {
         return run(before, ctx, 3);
     }
 
-    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
+    public final RecipeRun run(List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
         return run(before, ctx, ForkJoinScheduler.common(), maxCycles, 1);
     }
 
-    @Incubating(since = "7.3.0")
-    public final List<Result> run(List<? extends SourceFile> before,
-                                  ExecutionContext ctx,
-                                  RecipeScheduler recipeScheduler,
-                                  int maxCycles,
-                                  int minCycles) {
+    public final RecipeRun run(List<? extends SourceFile> before,
+                               ExecutionContext ctx,
+                               RecipeScheduler recipeScheduler,
+                               int maxCycles,
+                               int minCycles) {
         return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
