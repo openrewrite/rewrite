@@ -16,9 +16,10 @@
 package org.openrewrite.properties;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
-import org.openrewrite.test.ParserSupplier;
+import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -27,7 +28,12 @@ import java.util.function.Consumer;
 public class Assertions {
     private Assertions() {}
 
-    static ParserSupplier parserSupplier = new ParserSupplier(Properties.File.class, "properties", PropertiesParser::new);
+    private static final DslParserBuilder propertiesParser = new DslParserBuilder("properties", new Parser.Builder(Properties.File.class) {
+        @Override
+        public Parser<?> build() {
+            return new PropertiesParser();
+        }
+    });
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before) {
         return properties(before, s -> {
@@ -35,7 +41,7 @@ public class Assertions {
     }
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, Consumer<SourceSpec<Properties.File>> spec) {
-        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, parserSupplier, before, null);
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, propertiesParser, before, null);
         spec.accept(properties);
         return properties;
     }
@@ -47,7 +53,7 @@ public class Assertions {
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") String after,
                                    Consumer<SourceSpec<Properties.File>> spec) {
-        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, parserSupplier, before, after);
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, propertiesParser, before, after);
         spec.accept(properties);
         return properties;
     }

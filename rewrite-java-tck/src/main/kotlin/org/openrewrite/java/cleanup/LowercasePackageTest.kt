@@ -31,7 +31,7 @@ interface LowercasePackageTest : RewriteTest {
     }
 
     @Test
-    fun lowerCasePackage(jp: JavaParser) = rewriteRun(
+    fun lowerCasePackage(jp: JavaParser.Builder<*, *>) = rewriteRun(
         {spec -> spec.parser(jp) },
         java("""
             package com.UPPERCASE.CamelCase;

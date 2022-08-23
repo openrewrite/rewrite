@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 @Getter
 public class RecipeSpec {
@@ -45,7 +46,7 @@ public class RecipeSpec {
      * Default parsers to use if no more specific parser is set
      * on the {@link SourceSpec}.
      */
-    List<Parser<?>> parsers = new ArrayList<>();
+    List<Parser.Builder> parsers = new ArrayList<>();
 
     @Nullable
     ExecutionContext executionContext;
@@ -72,7 +73,12 @@ public class RecipeSpec {
 
     // The before and after here don't mean anything
     SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null,
-            new ParserSupplier(Quark.class, null, QuarkParser::new), "", null);
+            new DslParserBuilder(null, new Parser.Builder(Quark.class) {
+                @Override
+                public Parser<?> build() {
+                    return new QuarkParser();
+                }
+            }), "", null);
 
     /**
      * Configuration that applies to all source file inputs.
@@ -97,7 +103,33 @@ public class RecipeSpec {
         return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), recipes);
     }
 
+    /**
+     * @param parser The parser to use when a matching source file is found.
+     * @return The current recipe spec.
+     * @deprecated Use {@link #parser(Supplier)} instead, which isolates parsers per test.
+     */
+    @Deprecated
     public RecipeSpec parser(Parser<?> parser) {
+        this.parsers.add(new Parser.Builder(ParserTypeUtils.parserType(parser)) {
+            @Override
+            public Parser<?> build() {
+                return parser;
+            }
+        });
+        return this;
+    }
+
+    public RecipeSpec parser(Supplier<Parser<?>> parser) {
+        this.parsers.add(new Parser.Builder(ParserTypeUtils.parserType(parser.get())) {
+            @Override
+            public Parser<?> build() {
+                return parser.get();
+            }
+        });
+        return this;
+    }
+
+    public RecipeSpec parser(Parser.Builder parser) {
         this.parsers.add(parser);
         return this;
     }

@@ -16,8 +16,9 @@
 package org.openrewrite.xml;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.test.ParserSupplier;
+import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.xml.tree.Xml;
@@ -28,7 +29,12 @@ public class Assertions {
     private Assertions() {
     }
 
-    static final ParserSupplier parserSupplier = new ParserSupplier(Xml.Document.class, "xml", XmlParser::new);
+    private static final DslParserBuilder xmlParser = new DslParserBuilder("xml", new Parser.Builder(Xml.Document.class) {
+        @Override
+        public Parser<?> build() {
+            return new XmlParser();
+        }
+    });
 
     public static SourceSpecs xml(@Language("xml") @Nullable String before) {
         return xml(before, s -> {
@@ -36,7 +42,7 @@ public class Assertions {
     }
 
     public static SourceSpecs xml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, parserSupplier, before, null);
+        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, xmlParser, before, null);
         spec.accept(xml);
         return xml;
     }
@@ -48,7 +54,7 @@ public class Assertions {
 
     public static SourceSpecs xml(@Language("xml") @Nullable String before, @Language("yml") String after,
                              Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, parserSupplier, before, after);
+        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, xmlParser, before, after);
         spec.accept(xml);
         return xml;
     }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.test;
 
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
@@ -41,7 +42,12 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     static SourceSpecs other(@Nullable String before, Consumer<SourceSpec<Quark>> spec) {
-        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, new ParserSupplier(Quark.class, "other", QuarkParser::new), before, null);
+        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, new DslParserBuilder("other", new Parser.Builder(Quark.class) {
+            @Override
+            public Parser<?> build() {
+                return new QuarkParser();
+            }
+        }), before, null);
         spec.accept(quark);
         return quark;
     }
@@ -52,7 +58,12 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     static SourceSpecs text(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, new ParserSupplier(PlainText.class, "text", PlainTextParser::new), before, null);
+        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, new DslParserBuilder("text", new Parser.Builder(PlainText.class) {
+            @Override
+            public Parser<?> build() {
+                return new PlainTextParser();
+            }
+        }), before, null);
         spec.accept(text);
         return text;
     }
@@ -64,7 +75,12 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
 
     static SourceSpecs text(@Nullable String before, String after,
                              Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, new ParserSupplier(PlainText.class, "text", PlainTextParser::new), before, after);
+        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, new DslParserBuilder("text", new Parser.Builder(PlainText.class) {
+            @Override
+            public Parser<?> build() {
+                return new PlainTextParser();
+            }
+        }), before, after);
         spec.accept(text);
         return text;
     }

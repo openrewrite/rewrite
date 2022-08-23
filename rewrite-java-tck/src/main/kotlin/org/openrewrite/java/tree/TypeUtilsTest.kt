@@ -26,7 +26,7 @@ interface TypeUtilsTest : RewriteTest {
 
     /* isOverride */
     @Test
-    fun isOverrideBasicInterface(jp: JavaParser) = rewriteRun(
+    fun isOverrideBasicInterface(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             interface Interface {
@@ -44,7 +44,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isOverrideBasicInheritance(jp: JavaParser) = rewriteRun(
+    fun isOverrideBasicInheritance(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Superclass {
@@ -63,7 +63,7 @@ interface TypeUtilsTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1759")
     @Test
-    fun isOverrideParameterizedInterface(jp: JavaParser) = rewriteRun(
+    fun isOverrideParameterizedInterface(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             import java.util.Comparator;
@@ -80,7 +80,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isOverrideParameterizedMethod(jp: JavaParser) = rewriteRun(
+    fun isOverrideParameterizedMethod(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             interface Interface {
@@ -99,7 +99,7 @@ interface TypeUtilsTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1782")
     @Test
-    fun isOverrideConsidersTypeParameterPositions(jp: JavaParser) = rewriteRun(
+    fun isOverrideConsidersTypeParameterPositions(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             interface Interface <T, Y> {
@@ -123,7 +123,7 @@ interface TypeUtilsTest : RewriteTest {
 
     /* isOfType */
     @Test
-    fun isFullyQualifiedOfType(jp: JavaParser) = rewriteRun(
+    fun isFullyQualifiedOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -140,7 +140,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isParameterizedTypeOfType(jp: JavaParser) = rewriteRun(
+    fun isParameterizedTypeOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -159,7 +159,7 @@ interface TypeUtilsTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1857")
     @Test
-    fun isParameterizedTypeWithShallowClassesOfType(jp: JavaParser) = rewriteRun(
+    fun isParameterizedTypeWithShallowClassesOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -175,7 +175,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isMethodTypeIsOfType(jp: JavaParser) = rewriteRun(
+    fun isMethodTypeIsOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -200,7 +200,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun differentMethodTypeIsOfType(jp: JavaParser) = rewriteRun(
+    fun differentMethodTypeIsOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -226,7 +226,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun differentParameterizedTypesIsOfType(jp: JavaParser) = rewriteRun(
+    fun differentParameterizedTypesIsOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -243,7 +243,7 @@ interface TypeUtilsTest : RewriteTest {
         }}
     )
     @Test
-    fun isGenericTypeOfType(jp: JavaParser) = rewriteRun(
+    fun isGenericTypeOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -265,7 +265,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun differentVarianceOfGenericTypeOfType(jp: JavaParser) = rewriteRun(
+    fun differentVarianceOfGenericTypeOfType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -288,7 +288,7 @@ interface TypeUtilsTest : RewriteTest {
 
     /* isAssignableTo */
     @Test
-    fun isJavaTypeArrayAssignableTo(jp: JavaParser) = rewriteRun(
+    fun isJavaTypeArrayAssignableTo(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("class Test {}"),
         java("""
@@ -303,7 +303,7 @@ interface TypeUtilsTest : RewriteTest {
 
     /* isOfClassType */
     @Test
-    fun isFullyQualifiedTypeOfClassType(jp: JavaParser) = rewriteRun(
+    fun isFullyQualifiedTypeOfClassType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -318,7 +318,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isParameterizedTypeOfClassType(jp: JavaParser) = rewriteRun(
+    fun isParameterizedTypeOfClassType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -333,7 +333,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isVariableTypeOfClassType(jp: JavaParser) = rewriteRun(
+    fun isVariableTypeOfClassType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -348,7 +348,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isArrayTypeOfClassType(jp: JavaParser) = rewriteRun(
+    fun isArrayTypeOfClassType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {
@@ -363,7 +363,7 @@ interface TypeUtilsTest : RewriteTest {
     )
 
     @Test
-    fun isPrimitiveTypeOfClassType(jp: JavaParser) = rewriteRun(
+    fun isPrimitiveTypeOfClassType(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             class Test {

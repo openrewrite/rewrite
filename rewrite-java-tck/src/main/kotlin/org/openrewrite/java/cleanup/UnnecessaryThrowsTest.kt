@@ -36,7 +36,7 @@ interface UnnecessaryThrowsTest : JavaRecipeTest, RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2144")
     @Test
-    fun genericException(jp: JavaParser) = rewriteRun(
+    fun genericException(jp: JavaParser.Builder<*, *>) = rewriteRun(
             { spec -> spec.parser(jp) },
             java("""
                 class Test {

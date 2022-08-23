@@ -16,11 +16,9 @@
 package org.openrewrite
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.test.SourceSpecs.text
-import java.nio.file.Path
 
 class FindSourceFilesTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
@@ -28,18 +26,18 @@ class FindSourceFilesTest : RewriteTest {
     }
 
     @Test
-    fun findMatchingFile(@TempDir tempDir: Path) = rewriteRun(
+    fun findMatchingFile() = rewriteRun(
         text("hello world!", "~~>hello world!") { spec -> spec.path("a/b/hello.txt") }
     )
 
     @Test
-    fun starStarMatchesAtRoot(@TempDir tempDir: Path) = rewriteRun(
+    fun starStarMatchesAtRoot() = rewriteRun(
         text("hello world!", "~~>hello world!") { spec -> spec.path("hello.txt") },
         text("hello world!", "~~>hello world!") { spec -> spec.path("./hello.txt") }
     )
 
     @Test
-    fun windows(@TempDir tempDir: Path) = rewriteRun(
+    fun windows() = rewriteRun(
         text("hello world!", "~~>hello world!") { spec -> spec.path("C:\\Windows\\hello.txt") },
         text("hello world!", "~~>hello world!") { spec -> spec.path("\\Windows\\hello.txt") }
     )

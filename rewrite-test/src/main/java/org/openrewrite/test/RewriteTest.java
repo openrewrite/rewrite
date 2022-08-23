@@ -38,7 +38,6 @@ import java.util.stream.StreamSupport;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
-import static org.openrewrite.test.ParserTypeUtils.parserType;
 
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
@@ -136,7 +135,7 @@ public interface RewriteTest extends SourceSpecs {
             s.customizeExecutionContext.accept(executionContext);
         }
 
-        Map<ParserSupplier, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
+        Map<DslParserBuilder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
 
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             // ----- method specific parser -------------------------
@@ -154,7 +153,7 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new HashMap<>(sourceSpecs.length);
-        for (Map.Entry<ParserSupplier, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
+        for (Map.Entry<DslParserBuilder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
             Map<SourceSpec<?>, Parser.Input> inputs = new LinkedHashMap<>(sourceSpecsForParser.getValue().size());
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
                 if (sourceSpec.before == null) {
@@ -165,7 +164,7 @@ public interface RewriteTest extends SourceSpecs {
                 if (sourceSpec.sourcePath != null) {
                     sourcePath = sourceSpec.dir.resolve(sourceSpec.sourcePath);
                 } else {
-                    sourcePath = sourceSpecsForParser.getKey().get()
+                    sourcePath = sourceSpecsForParser.getKey().build()
                             .sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
                 }
                 inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(StandardCharsets.UTF_8))));
@@ -176,7 +175,7 @@ public interface RewriteTest extends SourceSpecs {
             Iterator<SourceSpec<?>> sourceSpecIter = inputs.keySet().iterator();
 
             //noinspection unchecked,rawtypes
-            List<SourceFile> sourceFiles = (List) sourceSpecsForParser.getKey().get()
+            List<SourceFile> sourceFiles = (List) sourceSpecsForParser.getKey().build()
                     .parseInputs(inputs.values(), relativeTo, executionContext);
             assertThat(sourceFiles.size())
                     .as("Every input should be parsed into a SourceFile.")
@@ -389,11 +388,11 @@ public interface RewriteTest extends SourceSpecs {
 }
 
 class RewriteTestUtils {
-    static boolean groupSourceSpecsByParser(RecipeSpec testMethodSpec, Map<ParserSupplier, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
-        for (Parser<?> parser : testMethodSpec.parsers) {
-            if (parserType(parser).equals(sourceSpec.sourceFileType)) {
+    static boolean groupSourceSpecsByParser(RecipeSpec testMethodSpec, Map<DslParserBuilder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
+        for (Parser.Builder parser : testMethodSpec.parsers) {
+            if (parser.getSourceFileType().equals(sourceSpec.sourceFileType)) {
                 sourceSpecsByParser.computeIfAbsent(
-                        new ParserSupplier(sourceSpec.sourceFileType, sourceSpec.dsl, () -> parser),
+                        new DslParserBuilder(sourceSpec.dsl, parser),
                         p -> new ArrayList<>()).add(sourceSpec);
                 return true;
             }

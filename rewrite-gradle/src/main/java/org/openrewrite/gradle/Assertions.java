@@ -16,10 +16,11 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Parser;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.test.ParserSupplier;
+import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -31,9 +32,13 @@ public class Assertions {
     private Assertions() {
     }
 
-    static final ParserSupplier parserSupplier = new ParserSupplier(G.CompilationUnit.class, "gradle", () ->
-            new GradleParser(GroovyParser.builder()
-                    .logCompilationWarningsAndErrors(true)));
+    private static final DslParserBuilder gradleParser = new DslParserBuilder("gradle", new Parser.Builder(G.CompilationUnit.class) {
+        @Override
+        public Parser<?> build() {
+            return new GradleParser(GroovyParser.builder()
+                    .logCompilationWarningsAndErrors(true));
+        }
+    });
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {
         return buildGradle(before, s -> {
@@ -41,7 +46,7 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", parserSupplier, before, null);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("build.gradle"));
         spec.accept(gradle);
         return gradle;
@@ -54,7 +59,7 @@ public class Assertions {
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") String after,
                                     Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", parserSupplier, before, after);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, after);
         gradle.path("build.gradle");
         spec.accept(gradle);
         return gradle;

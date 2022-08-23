@@ -199,13 +199,17 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         return new Builder();
     }
 
-    public static class Builder {
+    public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<Path> classpath = JavaParser.runtimeClasspath();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
+
+        public Builder() {
+            super(G.CompilationUnit.class);
+        }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;

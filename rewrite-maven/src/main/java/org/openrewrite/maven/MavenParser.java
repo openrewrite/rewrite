@@ -155,13 +155,17 @@ public class MavenParser implements Parser<Xml.Document> {
         return new Builder();
     }
 
-    public static class Builder {
+    public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
 
         @SuppressWarnings("DeprecatedIsStillUsed")
         @Deprecated
         @Nullable
         private HttpSender httpSender;
+
+        public Builder() {
+            super(Xml.Document.class);
+        }
 
         public Builder activeProfiles(@Nullable String... profiles) {
             //noinspection ConstantConditions

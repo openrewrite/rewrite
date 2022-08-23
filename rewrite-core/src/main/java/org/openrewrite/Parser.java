@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -190,4 +191,12 @@ public interface Parser<S extends SourceFile> {
     }
 
     Path sourcePathFromSourceText(Path prefix, String sourceCode);
+
+    @RequiredArgsConstructor
+    abstract class Builder {
+        @Getter
+        private final Class<? extends SourceFile> sourceFileType;
+
+        public abstract Parser<?> build();
+    }
 }

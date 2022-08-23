@@ -24,7 +24,7 @@ import org.openrewrite.test.RewriteTest
 interface FindRepeatableAnnotationsTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(FindRepeatableAnnotations())
-                .parser(JavaParser.fromJavaVersion().classpath("mapstruct").build())
+                .parser(JavaParser.fromJavaVersion().classpath("mapstruct"))
     }
 
     @Test

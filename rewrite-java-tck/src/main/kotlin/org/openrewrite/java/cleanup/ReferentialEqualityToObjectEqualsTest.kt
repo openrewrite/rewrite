@@ -30,8 +30,8 @@ interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
     }
 
     @Test
-    fun `does not modify boxed types`(jp: JavaParser) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun `does not modify boxed types`(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec -> spec.parser(jp) },
         java("""
             class C {
                 char c = 'c';
@@ -43,8 +43,8 @@ interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
     )
 
     @Test
-    fun `does not modify enum comparison`(jp: JavaParser) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun `does not modify enum comparison`(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec -> spec.parser(jp) },
         java(
             """
                 class B {
@@ -58,8 +58,8 @@ interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
     )
 
     @Test
-    fun `does not modify class comparisons`(jp: JavaParser) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun `does not modify class comparisons`(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec -> spec.parser(jp) },
         java(
             """
                 class A {
@@ -78,8 +78,8 @@ interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
     )
 
     @Test
-    fun `type does not override equals`(jp: JavaParser) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun `type does not override equals`(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec -> spec.parser(jp) },
         java("""
             class T {
                 void doSomething() {
@@ -94,8 +94,8 @@ interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
     )
 
     @Test
-    fun `only one side overrides equals`(jp: JavaParser) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun `only one side overrides equals`(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec -> spec.parser(jp) },
         java("""
             class T {
                 void doSomething() {
@@ -113,8 +113,8 @@ interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
     )
 
     @Test
-    fun doNotModifyWithinEqualsMethod(jp: JavaParser) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun doNotModifyWithinEqualsMethod(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec -> spec.parser(jp) },
         java("""
             class T {
                 String s1;
@@ -130,8 +130,8 @@ interface ReferentialEqualityToObjectEqualsTest : RewriteTest {
     )
 
     @Test
-    fun `both sides override equals`(jp: JavaParser) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun `both sides override equals`(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec -> spec.parser(jp) },
         java("""
             class T {
                 void doSomething() {

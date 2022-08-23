@@ -923,7 +923,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
-    fun updateImportPrefixWithEmptyPackage(jp: JavaParser) = rewriteRun(
+    fun updateImportPrefixWithEmptyPackage(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec ->
             spec.parser(jp)
             spec.recipe(
@@ -947,7 +947,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
-    fun updateClassPrefixWithEmptyPackage(jp: JavaParser) = rewriteRun(
+    fun updateClassPrefixWithEmptyPackage(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec ->
             spec.parser(jp)
             spec.recipe(

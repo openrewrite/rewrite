@@ -17,7 +17,7 @@ package org.openrewrite.hcl;
 
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.test.ParserSupplier;
+import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -26,7 +26,7 @@ import java.util.function.Consumer;
 public class Assertions {
     private Assertions() {}
 
-    static final ParserSupplier parserSupplier = new ParserSupplier(Hcl.ConfigFile.class, "hcl", () -> HclParser.builder().build());
+    private static final DslParserBuilder hclParser = new DslParserBuilder("hcl", HclParser.builder());
 
     public static SourceSpecs hcl(@Nullable String before) {
         return hcl(before, s -> {
@@ -34,7 +34,7 @@ public class Assertions {
     }
 
     public static SourceSpecs hcl(@Nullable String before, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
-        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, parserSupplier, before, null);
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, hclParser, before, null);
         spec.accept(hcl);
         return hcl;
     }
@@ -45,7 +45,7 @@ public class Assertions {
     }
 
     public static SourceSpecs hcl(@Nullable String before, String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
-        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, parserSupplier,  before, after);
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, hclParser,  before, after);
         spec.accept(hcl);
         return hcl;
     }

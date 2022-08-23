@@ -24,16 +24,13 @@ import org.openrewrite.test.RewriteTest
 class AddDelegatesToGradleApiTest : RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
-        spec.parser(
-            JavaParser.fromJavaVersion()
-                .classpath("groovy", "gradle-base-services")
-                .build())
-            .recipe(AddDelegatesToGradleApi())
+        spec.parser(JavaParser.fromJavaVersion().classpath("groovy", "gradle-base-services"))
+                .recipe(AddDelegatesToGradleApi())
     }
 
     @Test
     fun simpleMethod() = rewriteRun(
-        java("""
+            java("""
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -44,7 +41,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void someMethod(Closure action) { }
             }
         """,
-            """
+                    """
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -60,7 +57,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
 
     @Test
     fun methodWithBound() = rewriteRun(
-        java("""
+            java("""
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -71,7 +68,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void someMethod(Closure action) { }
             }
         """,
-            """
+                    """
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -87,7 +84,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
 
     @Test
     fun methodWithGenericBound() = rewriteRun(
-        java("""
+            java("""
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -98,7 +95,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void someMethod(Closure action) { }
             }
         """,
-            """
+                    """
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -114,7 +111,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
 
     @Test
     fun dontUnwrapTypesTooMuch() = rewriteRun(
-        java("""
+            java("""
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -126,7 +123,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void someMethod(Closure action) { }
             }
         """,
-            """
+                    """
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -143,7 +140,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
 
     @Test
     fun dontBeConfusedByOtherOverloads() = rewriteRun(
-        java("""
+            java("""
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -156,7 +153,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void someMethod(Closure action) {}
             }
         """,
-            """
+                    """
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -174,7 +171,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
 
     @Test
     fun leaveUnusableTypeInformationAlone() = rewriteRun(
-        java("""
+            java("""
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -190,7 +187,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
 
     @Test
     fun commentSaysNoDelegate() = rewriteRun(
-        java("""
+            java("""
             package org.gradle.example;
             
             import groovy.lang.Closure;
@@ -213,7 +210,7 @@ class AddDelegatesToGradleApiTest : RewriteTest {
                 void anotherMethod(Closure action) { }
             }
         """,
-        """
+                    """
             package org.gradle.example;
             
             import groovy.lang.Closure;

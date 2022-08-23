@@ -17,9 +17,8 @@ package org.openrewrite.maven;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.test.ParserSupplier;
+import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.xml.tree.Xml;
@@ -30,7 +29,7 @@ public class Assertions {
     private Assertions() {
     }
 
-    static final ParserSupplier parserSupplier = new ParserSupplier(Xml.Document.class, "maven", () -> MavenParser.builder().build());
+    private static final DslParserBuilder mavenParser = new DslParserBuilder("maven", MavenParser.builder());
 
     static void customizeExecutionContext(ExecutionContext ctx) {
         if(MavenSettings.readFromDiskEnabled()) {
@@ -45,7 +44,7 @@ public class Assertions {
     }
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", parserSupplier, before,
+        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", mavenParser, before,
                 null, SourceSpec.EachResult.noop, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);
@@ -59,7 +58,7 @@ public class Assertions {
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, @Language("xml") String after,
                                Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", parserSupplier, before,
+        SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", mavenParser, before,
                 after, SourceSpec.EachResult.noop, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);

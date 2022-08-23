@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.hcl.internal.HclParserVisitor;
 import org.openrewrite.hcl.internal.grammar.HCLLexer;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
@@ -121,8 +122,12 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
         return new Builder();
     }
 
-    public static class Builder {
+    public static class Builder extends Parser.Builder {
         protected final List<NamedStyles> styles = new ArrayList<>();
+
+        public Builder() {
+            super(Hcl.ConfigFile.class);
+        }
 
         public Builder styles(Iterable<? extends NamedStyles> styles) {
             for (NamedStyles style : styles) {

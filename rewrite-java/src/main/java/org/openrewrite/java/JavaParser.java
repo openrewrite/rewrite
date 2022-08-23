@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -199,7 +200,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     JavaSourceSet getSourceSet(ExecutionContext ctx);
 
     @SuppressWarnings("unchecked")
-    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
+    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = Collections.emptyList();
         protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
@@ -210,6 +211,10 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         protected Charset charset = Charset.defaultCharset();
         protected boolean logCompilationWarningsAndErrors = false;
         protected final List<NamedStyles> styles = new ArrayList<>();
+
+        public Builder() {
+            super(J.CompilationUnit.class);
+        }
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;

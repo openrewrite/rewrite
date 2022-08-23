@@ -27,7 +27,6 @@ interface PublicGetVisitorTest : RewriteTest {
             .parser(
                 JavaParser.fromJavaVersion()
                     .classpath(JavaParser.runtimeClasspath())
-                    .build()
             )
             .recipe(PublicGetVisitor())
     }

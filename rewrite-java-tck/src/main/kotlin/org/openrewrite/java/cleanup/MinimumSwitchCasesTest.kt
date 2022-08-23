@@ -32,7 +32,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
     }
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun primitiveAndDefault(jp: JavaParser) = rewriteRun(
+    fun primitiveAndDefault(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp)
             s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java(
@@ -68,7 +68,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun twoPrimitives(jp: JavaParser) = rewriteRun(
+    fun twoPrimitives(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp)
             s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java(
@@ -104,7 +104,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun stringAndDefault(jp: JavaParser) = rewriteRun(
+    fun stringAndDefault(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp)
             s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
@@ -138,7 +138,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun twoStrings(jp: JavaParser) = rewriteRun(
+    fun twoStrings(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp)
             s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
@@ -172,7 +172,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun onePrimitive(jp: JavaParser) = rewriteRun(
+    fun onePrimitive(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp)
             s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
@@ -201,7 +201,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun oneString(jp: JavaParser) = rewriteRun(
+    fun oneString(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp)
             s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""
@@ -231,7 +231,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Suppress("StatementWithEmptyBody")
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
-    fun noCases(jp: JavaParser) = rewriteRun(
+    fun noCases(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp) },
         java("""
             class Test {
@@ -246,7 +246,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1212")
-    fun importsOnEnum(jp: JavaParser) = rewriteRun(
+    fun importsOnEnum(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { s -> s.parser(jp) },
         java("""
             import java.time.DayOfWeek;
@@ -311,7 +311,7 @@ interface MinimumSwitchCasesTest : RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1701")
     @Test
-    fun removeBreaksFromCaseBody(jp: JavaParser)  = rewriteRun(
+    fun removeBreaksFromCaseBody(jp: JavaParser.Builder<*, *>)  = rewriteRun(
         { s -> s.parser(jp)
             s.typeValidationOptions(TypeValidation().methodInvocations(false))
         }, java("""

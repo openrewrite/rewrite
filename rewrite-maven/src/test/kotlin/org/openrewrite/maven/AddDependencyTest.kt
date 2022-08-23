@@ -32,7 +32,6 @@ class AddDependencyTest : RewriteTest {
         spec.parser(
             JavaParser.fromJavaVersion()
                 .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core")
-                .build()
         )
     }
 

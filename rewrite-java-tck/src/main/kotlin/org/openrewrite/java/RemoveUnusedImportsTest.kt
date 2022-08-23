@@ -47,7 +47,7 @@ interface RemoveUnusedImportsTest : JavaRecipeTest, RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1798")
     @Test
-    fun doNotRemoveInnerClassInSamePackage(jp: JavaParser) = rewriteRun(
+    fun doNotRemoveInnerClassInSamePackage(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec -> spec.parser(jp) },
         java("""
             package java.util;
