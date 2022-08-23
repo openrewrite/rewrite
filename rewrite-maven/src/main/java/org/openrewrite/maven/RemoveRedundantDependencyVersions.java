@@ -37,7 +37,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                    "Group is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -76,7 +76,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (!isManagedDependencyTag()) {
                     ResolvedDependency d = findDependency(tag);
-                    if (d != null && matchesVersion(d) && matchesScope(d, tag) &&
+                    if (d != null && matchesVersion(d) &&
                             matchesGroup(d) && matchesArtifact(d)) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
                         return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
@@ -102,13 +102,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
             private boolean ignoreVersionMatching() {
                 return Boolean.FALSE.equals(onlyIfVersionsMatch);
-            }
-
-            private boolean matchesScope(ResolvedDependency d, Xml.Tag dependencyTag) {
-                return Objects.equals(
-                        Scope.fromName(dependencyTag.getChildValue("scope").orElse(null)),
-                        getResolutionResult().getPom().getManagedScope(d.getGroupId(), d.getArtifactId(), d.getRequested().getType(),
-                                d.getRequested().getClassifier()));
             }
         };
     }
