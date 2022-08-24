@@ -215,8 +215,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             p.out.append('{');
             visitMarkers(lambda.getParameters().getMarkers(), p);
             visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+            visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
             if (!lambda.getParameters().getParameters().isEmpty()) {
-                visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.out.append("->");
             }
             if (lambda.getBody() instanceof J.Block) {

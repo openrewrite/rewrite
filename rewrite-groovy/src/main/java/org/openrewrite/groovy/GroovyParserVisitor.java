@@ -909,7 +909,7 @@ public class GroovyParserVisitor {
             Space prefix = sourceBefore("{");
             JavaType closureType = typeMapping.type(staticType(expression));
             List<JRightPadded<J>> paramExprs = emptyList();
-            if (expression.getParameters().length > 0) {
+            if (expression.getParameters() != null && expression.getParameters().length > 0) {
                 paramExprs = new ArrayList<>(expression.getParameters().length);
                 Parameter[] parameters = expression.getParameters();
                 for (int i = 0; i < parameters.length; i++) {
@@ -935,7 +935,13 @@ public class GroovyParserVisitor {
             }
 
             J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
-            Space arrow = params.getParameters().isEmpty() ? EMPTY : sourceBefore("->");
+            Space arrow = whitespace();
+            if(source.startsWith("->", cursor)) {
+                cursor += "->".length();
+                if(params.getParameters().isEmpty()) {
+                    params = params.withParameters(singletonList(new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
+                }
+            }
 
             queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), closureType));
             cursor += 1; // skip '}'
