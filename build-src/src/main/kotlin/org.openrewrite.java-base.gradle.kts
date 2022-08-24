@@ -27,13 +27,16 @@ tasks.withType<KotlinCompile>().configureEach {
     }
 }
 
+tasks.named<JavaCompile>("compileJava") {
+    options.release.set(8)
+    sourceCompatibility = "1.8"
+    targetCompatibility = "1.8"
+}
+
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
     options.isFork = true
-    options.release.set(8)
-    sourceCompatibility = "1.8"
-    targetCompatibility = "1.8"
 }
 
 tasks.named<Test>("test").configure {
