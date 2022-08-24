@@ -27,9 +27,14 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
-        return scope.isScope(parens) && isUnwrappable(getCursor()) ?
-                parens.getTree().withPrefix(parens.getPrefix()) :
-                super.visitParentheses(parens, p);
+        if (scope.isScope(parens) && isUnwrappable(getCursor())) {
+            J tree = parens.getTree().withPrefix(parens.getPrefix());
+            if (tree.getPrefix().isEmpty() && getCursor().getParentOrThrow().getValue() instanceof J.Return) {
+                tree = tree.withPrefix(tree.getPrefix().withWhitespace(" "));
+            }
+            return tree;
+        }
+        return super.visitParentheses(parens, p);
     }
 
     public static boolean isUnwrappable(Cursor parensScope) {

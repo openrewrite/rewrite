@@ -20,19 +20,47 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.Tree.randomId
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.Checkstyle
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle
 import org.openrewrite.style.NamedStyles
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress(
     "UnnecessaryLocalVariable", "ConstantConditions", "UnusedAssignment", "PointlessBooleanExpression",
     "MismatchedStringCase", "SillyAssignment", "StatementWithEmptyBody"
 )
-interface UnnecessaryParenthesesTest : JavaRecipeTest {
+interface UnnecessaryParenthesesTest : JavaRecipeTest, RewriteTest {
     override val recipe: Recipe?
         get() = UnnecessaryParentheses()
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(UnnecessaryParentheses())
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2170")
+    @Test
+    fun minimumSpace() = rewriteRun(
+            java(
+                    """
+                        class Test {
+                            int test() {
+                                return (1);
+                            }
+                        }
+                    """,
+                    """
+                        class Test {
+                            int test() {
+                                return 1;
+                            }
+                        }
+                    """
+            )
+    )
 
     /**
      * Setting all options to false to enable individually toggling configuration flags.
