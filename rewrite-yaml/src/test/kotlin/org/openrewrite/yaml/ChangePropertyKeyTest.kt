@@ -16,7 +16,6 @@
 package org.openrewrite.yaml
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -36,22 +35,6 @@ class ChangePropertyKeyTest : YamlRecipeTest {
             null
         )
 
-    @Disabled
-    @Issue("https://github.com/openrewrite/rewrite-spring/issues/213")
-    @Test
-    fun doesNotChangeSubKey() = assertUnchanged(
-        recipe = ChangePropertyKey(
-            "logging.file",
-            "logging.file.name",
-            null,
-            null,
-            null),
-        before = """
-          logging:
-            file:
-              path: "/user/home/my-app"
-        """
-    )
     @Issue("https://github.com/openrewrite/rewrite/issues/1873")
     @Test
     fun shorterNewKeyWithIndentedConfig() = assertChanged(
