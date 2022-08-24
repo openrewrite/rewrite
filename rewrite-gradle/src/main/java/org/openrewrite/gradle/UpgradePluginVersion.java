@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -37,6 +38,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 
+@Disabled("Gradle plugin portal is down on August 23, 2022")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradePluginVersion extends Recipe {
