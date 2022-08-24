@@ -85,13 +85,23 @@ public class Java8Parser implements JavaParser {
             try {
                 File tools = Paths.get(System.getProperty("java.home")).resolve("../lib/tools.jar").toFile();
                 if (!tools.exists()) {
-                    throw new IllegalStateException("To use Java8Parser, you must run the process with a JDK and not a JRE.");
+                    for (Path path : JavaParser.runtimeClasspath()) {
+                        File f = path.toFile();
+                        if (f.getName().endsWith("tools.jar")) {
+                            tools = f;
+                            break;
+                        }
+                    }
+                    if (!tools.exists()) {
+                        throw new IllegalStateException("To use Java8Parser, you must run the process with a JDK and not a JRE.");
+                    }
                 }
 
-                toolsClassLoader = new URLClassLoader(new URL[]{tools.toURI().toURL()}, Java8Parser.class.getClassLoader());
-                URLClassLoader appClassLoader = (URLClassLoader) Java8Parser.class.getClassLoader();
+                ClassLoader appClassLoader = Java8Parser.class.getClassLoader();
 
-                toolsAwareClassLoader = new URLClassLoader(appClassLoader.getURLs(), toolsClassLoader) {
+                toolsClassLoader = new URLClassLoader(new URL[]{tools.toURI().toURL()}, appClassLoader);
+
+                toolsAwareClassLoader = new ClassLoader() {
                     @Override
                     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
                         if (!name.contains("ReloadableJava8") &&
@@ -100,22 +110,23 @@ public class Java8Parser implements JavaParser {
                                 !name.contains("ReloadableTypeMapping")) {
                             return toolsClassLoader.loadClass(name);
                         }
+                        return appClassLoader.loadClass(name);
 
-                        Class<?> loadedClass = findLoadedClass(name);
-
-                        if (loadedClass == null) {
-                            try {
-                                loadedClass = findClass(name);
-                            } catch (ClassNotFoundException e) {
-                                loadedClass = super.loadClass(name, resolve);
-                            }
-                        }
-
-                        if (resolve) {
-                            resolveClass(loadedClass);
-                        }
-
-                        return loadedClass;
+//                        Class<?> loadedClass = findLoadedClass(name);
+//
+//                        if (loadedClass == null) {
+//                            try {
+//                                loadedClass = findClass(name);
+//                            } catch (ClassNotFoundException e) {
+//                                loadedClass = super.loadClass(name, resolve);
+//                            }
+//                        }
+//
+//                        if (resolve) {
+//                            resolveClass(loadedClass);
+//                        }
+//
+//                        return loadedClass;
                     }
                 };
             } catch (MalformedURLException e) {

@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     id("org.openrewrite.java-library")
     id("org.openrewrite.maven-publish")
@@ -25,29 +23,24 @@ dependencies {
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
+    testRuntimeOnly(files(tools))
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-tck"))
     testRuntimeOnly("ch.qos.logback:logback-classic:1.2.11")
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(8))
-    }
-}
-
-tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-    targetCompatibility = JavaVersion.VERSION_1_8.toString()
-    options.isFork = true
-    options.release.set(null as? Int) // remove `--release 8` set in `org.openrewrite.java-base`
+tasks.withType<JavaCompile> {
+    options.compilerArgs.addAll(
+            listOf(
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
+            )
+    )
 }
 
 tasks.withType<Test>().configureEach {
@@ -63,5 +56,6 @@ tasks.withType<Test>().configureEach {
 tasks.withType<Javadoc>().configureEach {
     executable = javaToolchains.javadocToolFor {
         languageVersion.set(JavaLanguageVersion.of(8))
+
     }.get().executablePath.toString()
 }
