@@ -25,7 +25,9 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.search.FindTypes;
@@ -38,6 +40,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -1293,6 +1297,53 @@ public interface J extends Tree {
         @With
         @Getter
         Space eof;
+
+        @Override
+        public long getWeight(Predicate<Object> uniqueIdentity) {
+            AtomicInteger n = new AtomicInteger();
+            new JavaVisitor<AtomicInteger>() {
+                final JavaTypeVisitor<AtomicInteger> typeVisitor = new JavaTypeVisitor<AtomicInteger>() {
+                    @Override
+                    public JavaType visit(@Nullable JavaType javaType, AtomicInteger n) {
+                        if(javaType != null && uniqueIdentity.test(javaType)) {
+                            n.incrementAndGet();
+                            return super.visit(javaType, n);
+                        }
+                        //noinspection ConstantConditions
+                        return javaType;
+                    }
+                };
+
+                final JavadocVisitor<AtomicInteger> javadocVisitor = new JavadocVisitor<AtomicInteger>(this) {
+                    @Override
+                    public @Nullable Javadoc visit(@Nullable Tree tree, AtomicInteger n) {
+                        if (tree != null) {
+                            n.incrementAndGet();
+                        }
+                        return super.visit(tree, n);
+                    }
+                };
+
+                @Override
+                public @Nullable J visit(@Nullable Tree tree, AtomicInteger n) {
+                    if (tree != null) {
+                        n.incrementAndGet();
+                    }
+                    return super.visit(tree, n);
+                }
+
+                @Override
+                public JavaType visitType(@Nullable JavaType javaType, AtomicInteger n) {
+                    return typeVisitor.visit(javaType, n);
+                }
+
+                @Override
+                protected JavadocVisitor<AtomicInteger> getJavadocVisitor() {
+                    return javadocVisitor;
+                }
+            }.visit(this, n);
+            return n.get();
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2848,7 +2899,7 @@ public interface J extends Tree {
          * Checks if the given {@link Expression} is a {@link Literal} with the given value.
          *
          * @param maybeLiteral An expresssion that may be an {@link Literal}.
-         * @param value The value to compare against.
+         * @param value        The value to compare against.
          * @return {@code true} if the given {@link Expression} is a {@link Literal} with the given value.
          */
         @Incubating(since = "7.25.0")
@@ -3865,6 +3916,7 @@ public interface J extends Tree {
 
         /**
          * This is an alias for {@link #getConstructorType()}.
+         *
          * @return The constructor type.
          */
         @Nullable
@@ -3874,6 +3926,7 @@ public interface J extends Tree {
 
         /**
          * This is an alias for {@link #withConstructorType(JavaType.Method)}.
+         *
          * @param methodType The constructor type.
          * @return An instance with the new constructor type.
          */

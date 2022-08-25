@@ -27,6 +27,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 /**
  * The simplest of all ASTs representing nothing more than just unstructured text.
@@ -80,5 +81,10 @@ public class PlainText implements SourceFile, Tree {
     @Override
     public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
         return new PlainTextPrinter<>();
+    }
+
+    @Override
+    public long getWeight(Predicate<Object> uniqueIdentity) {
+        return text.length() / 10;
     }
 }

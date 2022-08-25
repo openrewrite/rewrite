@@ -21,7 +21,10 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 
 public interface SourceFile extends Tree {
     /**
@@ -60,7 +63,7 @@ public interface SourceFile extends Tree {
     }
 
     default <P> byte[] printAllAsBytes(P p) {
-        return printAll(p).getBytes(getCharset());
+        return printAll(p).getBytes(getCharset() == null ? StandardCharsets.UTF_8 : getCharset());
     }
 
     default byte[] printAllAsBytes() {
@@ -85,5 +88,28 @@ public interface SourceFile extends Tree {
 
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
         throw new UnsupportedOperationException("SourceFile implementations should override this method");
+    }
+
+    /**
+     * A measure of the size of the AST by count of number of AST nodes or some other similar measure. Because perfect referential
+     * uniqueness is space inefficient, this weight will always be approximate and is best used for comparative size between two ASTs
+     * rather than an absolute measure.
+     *
+     * @param uniqueIdentity A means of only counting referentially equal AST nodes once. In performance sensitive situations
+     *                       this should use a probabilistic set membership data structure.
+     * @return The weight of the AST.
+     */
+    default long getWeight(Predicate<Object> uniqueIdentity) {
+        AtomicInteger n = new AtomicInteger();
+        new TreeVisitor<Tree, AtomicInteger>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, AtomicInteger atomicInteger) {
+                if (tree != null) {
+                    n.incrementAndGet();
+                }
+                return super.visit(tree, atomicInteger);
+            }
+        }.visit(this, n);
+        return n.get();
     }
 }
