@@ -339,6 +339,9 @@ public class TypeUtils {
         List<JavaType> declaringTypeParams = m.getDeclaringType().getTypeParameters();
 
         List<JavaType> typeParameters = clazz.getTypeParameters();
+        if (typeParameters.size() != declaringTypeParams.size()) {
+            return false;
+        }
         for (int j = 0; j < typeParameters.size(); j++) {
             JavaType typeAttributed = typeParameters.get(j);
             JavaType generic = declaringTypeParams.get(j);
