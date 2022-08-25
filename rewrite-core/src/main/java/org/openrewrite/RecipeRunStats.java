@@ -29,8 +29,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static java.util.Collections.emptyList;
-
 @FieldDefaults(makeFinal = true, level = AccessLevel.PACKAGE)
 @Incubating(since = "7.29.0")
 public class RecipeRunStats {
@@ -121,10 +119,14 @@ public class RecipeRunStats {
                                               Map<RecipeRunStats, Integer> seen,
                                               double scale) {
         seen.putIfAbsent(stats, seen.size() + 1);
-        String label = "r" + seen.size();
+        String id = "r" + seen.size();
         Duration time = stats.getOwnGetVisitor().plus(stats.getOwnVisit());
 
-        gantt.append("  ").append(stats.getRecipe().getClass().getSimpleName()).append("  :").append(label);
+        String label = stats.getRecipe().getClass().getSimpleName();
+        if (label.isEmpty()) {
+            label = "Recipe";
+        }
+        gantt.append("  ").append(label).append("  :").append(id);
 
         if (after != null) {
             gantt.append(", ").append("after r").append(seen.get(after));
