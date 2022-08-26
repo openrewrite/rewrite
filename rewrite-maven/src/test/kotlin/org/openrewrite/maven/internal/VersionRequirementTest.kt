@@ -49,16 +49,9 @@ class VersionRequirementTest {
     }
 
     @Test
-    fun overlappingHardRequirements() {
-        assertThat(VersionRequirement.fromVersion("[1,5]", 1).addRequirement("[5,11]")
-            .resolve(available))
-            .isEqualTo("5")
-    }
-
-    @Test
-    fun nonOverlappingHardRequirements() {
+    fun nearestRangeWins() {
         assertThat(VersionRequirement.fromVersion("[1,2]", 1).addRequirement("[9,10]")
             .resolve(available))
-            .isNull()
+            .isEqualTo("2")
     }
 }
