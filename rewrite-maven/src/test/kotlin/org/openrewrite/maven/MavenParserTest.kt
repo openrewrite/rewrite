@@ -61,40 +61,6 @@ class MavenParserTest : RewriteTest {
     )
 
     @Test
-    fun twoRangesInSameResolvedPom() = rewriteRun(
-        // Counter to what Maven does most of the time, the last range "wins" when the same dependency
-        // is defined twice with a range.
-        pomXml(
-            """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                
-                  <dependencies>
-                    <dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>[4.5,4.9]</version>
-                    </dependency>
-                    <dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>[4.7,4.9)</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
-        ) {spec ->
-            spec.afterRecipe { p ->
-                val results = p.markers.findFirst(MavenResolutionResult::class.java).orElseThrow()
-                val dependency = results.findDependencies("junit", "junit", Scope.Compile)[0]
-                assertThat(dependency.version).isEqualTo("4.8.2")
-            }
-        }
-    )
-
-    @Test
     fun invalidRange() {
         assertThatExceptionOfType(MavenParsingException::class.java).isThrownBy {
             rewriteRun(
@@ -179,6 +145,67 @@ class MavenParserTest : RewriteTest {
             }
         )
     )
+
+    @Test
+    fun differentRangeVersionInParent() = rewriteRun(
+        mavenProject("parent",
+            pomXml(
+                """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-parent</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>[4.5,4.6]</version>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """
+            ) {spec ->
+                spec.afterRecipe { p ->
+                    val results = p.markers.findFirst(MavenResolutionResult::class.java).orElseThrow()
+                    val dependency = results.findDependencies("junit", "junit", Scope.Compile)[0]
+                    assertThat(dependency.version).isEqualTo("4.6")
+                }
+            }
+        ),
+        mavenProject("app",
+            pomXml(
+                """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <parent>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1</version>
+                        <relativePath>..</relativePath>
+                      </parent>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>[4.8,4.9]</version>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """
+            ) {spec ->
+                spec.afterRecipe { p ->
+                    val results = p.markers.findFirst(MavenResolutionResult::class.java).orElseThrow()
+                    val dependency = results.findDependencies("junit", "junit", Scope.Compile)[0]
+                    assertThat(dependency.version).isEqualTo("4.9")
+                }
+            }
+        )
+    )
+
 
     @Test
     fun transitiveDependencyVersionDeterminedByBom() = rewriteRun(

@@ -238,10 +238,10 @@ public class VersionRequirement {
 
     @Nullable
     private String cacheResolved(Supplier<Iterable<String>> availableVersions) {
-        boolean hasHardRequirements = false;
-
         String nearestSoftRequirement = null;
         VersionRequirement next = this;
+        VersionRequirement nearestHardRequirement = null;
+
         while (next != null) {
             VersionSpec spec = next.versionSpec;
             if (spec instanceof DirectRequirement) {
@@ -250,38 +250,30 @@ public class VersionRequirement {
             } else if (spec instanceof SoftRequirement) {
                 nearestSoftRequirement = ((SoftRequirement) spec).version;
             } else {
-                hasHardRequirements = true;
+                nearestHardRequirement = next;
             }
             next = next.nearer;
         }
 
-        if (!hasHardRequirements) {
+        if (nearestHardRequirement == null) {
             return nearestSoftRequirement;
         }
-
+        VersionSpec hardRequirement = nearestHardRequirement.versionSpec;
         Version latest = null;
         for (String availableVersion : availableVersions.get()) {
             Version version = new Version(availableVersion);
 
-            boolean matchesAllHardRequirements = true;
-            next = this;
-            while (next != null) {
-                VersionSpec spec = next.versionSpec;
-                if (spec instanceof DynamicVersion) {
-                    matchesAllHardRequirements &= ((DynamicVersion) spec).matches(version);
-                } else if (spec instanceof RangeSet) {
-                    matchesAllHardRequirements &= ((RangeSet) spec).matches(version);
-                }
-                next = next.nearer;
-            }
+            if ((hardRequirement instanceof DynamicVersion && ((DynamicVersion) hardRequirement).matches(version)) ||
+                (hardRequirement instanceof RangeSet && ((RangeSet) hardRequirement).matches(version))) {
 
-            if (matchesAllHardRequirements && (latest == null || version.compareTo(latest) > 0)) {
-                latest = version;
+                if (latest == null || version.compareTo(latest) > 0) {
+                    latest = version;
+                }
             }
         }
 
         if (latest == null) {
-            // hard requirements are non-overlapping
+            // No version matches the hard requirement.
             return null;
         }
 
