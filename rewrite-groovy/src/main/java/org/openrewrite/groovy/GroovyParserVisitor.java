@@ -874,6 +874,29 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitBreakStatement(BreakStatement statement) {
+            queue.add(new J.Break(randomId(),
+                    sourceBefore("break"),
+                    Markers.EMPTY,
+                    (statement.getLabel() == null) ?
+                            null :
+                            new J.Identifier(randomId(),
+                                    sourceBefore(statement.getLabel()),
+                                    Markers.EMPTY, statement.getLabel(), null, null))
+            );
+        }
+
+        @Override
+        public void visitCaseStatement(CaseStatement statement) {
+            queue.add(new J.Case(randomId(),
+                    sourceBefore("case"),
+                    Markers.EMPTY,
+                    visit(statement.getExpression()),
+                    JContainer.build(sourceBefore(":"),
+                            visitRightPadded(((BlockStatement)statement.getCode()).getStatements().toArray(new ASTNode[0]), null), Markers.EMPTY)));
+        }
+
+        @Override
         public void visitCastExpression(CastExpression cast) {
             // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
             // If the CastExpression starts at the same place as the expression it contains, then it must be a groovy-style cast
@@ -1417,6 +1440,21 @@ public class GroovyParserVisitor {
                     typeMapping.type(staticType(ternary)));
             elvis = elvis.withMarkers(elvis.getMarkers().add(new Elvis(randomId())));
             queue.add(elvis);
+        }
+
+        @Override
+        public void visitSwitch(SwitchStatement statement) {
+            queue.add(new J.Switch(
+                    randomId(),
+                    sourceBefore("switch"),
+                    Markers.EMPTY,
+                    new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
+                            JRightPadded.build((Expression) visit(statement.getExpression())).withAfter(sourceBefore(")"))),
+                    new J.Block(
+                            randomId(), sourceBefore("{"), Markers.EMPTY,
+                            JRightPadded.build(false),
+                            visitRightPadded(statement.getCaseStatements().toArray(new CaseStatement[0]), null),
+                            sourceBefore("}"))));
         }
 
         @Override
