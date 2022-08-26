@@ -634,7 +634,7 @@ public class ResolvedPom {
     private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                (classifier == null || classifier.equals(it.getClassifier()))) {
+                (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }
