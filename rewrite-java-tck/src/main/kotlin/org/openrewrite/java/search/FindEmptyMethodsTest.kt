@@ -122,4 +122,13 @@ interface FindEmptyMethodsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun interfaceMethod() = assertUnchanged(
+        before ="""
+            interface MyInterface {
+                void doSomething();
+            }
+        """
+    )
 }

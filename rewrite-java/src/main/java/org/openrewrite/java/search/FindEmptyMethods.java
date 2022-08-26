@@ -62,7 +62,7 @@ public class FindEmptyMethods extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-                if (classDecl.hasModifier(J.Modifier.Type.Abstract)) {
+                if (classDecl.getKind() != J.ClassDeclaration.Kind.Type.Class || classDecl.hasModifier(J.Modifier.Type.Abstract)) {
                     return classDecl;
                 }
 
