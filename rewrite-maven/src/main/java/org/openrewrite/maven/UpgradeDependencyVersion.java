@@ -214,9 +214,11 @@ public class UpgradeDependencyVersion extends Recipe {
                                 return versions;
                             });
                     return versionComparator.upgrade(version, artifactVersions).orElse(null);
-                } catch (IllegalStateException e) {
-                    //This can happen when we encounter exotic version. Pass the error to the error handler and
-                    //in the spirit of "do no harm", return null.
+                } catch (Exception e) {
+                    // This can happen when we encounter exotic version or if we are unable to download the metadata for
+                    // a given dependency. Pass the error to the error handler and in the spirit of "do no harm", return
+                    // null. This allows the visitor to continue looking for other dependencies to upgrade in the same
+                    // AST.
                     ctx.getOnError().accept(e);
                     return null;
                 }
