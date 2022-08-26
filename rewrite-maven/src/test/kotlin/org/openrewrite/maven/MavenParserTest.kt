@@ -123,57 +123,61 @@ class MavenParserTest : RewriteTest {
 
     @Test
     fun differentRangeVersionInDependency() = rewriteRun(
-        pomXml(
-            """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-dep</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                    <dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>[4.5,4.9]</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
-        ) {spec ->
-            spec.afterRecipe { p ->
-                val results = p.markers.findFirst(MavenResolutionResult::class.java).orElseThrow()
-                val dependency = results.findDependencies("junit", "junit", Scope.Compile)[0]
-                assertThat(dependency.version).isEqualTo("4.9")
-            }
-        },
-        pomXml(
-            """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                    <dependency>
+        mavenProject("dep",
+            pomXml(
+                """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-dep</artifactId>
                       <version>1</version>
-                    </dependency>
-                    <dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>[4.5,4.9]</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
-        ) {spec ->
-            spec.afterRecipe { p ->
-                val results = p.markers.findFirst(MavenResolutionResult::class.java).orElseThrow()
-                val dependency = results.findDependencies("junit", "junit", Scope.Compile)[0]
-                assertThat(dependency.version).isEqualTo("4.9")
+                      <dependencies>
+                        <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>[4.5,4.9]</version>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """
+            ) {spec ->
+                spec.afterRecipe { p ->
+                    val results = p.markers.findFirst(MavenResolutionResult::class.java).orElseThrow()
+                    val dependency = results.findDependencies("junit", "junit", Scope.Compile)[0]
+                    assertThat(dependency.version).isEqualTo("4.9")
+                }
             }
-        }
+        ),
+        mavenProject("app",
+            pomXml(
+                """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>my-dep</artifactId>
+                          <version>1</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>[4.5,4.9]</version>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """
+            ) {spec ->
+                spec.afterRecipe { p ->
+                    val results = p.markers.findFirst(MavenResolutionResult::class.java).orElseThrow()
+                    val dependency = results.findDependencies("junit", "junit", Scope.Compile)[0]
+                    assertThat(dependency.version).isEqualTo("4.9")
+                }
+            }
+        )
     )
 
     @Test
