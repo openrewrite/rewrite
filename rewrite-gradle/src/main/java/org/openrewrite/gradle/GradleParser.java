@@ -15,6 +15,9 @@
  */
 package org.openrewrite.gradle;
 
+import lombok.Getter;
+import lombok.Setter;
+import lombok.experimental.Accessors;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.groovy.GroovyParser;
@@ -23,11 +26,13 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
 import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -92,5 +97,31 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("build.gradle");
+    }
+
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+
+    @Accessors(chain=true)
+    @Setter
+    @Getter
+    public static class Builder extends Parser.Builder {
+        protected GroovyParser.Builder groovyParser = GroovyParser.builder();
+
+        public Builder() {
+            super(G.CompilationUnit.class);
+        }
+
+        public GradleParser build() {
+            return new GradleParser(groovyParser);
+        }
+
+        @Override
+        public String getDslName() {
+            return "gradle";
+        }
     }
 }

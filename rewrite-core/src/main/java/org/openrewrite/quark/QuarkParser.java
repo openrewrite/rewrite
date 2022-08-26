@@ -126,4 +126,25 @@ public class QuarkParser implements Parser<Quark> {
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file");
     }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder extends Parser.Builder{
+        public Builder() {
+            super(Quark.class);
+        }
+
+        @Override
+        public Parser<Quark> build() {
+            return new QuarkParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "other";
+        }
+
+    }
 }

@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -135,26 +136,28 @@ public interface RewriteTest extends SourceSpecs {
             s.customizeExecutionContext.accept(executionContext);
         }
 
-        Map<DslParserBuilder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
-
+        Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
+        List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers.stream().map(Supplier::get).collect(Collectors.toList());
+        List<Parser.Builder> testClassSpecParsers = testClassSpec.parsers.stream().map(Supplier::get).collect(Collectors.toList());
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             // ----- method specific parser -------------------------
-            if (RewriteTestUtils.groupSourceSpecsByParser(testMethodSpec, sourceSpecsByParser, sourceSpec)) {
+            if (RewriteTestUtils.groupSourceSpecsByParser(methodSpecParsers, sourceSpecsByParser, sourceSpec)) {
                 continue;
             }
 
             // ----- test default parser -------------------------
-            if (RewriteTestUtils.groupSourceSpecsByParser(testClassSpec, sourceSpecsByParser, sourceSpec)) {
+            if (RewriteTestUtils.groupSourceSpecsByParser(testClassSpecParsers, sourceSpecsByParser, sourceSpec)) {
                 continue;
             }
 
             // ----- default parsers for each SourceFile type -------------------------
-            sourceSpecsByParser.computeIfAbsent(sourceSpec.getParserSupplier(), p -> new ArrayList<>()).add(sourceSpec);
+            sourceSpecsByParser.computeIfAbsent(sourceSpec.getParserSupplier().get(), p -> new ArrayList<>()).add(sourceSpec);
         }
 
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new HashMap<>(sourceSpecs.length);
-        for (Map.Entry<DslParserBuilder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
+        for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
             Map<SourceSpec<?>, Parser.Input> inputs = new LinkedHashMap<>(sourceSpecsForParser.getValue().size());
+            Parser<?> parser = sourceSpecsForParser.getKey().build();
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
                 if (sourceSpec.before == null) {
                     continue;
@@ -164,8 +167,7 @@ public interface RewriteTest extends SourceSpecs {
                 if (sourceSpec.sourcePath != null) {
                     sourcePath = sourceSpec.dir.resolve(sourceSpec.sourcePath);
                 } else {
-                    sourcePath = sourceSpecsForParser.getKey().build()
-                            .sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
+                    sourcePath = parser.sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
                 }
                 inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(StandardCharsets.UTF_8))));
             }
@@ -174,9 +176,8 @@ public interface RewriteTest extends SourceSpecs {
 
             Iterator<SourceSpec<?>> sourceSpecIter = inputs.keySet().iterator();
 
-            //noinspection unchecked,rawtypes
-            List<SourceFile> sourceFiles = (List) sourceSpecsForParser.getKey().build()
-                    .parseInputs(inputs.values(), relativeTo, executionContext);
+            //noinspection unchecked
+            List<SourceFile> sourceFiles = (List<SourceFile>) parser.parseInputs(inputs.values(), relativeTo, executionContext);
             assertThat(sourceFiles.size())
                     .as("Every input should be parsed into a SourceFile.")
                     .isEqualTo(inputs.size());
@@ -388,12 +389,16 @@ public interface RewriteTest extends SourceSpecs {
 }
 
 class RewriteTestUtils {
-    static boolean groupSourceSpecsByParser(RecipeSpec testMethodSpec, Map<DslParserBuilder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
-        for (Parser.Builder parser : testMethodSpec.parsers) {
+    static boolean groupSourceSpecsByParser(List<Parser.Builder> parserBuilders, Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
+        for(Map.Entry<Parser.Builder, List<SourceSpec<?>>> entry : sourceSpecsByParser.entrySet()) {
+            if(entry.getKey().getSourceFileType().equals(sourceSpec.sourceFileType)) {
+                entry.getValue().add(sourceSpec);
+                return true;
+            }
+        }
+        for (Parser.Builder parser : parserBuilders) {
             if (parser.getSourceFileType().equals(sourceSpec.sourceFileType)) {
-                sourceSpecsByParser.computeIfAbsent(
-                        new DslParserBuilder(sourceSpec.dsl, parser),
-                        p -> new ArrayList<>()).add(sourceSpec);
+                sourceSpecsByParser.computeIfAbsent(parser, p -> new ArrayList<>()).add(sourceSpec);
                 return true;
             }
         }

@@ -1486,7 +1486,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             StringBuilder message = new StringBuilder("Failed to convert for the following cursor stack:");
             message.append("--- BEGIN PATH ---\n");
 
-            List<Tree> paths = stream(getCurrentPath().spliterator(), false).collect(toList());
+            List<Tree> paths = stream(getCurrentPath().spliterator(), false).toList();
             for (int i = paths.size(); i-- > 0; ) {
                 JCTree tree = (JCTree) paths.get(i);
                 if (tree instanceof JCCompilationUnit) {

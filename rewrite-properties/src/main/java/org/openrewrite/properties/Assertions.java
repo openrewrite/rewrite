@@ -16,10 +16,8 @@
 package org.openrewrite.properties;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
-import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -28,20 +26,13 @@ import java.util.function.Consumer;
 public class Assertions {
     private Assertions() {}
 
-    private static final DslParserBuilder propertiesParser = new DslParserBuilder("properties", new Parser.Builder(Properties.File.class) {
-        @Override
-        public Parser<?> build() {
-            return new PropertiesParser();
-        }
-    });
-
     public static SourceSpecs properties(@Language("properties") @Nullable String before) {
         return properties(before, s -> {
         });
     }
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, Consumer<SourceSpec<Properties.File>> spec) {
-        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, propertiesParser, before, null);
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser::builder, before, null);
         spec.accept(properties);
         return properties;
     }
@@ -53,7 +44,7 @@ public class Assertions {
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") String after,
                                    Consumer<SourceSpec<Properties.File>> spec) {
-        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, propertiesParser, before, after);
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser::builder, before, after);
         spec.accept(properties);
         return properties;
     }

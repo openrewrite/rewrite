@@ -17,6 +17,7 @@ package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingEventListener;
@@ -59,5 +60,25 @@ public class PlainTextParser implements Parser<PlainText> {
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.txt");
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder extends Parser.Builder {
+        public Builder() {
+            super(PlainText.class);
+        }
+
+        @Override
+        public Parser<?> build() {
+            return new PlainTextParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "text";
+        }
     }
 }

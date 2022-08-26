@@ -205,6 +205,11 @@ public class MavenParser implements Parser<Xml.Document> {
         public MavenParser build() {
             return new MavenParser(httpSender, activeProfiles);
         }
+
+        @Override
+        public String getDslName() {
+            return "maven";
+        }
     }
 
     @Override

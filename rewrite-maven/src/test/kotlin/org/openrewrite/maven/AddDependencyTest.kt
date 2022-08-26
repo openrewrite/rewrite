@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("UnstableApiUsage", "NewClassNamingConvention")
+
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
@@ -29,17 +31,16 @@ import java.nio.file.Path
 
 class AddDependencyTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
-        spec.parser(
+        spec.parser {
             JavaParser.fromJavaVersion()
                 .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core")
-        )
+        }
     }
 
     private val usingGuavaIntMath = """
         import com.google.common.math.IntMath;
         public class A {
             boolean getMap() {
-                //noinspection UnstableApiUsage
                 return IntMath.isPrime(5);
             }
         }

@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("UnusedAssignment", "ConstantConditions", "ConstantConditionalExpression")
+
 package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Disabled
@@ -29,8 +31,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     }
 
     @Test
-    fun `find insecure uri`(javaParser: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
+    fun `find insecure uri`() = rewriteRun(
         java(
             """
                 import java.net.URI;
@@ -63,8 +64,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun `replace is a barrier guard`(javaParser: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
+    fun `replace is a barrier guard`() = rewriteRun(
         java(
             """
                 import java.net.URI;
@@ -84,8 +84,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun `reassignment breaks data flow path`(javaParser: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
+    fun `reassignment breaks data flow path`() = rewriteRun(
         java(
             """
                 import java.net.URI;
@@ -106,8 +105,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     @Disabled("MISSING: Assignment dominance of conditional that will always evaluate to true")
-    fun `reassignment in always evaluated path breaks data flow path`(javaParser: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
+    fun `reassignment in always evaluated path breaks data flow path`() = rewriteRun(
         java(
             """
                 import java.net.URI;
@@ -130,7 +128,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     fun `reassignment within block does not break path`(javaParser: JavaParser) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
         java(
             """
                 import java.net.URI;
@@ -165,7 +162,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     fun `dataflow through ternary operator`(javaParser: JavaParser) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
         java(
             """
                 import java.net.URI;
@@ -200,7 +196,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     fun `example of taint tracking`(javaParser: JavaParser) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
         java(
             """
                 import java.io.File;
@@ -235,7 +230,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     fun `example of taint tracking through an alternate flow path`(javaParser: JavaParser) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
         java(
             """
                 import java.io.File;
@@ -270,7 +264,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     fun `example of negative taint tracking`(javaParser: JavaParser) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
         java(
             """
                 import java.io.File;
@@ -291,7 +284,6 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
 
     @Test
     fun `arbitrary method calls are not dataflow`(javaParser: JavaParser) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
         java(
             """
                 import java.io.File;
@@ -316,8 +308,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun `arbitrary method call chains are not dataflow`(javaParser: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
+    fun `arbitrary method call chains are not dataflow`() = rewriteRun(
         java(
             """
                 import java.io.File;
@@ -339,8 +330,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun `special case toString on String type is DataFlow`(javaParser: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
+    fun `special case toString on String type is DataFlow`() = rewriteRun(
         java(
             """
                 import java.io.File;
@@ -382,8 +372,7 @@ interface UriCreatedWithHttpSchemeTest : RewriteTest {
     )
 
     @Test
-    fun `zero step flow is still considered and fixed`(javaParser: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(javaParser) },
+    fun `zero step flow is still considered and fixed`() = rewriteRun(
         java(
             """
                 import java.net.URI;

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -33,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.test.SourceSpecs.dir;
@@ -89,8 +91,8 @@ public class Assertions {
         });
     }
 
-    private static final DslParserBuilder javaParser = new DslParserBuilder("java", JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true));
+    private static final Supplier<Parser.Builder> javaParser = () -> JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true);
 
     public static SourceSpecs java(@Language("java") @Nullable String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(

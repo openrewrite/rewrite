@@ -198,5 +198,12 @@ public interface Parser<S extends SourceFile> {
         private final Class<? extends SourceFile> sourceFileType;
 
         public abstract Parser<?> build();
+
+        /**
+         * The name of the domain specific language this parser builder produces a parser for.
+         * Used to disambiguate when multiple different parsers are potentially applicable to a source.
+         * For example, determining that MavenParser should be used for a pom.xml instead of XmlParser.
+         */
+        public abstract String getDslName();
     }
 }

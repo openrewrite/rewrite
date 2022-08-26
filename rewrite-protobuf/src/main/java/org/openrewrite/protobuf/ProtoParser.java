@@ -112,4 +112,25 @@ public class ProtoParser implements Parser<Proto.Document> {
                     String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
         }
     }
+
+
+    public static Builder builder() {
+        return new Builder();
+    }
+    public static class Builder extends Parser.Builder {
+
+        public Builder() {
+            super(Proto.Document.class);
+        }
+
+        @Override
+        public ProtoParser build() {
+            return new ProtoParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "proto";
+        }
+    }
 }

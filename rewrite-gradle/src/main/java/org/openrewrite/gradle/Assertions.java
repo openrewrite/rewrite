@@ -20,25 +20,20 @@ import org.openrewrite.Parser;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
 import java.nio.file.Paths;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class Assertions {
 
     private Assertions() {
     }
 
-    private static final DslParserBuilder gradleParser = new DslParserBuilder("gradle", new Parser.Builder(G.CompilationUnit.class) {
-        @Override
-        public Parser<?> build() {
-            return new GradleParser(GroovyParser.builder()
-                    .logCompilationWarningsAndErrors(true));
-        }
-    });
+    private static final Supplier<Parser.Builder> gradleParser = () -> GradleParser.builder()
+            .setGroovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {
         return buildGradle(before, s -> {

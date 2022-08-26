@@ -16,9 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.yaml.tree.Yaml;
@@ -30,20 +28,13 @@ public class Assertions {
     private Assertions() {
     }
 
-    private static final DslParserBuilder yamlParser = new DslParserBuilder("yaml", new Parser.Builder(Yaml.Documents.class) {
-        @Override
-        public Parser<?> build() {
-            return new YamlParser();
-        }
-    });
-
     public static SourceSpecs yaml(@Language("yml") @Nullable String before) {
         return yaml(before, s -> {
         });
     }
 
     public static SourceSpecs yaml(@Language("yml") @Nullable String before, Consumer<SourceSpec<Yaml.Documents>> spec) {
-        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, yamlParser,  before, null);
+        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, YamlParser::builder,  before, null);
         spec.accept(yaml);
         return yaml;
     }
@@ -55,7 +46,7 @@ public class Assertions {
 
     public static SourceSpecs yaml(@Language("yml") @Nullable String before, @Language("yml") String after,
                              Consumer<SourceSpec<Yaml.Documents>> spec) {
-        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, yamlParser, before, after);
+        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, YamlParser::builder, before, after);
         spec.accept(yaml);
         return yaml;
     }

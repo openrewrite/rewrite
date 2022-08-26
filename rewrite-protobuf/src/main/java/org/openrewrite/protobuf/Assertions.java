@@ -16,10 +16,8 @@
 package org.openrewrite.protobuf;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.protobuf.tree.Proto;
-import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -30,20 +28,13 @@ public class Assertions {
     private Assertions() {
     }
 
-    private static final DslParserBuilder protobufParser = new DslParserBuilder("protobuf", new Parser.Builder(Proto.Document.class) {
-        @Override
-        public Parser<?> build() {
-            return new ProtoParser();
-        }
-    });
-
     public static SourceSpecs proto(@Language("protobuf") @Nullable String before) {
         return proto(before, s -> {
         });
     }
 
     public static SourceSpecs proto(@Language("protobuf") @Nullable String before, Consumer<SourceSpec<Proto.Document>> spec) {
-        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, protobufParser, before, null);
+        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, ProtoParser::builder, before, null);
         spec.accept(proto);
         return proto;
     }
@@ -55,7 +46,7 @@ public class Assertions {
 
     public static SourceSpecs proto(@Language("protobuf") @Nullable String before, @Language("protobuf") String after,
                               Consumer<SourceSpec<Proto.Document>> spec) {
-        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, protobufParser, before, after);
+        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, ProtoParser::builder, before, after);
         spec.accept(proto);
         return proto;
     }

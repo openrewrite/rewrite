@@ -17,14 +17,9 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.tools.ant.DirectoryScanner;
-import org.apache.tools.ant.types.selectors.SelectorUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.PathMatcher;
 
 @Value
 @EqualsAndHashCode(callSuper = true)

@@ -118,4 +118,24 @@ public class XmlParser implements Parser<Xml.Document> {
                     String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
         }
     }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+    public static class Builder extends org.openrewrite.Parser.Builder {
+
+        public Builder() {
+            super(Xml.Document.class);
+        }
+
+        @Override
+        public XmlParser build() {
+            return new XmlParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "xml";
+        }
+    }
 }

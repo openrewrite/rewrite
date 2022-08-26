@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -28,6 +29,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -41,7 +43,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @Nullable
     final String dsl;
 
-    final DslParserBuilder parserSupplier;
+    final Supplier<Parser.Builder> parserSupplier;
 
     @Nullable
     final String before;
@@ -63,7 +65,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final Consumer<ExecutionContext> customizeExecutionContext;
 
     public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
-                      DslParserBuilder parserSupplier, @Nullable String before, @Nullable String after) {
+                      Supplier<Parser.Builder> parserSupplier, @Nullable String before, @Nullable String after) {
         this.sourceFileType = sourceFileType;
         this.dsl = dsl;
         this.parserSupplier = parserSupplier;

@@ -35,11 +35,10 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
     }
 
     @Test
-    fun listAdd(jp: JavaParser.Builder<*, *>) = rewriteRun(
+    fun listAdd() = rewriteRun(
         { spec ->
             spec
                 .recipe(RecipeExceptionDemonstration("java.util.List add(..)"))
-                .parser(jp)
                 .executionContext(InMemoryExecutionContext())
         },
         java(

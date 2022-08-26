@@ -266,6 +266,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         }
 
         public abstract P build();
+
+        @Override
+        public String getDslName() {
+            return "java";
+        }
     }
 
     @Override

@@ -242,4 +242,24 @@ public class PropertiesParser implements Parser<Properties.File> {
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file.properties");
     }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+    public static class Builder extends org.openrewrite.Parser.Builder {
+
+        public Builder() {
+            super(Properties.File.class);
+        }
+
+        @Override
+        public PropertiesParser build() {
+            return new PropertiesParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "properties";
+        }
+    }
 }

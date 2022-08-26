@@ -30,7 +30,11 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
 
     @Test
     fun skipAll(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(jp.classpath(JavaParser.runtimeClasspath())) },
+        { spec ->
+            spec.parser { JavaParser.fromJavaVersion()
+                .classpath(JavaParser.runtimeClasspath())
+            }
+        },
         java(
             """
                 @RewriteSkip
@@ -47,7 +51,11 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
 
     @Test
     fun skipByClass(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(jp.classpath(JavaParser.runtimeClasspath())) },
+        { spec ->
+            spec.parser { JavaParser.fromJavaVersion()
+                .classpath(JavaParser.runtimeClasspath())
+            }
+        },
         java(
             """
                 @RewriteSkip(recipeClasses = ChangeType.class)
@@ -65,7 +73,11 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
 
     @Test
     fun skipByName(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(jp.classpath(JavaParser.runtimeClasspath())) },
+        { spec ->
+            spec.parser { JavaParser.fromJavaVersion()
+                .classpath(JavaParser.runtimeClasspath())
+            }
+        },
         java(
             """
                 @RewriteSkip(recipes = "org.openrewrite.java.ChangeType")
@@ -83,7 +95,11 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
 
     @Test
     fun skipByClassDoesNotMatch(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(jp.classpath(JavaParser.runtimeClasspath())) },
+        { spec ->
+            spec.parser { JavaParser.fromJavaVersion()
+                .classpath(JavaParser.runtimeClasspath())
+            }
+        },
         java(
             """
                 @RewriteSkip(recipeClasses = ChangeMethodName.class)

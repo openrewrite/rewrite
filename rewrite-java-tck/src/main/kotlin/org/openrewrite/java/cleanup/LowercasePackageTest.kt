@@ -19,7 +19,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.PathUtils
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import java.nio.file.Paths
@@ -31,8 +30,7 @@ interface LowercasePackageTest : RewriteTest {
     }
 
     @Test
-    fun lowerCasePackage(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp) },
+    fun lowerCasePackage() = rewriteRun(
         java("""
             package com.UPPERCASE.CamelCase;
             class A {}

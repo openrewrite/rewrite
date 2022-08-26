@@ -241,5 +241,10 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         public GroovyParser build() {
             return new GroovyParser(classpath, styles, logCompilationWarningsAndErrors, typeCache);
         }
+
+        @Override
+        public String getDslName() {
+            return "groovy";
+        }
     }
 }

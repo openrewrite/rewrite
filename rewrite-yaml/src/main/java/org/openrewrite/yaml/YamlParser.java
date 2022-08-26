@@ -22,6 +22,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
@@ -558,5 +559,25 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 return super.visitMapping(mapping, p);
             }
         }.visit(y, 0);
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+    public static class Builder extends org.openrewrite.Parser.Builder {
+
+        public Builder() {
+            super(Yaml.Documents.class);
+        }
+
+        @Override
+        public YamlParser build() {
+            return new YamlParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "yaml";
+        }
     }
 }

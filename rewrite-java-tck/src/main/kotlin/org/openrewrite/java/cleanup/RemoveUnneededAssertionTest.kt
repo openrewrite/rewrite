@@ -67,7 +67,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit jupiter assertTrue(true)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api").build()) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit-jupiter-api") }},
         java(
             """
                 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -88,7 +88,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit jupiter assertFalse(false)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit-jupiter-api") }},
         java(
             """
                 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -109,7 +109,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit jupiter assertTrue(true, message)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit-jupiter-api") }},
         java(
             """
                 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -130,7 +130,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit jupiter assertFalse(false, message)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit-jupiter-api") }},
         java(
             """
                 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -151,7 +151,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit4 assertTrue(true)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit")) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit") }},
         java(
             """
                 import static org.junit.Assert.assertTrue;
@@ -172,7 +172,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit4 assertFalse(false)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit")) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit") }},
         java(
             """
                 import static org.junit.Assert.assertFalse;
@@ -193,7 +193,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit4 assertTrue(message, true)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit")) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit") }},
         java(
             """
                 import static org.junit.Assert.assertTrue;
@@ -214,7 +214,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
 
     @Test
     fun `junit4 assertFalse(message, false)`() = rewriteRun(
-        { spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit")) },
+        { spec -> spec.parser { JavaParser.fromJavaVersion().classpath("junit") }},
         java(
             """
                 import static org.junit.Assert.assertFalse;

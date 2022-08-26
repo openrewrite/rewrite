@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.search.SemanticallyEqualTest.Companion.jp
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
@@ -29,8 +30,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     }
 
     @Test
-    fun doNotCombineDifferentCatchBlocks(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun doNotCombineDifferentCatchBlocks() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends RuntimeException {}"),
         java("""
@@ -48,8 +48,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun childClassIsCaughtBeforeParentClass(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun childClassIsCaughtBeforeParentClass() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends BaseException {}"),
         java("class BaseException extends RuntimeException {}"),
@@ -68,8 +67,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun blocksContainDifferentComments(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun blocksContainDifferentComments() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends RuntimeException {}"),
         java("""
@@ -87,8 +85,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun blocksContainSameComments(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun blocksContainSameComments() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends RuntimeException {}"),
         java("""
@@ -116,8 +113,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun combineSameSemanticallyEquivalentMethodTypes(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun combineSameSemanticallyEquivalentMethodTypes() = rewriteRun(
         java("class A extends BaseException {}"),
         java("class B extends BaseException {}"),
         java("class BaseException extends RuntimeException {}"),
@@ -148,8 +144,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun combineCatchesIntoNewMultiCatch(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun combineCatchesIntoNewMultiCatch() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends RuntimeException {}"),
         java("""
@@ -174,8 +169,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun fromMultiCatchCombineWithCatch(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun fromMultiCatchCombineWithCatch() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends RuntimeException {}"),
         java("class C extends RuntimeException {}"),
@@ -201,8 +195,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun fromCatchCombineWithMultiCatch(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun fromCatchCombineWithMultiCatch() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends RuntimeException {}"),
         java("class C extends RuntimeException {}"),
@@ -228,8 +221,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun fromMultiCatchCombineWithMultiCatch(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun fromMultiCatchCombineWithMultiCatch() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends RuntimeException {}"),
         java("class C extends RuntimeException {}"),
@@ -256,8 +248,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun preserveOrderOfCatchesWhenPossible(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun preserveOrderOfCatchesWhenPossible() = rewriteRun(
         java("class A extends RuntimeException {}"),
         java("class B extends BaseException {}"),
         java("class C extends BaseException {}"),
@@ -288,8 +279,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun removeRedundantChildClasses(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun removeRedundantChildClasses() = rewriteRun(
         java("class A extends BaseException {}"),
         java("class B extends RuntimeException {}"),
         java("class BaseException extends RuntimeException {}"),
@@ -316,8 +306,7 @@ interface CombineSemanticallyEqualCatchBlocksTest : RewriteTest {
     )
 
     @Test
-    fun removeRedundantChildClassesWithExistingMultiCatches(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        {spec -> spec.parser(jp)},
+    fun removeRedundantChildClassesWithExistingMultiCatches() = rewriteRun(
         java("class A extends BaseException {}"),
         java("class B extends RuntimeException {}"),
         java("class BaseException extends RuntimeException {}"),

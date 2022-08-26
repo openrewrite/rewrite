@@ -46,7 +46,7 @@ public class RecipeSpec {
      * Default parsers to use if no more specific parser is set
      * on the {@link SourceSpec}.
      */
-    List<Parser.Builder> parsers = new ArrayList<>();
+    List<Supplier<Parser.Builder>> parsers = new ArrayList<>();
 
     @Nullable
     ExecutionContext executionContext;
@@ -72,13 +72,7 @@ public class RecipeSpec {
     };
 
     // The before and after here don't mean anything
-    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null,
-            new DslParserBuilder(null, new Parser.Builder(Quark.class) {
-                @Override
-                public Parser<?> build() {
-                    return new QuarkParser();
-                }
-            }), "", null);
+    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser::builder, "", null);
 
     /**
      * Configuration that applies to all source file inputs.
@@ -104,32 +98,10 @@ public class RecipeSpec {
     }
 
     /**
-     * @param parser The parser to use when a matching source file is found.
+     * @param parser The parser supplier to use when a matching source file is found.
      * @return The current recipe spec.
-     * @deprecated Use {@link #parser(Supplier)} instead, which isolates parsers per test.
      */
-    @Deprecated
-    public RecipeSpec parser(Parser<?> parser) {
-        this.parsers.add(new Parser.Builder(ParserTypeUtils.parserType(parser)) {
-            @Override
-            public Parser<?> build() {
-                return parser;
-            }
-        });
-        return this;
-    }
-
-    public RecipeSpec parser(Supplier<Parser<?>> parser) {
-        this.parsers.add(new Parser.Builder(ParserTypeUtils.parserType(parser.get())) {
-            @Override
-            public Parser<?> build() {
-                return parser.get();
-            }
-        });
-        return this;
-    }
-
-    public RecipeSpec parser(Parser.Builder parser) {
+    public RecipeSpec parser(Supplier<Parser.Builder> parser) {
         this.parsers.add(parser);
         return this;
     }

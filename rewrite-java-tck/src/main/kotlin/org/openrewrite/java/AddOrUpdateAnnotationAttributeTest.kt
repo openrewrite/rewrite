@@ -206,10 +206,8 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
-    fun dontChangeWhenSetToAddOnly(jp: JavaParser.Builder<*, *>) = rewriteRun(
-        { spec -> spec.parser(jp)
-            .recipe(AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", true))
-        },
+    fun dontChangeWhenSetToAddOnly() = rewriteRun(
+        { spec -> spec.recipe(AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", true)) },
         java("""
             package org.junit;
             public @interface Test {

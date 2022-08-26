@@ -19,7 +19,6 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.test.DslParserBuilder;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
@@ -30,20 +29,13 @@ public class Assertions {
     private Assertions() {
     }
 
-    private static final DslParserBuilder jsonParser = new DslParserBuilder("json", new Parser.Builder(Json.Document.class) {
-        @Override
-        public Parser<?> build() {
-            return new JsonParser();
-        }
-    });
-
     public static SourceSpecs json(@Language("json") @Nullable String before) {
         return json(before, s -> {
         });
     }
 
     public static SourceSpecs json(@Language("json") @Nullable String before, Consumer<SourceSpec<Json.Document>> spec) {
-        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, jsonParser, before, null);
+        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, JsonParser::builder, before, null);
         spec.accept(json);
         return json;
     }
@@ -55,7 +47,7 @@ public class Assertions {
 
     public static SourceSpecs json(@Language("json") @Nullable String before, @Language("json") String after,
                              Consumer<SourceSpec<Json.Document>> spec) {
-        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, jsonParser, before, after);
+        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, JsonParser::builder, before, after);
         spec.accept(json);
         return json;
     }

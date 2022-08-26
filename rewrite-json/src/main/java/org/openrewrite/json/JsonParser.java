@@ -104,4 +104,24 @@ public class JsonParser implements Parser<Json.Document> {
                     String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
         }
     }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+    public static class Builder extends org.openrewrite.Parser.Builder {
+
+        public Builder() {
+            super(Json.Document.class);
+        }
+
+        @Override
+        public JsonParser build() {
+            return new JsonParser();
+        }
+
+        @Override
+        public String getDslName() {
+            return "json";
+        }
+    }
 }

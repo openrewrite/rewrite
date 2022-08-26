@@ -139,5 +139,10 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
         public HclParser build() {
             return new HclParser(styles);
         }
+
+        @Override
+        public String getDslName() {
+            return "hcl";
+        }
     }
 }
