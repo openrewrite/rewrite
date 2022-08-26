@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 
@@ -49,6 +50,16 @@ public class VersionRequirement {
 
     @Nullable
     private volatile transient String selected;
+
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        if (nearer != null) {
+            builder.append(nearer).append(", ");
+        }
+        builder.append(versionSpec.toString());
+        return builder.toString();
+    }
 
     public static VersionRequirement fromVersion(String requested, int depth) {
         return new VersionRequirement(null, VersionSpec.build(requested, depth == 0));
@@ -134,11 +145,21 @@ public class VersionRequirement {
         private DirectRequirement(String version) {
             super(version);
         }
+
+        @Override
+        public String toString() {
+            return "Version='" + version + "'";
+        }
     }
 
     @Data
     private static class SoftRequirement implements VersionSpec {
         final String version;
+
+        @Override
+        public String toString() {
+            return "Soft version='" + version + "'";
+        }
     }
 
     private enum DynamicVersion implements VersionSpec {
@@ -148,6 +169,12 @@ public class VersionRequirement {
         public boolean matches(Version version) {
             return this == LATEST || !version.toString().endsWith("-SNAPSHOT");
         }
+
+        @Override
+        public String toString() {
+            return "Dynamic='" + name() + "'";
+        }
+
     }
 
     @Value
@@ -175,6 +202,11 @@ public class VersionRequirement {
                 }
             }
             return false;
+        }
+
+        @Override
+        public String toString() {
+            return ranges.stream().map(Range::toString).collect(Collectors.joining(",", "RangeSet={", "}"));
         }
     }
 
