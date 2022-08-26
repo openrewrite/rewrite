@@ -19,10 +19,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
@@ -49,6 +50,11 @@ public class CompareEnumsWithEqualityOperator extends Recipe {
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>("java.lang.Enum equals(java.lang.Object)");
     }
 
     @Override
