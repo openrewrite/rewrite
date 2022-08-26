@@ -536,6 +536,9 @@ public class ResolvedPom {
                         VersionRequirement newRequirement = VersionRequirement.fromVersion(d.getVersion(), depth);
                         requirements.put(ga, newRequirement);
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
+                        if (newRequiredVersion == null) {
+                            throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
+                        }
                         d = d.withGav(d.getGav().withVersion(newRequiredVersion));
                     } else {
                         VersionRequirement newRequirement = existingRequirement.addRequirement(d.getVersion());
@@ -543,6 +546,10 @@ public class ResolvedPom {
 
                         String existingRequiredVersion = existingRequirement.resolve(ga, downloader, getRepositories());
                         String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
+                        if (newRequiredVersion == null) {
+                            throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
+                        }
+                        d = d.withGav(d.getGav().withVersion(newRequiredVersion));
 
                         if (!Objects.equals(existingRequiredVersion, newRequiredVersion)) {
                             // start over from the top with the knowledge of this new requirement and throwing
@@ -552,7 +559,7 @@ public class ResolvedPom {
                                     .getResolutionListener()
                                     .clear();
                             return resolveDependencies(scope, requirements, downloader, ctx);
-                        } else if (contains(dependencies, ga)) {
+                        } else if (contains(dependencies, ga, d.getClassifier())) {
                             // we've already resolved this previously and the requirement didn't change,
                             // so just skip and continue on
                             continue;
@@ -624,9 +631,10 @@ public class ResolvedPom {
         return dependencies;
     }
 
-    private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga) {
+    private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
-            if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId())) {
+            if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
+                (Objects.equals(classifier, it.getClassifier()))) {
                 return true;
             }
         }
@@ -647,10 +655,6 @@ public class ResolvedPom {
             return s == null ? Scope.Compile : s;
         }
         return Scope.fromName(getValue(d2.getScope()));
-    }
-
-    private GroupArtifact groupArtifact(Dependency dependency) {
-        return new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId());
     }
 
     private Dependency getValues(Dependency dep, int depth) {
