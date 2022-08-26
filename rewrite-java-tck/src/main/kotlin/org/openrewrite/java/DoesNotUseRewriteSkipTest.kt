@@ -31,9 +31,9 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
     @Test
     fun skipAll(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec ->
-            spec.parser { JavaParser.fromJavaVersion()
+            spec.parser( JavaParser.fromJavaVersion()
                 .classpath(JavaParser.runtimeClasspath())
-            }
+            )
         },
         java(
             """
@@ -52,9 +52,9 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
     @Test
     fun skipByClass(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec ->
-            spec.parser { JavaParser.fromJavaVersion()
+            spec.parser( JavaParser.fromJavaVersion()
                 .classpath(JavaParser.runtimeClasspath())
-            }
+            )
         },
         java(
             """
@@ -74,9 +74,9 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
     @Test
     fun skipByName(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec ->
-            spec.parser { JavaParser.fromJavaVersion()
+            spec.parser( JavaParser.fromJavaVersion()
                 .classpath(JavaParser.runtimeClasspath())
-            }
+            )
         },
         java(
             """
@@ -96,9 +96,9 @@ interface DoesNotUseRewriteSkipTest : RewriteTest {
     @Test
     fun skipByClassDoesNotMatch(jp: JavaParser.Builder<*, *>) = rewriteRun(
         { spec ->
-            spec.parser { JavaParser.fromJavaVersion()
+            spec.parser( JavaParser.fromJavaVersion()
                 .classpath(JavaParser.runtimeClasspath())
-            }
+            )
         },
         java(
             """

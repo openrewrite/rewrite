@@ -31,10 +31,8 @@ import java.nio.file.Path
 
 class AddDependencyTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
-        spec.parser {
-            JavaParser.fromJavaVersion()
-                .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core")
-        }
+        spec.parser(JavaParser.fromJavaVersion()
+            .classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core"))
     }
 
     private val usingGuavaIntMath = """

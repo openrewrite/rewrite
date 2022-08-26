@@ -91,7 +91,7 @@ public class Assertions {
         });
     }
 
-    private static final Supplier<Parser.Builder> javaParser = () -> JavaParser.fromJavaVersion()
+    private static final Parser.Builder javaParser = JavaParser.fromJavaVersion()
             .logCompilationWarningsAndErrors(true);
 
     public static SourceSpecs java(@Language("java") @Nullable String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {

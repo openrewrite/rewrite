@@ -32,7 +32,7 @@ public class Assertions {
     private Assertions() {
     }
 
-    private static final Supplier<Parser.Builder> gradleParser = () -> GradleParser.builder()
+    private static final Parser.Builder gradleParser = GradleParser.builder()
             .setGroovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {

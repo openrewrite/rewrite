@@ -36,7 +36,7 @@ public class Assertions {
     }
 
     public static SourceSpecs groovy(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser::builder, before, null);
+        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, null);
         spec.accept(groovy);
         return groovy;
     }
@@ -48,7 +48,7 @@ public class Assertions {
 
     public static SourceSpecs groovy(@Language("groovy") @Nullable String before, @Language("groovy") String after,
                                      Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser::builder, before, after);
+        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, after);
         spec.accept(groovy);
         return groovy;
     }

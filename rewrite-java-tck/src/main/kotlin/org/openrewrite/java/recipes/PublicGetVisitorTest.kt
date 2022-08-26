@@ -24,10 +24,8 @@ import org.openrewrite.test.RewriteTest
 interface PublicGetVisitorTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(PublicGetVisitor())
-            .parser {
-                JavaParser.fromJavaVersion()
-                    .classpath(JavaParser.runtimeClasspath())
-            }
+            .parser(JavaParser.fromJavaVersion()
+                    .classpath(JavaParser.runtimeClasspath()))
     }
 
     @Suppress("NullableProblems")

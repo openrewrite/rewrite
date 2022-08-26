@@ -137,8 +137,11 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
-        List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers.stream().map(Supplier::get).collect(Collectors.toList());
-        List<Parser.Builder> testClassSpecParsers = testClassSpec.parsers.stream().map(Supplier::get).collect(Collectors.toList());
+        List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
+        // Clone class-level parsers to ensure that no state leaks between tests
+        List<Parser.Builder> testClassSpecParsers = testClassSpec.parsers.stream()
+                .map(Parser.Builder::clone)
+                .collect(Collectors.toList());
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             // ----- method specific parser -------------------------
             if (RewriteTestUtils.groupSourceSpecsByParser(methodSpecParsers, sourceSpecsByParser, sourceSpec)) {
@@ -151,7 +154,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             // ----- default parsers for each SourceFile type -------------------------
-            sourceSpecsByParser.computeIfAbsent(sourceSpec.getParserSupplier().get(), p -> new ArrayList<>()).add(sourceSpec);
+            sourceSpecsByParser.computeIfAbsent(sourceSpec.getParser().clone(), p -> new ArrayList<>()).add(sourceSpec);
         }
 
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new HashMap<>(sourceSpecs.length);

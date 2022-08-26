@@ -24,7 +24,7 @@ import org.openrewrite.test.RewriteTest
 class AddDelegatesToGradleApiTest : RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
-        spec.parser { JavaParser.fromJavaVersion().classpath("groovy", "gradle-base-services") }
+        spec.parser( JavaParser.fromJavaVersion().classpath("groovy", "gradle-base-services") )
                 .recipe(AddDelegatesToGradleApi())
     }
 

@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.JavaType;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
@@ -24,7 +25,7 @@ import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class JavaTypeCache {
+public class JavaTypeCache implements Cloneable {
     @Value
     private static class BytesKey {
         byte[] data;
@@ -56,5 +57,16 @@ public class JavaTypeCache {
 
     public int size() {
         return typeCache.size();
+    }
+
+    @Override
+    public JavaTypeCache clone() {
+        try {
+            JavaTypeCache clone = (JavaTypeCache) super.clone();
+            clone.typeCache = new HashMap<>(this.typeCache);
+            return clone;
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -20,7 +20,6 @@ import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.quark.Quark;
 import org.openrewrite.quark.QuarkParser;
 
 import java.io.InputStream;
@@ -31,7 +30,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 @Getter
 public class RecipeSpec {
@@ -46,7 +44,7 @@ public class RecipeSpec {
      * Default parsers to use if no more specific parser is set
      * on the {@link SourceSpec}.
      */
-    List<Supplier<Parser.Builder>> parsers = new ArrayList<>();
+    List<Parser.Builder> parsers = new ArrayList<>();
 
     @Nullable
     ExecutionContext executionContext;
@@ -72,7 +70,7 @@ public class RecipeSpec {
     };
 
     // The before and after here don't mean anything
-    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser::builder, "", null);
+    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser.builder(), "", null);
 
     /**
      * Configuration that applies to all source file inputs.
@@ -101,7 +99,7 @@ public class RecipeSpec {
      * @param parser The parser supplier to use when a matching source file is found.
      * @return The current recipe spec.
      */
-    public RecipeSpec parser(Supplier<Parser.Builder> parser) {
+    public RecipeSpec parser(Parser.Builder parser) {
         this.parsers.add(parser);
         return this;
     }

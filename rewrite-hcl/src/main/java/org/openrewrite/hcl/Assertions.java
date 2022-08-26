@@ -31,7 +31,7 @@ public class Assertions {
     }
 
     public static SourceSpecs hcl(@Nullable String before, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
-        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser::builder, before, null);
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(), before, null);
         spec.accept(hcl);
         return hcl;
     }
@@ -42,7 +42,7 @@ public class Assertions {
     }
 
     public static SourceSpecs hcl(@Nullable String before, String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
-        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser::builder,  before, after);
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(),  before, after);
         spec.accept(hcl);
         return hcl;
     }

@@ -142,6 +142,7 @@ public interface Parser<S extends SourceFile> {
             );
         }
 
+        @SuppressWarnings("unused")
         public static Input fromResource(String resource) {
             return new Input(
                     Paths.get(Long.toString(System.nanoTime())), null,
@@ -150,8 +151,9 @@ public interface Parser<S extends SourceFile> {
             );
         }
 
+        @SuppressWarnings("unused")
         public static List<Input> fromResource(String resource, String delimiter) {
-            return Arrays.stream(StringUtils.readFully(Input.class.getResourceAsStream(resource)).split(delimiter))
+            return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource))).split(delimiter))
                     .map(source -> new Parser.Input(
                             Paths.get(Long.toString(System.nanoTime())), null,
                             () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
@@ -193,7 +195,7 @@ public interface Parser<S extends SourceFile> {
     Path sourcePathFromSourceText(Path prefix, String sourceCode);
 
     @RequiredArgsConstructor
-    abstract class Builder {
+    abstract class Builder implements Cloneable {
         @Getter
         private final Class<? extends SourceFile> sourceFileType;
 
@@ -205,5 +207,15 @@ public interface Parser<S extends SourceFile> {
          * For example, determining that MavenParser should be used for a pom.xml instead of XmlParser.
          */
         public abstract String getDslName();
+
+        @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
+        @Override
+        public Builder clone() {
+            try {
+                return (Builder) super.clone();
+            } catch (CloneNotSupportedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 }

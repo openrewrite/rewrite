@@ -271,6 +271,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         public String getDslName() {
             return "java";
         }
+
+        @Override
+        public Builder<P, B> clone() {
+            Builder<P, B> clone = (Builder<P, B>) super.clone();
+            clone.javaTypeCache = this.javaTypeCache.clone();
+            return clone;
+        }
     }
 
     @Override

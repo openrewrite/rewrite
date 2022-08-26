@@ -43,7 +43,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @Nullable
     final String dsl;
 
-    final Supplier<Parser.Builder> parserSupplier;
+    final Parser.Builder parser;
 
     @Nullable
     final String before;
@@ -65,10 +65,10 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final Consumer<ExecutionContext> customizeExecutionContext;
 
     public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
-                      Supplier<Parser.Builder> parserSupplier, @Nullable String before, @Nullable String after) {
+                      Parser.Builder parser, @Nullable String before, @Nullable String after) {
         this.sourceFileType = sourceFileType;
         this.dsl = dsl;
-        this.parserSupplier = parserSupplier;
+        this.parser = parser;
         this.before = before;
         this.after = after;
         this.eachResult = EachResult.noop;
