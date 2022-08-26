@@ -15,23 +15,19 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AddSerialVersionUidToSerializable extends Recipe {
 
@@ -52,7 +48,6 @@ public class AddSerialVersionUidToSerializable extends Recipe {
         return Collections.singleton("RSPEC-2057");
     }
 
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
@@ -60,35 +55,38 @@ public class AddSerialVersionUidToSerializable extends Recipe {
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                // only interested in class declaration variables
+                // Anonymous classes are not of interest
                 return method;
             }
 
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
-                J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                if (enclosingClass == null || !implementsSerializable(enclosingClass.getType())) {
-                    return multiVariable;
-                }
-                J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
-                for (J.VariableDeclarations.NamedVariable v : varDecls.getVariables()) {
-                    if ("serialVersionUID".equals((v.getSimpleName()))) {
-                        getCursor().dropParentUntil(J.ClassDeclaration.class::isInstance).putMessage("has-serial-version-id", Boolean.TRUE);
-                        varDecls = maybeFixVariableDeclarations(varDecls);
-                        if (multiVariable != varDecls) {
-                            varDecls = maybeAutoFormat(multiVariable, varDecls, executionContext, getCursor().getParentOrThrow());
-                        }
-                        break;
-                    }
-                }
-                return varDecls;
+                // Anonymous classes are not of interest
+                return multiVariable;
             }
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                Boolean needsSerialVersionId = getCursor().pollMessage("has-serial-version-id");
-                if (needsSerialVersionId == null && implementsSerializable(c.getType())) {
+                if(c.getKind() != J.ClassDeclaration.Kind.Type.Class || !requiresSerialVersionField(classDecl.getType())) {
+                    return c;
+                }
+                AtomicBoolean needsSerialVersionId = new AtomicBoolean(true);
+                J.Block body = c.getBody();
+                c = c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(), s -> {
+                    if(!(s instanceof J.VariableDeclarations)) {
+                        return s;
+                    }
+                    J.VariableDeclarations varDecls = (J.VariableDeclarations) s;
+                    for(J.VariableDeclarations.NamedVariable v : varDecls.getVariables()) {
+                        if("serialVersionUID".equals(v.getSimpleName())) {
+                            needsSerialVersionId.set(false);
+                            return maybeAutoFormat(varDecls, maybeFixVariableDeclarations(varDecls), ctx, new Cursor(getCursor(), body));
+                        }
+                    }
+                    return s;
+                })));
+                if (needsSerialVersionId.get()) {
                     c = c.withTemplate(template, c.getBody().getCoordinates().firstStatement());
                 }
                 return c;
@@ -99,26 +97,26 @@ public class AddSerialVersionUidToSerializable extends Recipe {
                 if (!J.Modifier.hasModifier(modifiers, J.Modifier.Type.Private)
                         || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Static)
                         || !J.Modifier.hasModifier(modifiers, J.Modifier.Type.Final)) {
+                    Space singleSpace = Space.build(" ", Collections.emptyList());
                     varDecls = varDecls.withModifiers(Arrays.asList(
                             new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Private, Collections.emptyList()),
-                            new J.Modifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, J.Modifier.Type.Static, Collections.emptyList()),
-                            new J.Modifier(Tree.randomId(), Space.format(" "), Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList())
+                            new J.Modifier(Tree.randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Static, Collections.emptyList()),
+                            new J.Modifier(Tree.randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList())
                     ));
                 }
-                JavaType.Primitive variableType = TypeUtils.asPrimitive(varDecls.getType());
-                if (variableType != JavaType.Primitive.Long) {
+                if (TypeUtils.asPrimitive(varDecls.getType()) != JavaType.Primitive.Long) {
                     varDecls = varDecls.withTypeExpression(new J.Primitive(Tree.randomId(), Space.EMPTY, Markers.EMPTY, JavaType.Primitive.Long));
                 }
                 return varDecls;
             }
 
-            private boolean implementsSerializable(@Nullable JavaType type) {
+            private boolean requiresSerialVersionField(@Nullable JavaType type) {
                 if (type == null) {
                     return false;
                 } else if (type instanceof JavaType.Primitive) {
                     return true;
                 } else if (type instanceof JavaType.Array) {
-                    return implementsSerializable(((JavaType.Array) type).getElemType());
+                    return requiresSerialVersionField(((JavaType.Array) type).getElemType());
                 } else if (type instanceof JavaType.Parameterized) {
                     JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
                     if (parameterized.isAssignableTo("java.util.Collection") || parameterized.isAssignableTo("java.util.Map")) {
@@ -126,7 +124,7 @@ public class AddSerialVersionUidToSerializable extends Recipe {
                         //force all type parameters to be checked to correctly scoop up all non-serializable candidates.
                         boolean typeParametersSerializable = true;
                         for (JavaType typeParameter : parameterized.getTypeParameters()) {
-                            typeParametersSerializable = typeParametersSerializable && implementsSerializable(typeParameter);
+                            typeParametersSerializable = typeParametersSerializable && requiresSerialVersionField(typeParameter);
                         }
                         return typeParametersSerializable;
                     }

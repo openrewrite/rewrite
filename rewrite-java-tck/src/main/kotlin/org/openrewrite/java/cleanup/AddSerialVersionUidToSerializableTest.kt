@@ -16,40 +16,36 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = AddSerialVersionUidToSerializable()
-
-    override val parser: JavaParser
-        get() = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .build()
+interface AddSerialVersionUidToSerializableTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(AddSerialVersionUidToSerializable())
+    }
 
     @Test
-    fun doNothingNotSerializable() = assertUnchanged(
-        before = """
+    fun doNothingNotSerializable() = rewriteRun(
+        java("""
             public class Example {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun addSerialVersionUID() = assertChanged(
-        before = """
+    fun addSerialVersionUID() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public class Example implements Serializable {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent(),
-        after = """
+        """,
+        """
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -57,12 +53,12 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun fixSerialVersionUIDModifiers() = assertChanged(
-        before = """
+    fun fixSerialVersionUIDModifiers() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -70,8 +66,8 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent(),
-        after = """
+        """,
+        """
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -79,12 +75,12 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun fixSerialVersionUIDNoModifiers() = assertChanged(
-        before = """
+    fun fixSerialVersionUIDNoModifiers() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -92,8 +88,8 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent(),
-        after = """
+        """,
+        """
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -101,12 +97,12 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun fixSerialVersionUIDNoModifiersWrongType() = assertChanged(
-        before = """
+    fun fixSerialVersionUIDNoModifiersWrongType() = rewriteRun(
+        java("""
             import java.io.Serializable;
 
             public class Example implements Serializable {
@@ -114,8 +110,8 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent(),
-        after = """
+        """,
+        """
             import java.io.Serializable;
 
             public class Example implements Serializable {
@@ -123,12 +119,12 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun uidAlreadyPresent() = assertUnchanged(
-        before = """
+    fun uidAlreadyPresent() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -136,12 +132,12 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 private String fred;
                 private int numberOfFreds;
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun methodDeclarationsAreNotVisited() = assertChanged(
-        before = """
+    fun methodDeclarationsAreNotVisited() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -152,7 +148,7 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.io.Serializable;
                         
             public class Example implements Serializable {
@@ -163,36 +159,57 @@ interface AddSerialVersionUidToSerializableTest : JavaRecipeTest {
                     int serialVersionUID = 1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotAlterAnInterface() = assertUnchanged(
-        before = """
+    fun doNotAlterAnInterface() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public interface Example extends Serializable {
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun doNotAlterAnException() = assertUnchanged(
-        before = """
+    fun doNotAlterAnException() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public class MyException extends Exception implements Serializable {
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun doNotAlterARuntimeException() = assertUnchanged(
-        before = """
+    fun doNotAlterARuntimeException() = rewriteRun(
+        java("""
             import java.io.Serializable;
                         
             public class MyException extends RuntimeException implements Serializable {
             }
-        """.trimIndent()
+        """)
+    )
+
+    @Test
+    fun serializableInnerClass() = rewriteRun(
+        java("""
+            import java.io.Serializable;
+            public class Outer {
+                public static class Inner implements Serializable {
+                
+                }
+            }
+        """,
+        """
+            import java.io.Serializable;
+            public class Outer {
+                public static class Inner implements Serializable {
+                    private static final long serialVersionUID = 1;
+                
+                }
+            }
+        """)
     )
 }
