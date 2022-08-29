@@ -235,6 +235,10 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Lambda) {
             J.Lambda l = (J.Lambda) j;
+            if (l.getBody() instanceof Expression) {
+                before.insert(0,"return ");
+                after.append(";");
+            }
             before.insert(0, "{ if(true) {");
             after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
 
