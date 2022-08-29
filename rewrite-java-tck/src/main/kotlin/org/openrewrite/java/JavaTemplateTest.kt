@@ -636,44 +636,6 @@ interface JavaTemplateTest : JavaRecipeTest {
         """
     )
 
-    @Test
-    fun replaceLambdaBinaryExpression2(jp: JavaParser.Builder<*, *>) = assertChanged (
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
-            object : JavaVisitor<ExecutionContext>() {
-                val ENUM_EQUALS = MethodMatcher("java.lang.Enum equals(java.lang.Object)")
-                val t = JavaTemplate.builder({ cursor }, "#{any()} == #{any()}")
-                    .doBeforeParseTemplate(System.out::println)
-                    .javaParser { JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true).build() }.build()
-
-                override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
-                    if (ENUM_EQUALS.matches(method)) {
-                        return method.withTemplate(t, method.coordinates.replace(), method.select, method.arguments[0])
-                    }
-                    return super.visitMethodInvocation(method, p)
-                }
-            }
-        },
-        before = """
-            
-            class Test {
-                enum Abc {A,B,C}
-                static void method(Abc o) {
-                    boolean b = o.equals(Abc.A);
-                }
-            }
-        """,
-        after = """
-            
-            class Test {
-                enum Abc {A,B,C}
-                static void method(Abc o) {
-                    boolean b = o == Abc.A;
-                }
-            }
-        """
-    )
-
     @Suppress("ClassInitializerMayBeStatic")
     @Test
     fun replaceMethodNameAndArgumentsSimultaneously(jp: JavaParser) = assertChanged(
