@@ -122,4 +122,26 @@ interface FindEmptyMethodsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Test
+    fun interfaceMethods() = assertChanged(
+        before = """
+            interface MyInterface {
+                void doSomething();
+                default Integer doSomethingElse(Integer i) {}
+                default Integer doSomethingElseAgain(Integer i) {
+                    return i + 1;
+                }
+            }
+        """,
+        after = """
+            interface MyInterface {
+                void doSomething();
+                /*~~>*/default Integer doSomethingElse(Integer i) {}
+                default Integer doSomethingElseAgain(Integer i) {
+                    return i + 1;
+                }
+            }
+        """
+    )
 }
