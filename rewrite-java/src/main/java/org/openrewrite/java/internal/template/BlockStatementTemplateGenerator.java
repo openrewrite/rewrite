@@ -240,9 +240,11 @@ public class BlockStatementTemplateGenerator {
                 after.append(";");
             }
             before.insert(0, "{ if(true) {");
-            after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
-
-            before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
+            after.append("}");
+            if (!(l.getBody() instanceof J.Block)) {
+                after.append("\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
+                before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
+            }
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
         } else if(j instanceof J.MethodInvocation) {
