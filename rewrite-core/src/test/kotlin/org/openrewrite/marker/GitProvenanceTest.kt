@@ -62,44 +62,51 @@ class GitProvenanceTest {
 
     @Test
     fun localBranchPresent(@TempDir projectDir: Path) {
-        Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()
-        assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
-            .isEqualTo("main")
+        Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call().use {
+            assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
+                .isEqualTo("main")
+        }
     }
 
     @Test
     fun detachedHead(@TempDir projectDir: Path) {
-        val git = initGitWithOneCommit(projectDir)
-        git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
-        assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
-            .isEqualTo("main")
+        initGitWithOneCommit(projectDir).use { git ->
+            git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
+            assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
+                .isEqualTo("main")
+        }
     }
 
     @Test
     fun detachedHeadJenkinsLocalBranch(@TempDir projectDir: Path) {
-        val git = initGitWithOneCommit(projectDir)
-        git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
-        assertThat(
-            GitProvenance.fromProjectDirectory(
-                projectDir,
-                JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
-                    "https://jenkins", "job", "main", "origin/main")
-            )!!.branch
-        ).isEqualTo("main")
+        initGitWithOneCommit(projectDir).use { git ->
+            git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
+            assertThat(
+                GitProvenance.fromProjectDirectory(
+                    projectDir,
+                    JenkinsBuildEnvironment(
+                        randomId(), "1", "1", "https://jenkins/job/1",
+                        "https://jenkins", "job", "main", "origin/main"
+                    )
+                )!!.branch
+            ).isEqualTo("main")
+        }
     }
 
     @Test
     fun detachedHeadJenkinsNoLocalBranch(@TempDir projectDir: Path) {
-        val git = initGitWithOneCommit(projectDir)
-        git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
+        initGitWithOneCommit(projectDir).use { git ->
+            git.checkout().setName(git.repository.resolve(Constants.HEAD).name).call()
 
-        assertThat(
-            GitProvenance.fromProjectDirectory(
-                projectDir,
-                JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
-                    "https://jenkins", "job", null, "origin/main")
-            )!!.branch
-        ).isEqualTo("main")
+            assertThat(
+                GitProvenance.fromProjectDirectory(
+                    projectDir,
+                    JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
+                        "https://jenkins", "job", null, "origin/main")
+                )!!.branch
+            ).isEqualTo("main")
+        }
+
     }
 
     private fun initGitWithOneCommit(projectDir: Path): Git {
@@ -120,22 +127,23 @@ class GitProvenanceTest {
 
     @Test
     fun detachedHeadBehindBranchHead(@TempDir projectDir: Path) {
-        val git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()
-        projectDir.resolve("test.txt").writeText("hi")
-        git.add().addFilepattern("*").call()
-        git.commit().setMessage("init").setSign(false).call()
-        val commit1 = git.repository.resolve(Constants.HEAD).name
+        Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call().use { git ->
+            projectDir.resolve("test.txt").writeText("hi")
+            git.add().addFilepattern("*").call()
+            git.commit().setMessage("init").setSign(false).call()
+            val commit1 = git.repository.resolve(Constants.HEAD).name
 
-        projectDir.resolve("test.txt").writeText("hi")
-        git.add().addFilepattern("*").call()
-        git.commit().setMessage("init").setSign(false).call()
+            projectDir.resolve("test.txt").writeText("hi")
+            git.add().addFilepattern("*").call()
+            git.commit().setMessage("init").setSign(false).call()
 
-        assertThat(git.repository.resolve(Constants.HEAD).name).isNotEqualTo(commit1)
+            assertThat(git.repository.resolve(Constants.HEAD).name).isNotEqualTo(commit1)
 
-        git.checkout().setName(commit1).call()
+            git.checkout().setName(commit1).call()
 
-        assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
-            .isEqualTo("main")
+            assertThat(GitProvenance.fromProjectDirectory(projectDir, null)!!.branch)
+                .isEqualTo("main")
+        }
     }
 
     @Test
@@ -147,28 +155,29 @@ class GitProvenanceTest {
 
         // push an initial commit to the remote
         val cloneDir = projectDir.resolve("clone1")
-        var git = Git.cloneRepository().setURI(remoteRepo.directory.absolutePath).setDirectory(cloneDir.toFile()).call()
-        projectDir.resolve("test.txt").writeText("hi")
-        git.add().addFilepattern("*").call()
-        git.commit().setMessage("init").setSign(false).call()
+        Git.cloneRepository().setURI(remoteRepo.directory.absolutePath).setDirectory(cloneDir.toFile()).call().use { git ->
+            projectDir.resolve("test.txt").writeText("hi")
+            git.add().addFilepattern("*").call()
+            git.commit().setMessage("init").setSign(false).call()
 
-        try {
-            "git push -u origin main".runCommand(cloneDir)
-            val commit = git.repository.resolve(Constants.HEAD).name
+            try {
+                "git push -u origin main".runCommand(cloneDir)
+                val commit = git.repository.resolve(Constants.HEAD).name
 
-            // shallow clone the remote to another directory
-            "git clone file:///${remoteRepo.directory.absolutePath} shallowClone --depth 1 --branch main".runCommand(
-                projectDir
-            )
-            git = Git.open(projectDir.resolve("shallowClone").toFile())
+                // shallow clone the remote to another directory
+                "git clone file:///${remoteRepo.directory.absolutePath} shallowClone --depth 1 --branch main".runCommand(
+                    projectDir
+                )
+                val git2 = Git.open(projectDir.resolve("shallowClone").toFile())
 
-            // creates detached head
-            git.checkout().setName(commit).call()
+                // creates detached head
+                git2.checkout().setName(commit).call()
 
-            assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null)!!.branch)
-                .isEqualTo(null)
-        } catch (ignored: Throwable) {
-            // can't run git command line
+                assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null)!!.branch)
+                    .isEqualTo(null)
+            } catch (ignored: Throwable) {
+                // can't run git command line
+            }
         }
     }
 
@@ -190,10 +199,11 @@ class GitProvenanceTest {
 
         //Now create new workspace directory, git init and then fetch from remote.
         val workspaceDir = projectDir.resolve("workspace")
-        val git = Git.init().setDirectory(workspaceDir.toFile()).call()
-        git.remoteAdd().setName("origin").setUri(URIish(remoteRepo.directory.absolutePath)).call()
-        git.fetch().setRemote("origin").setForceUpdate(true).setTagOpt(TagOpt.FETCH_TAGS).setRefSpecs("+refs/heads/*:refs/remotes/origin/*").call()
-        git.checkout().setName(commit.name).call()
+        Git.init().setDirectory(workspaceDir.toFile()).call().use { git ->
+            git.remoteAdd().setName("origin").setUri(URIish(remoteRepo.directory.absolutePath)).call()
+            git.fetch().setRemote("origin").setForceUpdate(true).setTagOpt(TagOpt.FETCH_TAGS).setRefSpecs("+refs/heads/*:refs/remotes/origin/*").call()
+            git.checkout().setName(commit.name).call()
+        }
 
         try {
             assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null)!!.branch)
