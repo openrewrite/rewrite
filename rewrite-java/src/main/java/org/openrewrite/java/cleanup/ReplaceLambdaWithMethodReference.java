@@ -143,25 +143,23 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
             private boolean methodArgumentsMatchLambdaParameters(J.MethodInvocation method, J.Lambda lambda) {
                 List<Expression> methodArgs = method.getArguments();
                 List<J> lambdaParameters = lambda.getParameters().getParameters();
-                if (methodArgs.size() != lambdaParameters.size()) {
+                if (methodArgs.size() != lambdaParameters.size() || method.getMethodType() == null) {
                     return false;
                 }
-                for (int i = 0; i < lambdaParameters.size(); i++) {
-                    JavaType methodParamType = methodArgs.get(i).getType();
-                    if (!(lambdaParameters.get(i) instanceof TypedTree)) {
-                        return false;
+                if(method.getMethodType().getParameterTypes().size() > 0) {
+                    for (int i = 0; i < lambdaParameters.size(); i++) {
+                        if (!(lambdaParameters.get(i) instanceof J.VariableDeclarations) || !(methodArgs.get(i) instanceof J.Identifier)) {
+                            return false;
+                        }
+                        J.Identifier lambdaParam = ((J.VariableDeclarations) lambdaParameters.get(i)).getVariables().get(0).getName();
+                        J.Identifier methodArgument = (J.Identifier) methodArgs.get(i);
+                        if (!lambdaParam.getSimpleName().equals(methodArgument.getSimpleName())) {
+                            return false;
+                        }
                     }
-                    TypedTree lambdaParam = (TypedTree) lambdaParameters.get(i);
-                    if (lambdaParam instanceof J.VariableDeclarations) {
-                        lambdaParam = ((J.VariableDeclarations) lambdaParam).getVariables().get(0);
-                    }
-
-                    if (methodArgs.size() < i + 1 || !Objects.equals(methodParamType, lambdaParam.getType())) {
-                        return false;
-                    }
+                    return true;
                 }
-
-                return true;
+                return methodArgs.get(0) instanceof J.Empty && lambdaParameters.get(0) instanceof J.Empty;
             }
 
             private boolean isNullCheck(J j1, J j2) {

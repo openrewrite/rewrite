@@ -13,23 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("RedundantOperationOnEmptyContainer", "ResultOfMethodCallIgnored", "MainFunctionReturnUnit",
+    "RedundantCast", "DuplicatedCode"
+)
+
 package org.openrewrite.java.cleanup
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = ReplaceLambdaWithMethodReference()
+interface ReplaceLambdaWithMethodReferenceTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(ReplaceLambdaWithMethodReference())
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1926")
     @Test
-    fun multipleMethodInvocations() = assertUnchanged(
-        before = """
+    fun multipleMethodInvocations() = rewriteRun(
+        java("""
             import java.nio.file.Path;
             import java.nio.file.Paths;
             import java.util.List;import java.util.stream.Collectors;
@@ -42,12 +49,12 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                         .collect(Collectors.toList());
                 }
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun containsMultipleStatements() = assertUnchanged(
-        before = """
+    fun containsMultipleStatements() = rewriteRun(
+        java("""
             import java.util.List;
             import java.util.stream.Collectors;
 
@@ -59,14 +66,14 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                     }).collect(Collectors.toList());
                 }
             }
-        """
+        """)
     )
 
     @Suppress("RedundantCast")
     @Issue("https://github.com/openrewrite/rewrite/issues/1772")
     @Test
-    fun typeCastOnMethodInvocationReturnType() = assertUnchanged(
-        before = """
+    fun typeCastOnMethodInvocationReturnType() = rewriteRun(
+        java("""
             import java.util.List;
             import java.util.stream.Collectors;
             import java.util.stream.Stream;
@@ -78,19 +85,17 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                             .collect(Collectors.toList());
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun instanceOf() = assertChanged(
-        dependsOn = arrayOf(
-            """
+    fun instanceOf() = rewriteRun(
+        java("""
             package org.test;
             public class CheckType {
             }
-        """
-        ),
-        before = """
+        """),
+        java("""
             import java.util.List;
             import java.util.stream.Collectors;
 
@@ -102,7 +107,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
             import java.util.stream.Collectors;
 
@@ -113,35 +118,32 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                     return input.stream().filter(CheckType.class::isInstance).collect(Collectors.toList());
                 }
             }
-        """,
-        afterConditions = { cu ->
-            val value = (((((((cu.classes[0].body.statements[0] as J.MethodDeclaration)
-                .body!!.statements[0] as J.Return)
-                .expression as J.MethodInvocation)
-                .select as J.MethodInvocation)
-                .arguments[0] as J.MemberReference)
-                .containing as J.FieldAccess)
-                .target as J.Identifier).type!!.toString()
-            assertThat(value).isEqualTo("org.test.CheckType")
-        }
+        """) { spec ->
+            spec.afterRecipe { cu ->
+                val value = (((((((cu.classes[0].body.statements[0] as J.MethodDeclaration)
+                    .body!!.statements[0] as J.Return)
+                    .expression as J.MethodInvocation)
+                    .select as J.MethodInvocation)
+                    .arguments[0] as J.MemberReference)
+                    .containing as J.FieldAccess)
+                    .target as J.Identifier).type!!.toString()
+                assertThat(value).isEqualTo("org.test.CheckType")
+        }}
     )
 
-    @Suppress("Convert2MethodRef")
     @Test
-    fun functionMultiParamReference() = assertChanged(
-        dependsOn = arrayOf(
-            """
-                public interface ObservableValue<T> {
-                }
-            """,
-            """
-                @FunctionalInterface
-                public interface ChangeListener<T> {
-                    void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
-                }
-            """.trimIndent()
-        ),
-        before = """
+    fun functionMultiParamReference() = rewriteRun(
+        java("""
+            public interface ObservableValue<T> {
+            }
+        """),
+        java("""
+            @FunctionalInterface
+            public interface ChangeListener<T> {
+                void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
+            }
+        """),
+        java("""
             import java.util.function.Function;
             class Test {
             
@@ -155,7 +157,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+            """
             import java.util.function.Function;
             class Test {
             
@@ -166,13 +168,14 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                     System.out.println(strVal);
                 }
             }
-        """
+        """)
     )
+
 
     @Suppress("Convert2MethodRef")
     @Test
-    fun nonStaticMethods() = assertChanged(
-        before = """
+    fun nonStaticMethods() = rewriteRun(
+        java("""
             import java.util.Collections;
             class Test {
                 Runnable r = () -> run();
@@ -186,7 +189,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 Runnable r = () -> t.run();
             }
         """,
-        after = """
+        """
             import java.util.Collections;
             class Test {
                 Runnable r = this::run;
@@ -199,13 +202,13 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 Test t = new Test();
                 Runnable r = t::run;
             }
-        """
+        """)
     )
 
     @Suppress("Convert2MethodRef")
     @Test
-    fun staticMethods() = assertChanged(
-        before = """
+    fun staticMethods() = rewriteRun(
+        java("""
             import java.util.Collections;
             class Test {
                 Runnable r = () -> run();
@@ -218,7 +221,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 Runnable r = () -> Test.run();
             }
         """,
-        after = """
+        """
             import java.util.Collections;
             class Test {
                 Runnable r = Test::run;
@@ -230,66 +233,63 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
             class Test2 {
                 Runnable r = Test::run;
             }
-        """
+        """)
     )
 
     @Suppress("Convert2MethodRef")
     @Test
-    fun systemOutPrint() = assertChanged(
-        before = """
+    fun systemOutPrint() = rewriteRun(
+        java("""
             import java.util.List;
 
             class Test {
                 void method(List<Integer> input) {
-                    return input.forEach(x -> System.out.println(x));
+                    input.forEach(x -> System.out.println(x));
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
 
             class Test {
                 void method(List<Integer> input) {
-                    return input.forEach(System.out::println);
+                    input.forEach(System.out::println);
                 }
             }
-        """
+        """)
     )
 
     @Suppress("Convert2MethodRef", "CodeBlock2Expr")
     @Test
-    fun systemOutPrintInBlock() = assertChanged(
-        before = """
+    fun systemOutPrintInBlock() = rewriteRun(
+        java("""
             import java.util.List;
 
             class Test {
                 void method(List<Integer> input) {
-                    return input.forEach(x -> { System.out.println(x); });
+                    input.forEach(x -> { System.out.println(x); });
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
 
             class Test {
                 void method(List<Integer> input) {
-                    return input.forEach(System.out::println);
+                    input.forEach(System.out::println);
                 }
             }
-        """
+        """)
     )
 
-    @Suppress("RedundantCast")
     @Test
-    fun castType() = assertChanged(
-        dependsOn = arrayOf(
-            """
+    fun castType() = rewriteRun(
+        java("""
             package org.test;
             public class CheckType {
             }
-        """
-        ),
-        before = """
+        """),
+        java("""
             import java.util.List;
             import java.util.stream.Collectors;
 
@@ -304,7 +304,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+            """
             import java.util.List;
             import java.util.stream.Collectors;
 
@@ -318,23 +318,25 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                         .collect(Collectors.toList());
                 }
             }
-        """,
-        afterConditions = { cu ->
-            val value = (((((((cu.classes[0].body.statements[0] as J.MethodDeclaration)
-                .body!!.statements[0] as J.Return)
-                .expression as J.MethodInvocation)
-                .select as J.MethodInvocation)
-                .arguments[0] as J.MemberReference)
-                .containing as J.FieldAccess)
-                .target as J.Identifier).type!!.toString()
-            assertThat(value).isEqualTo("org.test.CheckType")
+        """) { spec ->
+            spec.afterRecipe { cu ->
+                val value = (((((((cu.classes[0].body.statements[0] as J.MethodDeclaration)
+                    .body!!.statements[0] as J.Return)
+                    .expression as J.MethodInvocation)
+                    .select as J.MethodInvocation)
+                    .arguments[0] as J.MemberReference)
+                    .containing as J.FieldAccess)
+                    .target as J.Identifier).type!!.toString()
+                assertThat(value).isEqualTo("org.test.CheckType")
+            }
         }
     )
 
+
     @Suppress("Convert2MethodRef")
     @Test
-    fun notEqualToNull() = assertChanged(
-        before = """
+    fun notEqualToNull() = rewriteRun(
+        java("""
             import java.util.List;
             import java.util.stream.Collectors;
 
@@ -346,7 +348,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
             import java.util.Objects;
             import java.util.stream.Collectors;
@@ -358,13 +360,13 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                         .collect(Collectors.toList());
                 }
             }
-        """
+        """)
     )
 
     @Suppress("Convert2MethodRef")
     @Test
-    fun isEqualToNull() = assertChanged(
-        before = """
+    fun isEqualToNull() = rewriteRun(
+        java("""
             import java.util.List;
             import java.util.stream.Collectors;
 
@@ -375,7 +377,7 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
             import java.util.Objects;
             import java.util.stream.Collectors;
@@ -386,67 +388,63 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                         .anyMatch(Objects::isNull);
                 }
             }
+        """)
+    )
+
+    @Suppress("Convert2MethodRef", "CodeBlock2Expr")
+    @Test
+    fun voidMethodReference() = rewriteRun(
+        java("""
+            class Test {
+                Runnable r = () -> {
+                    this.execute();
+                };
+
+                void execute() {}
+            }
+        """,
         """
+            class Test {
+                Runnable r = this::execute;
+
+                void execute() {}
+            }
+        """)
     )
 
     @Suppress("Convert2MethodRef", "CodeBlock2Expr")
     @Test
-    fun voidMethodReference() = assertChanged(
-        before =
-            """
-                class Test {
-                    Runnable r = () -> {
-                        this.execute();
-                    };
+    fun functionReference() = rewriteRun(
+        java("""
+            import java.util.function.Function;
 
-                    void execute() {}
+            class Test {
+                Function<Integer, String> f = (i) -> {
+                    return this.execute(i);
+                };
+                
+                String execute(Integer i) {
+                    return i.toString();
                 }
-            """,
-        after =
-            """
-                class Test {
-                    Runnable r = this::execute;
+            }
+        """,
+        """
+            import java.util.function.Function;
 
-                    void execute() {}
+            class Test {
+                Function<Integer, String> f = this::execute;
+                
+                String execute(Integer i) {
+                    return i.toString();
                 }
-            """
-    )
-
-    @Suppress("Convert2MethodRef", "CodeBlock2Expr")
-    @Test
-    fun functionReference() = assertChanged(
-        before =
-            """
-                import java.util.function.Function;
-
-                class Test {
-                    Function<Integer, String> f = (i) -> {
-                        return this.execute(i);
-                    };
-                    
-                    String execute(Integer i) {
-                        return i.toString();
-                    }
-                }
-            """,
-        after =
-            """
-                import java.util.function.Function;
-
-                class Test {
-                    Function<Integer, String> f = this::execute;
-                    
-                    String execute(Integer i) {
-                        return i.toString();
-                    }
-                }
-            """
+            }
+        """)
     )
 
     @Suppress("CodeBlock2Expr")
     @Test
-    fun returnExpressionIsNotAMethodInvocation() = assertUnchanged(
-        before = """
+    fun returnExpressionIsNotAMethodInvocation() = rewriteRun(
+        java("""
             class T {
                 public void killBatchJob() {
                     return deleteSparkBatchRequest()
@@ -456,19 +454,19 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                             .defaultIfEmpty(this);
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun labmdaReturnsFunctionalInterface() = assertUnchanged(
-        dependsOn = arrayOf("""
+    fun lambdaReturnsFunctionalInterface() = rewriteRun(
+        java("""
             package abc;
             @FunctionalInterface
             public interface MyFunction {
                 String get();
             }
         """),
-        before = """
+        java("""
             package abc;
             
             class M {
@@ -476,6 +474,21 @@ interface ReplaceLambdaWithMethodReferenceTest : JavaRecipeTest {
                     return () -> fcn;
                 }
             }
-        """
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2178")
+    @Test
+    fun doNotReplaceInvocationWhichAcceptsArgument() = rewriteRun(
+        java("""
+            import java.util.*;
+
+            class A {
+                void foo() {
+                    new ArrayList<List<Integer>>().stream()
+                            .map(it -> it.addAll(Arrays.asList(1, 2, 3)));
+                }
+            }
+        """)
     )
 }
