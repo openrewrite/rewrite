@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import org.openrewrite.config.Environment
 import org.openrewrite.scheduling.DirectScheduler
+import org.openrewrite.test.AdHocRecipe
 import java.io.File
 import java.nio.file.Path
 import java.util.*
@@ -191,11 +192,6 @@ interface RecipeTest<T : SourceFile> {
 
     fun toRecipe(supplier: () -> TreeVisitor<*, ExecutionContext>): Recipe {
         return AdHocRecipe(supplier)
-    }
-
-    class AdHocRecipe(private val visitor: () -> TreeVisitor<*, ExecutionContext>) : Recipe() {
-        override fun getDisplayName(): String = "Ad hoc recipe"
-        override fun getVisitor(): TreeVisitor<*, ExecutionContext> = visitor()
     }
 
     private class RecipeSchedulerCheckingExpectedCycles(

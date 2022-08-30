@@ -15,16 +15,18 @@
  */
 package org.openrewrite.test;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
 import java.util.function.Supplier;
 
-@RequiredArgsConstructor
-class AdHocRecipe extends Recipe {
+public class AdHocRecipe extends Recipe {
     private final Supplier<TreeVisitor<?, ExecutionContext>> treeVisitorSupplier;
+
+    public AdHocRecipe(Supplier<TreeVisitor<?, ExecutionContext>> treeVisitorSupplier) {
+        this.treeVisitorSupplier = treeVisitorSupplier;
+    }
 
     @Override
     public String getDisplayName() {

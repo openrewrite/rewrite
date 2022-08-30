@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("DuplicatedCode")
+@file:Suppress("DuplicatedCode", "ConstantConditions")
 
 package org.openrewrite.java
 
@@ -22,13 +22,15 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.Space
+import org.openrewrite.test.RewriteTest
 import java.util.Comparator.comparing
 
 @Suppress("Convert2MethodRef", "UnnecessaryBoxing")
-interface JavaTemplateTest : JavaRecipeTest {
+interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1339")
     @Test
@@ -259,7 +261,7 @@ interface JavaTemplateTest : JavaRecipeTest {
                 val t = JavaTemplate.builder({ cursor }, "new A()").build()
 
                 override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J =
-                    when (newClass.arguments!![0]) {
+                    when (newClass.arguments[0]) {
                         is J.Empty -> newClass
                         else -> newClass.withTemplate(t, newClass.coordinates.replace())
                     }
@@ -620,7 +622,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             class Test {
                 enum Abc {A,B,C}
                 static void method(Stream<Abc> obj) {
-                    obj.filter(o -> o.equals(Abc.A));
+                    Object a = obj.filter(o -> o.equals(Abc.A));
                 }
             }
         """,
@@ -630,7 +632,7 @@ interface JavaTemplateTest : JavaRecipeTest {
             class Test {
                 enum Abc {A,B,C}
                 static void method(Stream<Abc> obj) {
-                    obj.filter(o -> o == Abc.A);
+                    Object a = obj.filter(o -> o == Abc.A);
                 }
             }
         """
@@ -2178,5 +2180,44 @@ interface JavaTemplateTest : JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2090")
+    @Test
+    fun assignmentWithinIfPredicate() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J.Assignment {
+                        if((assignment.assignment is J.Literal) && "1" == (assignment.assignment as J.Literal).valueSource) {
+                            return assignment.withTemplate(
+                                JavaTemplate.builder(this::getCursor, "value = 0")
+                                    .doBeforeParseTemplate {
+                                        println(it)
+                                    }.build(),
+                                assignment.coordinates.replace()
+                            )
+                        }
+                        return assignment
+                    }
+                }
+            })
+        },
+        java("""
+            class A {
+                void foo() {
+                    double value = 0;
+                    if ((value = 1) == 0) {}
+                }
+            }
+        """,
+        """
+            class A {
+                void foo() {
+                    double value = 0;
+                    if ((value = 0) == 0) {}
+                }
+            }
+        """)
     )
 }

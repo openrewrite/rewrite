@@ -271,7 +271,7 @@ public class BlockStatementTemplateGenerator {
         } else if(j instanceof J.If) {
             J.If iff = (J.If)j;
             if(referToSameElement(prior, iff.getIfCondition())) {
-                before.insert(0, "boolean __b" + cursor.getPathAsStream().count() + "__ =");
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
             }
         } else if(j instanceof J.Assignment) {
