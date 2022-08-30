@@ -113,8 +113,7 @@ interface GuardTest : RewriteTest {
 
     @Test
     fun `identifies guards with methods with parameters`() = rewriteRun(
-            java(
-                    """
+        java("""
             abstract class Test {
 
                 void test(boolean x, Boolean y) {
@@ -127,8 +126,9 @@ interface GuardTest : RewriteTest {
                 }
             }
             """,
-                    """
+        """
             abstract class Test {
+
                 void test(/*~~>*/boolean /*~~>*/x, /*~~>*/Boolean /*~~>*/y) {
                     if (/*~~>*/x) {
                         // ...
@@ -138,8 +138,7 @@ interface GuardTest : RewriteTest {
                     }
                 }
             }
-            """
-            )
+            """)
     )
 
 

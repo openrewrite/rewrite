@@ -17,11 +17,7 @@ package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.internal.StringUtils.*
-import java.net.URI
-import java.nio.file.spi.FileSystemProvider
 
 class StringUtilsTest {
     @Test
@@ -283,5 +279,10 @@ class StringUtilsTest {
         assertThat(greatestCommonSubstringLength("", "")).isEqualTo(0)
         assertThat(greatestCommonSubstringLength("abc", "def")).isEqualTo(0)
         assertThat(greatestCommonSubstringLength("abc1", "1")).isEqualTo(1)
+    }
+
+    @Test
+    fun allowConsecutiveLineBreaks() {
+        assertThat(trimIndentPreserveCRLF("    \n    \n    a")).isEqualTo("\n\na")
     }
 }

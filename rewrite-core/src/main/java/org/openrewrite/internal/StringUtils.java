@@ -109,18 +109,15 @@ public class StringUtils {
 
         StringBuilder trimmed = new StringBuilder();
         for (int i = 0; i < charArray.length; i++) {
-            boolean nonWhitespaceEncountered = false;
             int j = i;
             for (; j < charArray.length; j++) {
                 char c = charArray[j];
-                if (j - i >= indentLevel || (nonWhitespaceEncountered |= !Character.isWhitespace(c))) {
-                    trimmed.append(c);
-                }
                 if (c == '\r' || c == '\n') {
-                    if (!nonWhitespaceEncountered && j - 1 < indentLevel) {
-                        trimmed.append(c);
-                    }
+                    trimmed.append(c);
                     break;
+                }
+                if (j - i >= indentLevel) {
+                    trimmed.append(c);
                 }
             }
             i = j;

@@ -962,6 +962,7 @@ interface ControlFlowTest : RewriteTest {
             """,
             """
             import java.util.LinkedList;
+
             class Test {
                 public void test () /*~~(BB: 6 CN: 3 EX: 1 | 1L)~~>*/{
                     LinkedList<Integer> l1 = new LinkedList<>();
@@ -1083,6 +1084,7 @@ interface ControlFlowTest : RewriteTest {
             """, """
             abstract class Test {
                 abstract boolean guard();
+
                 void test() /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     String n = "42";
                     int[] b = new int[1];
@@ -1240,6 +1242,7 @@ interface ControlFlowTest : RewriteTest {
                         try (InputStream source = source()) {
                             return source.read();
                         } catch (RuntimeException ignored) {
+
                         }
                         return 0;
                     }
@@ -1443,6 +1446,7 @@ interface ControlFlowTest : RewriteTest {
             """
             import java.lang.StringBuffer;
             import java.nio.ByteBuffer;
+
             class Test {
                 /**
                  * Decodes the specified URL as per RFC 3986, i.e. transforms
@@ -1490,6 +1494,7 @@ interface ControlFlowTest : RewriteTest {
                     }
                     return /*~~(12L)~~>*/decoded;
                 }
+
                 private static String utf8Decode(ByteBuffer buff) /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                     return null;
                 }
@@ -1645,6 +1650,7 @@ interface ControlFlowTest : RewriteTest {
             import java.util.Enumeration;
             import java.util.zip.ZipEntry;
             import java.util.zip.ZipFile;
+
             class Test {
                 void test(File destination, ZipEntry e, ZipFile zip) /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
                     File f = new File(destination, e.getName());
@@ -1657,6 +1663,7 @@ interface ControlFlowTest : RewriteTest {
                     );
                 }
             }
+
             class IOUtils {
                 static void copy(Object input, Object output) /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                     //.. nop
@@ -1754,6 +1761,7 @@ interface ControlFlowTest : RewriteTest {
             """,
             """
             import java.util.LinkedList;
+
             class Test {
                 public void test () /*~~(BB: 7 CN: 4 EX: 1 | 1L)~~>*/{
                     LinkedList<Integer> l2 = new LinkedList<>();
@@ -1849,6 +1857,7 @@ interface ControlFlowTest : RewriteTest {
                 abstract boolean condition();
                 abstract boolean otherCondition();
                 abstract boolean thirdCondition();
+
                 void test() /*~~(BB: 4 CN: 3 EX: 1 | 1L)~~>*/{
                     while (/*~~(1C)~~>*/condition() && /*~~(2L | 2C)~~>*/otherCondition() && /*~~(3L | 3C)~~>*/thirdCondition())/*~~(4L)~~>*/;
                 }
@@ -1927,6 +1936,7 @@ interface ControlFlowTest : RewriteTest {
             import java.util.jar.JarEntry;
             import java.util.jar.JarInputStream;
             import java.util.jar.Manifest;
+
             class Test {
                 private String getCommit(final URL jarURL) /*~~(BB: 8 CN: 4 EX: 2 | 1L)~~>*/{
                     try {
@@ -1996,19 +2006,23 @@ interface ControlFlowTest : RewriteTest {
             """
             abstract class Test {
                 abstract boolean conditional();
+
                 void testDeclareAClass() {
                     if (conditional()) {
                         class A implements ExampleInterface {
+
                             @Override
                             public int doSomething() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                                 System.out.println("Hello");
                                 return 1;
                             }
+
                             @Override
                             public int doSomethingElse() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                                 System.out.println("Hello");
                                 return 2;
                             }
+
                             @Override
                             public int doAThirdThing() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
                                 System.out.println("I don't know why you say goodbye, I say Hello!");
@@ -2018,6 +2032,7 @@ interface ControlFlowTest : RewriteTest {
                         new A().doAThirdThing();
                     }
                 }
+
                 interface ExampleInterface {
                     int doSomething();
                     int doSomethingElse();
