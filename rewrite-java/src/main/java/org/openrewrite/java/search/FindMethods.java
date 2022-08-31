@@ -89,7 +89,7 @@ public class FindMethods extends Recipe {
                     if (!flowEnabled) {
                         m = m.withMarkers(m.getMarkers().searchResult());
                     } else {
-                        doAfterVisit(new FindLocalFlowPaths(getFlowSpec(method)));
+                        doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(method)));
                     }
                 }
                 return m;
@@ -102,7 +102,7 @@ public class FindMethods extends Recipe {
                     if (!flowEnabled) {
                         m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
                     } else {
-                        doAfterVisit(new FindLocalFlowPaths(getFlowSpec(memberRef)));
+                        doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(memberRef)));
                     }
                 }
                 return m;
@@ -115,7 +115,7 @@ public class FindMethods extends Recipe {
                     if (!flowEnabled) {
                         n = n.withMarkers(n.getMarkers().searchResult());
                     } else {
-                        doAfterVisit(new FindLocalFlowPaths(getFlowSpec(newClass)));
+                        doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(newClass)));
                     }
                 }
                 return n;

@@ -30,14 +30,14 @@ import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.24.0")
 @RequiredArgsConstructor
-public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
+public class FindLocalFlowPaths<P> extends JavaIsoVisitor<P> {
     private static final String FLOW_GRAPHS = "flowGraphs";
     private final LocalFlowSpec<?, ?> spec;
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         getCursor().putMessage(FLOW_GRAPHS, new ArrayList<>());
-        JavaSourceFile c = super.visitJavaSourceFile(cu, ctx);
+        JavaSourceFile c = super.visitJavaSourceFile(cu, p);
 
         Set<Expression> flowSteps = Collections.newSetFromMap(new IdentityHashMap<>());
         List<SinkFlow<?, ?>> sinkFlows = getCursor().getMessage(FLOW_GRAPHS);
@@ -50,9 +50,9 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
         }
 
         if (!flowSteps.isEmpty()) {
-            doAfterVisit(new JavaIsoVisitor<ExecutionContext>() {
+            doAfterVisit(new JavaIsoVisitor<P>() {
                 @Override
-                public Expression visitExpression(Expression expression, ExecutionContext ctx) {
+                public Expression visitExpression(Expression expression, P p) {
                     return flowSteps.contains(expression) ?
                             expression.withMarkers(expression.getMarkers().searchResult()) :
                             expression;
@@ -63,7 +63,7 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public Expression visitExpression(Expression expression, ExecutionContext ctx) {
+    public Expression visitExpression(Expression expression, P p) {
         Dataflow.startingAt(getCursor()).findSinks(spec).ifPresent(flow -> {
             if (flow.isNotEmpty()) {
                 List<SinkFlow<?, ?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
@@ -72,5 +72,14 @@ public class FindLocalFlowPaths extends JavaIsoVisitor<ExecutionContext> {
             }
         });
         return expression;
+    }
+
+    public static boolean anyMatch(Cursor cursor, LocalFlowSpec<?, ?> spec) {
+        JavaSourceFile enclosing = cursor.firstEnclosingOrThrow(JavaSourceFile.class);
+        return new FindLocalFlowPaths<Integer>(spec).visit(enclosing, 0) != enclosing;
+    }
+
+    public static boolean noneMatch(Cursor cursor, LocalFlowSpec<?, ?> spec) {
+        return !anyMatch(cursor, spec);
     }
 }
