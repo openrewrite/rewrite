@@ -153,77 +153,89 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        if (to instanceof JavaType.Unknown || from instanceof JavaType.Unknown) {
-            return false;
-        }
-        if (to == from) {
-            return true;
-        } else if (to instanceof JavaType.FullyQualified) {
-            JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
-            return isAssignableTo(toFq.getFullyQualifiedName(), from);
-        } else if (to instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
-            for (JavaType bound : genericTo.getBounds()) {
-                if (isAssignableTo(bound, from)) {
-                    return true;
+        try {
+            if (to instanceof JavaType.Unknown || from instanceof JavaType.Unknown) {
+                return false;
+            }
+            if (to == from) {
+                return true;
+            } else if (to instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
+                return isAssignableTo(toFq.getFullyQualifiedName(), from);
+            } else if (to instanceof JavaType.GenericTypeVariable) {
+                JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
+                for (JavaType bound : genericTo.getBounds()) {
+                    if (isAssignableTo(bound, from)) {
+                        return true;
+                    }
                 }
+            } else if (to instanceof JavaType.Variable) {
+                return isAssignableTo(((JavaType.Variable) to).getType(), from);
+            } else if (to instanceof JavaType.Method) {
+                return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
+            } else if (to instanceof JavaType.Primitive) {
+                if (from instanceof JavaType.FullyQualified) {
+                    // Account for auto-unboxing
+                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(((JavaType.Primitive) to).getClassName());
+                    return isAssignableTo(boxed, from);
+                }
+            } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
+                return isAssignableTo(((JavaType.Array) to).getElemType(), ((JavaType.Array) from).getElemType());
             }
-        } else if (to instanceof JavaType.Variable) {
-            return isAssignableTo(((JavaType.Variable) to).getType(), from);
-        } else if (to instanceof JavaType.Method) {
-            return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
-        } else if (to instanceof JavaType.Primitive) {
-            if (from instanceof JavaType.FullyQualified) {
-                // Account for auto-unboxing
-                JavaType.FullyQualified boxed = JavaType.ShallowClass.build(((JavaType.Primitive) to).getClassName());
-                return isAssignableTo(boxed, from);
-            }
-        } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
-            return isAssignableTo(((JavaType.Array) to).getElemType(), ((JavaType.Array) from).getElemType());
+        } catch (Exception e) {
+            return false;
         }
         return false;
     }
 
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
-        if (from instanceof JavaType.FullyQualified) {
-            JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
+        try {
+            if (from instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-            return to.equals(classFrom.getFullyQualifiedName()) ||
-                    isAssignableTo(to, classFrom.getSupertype()) ||
-                    classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
-        } else if (from instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
-            for (JavaType bound : genericFrom.getBounds()) {
-                if (isAssignableTo(to, bound)) {
-                    return true;
+                return to.equals(classFrom.getFullyQualifiedName()) ||
+                        isAssignableTo(to, classFrom.getSupertype()) ||
+                        classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+            } else if (from instanceof JavaType.GenericTypeVariable) {
+                JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
+                for (JavaType bound : genericFrom.getBounds()) {
+                    if (isAssignableTo(to, bound)) {
+                        return true;
+                    }
                 }
+            } else if (from instanceof JavaType.Variable) {
+                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+            } else if (from instanceof JavaType.Method) {
+                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
             }
-        } else if (from instanceof JavaType.Variable) {
-            return isAssignableTo(to, ((JavaType.Variable) from).getType());
-        } else if (from instanceof JavaType.Method) {
-            return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+        } catch (Exception e) {
+            return false;
         }
         return false;
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
-        if (from instanceof JavaType.FullyQualified) {
-            JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
+        try {
+            if (from instanceof JavaType.FullyQualified) {
+                JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-            return to.matcher(classFrom.getFullyQualifiedName()).matches() ||
-                    isAssignableTo(to, classFrom.getSupertype()) ||
-                    classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
-        } else if (from instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
-            for (JavaType bound : genericFrom.getBounds()) {
-                if (isAssignableTo(to, bound)) {
-                    return true;
+                return to.matcher(classFrom.getFullyQualifiedName()).matches() ||
+                        isAssignableTo(to, classFrom.getSupertype()) ||
+                        classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+            } else if (from instanceof JavaType.GenericTypeVariable) {
+                JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
+                for (JavaType bound : genericFrom.getBounds()) {
+                    if (isAssignableTo(to, bound)) {
+                        return true;
+                    }
                 }
+            } else if (from instanceof JavaType.Variable) {
+                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+            } else if (from instanceof JavaType.Method) {
+                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
             }
-        } else if (from instanceof JavaType.Variable) {
-            return isAssignableTo(to, ((JavaType.Variable) from).getType());
-        } else if (from instanceof JavaType.Method) {
-            return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+        } catch (Exception e) {
+            return false;
         }
         return false;
     }
