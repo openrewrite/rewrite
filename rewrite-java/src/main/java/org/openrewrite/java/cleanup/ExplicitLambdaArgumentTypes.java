@@ -89,6 +89,14 @@ public class ExplicitLambdaArgumentTypes extends Recipe {
                 J.VariableDeclarations.NamedVariable nv = multiVariable.getVariables().get(0);
                 TypeTree typeExpression = buildTypeTree(nv.getType(), Space.EMPTY);
                 if (typeExpression != null) {
+                    // "? extends Foo" is not a valid type definition on its own. Unwrap wildcard and replace with its bound
+                    if(typeExpression instanceof J.Wildcard) {
+                        J.Wildcard wildcard = (J.Wildcard)typeExpression;
+                        if(wildcard.getBoundedType() == null) {
+                            return multiVariable;
+                        }
+                        typeExpression = buildTypeTree(wildcard.getBoundedType().getType(), Space.EMPTY);
+                    }
                     multiVariable = multiVariable.withTypeExpression(typeExpression);
                     int arrayDimensions = countDimensions(nv.getType());
                     if (arrayDimensions > 0) {

@@ -19,11 +19,14 @@ import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.TypeUtils
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress(
     "ComparatorCombinators",
@@ -31,9 +34,13 @@ import org.openrewrite.java.tree.TypeUtils
     "ResultOfMethodCallIgnored",
     "CodeBlock2Expr"
 )
-interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
+interface ExplicitLambdaArgumentTypesTest : RewriteTest, JavaRecipeTest {
     override val recipe: Recipe?
         get() = ExplicitLambdaArgumentTypes()
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(ExplicitLambdaArgumentTypes())
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1459")
     @Test
@@ -545,4 +552,30 @@ interface ExplicitLambdaArgumentTypesTest : JavaRecipeTest {
         }
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2177")
+    @Test
+    fun extendsConstraint() = rewriteRun(
+        java("""
+            package com.test;
+            
+            import java.util.List;
+            
+            class A {
+                void foo(List<? extends A> a) {
+                    a.forEach(it -> { });
+                }
+            }
+        """,
+        """
+            package com.test;
+            
+            import java.util.List;
+            
+            class A {
+                void foo(List<? extends A> a) {
+                    a.forEach((A it) -> { });
+                }
+            }
+        """)
+    )
 }
