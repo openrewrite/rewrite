@@ -48,7 +48,7 @@ public class ReplaceStackWithDequeTest implements RewriteTest {
                   import java.util.ArrayDeque;
                   import java.util.Deque;
                   import java.util.Stack;
-                  \n
+                  
                   class Test {
                       void test() {
                           Deque<Integer> stack = new ArrayDeque<>();
