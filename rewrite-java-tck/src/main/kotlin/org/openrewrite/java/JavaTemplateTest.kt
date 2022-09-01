@@ -2220,7 +2220,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/66")
     @Test
-    fun lamdaBodyIsNewClassDeclaration() = rewriteRun(
+    fun lambdaIsNewClass() = rewriteRun(
         { spec ->
             spec.recipe(toRecipe {
                 object : JavaIsoVisitor<ExecutionContext>() {
@@ -2240,21 +2240,23 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         java(
             """
             class T {
+                public T (int a, Runnable r, String s) { }
                 static void method() {
-                    new Thread(() -> {
+                    new T(1, () -> {
                         int i;
                         i = Integer.valueOf(1);
-                    }).start();
+                    }, "hello" );
                 }
             }
             """,
             """
             class T {
+                public T (int a, Runnable r, String s) { }
                 static void method() {
-                    new Thread(() -> {
+                    new T(1, () -> {
                         int i;
                         i = 1;
-                    }).start();
+                    }, "hello" );
                 }
             }
             """
