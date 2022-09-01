@@ -18,6 +18,7 @@ package org.openrewrite.java.tree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.CompilationUnit
 
@@ -113,5 +114,32 @@ interface ImportTest : JavaTreeTest {
 
         assertTrue(b < c)
         assertTrue(c > b)
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2156")
+    @Test
+    fun uppercasePackage(jp: JavaParser) {
+        val cus = jp.parse("""
+            package org.openrewrite.BadPackage;
+            
+            public class Foo {
+                public static class Bar {
+                }
+            }
+        """,
+            """
+            package org.openrewrite;
+            
+            import org.openrewrite.BadPackage.Foo;
+            import org.openrewrite.BadPackage.Foo.Bar;
+            
+            public class Bar {
+                private Foo foo; 
+            }
+            
+        """)
+        assertThat(cus[0].packageDeclaration!!.packageName).isEqualTo("org.openrewrite.BadPackage")
+        assertThat(cus[1].imports[0].packageName).isEqualTo("org.openrewrite.BadPackage")
+        assertThat(cus[1].imports[1].packageName).isEqualTo("org.openrewrite.BadPackage")
     }
 }

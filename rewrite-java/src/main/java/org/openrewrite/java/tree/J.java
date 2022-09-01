@@ -39,6 +39,7 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -2470,12 +2471,20 @@ public interface J extends Tree {
          * </code>
          */
         public String getPackageName() {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
+            if(fq != null) {
+                return fq.getPackageName();
+            }
             String typeName = getTypeName();
             int lastDot = typeName.lastIndexOf('.');
             return lastDot < 0 ? "" : typeName.substring(0, lastDot);
         }
 
         public String getClassName() {
+            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
+            if(fq != null) {
+                return fq.getClassName();
+            }
             String typeName = getTypeName();
             int lastDot = typeName.lastIndexOf('.');
             return lastDot < 0 ? typeName : typeName.substring(lastDot + 1);
@@ -4017,6 +4026,13 @@ public interface J extends Tree {
 
         @With
         List<Annotation> annotations;
+
+
+        public String getPackageName() {
+            return expression.withPrefix(Space.EMPTY).print(new Cursor(null,
+                    new J.CompilationUnit(null, null, null, Space.EMPTY, Markers.EMPTY, null,
+                            null, null, false, null, null, null, null, Space.EMPTY)));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
