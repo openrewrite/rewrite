@@ -18,7 +18,10 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress(
     "ConstantConditions",
@@ -32,11 +35,17 @@ import org.openrewrite.java.JavaRecipeTest
     "UseOfObsoleteCollectionType",
     "UnnecessaryLocalVariable",
     "EmptyFinallyBlock",
-    "ClassInitializerMayBeStatic", "FunctionName"
+    "ClassInitializerMayBeStatic",
+    "FunctionName",
+    "ParameterCanBeLocal"
 )
-interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
+interface RemoveUnusedLocalVariablesTest : RewriteTest, JavaRecipeTest {
     override val recipe: Recipe
-        get() = RemoveUnusedLocalVariables(null)
+        get() = RemoveUnusedLocalVariables(arrayOf())
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(RemoveUnusedLocalVariables(arrayOf()))
+    }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/841")
@@ -759,4 +768,23 @@ interface RemoveUnusedLocalVariablesTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1743")
+    @Test
+    fun assignmentWithinExpression() = rewriteRun(
+        java("""
+            class A {
+                void foo() {
+                    String foo;
+                    Long.parseLong(foo = "123");
+                }
+            }
+        """,
+        """
+            class A {
+                void foo() {
+                    Long.parseLong("123");
+                }
+            }
+        """)
+    )
 }

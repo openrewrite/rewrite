@@ -22,12 +22,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.internal.InvocationMatcher;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.*;
@@ -95,7 +93,8 @@ public class RemoveUnusedLocalVariables extends Recipe {
                                 is instanceof J.Try.Resource ||
                                 is instanceof J.Try.Catch ||
                                 is instanceof J.MultiCatch ||
-                                is instanceof J.Lambda
+                                is instanceof J.Lambda ||
+                                is instanceof JavaSourceFile
                 );
             }
 
@@ -132,6 +131,9 @@ public class RemoveUnusedLocalVariables extends Recipe {
                     List<Statement> assignmentReferences = References.findLhsReferences(parentScope.getValue(), variable.getName());
                     for (Statement ref : assignmentReferences) {
                         doAfterVisit(new DeleteStatement<>(ref));
+                        if(ref instanceof J.Assignment) {
+                            doAfterVisit(new PruneAssignmentExpression((J.Assignment) ref));
+                        }
                     }
                     return null;
                 }
@@ -188,6 +190,44 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 return mightSideEffect.get();
             }
         };
+    }
+
+    /**
+     * Take an assignment in a context other than a variable declaration, such as the arguments of a function invocation or if condition,
+     * and remove the assignment, leaving behind the value being assigned.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private static class PruneAssignmentExpression extends JavaIsoVisitor<ExecutionContext> {
+        J.Assignment assignment;
+
+        @Override
+        public <T extends J> J.ControlParentheses<T> visitControlParentheses(J.ControlParentheses<T> c, ExecutionContext executionContext) {
+            //noinspection unchecked
+            c = (J.ControlParentheses<T>) new AssignmentToLiteral(assignment)
+                    .visitNonNull(c, executionContext, getCursor());
+            return c;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, ExecutionContext executionContext) {
+            AssignmentToLiteral atl = new AssignmentToLiteral(assignment);
+            m = m.withArguments(ListUtils.map(m.getArguments(), it -> (Expression) atl.visitNonNull(it, executionContext, getCursor())));
+            return m;
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private static class AssignmentToLiteral extends JavaVisitor<ExecutionContext> {
+        J.Assignment assignment;
+        @Override
+        public J visitAssignment(J.Assignment a, ExecutionContext executionContext) {
+            if(assignment.isScope(a)) {
+                return a.getAssignment().withPrefix(a.getPrefix());
+            }
+            return a;
+        }
     }
 
     private static class References {
