@@ -101,7 +101,7 @@ public class DeclarativeRecipe extends Recipe {
         uninitializedRecipes.add(recipe);
     }
 
-    void addUninitialized(String recipeName) {
+    public void addUninitialized(String recipeName) {
         try {
             uninitializedRecipes.add((Recipe) Class.forName(recipeName).getDeclaredConstructor().newInstance());
         } catch (Exception e) {
@@ -109,7 +109,7 @@ public class DeclarativeRecipe extends Recipe {
         }
     }
 
-    void addValidation(Validated validated) {
+    public void addValidation(Validated validated) {
         validation = validation.and(validated);
     }
 
