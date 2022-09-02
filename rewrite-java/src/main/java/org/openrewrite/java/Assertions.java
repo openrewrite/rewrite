@@ -34,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.test.SourceSpecs.dir;
@@ -169,6 +168,13 @@ public class Assertions {
 
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {
         return sourceSpec.markers(javaVersion(version));
+    }
+
+    public static SourceSpecs version(SourceSpecs sourceSpec, int version) {
+        for (SourceSpec<?> spec : sourceSpec) {
+            spec.markers((javaVersion(17)));
+        }
+        return sourceSpec;
     }
 
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
