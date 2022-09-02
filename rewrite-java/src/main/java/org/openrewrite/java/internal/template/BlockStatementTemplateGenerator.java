@@ -205,12 +205,31 @@ public class BlockStatementTemplateGenerator {
             }
 
             after.append('}');
-            if (parent instanceof J.Lambda) {
-                after.append(';');
-            }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
-            if (n.getArguments().stream().noneMatch(arg -> referToSameElement(prior, arg))) {
+            if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+                StringBuilder beforeSegments = new StringBuilder();
+                StringBuilder afterSegments = new StringBuilder();
+                beforeSegments.append("new ").append(n.getClazz().printTrimmed(cursor)).append("(");
+                boolean priorFound = false;
+                for(Expression arg : n.getArguments()) {
+                    if(!priorFound) {
+                        if (referToSameElement(prior, arg)) {
+                            priorFound = true;
+                            continue;
+                        }
+                        beforeSegments.append(valueOfType(arg.getType())).append(",");
+                    } else {
+                        afterSegments.append(",").append(valueOfType(arg.getType()));
+                    }
+                }
+                afterSegments.append(")");
+                before.insert(0, beforeSegments);
+                after.append(afterSegments);
+                if(next(cursor).getValue() instanceof J.Block) {
+                    after.append(";");
+                }
+            } else {
                 n = n.withBody(null).withPrefix(Space.EMPTY);
                 before.insert(0, n.printTrimmed(cursor).trim());
                 after.append(';');
@@ -239,10 +258,20 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0,"return ");
                 after.append(";");
             }
-            before.insert(0, "{ if(true) {");
-            after.append("}\nreturn ").append(valueOfType(l.getType())).append(";\n};\n");
+            before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim() + "{ if(true) {");
 
-            before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
+            after.append("}\n");
+            JavaType.Method mt = findSingleAbstractMethod(l.getType());
+            if(mt == null) {
+                // Missing type information, but usually the Java compiler can soldier on anyway
+                after.append("return null;\n");
+            } else if(mt.getReturnType() != JavaType.Primitive.Void) {
+                after.append("return ").append(valueOfType(mt.getReturnType())).append(";\n");
+            }
+            after.append("}");
+            if(next(cursor).getValue() instanceof J.Block) {
+                after.append(";");
+            }
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
         } else if(j instanceof J.MethodInvocation) {
@@ -403,5 +432,21 @@ public class BlockStatementTemplateGenerator {
 
     private static boolean referToSameElement(@Nullable Tree t1, @Nullable Tree t2) {
         return t1 == t2 || (t1 != null && t2 != null && t1.getId().equals(t2.getId()));
+    }
+
+    /**
+     * Accepts a @FunctionalInterface and returns the single abstract method from it, or null if the single abstract
+     * method cannot be found
+     */
+    @Nullable
+    private static JavaType.Method findSingleAbstractMethod(@Nullable JavaType javaType) {
+        if(javaType == null) {
+            return null;
+        }
+        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(javaType);
+        if(fq == null) {
+            return null;
+        }
+        return fq.getMethods().stream().filter(method -> method.hasFlags(Flag.Abstract)).findAny().orElse(null);
     }
 }

@@ -2191,10 +2191,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J.Assignment {
                         if((assignment.assignment is J.Literal) && "1" == (assignment.assignment as J.Literal).valueSource) {
                             return assignment.withTemplate(
-                                JavaTemplate.builder(this::getCursor, "value = 0")
-                                    .doBeforeParseTemplate {
-                                        println(it)
-                                    }.build(),
+                                JavaTemplate.builder(this::getCursor, "value = 0").build(),
                                 assignment.coordinates.replace()
                             )
                         }
@@ -2219,5 +2216,50 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/66")
+    @Test
+    fun lambdaIsNewClass() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J.Assignment {
+                        var a = assignment
+                        if(a.assignment is J.MethodInvocation) {
+                            val mi = a.assignment as J.MethodInvocation
+                            a = a.withAssignment(mi.withTemplate(
+                                JavaTemplate.builder(this::getCursor, "1").build(), mi.coordinates.replace()
+                            ))
+                        }
+                        return a
+                    }
+                }
+            })
+        },
+        java(
+            """
+            class T {
+                public T (int a, Runnable r, String s) { }
+                static void method() {
+                    new T(1, () -> {
+                        int i;
+                        i = Integer.valueOf(1);
+                    }, "hello" );
+                }
+            }
+            """,
+            """
+            class T {
+                public T (int a, Runnable r, String s) { }
+                static void method() {
+                    new T(1, () -> {
+                        int i;
+                        i = 1;
+                    }, "hello" );
+                }
+            }
+            """
+        )
     )
 }
