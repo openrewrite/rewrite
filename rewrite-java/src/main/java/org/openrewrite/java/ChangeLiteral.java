@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.apache.commons.lang.StringEscapeUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -54,7 +54,7 @@ public class ChangeLiteral<P> extends JavaIsoVisitor<P> {
                     transformedSource = transformed.toString();
                     break;
                 case Char:
-                    String escaped = StringEscapeUtils.escapeJavaScript(transformed.toString());
+                    String escaped = StringEscapeUtils.escapeEcmaScript(transformed.toString());
 
                     // there are two differences between javascript escaping and character escaping
                     switch (escaped) {
