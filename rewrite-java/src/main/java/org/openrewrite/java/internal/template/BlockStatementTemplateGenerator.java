@@ -232,7 +232,9 @@ public class BlockStatementTemplateGenerator {
             } else {
                 n = n.withBody(null).withPrefix(Space.EMPTY);
                 before.insert(0, n.printTrimmed(cursor).trim());
-                after.append(';');
+                if (!(next(cursor).getValue() instanceof J.MethodInvocation)) {
+                    after.append(';');
+                }
             }
         } else if (j instanceof J.ForLoop) {
             J.ForLoop f = (J.ForLoop) j;
@@ -294,6 +296,9 @@ public class BlockStatementTemplateGenerator {
                     after.append(">()");
                 }
             }
+//            else if (m.getSelect() == prior) {
+//                after.append("." + m.withSelect(null).withComments(comments).printTrimmed(cursor));
+//            }
         } else if(j instanceof J.Return) {
             before.insert(0, "return ");
             after.append(";");
