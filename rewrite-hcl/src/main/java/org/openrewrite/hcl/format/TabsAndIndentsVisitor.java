@@ -228,6 +228,16 @@ class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                 HclContainer.build(before, js, container.getMarkers());
     }
 
+
+    @Override
+    public Hcl.Attribute visitAttribute(final Hcl.Attribute attribute, final P p) {
+        Hcl.Attribute a = attribute;
+        if (attribute.getComma() != null) {
+            a =  attribute.withComma(attribute.getComma().withPrefix(Space.EMPTY));
+        }
+        return super.visitAttribute(a, p);
+    }
+
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
         if (!space.getLastWhitespace().contains("\n")) {
             return space;

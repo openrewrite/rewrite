@@ -54,8 +54,8 @@ class AutoFormatTest : RewriteTest {
             """
                 locals {
                   object = {
-                         string_attr = "value1",
-                         int_attr = 2
+                         string_attr = "value1"   ,   
+                         int_attr = 2,
                   }
                 }
             """,
@@ -63,7 +63,7 @@ class AutoFormatTest : RewriteTest {
                 locals {
                   object = {
                     string_attr = "value1",
-                    int_attr    = 2
+                    int_attr    = 2,
                   }
                 }
             """

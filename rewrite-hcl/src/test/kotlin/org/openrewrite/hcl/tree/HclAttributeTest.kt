@@ -48,7 +48,6 @@ class HclAttributeTest : RewriteTest {
         """.trimIndent(),
         )
     )
-
     @Test
     fun attributeValue() = rewriteRun(
         { spec ->

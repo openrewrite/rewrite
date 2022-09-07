@@ -51,7 +51,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
 
         Hcl parent = getCursor().dropParentUntil(t -> t instanceof Hcl).getValue();
         if (parent instanceof Hcl.Block || parent instanceof Hcl.ObjectValue) {
-            List<Hcl.Attribute> siblingAttributes = getSilingAttributes(parent);
+            List<Hcl.Attribute> siblingAttributes = getSiblingAttributes(parent);
 
             if (attribute.getType().equals(Hcl.Attribute.Type.Assignment)) {
                 HclLeftPadded<Hcl.Attribute.Type> type = a.getPadding().getType();
@@ -79,7 +79,7 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
     }
 
     @NotNull
-    private List<Hcl.Attribute> getSilingAttributes(final Hcl parent) {
+    private List<Hcl.Attribute> getSiblingAttributes(final Hcl parent) {
         List<Hcl.Attribute> allAttributes = new ArrayList<>();
         if (parent instanceof Hcl.Block) {
             for (final BodyContent bc : ((Hcl.Block) parent).getBody()) {
