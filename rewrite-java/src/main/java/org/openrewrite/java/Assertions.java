@@ -172,7 +172,7 @@ public class Assertions {
 
     public static SourceSpecs version(SourceSpecs sourceSpec, int version) {
         for (SourceSpec<?> spec : sourceSpec) {
-            spec.markers((javaVersion(17)));
+            spec.markers((javaVersion(version)));
         }
         return sourceSpec;
     }

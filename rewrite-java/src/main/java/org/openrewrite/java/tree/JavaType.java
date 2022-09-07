@@ -1084,10 +1084,10 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Method method = (Method) o;
-            assert declaringType != null;
-            assert returnType != null;
-            return declaringType.equals(method.declaringType) && name.equals(method.name) &&
-                    returnType.equals(method.returnType) && Objects.equals(parameterTypes, method.parameterTypes);
+            return Objects.equals(declaringType, method.declaringType) &&
+                    name.equals(method.name) &&
+                    Objects.equals(returnType, method.returnType) &&
+                    Objects.equals(parameterTypes, method.parameterTypes);
         }
 
         @Override

@@ -758,7 +758,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                     <dependency>
                         <groupId>com.fasterxml.jackson.core</groupId>
                         <artifactId>jackson-core</artifactId>
-                        <version>2.13.3</version>
+                        <version>2.13.4</version>
                     </dependency>
                 </dependencies>
             </project>

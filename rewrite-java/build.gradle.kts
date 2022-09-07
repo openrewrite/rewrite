@@ -29,7 +29,8 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.junit.jupiter:junit-jupiter-api:latest.release")
     compileOnly("org.assertj:assertj-core:latest.release")
-    implementation("commons-lang:commons-lang:latest.release")
+    implementation("org.apache.commons:commons-lang3:latest.release")
+    implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
     implementation("org.xerial.snappy:snappy-java:1.1.8.4")
