@@ -20,6 +20,10 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType.ShallowClass
+import org.openrewrite.java.tree.Space
+import org.openrewrite.marker.Markers
+import java.util.*
 
 interface ImplementInterfaceTest : JavaRecipeTest {
     override val recipe: Recipe?
@@ -28,6 +32,41 @@ interface ImplementInterfaceTest : JavaRecipeTest {
                 return object : JavaVisitor<ExecutionContext>() {
                     override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J {
                         doAfterVisit(ImplementInterface(classDecl, "b.B"))
+                        return classDecl
+                    }
+                }
+            }
+        }
+
+    val recipeTyped: Recipe
+        get() = object : TestRecipe() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : JavaVisitor<ExecutionContext>() {
+                    override fun visitClassDeclaration(classDecl: J.ClassDeclaration, ctx: ExecutionContext): J {
+                        doAfterVisit(
+                            ImplementInterface(
+                                classDecl,
+                                "b.B",
+                                listOf(
+                                    J.Identifier(
+                                        UUID.randomUUID(),
+                                        Space.EMPTY,
+                                        Markers.EMPTY,
+                                        "String",
+                                        ShallowClass.build("java.lang.String"),
+                                        null
+                                    ),
+                                    J.Identifier(
+                                        UUID.randomUUID(),
+                                        Space.build(" ", emptyList()),
+                                        Markers.EMPTY,
+                                        "LocalDate",
+                                        ShallowClass.build("java.time.LocalDate"),
+                                        null
+                                    )
+                                )
+                            )
+                        )
                         return classDecl
                     }
                 }
@@ -70,6 +109,28 @@ interface ImplementInterfaceTest : JavaRecipeTest {
             import c.C;
             
             class A implements C, B {
+            }
+        """
+    )
+
+    @Test
+    fun addAnImplementedInterfaceWithTypeParameters(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = recipeTyped,
+        dependsOn = arrayOf(b, c),
+        before = """
+            import c.C;
+            
+            class A implements C {
+            }
+        """,
+        after = """
+            import b.B;
+            import c.C;
+            
+            import java.time.LocalDate;
+            
+            class A implements C, B<String, LocalDate> {
             }
         """
     )

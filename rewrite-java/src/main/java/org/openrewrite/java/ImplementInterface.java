@@ -16,8 +16,13 @@
 package org.openrewrite.java;
 
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.format;
@@ -25,14 +30,24 @@ import static org.openrewrite.java.tree.Space.format;
 public class ImplementInterface<P> extends JavaIsoVisitor<P> {
     private final J.ClassDeclaration scope;
     private final JavaType.FullyQualified interfaceType;
+    private final @Nullable List<Expression> typeParameters;
 
-    public ImplementInterface(J.ClassDeclaration scope, JavaType.FullyQualified interfaceType) {
+    public ImplementInterface(J.ClassDeclaration scope, JavaType.FullyQualified interfaceType, @Nullable List<Expression> typeParameters) {
         this.scope = scope;
         this.interfaceType = interfaceType;
+        this.typeParameters = typeParameters;
+    }
+
+    public ImplementInterface(J.ClassDeclaration scope, String interfaze, @Nullable List<Expression> typeParameters) {
+        this(scope, JavaType.ShallowClass.build(interfaze), typeParameters);
+    }
+
+    public ImplementInterface(J.ClassDeclaration scope, JavaType.FullyQualified interfaceType) {
+        this(scope, interfaceType, null);
     }
 
     public ImplementInterface(J.ClassDeclaration scope, String interfaze) {
-        this(scope, JavaType.ShallowClass.build(interfaze));
+        this(scope, interfaze, null);
     }
 
     @Override
@@ -41,7 +56,7 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
         if (c.isScope(scope) && (c.getImplements() == null || c.getImplements().stream()
                 .noneMatch(f -> TypeUtils.isAssignableTo(f.getType(), interfaceType)))) {
 
-            if(!classDecl.getSimpleName().equals(interfaceType.getClassName())) {
+            if (!classDecl.getSimpleName().equals(interfaceType.getClassName())) {
                 maybeAddImport(interfaceType);
             }
 
@@ -50,7 +65,29 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
                     .withType(interfaceType)
                     .withPrefix(format(" "));
 
-            c = c.withImplements(ListUtils.concat(c.getImplements(), impl));
+            if (typeParameters != null && !typeParameters.isEmpty()) {
+                typeParameters.stream()
+                        .map(Expression::getType)
+                        .map(t -> (t instanceof JavaType.FullyQualified) ? (JavaType.FullyQualified) t : null)
+                        .filter(Objects::nonNull)
+                        .forEach(t -> maybeAddImport(t.getFullyQualifiedName()));
+
+                List<JRightPadded<Expression>> elements = typeParameters.stream()
+                        .map(t -> new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY))
+                        .collect(Collectors.toList());
+
+                J.ParameterizedType typedImpl = new J.ParameterizedType(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        impl,
+                        JContainer.build(Space.EMPTY, elements, Markers.EMPTY)
+                );
+
+                c = c.withImplements(ListUtils.concat(c.getImplements(), typedImpl));
+            } else {
+                c = c.withImplements(ListUtils.concat(c.getImplements(), impl));
+            }
 
             JContainer<TypeTree> anImplements = c.getPadding().getImplements();
             assert anImplements != null;
