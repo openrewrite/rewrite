@@ -26,6 +26,50 @@ class AutoFormatTest : RewriteTest {
         spec.recipe(AutoFormat())
     }
 
+    @Test
+    fun objectValues() = rewriteRun(
+        hcl(
+            """
+                locals {
+                  object = {
+                         string_attr = "value1"
+                         int_attr    = 2
+                  }
+                }
+            """,
+            """
+                locals {
+                  object = {
+                    string_attr = "value1"
+                    int_attr    = 2
+                  }
+                }
+            """
+        )
+    )
+
+    @Test
+    fun objectValuesCommas() = rewriteRun(
+        hcl(
+            """
+                locals {
+                  object = {
+                         string_attr = "value1",
+                         int_attr = 2
+                  }
+                }
+            """,
+            """
+                locals {
+                  object = {
+                    string_attr = "value1",
+                    int_attr    = 2
+                  }
+                }
+            """
+        )
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/974")
     @Test
     fun lineComments() = rewriteRun(

@@ -432,27 +432,43 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             List<HCLParser.ObjectelemContext> values = ctx.objectelem();
             for (int i = 0; i < values.size(); i++) {
                 HCLParser.ObjectelemContext value = values.get(i);
-                mappedValues.add(HclRightPadded.build((Expression) visit(value))
-                        .withAfter(i == values.size() - 1 ? sourceBefore("}") : sourceBefore(",")));
+                Expression expr = (Expression) visit(value);
+                Space after = Space.EMPTY;
+                if (i == values.size() - 1) {
+                    after = sourceBefore("}");
+                    if (value.COMMA() != null) {
+                        after = after.withWhitespace("," + after.getWhitespace());
+                    }
+                } else if (value.COMMA() != null) {
+                    after = Space.format(",");
+                }
+                mappedValues.add(HclRightPadded.build(expr).withAfter(after));
             }
 
-            return new Hcl.ObjectValue(randomId(), Space.format(prefix), Markers.EMPTY, HclContainer
-                    .build(tuplePrefix, mappedValues, Markers.EMPTY));
+            return new Hcl.ObjectValue(randomId(), Space.format(prefix), Markers.EMPTY,
+                    HclContainer.build(tuplePrefix, mappedValues, Markers.EMPTY));
         });
     }
 
     @Override
     public Hcl visitObjectelem(HCLParser.ObjectelemContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            Space parenthesesPrefix = null;
-            if (ctx.LPAREN() != null) {
-                parenthesesPrefix = sourceBefore("(");
-            }
-            Expression identifier = visitIdentifier(ctx.Identifier());
-            if (ctx.RPAREN() != null) {
-                identifier = new Hcl.Parentheses(randomId(), parenthesesPrefix,
-                        Markers.EMPTY, HclRightPadded.build(identifier)
-                        .withAfter(sourceBefore(")")));
+            Expression identifier;
+            if (ctx.QUOTE(0) != null) {
+                Space quotePrefix = sourceBefore("\"");
+                List<Expression> expressions = visitTemplateExpressions(ctx.quotedTemplatePart());
+                identifier = new Hcl.QuotedTemplate(randomId(), quotePrefix, Markers.EMPTY, expressions);
+                skip(ctx.QUOTE(1));
+            } else {
+                Space parenthesesPrefix = null;
+                if (ctx.LPAREN() != null) {
+                    parenthesesPrefix = sourceBefore("(");
+                }
+                identifier = visitIdentifier(ctx.Identifier());
+                if (ctx.RPAREN() != null) {
+                    identifier = new Hcl.Parentheses(randomId(), parenthesesPrefix, Markers.EMPTY,
+                            HclRightPadded.build(identifier).withAfter(sourceBefore(")")));
+                }
             }
 
             return new Hcl.Attribute(

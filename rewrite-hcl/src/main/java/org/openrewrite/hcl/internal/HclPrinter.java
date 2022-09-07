@@ -291,7 +291,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visitSpace(objectValue.getPrefix(), Space.Location.OBJECT_VALUE, p);
         visitMarkers(objectValue.getMarkers(), p);
         visitContainer("{", objectValue.getPadding().getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES,
-                ",", "}", p);
+                "", "}", p);
         return objectValue;
     }
 

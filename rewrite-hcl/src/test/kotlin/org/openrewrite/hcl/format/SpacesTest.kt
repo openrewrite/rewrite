@@ -105,16 +105,16 @@ class SpacesTest : HclRecipeTest {
             variable myvar {
               description = "Sample Variable"
               type = object({
-                string_var = "value"
-                string_var_2 = "value"
+                string_var = string
+                string_var_2 = string
                 multiline_var = object({
                   x = string
                   foo = string
                   
                   y = string
                 })
-                another_string_var = "value"
-                another_string_var_2 = "value"
+                another_string_var = string
+                another_string_var_2 = string
               })
             }
         """,
@@ -122,17 +122,59 @@ class SpacesTest : HclRecipeTest {
             variable myvar {
               description = "Sample Variable"
               type = object({
-                string_var   = "value"
-                string_var_2 = "value"
+                string_var   = string
+                string_var_2 = string
                 multiline_var = object({
                   x   = string
                   foo = string
                   
                   y = string
                 })
-                another_string_var   = "value"
-                another_string_var_2 = "value"
+                another_string_var   = string
+                another_string_var_2 = string
               })
+            }
+        """
+    )
+
+    @Test
+    fun objectAttributeGroupMultilineValue() = assertChanged(
+        before = """
+            locals {
+               myvar = {
+                 description = "Sample Variable"
+                 type = {
+                   string_var = "value"
+                   string_var_2 = "value"
+                   multiline_var = {
+                     x = "value"
+                     foo = "value"
+                  
+                     y = "value"
+                   }
+                   another_string_var = "value"
+                   another_string_var_2 = "value"
+                }
+              } 
+            }
+        """,
+        after = """ 
+            locals {
+               myvar = {
+                 description = "Sample Variable"
+                 type = {
+                   string_var   = "value"
+                   string_var_2 = "value"
+                   multiline_var = {
+                     x   = "value"
+                     foo = "value"
+                  
+                     y = "value"
+                   }
+                   another_string_var   = "value"
+                   another_string_var_2 = "value"
+                }
+              } 
             }
         """
     )

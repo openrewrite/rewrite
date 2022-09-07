@@ -15,18 +15,18 @@
  */
 package org.openrewrite.hcl.format;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.BodyContent;
+import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.HclLeftPadded;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -50,14 +50,14 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         Hcl.Attribute a = super.visitAttribute(attribute, p);
 
         Hcl parent = getCursor().dropParentUntil(t -> t instanceof Hcl).getValue();
-        if (parent instanceof Hcl.Block) {
-            Hcl.Block block = (Hcl.Block) parent;
+        if (parent instanceof Hcl.Block || parent instanceof Hcl.ObjectValue) {
+            List<Hcl.Attribute> siblingAttributes = getSilingAttributes(parent);
 
             if (attribute.getType().equals(Hcl.Attribute.Type.Assignment)) {
                 HclLeftPadded<Hcl.Attribute.Type> type = a.getPadding().getType();
 
                 if (Boolean.TRUE.equals(style.getBodyContent().getColumnarAlignment())) {
-                    List<Hcl.Attribute> groupAttributes = attributesInGroup(block, attribute);
+                    List<Hcl.Attribute> groupAttributes = attributesInGroup(siblingAttributes, attribute);
 
                     int rightMostColumnOfAttributeKey = 0;
                     for (final Hcl.Attribute sibling : groupAttributes) {
@@ -78,8 +78,27 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         return a;
     }
 
+    @NotNull
+    private List<Hcl.Attribute> getSilingAttributes(final Hcl parent) {
+        List<Hcl.Attribute> allAttributes = new ArrayList<>();
+        if (parent instanceof Hcl.Block) {
+            for (final BodyContent bc : ((Hcl.Block) parent).getBody()) {
+                if (bc instanceof Hcl.Attribute) {
+                    allAttributes.add((Hcl.Attribute) bc);
+                }
+            }
+        }else {
+            for (final Expression expr : ((Hcl.ObjectValue) parent).getAttributes()) {
+                if (expr instanceof Hcl.Attribute) {
+                    allAttributes.add((Hcl.Attribute) expr);
+                }
+            }
+        }
+        return allAttributes;
+    }
+
     // find group of attributes (attributes with no extra newlines) containing given attribute
-    private List<Hcl.Attribute> attributesInGroup(Hcl.Block block, Hcl.Attribute attribute) {
+    private List<Hcl.Attribute> attributesInGroup(List<Hcl.Attribute> siblings, Hcl.Attribute attribute) {
         boolean isAttributeMultiline = attribute.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
        if (isAttributeMultiline) {
             return Collections.singletonList(attribute);
@@ -88,29 +107,26 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         List<Hcl.Attribute> groupAttributes = new ArrayList<>();
         boolean groupFound = false;
         Hcl.Attribute perviousSibling = null;
-        for (BodyContent bodyContent : block.getBody()) {
-            if (bodyContent instanceof Hcl.Attribute) {
-                Hcl.Attribute sibling = (Hcl.Attribute) bodyContent;
-                if (sibling.getType().equals(Hcl.Attribute.Type.Assignment)) {
-                    boolean siblingPrefixHasNewLines = sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2;
-                    boolean siblingIsMultiline = sibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
-                    boolean previousSiblingIsMultiline = perviousSibling != null && perviousSibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
-                    boolean newGroup  = siblingPrefixHasNewLines || previousSiblingIsMultiline || siblingIsMultiline;
-                    if (newGroup) {
-                        if (groupFound) {
-                            break;
-                        }
-                        groupAttributes.clear();
+        for (Hcl.Attribute sibling : siblings) {
+            if (sibling.getType().equals(Hcl.Attribute.Type.Assignment)) {
+                boolean siblingPrefixHasNewLines = sibling.getPrefix().getWhitespace().split("\r\n|\r|\n").length > 2;
+                boolean siblingIsMultiline = sibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
+                boolean previousSiblingIsMultiline = perviousSibling != null && perviousSibling.getValue().print(getCursor()).split("\r\n|\r|\n").length > 2;
+                boolean newGroup  = siblingPrefixHasNewLines || previousSiblingIsMultiline || siblingIsMultiline;
+                if (newGroup) {
+                    if (groupFound) {
+                        break;
                     }
-                    if (sibling.getId() == attribute.getId()) {
-                        groupFound = true;
-                    }
-                    groupAttributes.add(sibling);
-                    perviousSibling = sibling;
+                    groupAttributes.clear();
                 }
+                if (sibling.getId() == attribute.getId()) {
+                    groupFound = true;
+                }
+                groupAttributes.add(sibling);
+                perviousSibling = sibling;
             }
         }
-        
+
         return groupAttributes;
     }
 

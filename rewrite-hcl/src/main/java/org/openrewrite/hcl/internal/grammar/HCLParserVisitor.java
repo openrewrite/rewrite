@@ -132,13 +132,6 @@ public interface HCLParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx);
 	/**
-	 * Visit a parse tree produced by the {@code BlockExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitBlockExpression(HCLParser.BlockExpressionContext ctx);
-	/**
 	 * Visit a parse tree produced by the {@code ForExpression}
 	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree
