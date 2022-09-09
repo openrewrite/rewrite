@@ -137,10 +137,34 @@ class JsonPathMatcherTest : RewriteTest {
         }
     )
 
-    @Disabled("Test enables a simple way to test JsonPatchMatches on HCL.")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2198")
     @Test
-    fun findJsonPathMatches() = assertMatched(
-        jsonPath = "$.*[?(@.features)]",
+    fun matchPropertyFromWildCardOnBlock() = rewriteRun(
+        hcl(
+            """
+            provider "azurerm" {
+              features {
+                key_vault {
+                  purge_soft_delete_on_destroy = true
+                }
+              }
+              somethingElse {
+              }
+              attr = 1
+            }
+            """
+        ) { spec ->
+            spec.beforeRecipe { configFile ->
+                assertThat(anyBlockMatch(configFile, JsonPathMatcher("$.*.features"))).isTrue
+                assertThat(anyBlockMatch(configFile, JsonPathMatcher("$.*.no_match"))).isFalse
+            }
+        }
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2198")
+    @Test
+    fun matchParentBlockWithWildCard() = assertMatched(
+        jsonPath = "$.*",
         before = arrayOf("""
             provider "azurerm" {
               features {
@@ -154,11 +178,37 @@ class JsonPathMatcherTest : RewriteTest {
             }
         """.trimIndent()),
         after = arrayOf("""
-            features {
-              key_vault {
-                purge_soft_delete_on_destroy = true
+            provider "azurerm" {
+              features {
+                key_vault {
+                  purge_soft_delete_on_destroy = true
+                }
               }
+              somethingElse {
+              }
+              attr = 1
             }
+        """.trimIndent()),
+        printMatches = false
+    )
+
+    @Disabled("Test enables a simple way to test JsonPatchMatches on HCL.")
+    @Test
+    fun findJsonPathMatches() = assertMatched(
+        jsonPath = "$.*",
+        before = arrayOf("""
+            provider "azurerm" {
+              features {
+                key_vault {
+                  purge_soft_delete_on_destroy = true
+                }
+              }
+              somethingElse {
+              }
+              attr = 1
+            }
+        """.trimIndent()),
+        after = arrayOf("""
         """.trimIndent()),
         printMatches = true
     )

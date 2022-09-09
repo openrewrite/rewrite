@@ -323,15 +323,36 @@ public class JsonPathMatcher {
                 Hcl.Attribute attr = (Hcl.Attribute) scope;
                 return attr.getValue();
             } else if (scope instanceof List) {
-                return ((List<Object>) scope).stream()
+                List<Object> results = ((List<Object>) scope).stream()
                         .map(o -> {
                             scope = o;
                             return visitWildcard(ctx);
                         })
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList());
+
+                List<Object> matches = new ArrayList<>();
+                if (stop != null && stop == getExpressionContext(ctx)) {
+                    // Return the values of each result when the JsonPath ends with a wildcard.
+                    results.forEach(o -> matches.add(getValue(o)));
+                } else {
+                    // Unwrap lists of results from visitProperty to match the position of the cursor.
+                    for (Object result : results) {
+                        if (result instanceof List) {
+                            matches.addAll(((List<Object>) result));
+                        } else {
+                            matches.add(result);
+                        }
+                    }
+                }
+
+                return getResultFromList(matches);
             } else if (scope instanceof Hcl.Block) {
                 Hcl.Block block = (Hcl.Block) scope;
+                if (stop != null && getExpressionContext(ctx) == stop) {
+                    return block;
+                }
+                scope = block.getBody();
                 return block.getBody();
             }
 
