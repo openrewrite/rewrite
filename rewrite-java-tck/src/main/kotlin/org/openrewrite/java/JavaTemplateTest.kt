@@ -22,10 +22,9 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
-import org.openrewrite.java.tree.Space
+import org.openrewrite.java.tree.*
 import org.openrewrite.test.RewriteTest
 import java.util.Comparator.comparing
 
@@ -2257,6 +2256,92 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                         int i;
                         i = 1;
                     }, "hello" );
+                }
+            }
+            """
+        )
+    )
+
+    @Suppress("RedundantOperationOnEmptyContainer", "RedundantOperationOnEmptyContainer")
+    @Test
+    fun replaceForEachControlVariable() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitVariableDeclarations(
+                        multiVariable: J.VariableDeclarations,
+                        p: ExecutionContext
+                    ): J.VariableDeclarations {
+                        var mv = super.visitVariableDeclarations(multiVariable, p)
+                        if (TypeUtils.isOfType(mv.typeExpression!!.type, JavaType.Primitive.String)) {
+                            mv = multiVariable.withTemplate(
+                                JavaTemplate.builder(this::getCursor, "Object #{} = 0").build(),
+                                multiVariable.coordinates.replace(),
+                                multiVariable.variables[0].simpleName
+                            )
+                            mv = mv.withVariables(ListUtils.map(mv.variables) { t ->
+                                t.withInitializer(null)
+                            })
+                        }
+                        return mv
+                    }
+                }
+            })
+        },
+        java(
+            """
+            import java.util.ArrayList;
+            class T {
+                void m() {
+                    for (String s : new ArrayList<String>()) {}
+                }
+            }
+            """,
+            """
+            import java.util.ArrayList;
+            class T {
+                void m() {
+                    for (Object s : new ArrayList<String>()) {}
+                }
+            }
+            """
+        )
+    )
+
+    @Suppress("StatementWithEmptyBody", "RedundantOperationOnEmptyContainer")
+    @Test
+    fun replaceForEachControlIterator() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaVisitor<ExecutionContext>() {
+                    override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J {
+                        var nc = super.visitNewClass(newClass, p)
+                        if (TypeUtils.isOfClassType(newClass.type, "java.util.ArrayList")) {
+                            nc = nc.withTemplate(JavaTemplate.builder(this::getCursor,"Collections.emptyList()")
+                                .imports("java.util.Collections").build(),
+                                newClass.coordinates.replace())
+                        }
+                        return nc
+                    }
+                }
+            })
+        },
+        java(
+            """
+            import java.util.ArrayList;
+            import java.util.Collections;
+            class T {
+                void m() {
+                    for (String s : new ArrayList<String>()) {}
+                }
+            }
+            """,
+            """
+            import java.util.ArrayList;
+            import java.util.Collections;
+            class T {
+                void m() {
+                    for (String s : Collections.emptyList()) {}
                 }
             }
             """

@@ -241,11 +241,18 @@ public class BlockStatementTemplateGenerator {
             f = f.withBody(null).withPrefix(Space.EMPTY)
                     .withControl(f.getControl().withCondition(null).withUpdate(emptyList()));
             before.insert(0, f.printTrimmed(cursor).trim());
+        } else if (j instanceof J.ForEachLoop.Control) {
+            J.ForEachLoop.Control c = (J.ForEachLoop.Control)j;
+            if (c.getVariable() == prior) {
+                after.append(c.getIterable().printTrimmed(cursor));
+            }
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;
-            f = f.withBody(null).withPrefix(Space.EMPTY);
-            before.insert(0, f.printTrimmed(cursor).trim());
-        } else if (j instanceof J.Try) {
+            if (!referToSameElement(prior, f.getControl())) {
+                f = f.withBody(null).withPrefix(Space.EMPTY);
+                before.insert(0, f.printTrimmed(cursor).trim());
+            }
+        }else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
             if (t.getResources() != null) {
                 before.insert(0, ")");
