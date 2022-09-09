@@ -51,8 +51,7 @@ public interface Xml extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return v instanceof XmlVisitor ?
-                (R) acceptXml(v.adapt(XmlVisitor.class), p) : v.defaultValue(this, p);
+        return (R) acceptXml(v.adapt(XmlVisitor.class), p);
     }
 
     @Nullable

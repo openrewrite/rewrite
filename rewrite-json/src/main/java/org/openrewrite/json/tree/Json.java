@@ -36,8 +36,7 @@ public interface Json extends Tree {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return v instanceof JsonVisitor ?
-                (R) acceptJson(v.adapt(JsonVisitor.class), p) : v.defaultValue(this, p);
+        return (R) acceptJson(v.adapt(JsonVisitor.class), p);
     }
 
     @Nullable
