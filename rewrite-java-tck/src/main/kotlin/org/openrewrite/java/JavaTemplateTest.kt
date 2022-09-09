@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
-import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.*
 import org.openrewrite.test.RewriteTest
@@ -2273,15 +2272,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                         p: ExecutionContext
                     ): J.VariableDeclarations {
                         var mv = super.visitVariableDeclarations(multiVariable, p)
-                        if (TypeUtils.isOfType(mv.typeExpression!!.type, JavaType.Primitive.String)) {
+                        if (mv.variables[0].initializer == null && TypeUtils.isOfType(mv.typeExpression!!.type, JavaType.Primitive.String)) {
                             mv = multiVariable.withTemplate(
-                                JavaTemplate.builder(this::getCursor, "Object #{} = 0").build(),
+                                JavaTemplate.builder(this::getCursor, "Object #{}").build(),
                                 multiVariable.coordinates.replace(),
                                 multiVariable.variables[0].simpleName
                             )
-                            mv = mv.withVariables(ListUtils.map(mv.variables) { t ->
-                                t.withInitializer(null)
-                            })
                         }
                         return mv
                     }
