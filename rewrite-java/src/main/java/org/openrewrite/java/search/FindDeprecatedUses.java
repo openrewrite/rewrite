@@ -16,9 +16,14 @@
 package org.openrewrite.java.search;
 
 import lombok.Getter;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
 @Getter
 public class FindDeprecatedUses extends Recipe {
@@ -45,7 +50,7 @@ public class FindDeprecatedUses extends Recipe {
         this.typePattern = typePattern;
         this.matchInherited = matchInherited;
         this.ignoreDeprecatedScopes = ignoreDeprecatedScopes;
-        doNext(new FindDeprecatedMethods(typePattern + " *(..)", ignoreDeprecatedScopes));
+        doNext(new FindDeprecatedMethods((typePattern == null ? "*..*" : typePattern) + " *(..)", ignoreDeprecatedScopes));
         doNext(new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes));
         doNext(new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes));
     }

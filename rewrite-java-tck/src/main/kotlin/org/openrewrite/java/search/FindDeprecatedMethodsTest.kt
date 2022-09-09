@@ -16,10 +16,13 @@
 package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RewriteTest
 
-interface FindDeprecatedMethodsTest : JavaRecipeTest {
+interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
 
     @Test
     fun ignoreDeprecationsInDeprecatedMethod(jp: JavaParser) = assertUnchanged(
@@ -123,5 +126,31 @@ interface FindDeprecatedMethodsTest : JavaRecipeTest {
                 }
             }
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2196")
+    @Test
+    fun noNPEWhenUsedFromDeprecatedUses() = rewriteRun(
+        { spec -> spec.recipe(FindDeprecatedUses(null, null, null))},
+        java("""
+            class Test {
+                @Deprecated
+                void test(int n) {
+                    if(n == 1) {
+                        test(n + 1);
+                    }
+                }
+            }
+        """,
+        """
+            class Test {
+                @Deprecated
+                void test(int n) {
+                    if(n == 1) {
+                        /*~~>*/test(n + 1);
+                    }
+                }
+            }
+        """)
     )
 }
