@@ -22,6 +22,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -36,6 +37,7 @@ import static java.util.Collections.newSetFromMap;
 @RequiredArgsConstructor
 public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
+    private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
     static final String EXPR_STATEMENT_PARAM = "" +
             "class __P__ {" +
             "  static native <T> T p();" +
@@ -84,6 +86,7 @@ public class BlockStatementTemplateGenerator {
         List<J2> js = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
+            final TemplatedTreeTrimmer treeTrimmer = new TemplatedTreeTrimmer();
             boolean done = false;
 
             @Nullable
@@ -109,8 +112,14 @@ public class BlockStatementTemplateGenerator {
                     @SuppressWarnings("unchecked") J2 t = (J2) tree;
 
                     if (blockEnclosingTemplateComment != null) {
-                        js.add(t);
-                        return t;
+                        //noinspection unchecked
+                        J2 trimmed = (J2) treeTrimmer.visit(t, 0);
+                        if (trimmed != null) {
+                            js.add(trimmed);
+                        } else {
+                            done = true;
+                        }
+                        return trimmed;
                     }
 
                     List<Comment> comments = t.getPrefix().getComments();
@@ -118,8 +127,15 @@ public class BlockStatementTemplateGenerator {
                         Comment comment = comments.get(i);
                         if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
                             blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
-                            js.add(t.withPrefix(t.getPrefix().withComments(comments.subList(i + 1, comments.size()))));
-                            return t;
+                            //noinspection unchecked
+                            J2 trimmed = (J2) treeTrimmer.visit(t, 0);
+                            if (t != trimmed) {
+                                done = true;
+                            }
+                            if (trimmed != null) {
+                                js.add(trimmed.withPrefix(trimmed.getPrefix().withComments(comments.subList(i + 1, comments.size()))));
+                            }
+                            return trimmed;
                         }
                     }
                 }
@@ -241,10 +257,17 @@ public class BlockStatementTemplateGenerator {
             f = f.withBody(null).withPrefix(Space.EMPTY)
                     .withControl(f.getControl().withCondition(null).withUpdate(emptyList()));
             before.insert(0, f.printTrimmed(cursor).trim());
+        } else if (j instanceof J.ForEachLoop.Control) {
+            J.ForEachLoop.Control c = (J.ForEachLoop.Control)j;
+            if (c.getVariable() == prior) {
+                after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+            }
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;
-            f = f.withBody(null).withPrefix(Space.EMPTY);
-            before.insert(0, f.printTrimmed(cursor).trim());
+            if (!referToSameElement(prior, f.getControl())) {
+                f = f.withBody(null).withPrefix(Space.EMPTY);
+                before.insert(0, f.printTrimmed(cursor).trim());
+            }
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
             if (t.getResources() != null) {
@@ -453,5 +476,31 @@ public class BlockStatementTemplateGenerator {
             return null;
         }
         return fq.getMethods().stream().filter(method -> method.hasFlags(Flag.Abstract)).findAny().orElse(null);
+    }
+
+    // Visitor for removing any trees having or following the `STOP_COMMENT`
+    private static class TemplatedTreeTrimmer extends JavaVisitor<Integer> {
+        private boolean foundStop;
+
+        private boolean stopCommentExists(@Nullable J j) {
+            if (j != null) {
+                for (Comment comment : j.getComments()) {
+                    if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, Integer integer) {
+            J j = super.visit(tree, integer);
+            if (foundStop || stopCommentExists(j)) {
+                foundStop = true;
+                return null;
+            }
+            return j;
+        }
     }
 }
