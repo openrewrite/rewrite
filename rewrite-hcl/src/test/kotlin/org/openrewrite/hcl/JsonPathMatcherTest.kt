@@ -19,9 +19,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.hcl.Assertions.hcl
-import org.openrewrite.hcl.tree.BodyContent
-import org.openrewrite.hcl.tree.Expression
 import org.openrewrite.hcl.tree.Hcl
 import org.openrewrite.test.RewriteTest
 
@@ -114,10 +113,34 @@ class JsonPathMatcherTest : RewriteTest {
         }
     )
 
-    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/2197")
     @Test
-    fun matchBlock() = assertMatched(
-        jsonPath = "$.provider.somethingElse",
+    fun unaryExpressionOnBlockName() = rewriteRun(
+        hcl(
+            """
+            provider "azurerm" {
+              features {
+                key_vault {
+                  purge_soft_delete_on_destroy = true
+                }
+              }
+              somethingElse {
+              }
+              attr = 1
+            }
+            """
+        ) { spec ->
+            spec.beforeRecipe { configFile ->
+                assertThat(anyBlockMatch(configFile, JsonPathMatcher("$.*[?(@.features)]"))).isTrue
+                assertThat(anyBlockMatch(configFile, JsonPathMatcher("$.*[?(@.no_match)]"))).isFalse
+            }
+        }
+    )
+
+    @Disabled("Test enables a simple way to test JsonPatchMatches on HCL.")
+    @Test
+    fun findJsonPathMatches() = assertMatched(
+        jsonPath = "$.*[?(@.features)]",
         before = arrayOf("""
             provider "azurerm" {
               features {
@@ -130,15 +153,17 @@ class JsonPathMatcherTest : RewriteTest {
               attr = 1
             }
         """.trimIndent()),
-        after = arrayOf(),
+        after = arrayOf("""
+            features {
+              key_vault {
+                purge_soft_delete_on_destroy = true
+              }
+            }
+        """.trimIndent()),
         printMatches = true
     )
 
-    private fun assertNotMatched(before: Array<String>, jsonPath: String) {
-        val results = visit(before, jsonPath, false)
-        assertThat(results).hasSize(0)
-    }
-
+    @Suppress("SameParameterValue")
     private fun assertMatched(before: Array<String>, after: Array<String>, jsonPath: String, printMatches: Boolean = false) {
         val results = visit(before, jsonPath, printMatches)
         assertThat(results).hasSize(after.size)
@@ -217,20 +242,6 @@ class JsonPathMatcherTest : RewriteTest {
                     return b
                 }
 
-                override fun visitBodyContent(bodyContent: BodyContent, p: MutableList<String>): BodyContent {
-                    val b = super.visitBodyContent(bodyContent, p)
-                    if (matcher.matches(cursor)) {
-                        val match = b.printTrimmed(cursor)
-                        if (printMatches) {
-                            println("matched in visitBodyContent")
-                            println(match)
-                            println()
-                        }
-                        p.add(match)
-                    }
-                    return b
-                }
-
                 override fun visitConditional(conditional: Hcl.Conditional, p: MutableList<String>): Hcl.Conditional {
                     val c = super.visitConditional(conditional, p)
                     if (matcher.matches(cursor)) {
@@ -265,20 +276,6 @@ class JsonPathMatcherTest : RewriteTest {
                         val match = e.printTrimmed(cursor)
                         if (printMatches) {
                             println("matched in visitEmpty")
-                            println(match)
-                            println()
-                        }
-                        p.add(match)
-                    }
-                    return e
-                }
-
-                override fun visitExpression(expression: Expression, p: MutableList<String>): Expression {
-                    val e = super.visitExpression(expression, p)
-                    if (matcher.matches(cursor)) {
-                        val match = e.printTrimmed(cursor)
-                        if (printMatches) {
-                            println("matched in visitExpression")
                             println(match)
                             println()
                         }

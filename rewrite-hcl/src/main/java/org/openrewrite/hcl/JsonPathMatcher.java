@@ -374,12 +374,14 @@ public class JsonPathMatcher {
                 } else if (scope instanceof Hcl.Block) {
                     Hcl.Block block = (Hcl.Block) scope;
                     for (Hcl body : block.getBody()) {
-                        if (body instanceof Hcl.Attribute) {
+                        String name = ctx.StringLiteral() != null ?
+                                unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
+                        if (block.getType() instanceof Hcl.Identifier && block.getType().getName().equals(name)) {
+                            return block;
+                        } else if (body instanceof Hcl.Attribute) {
                             Hcl.Attribute attr = (Hcl.Attribute) body;
                             if (ctx.Identifier() != null || ctx.StringLiteral() != null) {
                                 String key = attr.getSimpleName();
-                                String name = ctx.StringLiteral() != null ?
-                                        unquoteStringLiteral(ctx.StringLiteral().getText()) : ctx.Identifier().getText();
                                 if (key.equals(name)) {
                                     return block;
                                 }
