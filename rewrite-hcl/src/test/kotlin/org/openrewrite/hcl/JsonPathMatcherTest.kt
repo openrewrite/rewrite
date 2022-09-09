@@ -16,6 +16,7 @@
 package org.openrewrite.hcl
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.hcl.Assertions.hcl
@@ -113,9 +114,10 @@ class JsonPathMatcherTest : RewriteTest {
         }
     )
 
+    @Disabled
     @Test
     fun matchBlock() = assertMatched(
-        jsonPath = "$.provider.features.key_vault",
+        jsonPath = "$.provider.somethingElse",
         before = arrayOf("""
             provider "azurerm" {
               features {
