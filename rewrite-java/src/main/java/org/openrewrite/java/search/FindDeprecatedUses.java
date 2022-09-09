@@ -52,7 +52,7 @@ public class FindDeprecatedUses extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find uses of deprecated classes";
+        return "Find uses of deprecated classes, methods, and fields";
     }
 
     @Override
