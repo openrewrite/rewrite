@@ -252,7 +252,7 @@ public class BlockStatementTemplateGenerator {
                 f = f.withBody(null).withPrefix(Space.EMPTY);
                 before.insert(0, f.printTrimmed(cursor).trim());
             }
-        }else if (j instanceof J.Try) {
+        } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
             if (t.getResources() != null) {
                 before.insert(0, ")");
