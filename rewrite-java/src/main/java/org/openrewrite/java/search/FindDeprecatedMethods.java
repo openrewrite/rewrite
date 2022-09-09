@@ -81,13 +81,14 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
+        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern, true);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (method.getMethodType() != null) {
                     for (JavaType.FullyQualified annotation : method.getMethodType().getAnnotations()) {
-                        if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                        if ((methodMatcher == null || methodMatcher.matches(method)) && TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
                             if (Boolean.TRUE.equals(ignoreDeprecatedScopes)) {
                                 Iterator<Object> cursorPath = getCursor().getPath();
                                 while (cursorPath.hasNext()) {

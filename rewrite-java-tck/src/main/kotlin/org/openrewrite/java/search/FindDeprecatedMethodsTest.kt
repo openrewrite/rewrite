@@ -153,4 +153,43 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
             }
         """)
     )
+
+    @Test
+    fun onlyFoo() = rewriteRun(
+            { spec -> spec.recipe(FindDeprecatedMethods("*..* foo(..)", false)) },
+            java("""
+                class Test {
+                    @Deprecated
+                    void test(int n) {
+                        if(n == 1) {
+                            test(n + 1);
+                        }
+                    }
+                    
+                    @Deprecated
+                    void foo(int n) {
+                        if(n == 1) {
+                            foo(n + 1);
+                        }
+                    }
+                }
+            """,
+            """
+                class Test {
+                    @Deprecated
+                    void test(int n) {
+                        if(n == 1) {
+                            test(n + 1);
+                        }
+                    }
+                    
+                    @Deprecated
+                    void foo(int n) {
+                        if(n == 1) {
+                            /*~~>*/foo(n + 1);
+                        }
+                    }
+                }
+            """)
+    )
 }
