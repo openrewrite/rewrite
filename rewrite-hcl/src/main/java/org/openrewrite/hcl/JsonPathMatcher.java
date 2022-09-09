@@ -20,14 +20,12 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
-import org.antlr.v4.runtime.tree.TerminalNodeImpl;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.internal.grammar.JsonPathLexer;
 import org.openrewrite.hcl.internal.grammar.JsonPathParser;
 import org.openrewrite.hcl.internal.grammar.JsonPathParserBaseVisitor;
 import org.openrewrite.hcl.internal.grammar.JsonPathParserVisitor;
-import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -37,7 +35,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.disjoint;
-import static java.util.Collections.max;
 
 /**
  * Provides methods for matching the given cursor location to a specific JsonPath expression.
