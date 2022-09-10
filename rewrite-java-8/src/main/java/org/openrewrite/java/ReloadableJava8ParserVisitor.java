@@ -180,7 +180,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         TypeTree elemType = convert(typeIdent);
 
         List<JRightPadded<Space>> dimensions = emptyList();
-        if(dimCount > 0) {
+        if (dimCount > 0) {
             dimensions = new ArrayList<>(dimCount);
             for (int n = 0; n < dimCount; n++) {
                 dimensions.add(padRight(sourceBefore("["), sourceBefore("]")));
@@ -1409,11 +1409,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     private List<JLeftPadded<Space>> arrayDimensions() {
         List<JLeftPadded<Space>> dims = null;
-        while(true) {
+        while (true) {
             int beginBracket = indexOfNextNonWhitespace(cursor, source);
             if (source.charAt(beginBracket) == '[') {
                 int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
-                if(dims == null) {
+                if (dims == null) {
                     dims = new ArrayList<>(2);
                 }
                 dims.add(padLeft(format(source.substring(cursor, beginBracket)),
@@ -1503,7 +1503,13 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private long lineNumber(Tree tree) {
-        return source.substring(0, ((JCTree) tree).getStartPosition()).chars().filter(c -> c == '\n').count() + 1;
+        int lineNumber = 1;
+        for (char c : source.substring(0, ((JCTree) tree).getStartPosition()).toCharArray()) {
+            if (c == '\n') {
+                lineNumber++;
+            }
+        }
+        return lineNumber;
     }
 
     @Nullable
@@ -1527,7 +1533,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
                                                              Function<Tree, Space> innerSuffix,
                                                              Function<Tree, Space> suffix) {
-        if(trees.isEmpty()) {
+        if (trees.isEmpty()) {
             return emptyList();
         }
         List<JRightPadded<J2>> converted = new ArrayList<>(trees.size());
