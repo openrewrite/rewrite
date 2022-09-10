@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal;
 
-import org.apache.tools.ant.DirectoryScanner;
 import org.apache.tools.ant.types.selectors.SelectorUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -29,14 +28,8 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
-import java.util.stream.Stream;
-
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
-import static java.util.stream.Collectors.groupingBy;
 
 public class StringUtils {
     private StringUtils() {
@@ -58,7 +51,6 @@ public class StringUtils {
      * @return A mutated version of the string that removed the common indention.
      */
     public static String trimIndent(String text) {
-
         if (text.isEmpty()) {
             return text;
         }
@@ -161,29 +153,6 @@ public class StringUtils {
             minIndent = Math.min(whiteSpaceCount, minIndent);
         }
         return minIndent;
-    }
-
-    static int indentLevel(String text) {
-        Stream<String> lines = Arrays.stream(text.replaceAll("\\s+$", "").split("\\r?\\n")).filter(s -> !isBlank(s));
-
-        AtomicBoolean dropWhile = new AtomicBoolean(false);
-        AtomicBoolean takeWhile = new AtomicBoolean(true);
-        SortedMap<Integer, Long> indentFrequencies = lines
-                .filter(l -> {
-                    dropWhile.set(dropWhile.get() || !l.isEmpty());
-                    return dropWhile.get();
-                })
-                .map(l -> {
-                    takeWhile.set(true);
-                    return (int) l.chars()
-                            .filter(c -> {
-                                takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
-                                return takeWhile.get();
-                            })
-                            .count();
-                })
-                .collect(groupingBy(identity(), TreeMap::new, counting()));
-        return mostCommonIndent(indentFrequencies);
     }
 
     public static int mostCommonIndent(SortedMap<Integer, Long> indentFrequencies) {
@@ -338,7 +307,13 @@ public class StringUtils {
     }
 
     public static int indexOfNonWhitespace(String text) {
-        return indexOf(text, it -> !(it == ' ' || it == '\t' || it == '\n' || it == '\r'));
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r')) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -512,7 +487,7 @@ public class StringUtils {
         return s2.length() < s1.length() ? s2.toString() : s1.toString();
     }
 
-    public static boolean isNumeric(String str) {
+    public static boolean isNumeric(@Nullable String str) {
         if (str == null) {
             return false;
         }

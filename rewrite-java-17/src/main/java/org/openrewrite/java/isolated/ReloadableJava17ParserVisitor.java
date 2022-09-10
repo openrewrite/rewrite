@@ -91,7 +91,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     private int cursor = 0;
 
-    private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public ReloadableJava17ParserVisitor(Path sourcePath,
@@ -999,14 +998,19 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     convert(dim, t -> sourceBefore("]"))));
         }
 
-        Matcher matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
-        while (matcher.find(cursor)) {
-            cursor(matcher.end());
-            dimensions.add(new J.ArrayDimension(
-                    randomId(),
-                    format(matcher.group(1)),
-                    Markers.EMPTY,
-                    padRight(new J.Empty(randomId(), format(matcher.group(2)), Markers.EMPTY), EMPTY)));
+        while(true) {
+            int beginBracket = indexOfNextNonWhitespace(cursor, source);
+            if (source.charAt(beginBracket) == '[') {
+                int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
+                dimensions.add(new J.ArrayDimension(
+                        randomId(),
+                        format(source.substring(cursor, beginBracket)),
+                        Markers.EMPTY,
+                        padRight(new J.Empty(randomId(), format(source.substring(beginBracket + 1, endBracket)), Markers.EMPTY), EMPTY)));
+                cursor = endBracket + 1;
+            } else {
+                break;
+            }
         }
 
         JContainer<Expression> initializer = node.getInitializers() == null ? null :
@@ -1254,8 +1258,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             } else {
                 fullName += "." + part;
 
-                Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
-                Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : Space.EMPTY;
+                int endOfPrefix = indexOfNextNonWhitespace(0, part);
+                Space identFmt = endOfPrefix > 0 ? format(part.substring(0, endOfPrefix)) : EMPTY;
 
                 Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
                 //noinspection ResultOfMethodCallIgnored
@@ -1664,6 +1668,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             return EMPTY; // unable to find this delimiter
         }
 
+        if (delimIndex == cursor) {
+            cursor += untilDelim.length();
+            return EMPTY;
+        }
         String prefix = source.substring(cursor, delimIndex);
         cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
         return Space.format(prefix);
@@ -1689,18 +1697,26 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
+                    char c1 = source.charAt(delimIndex);
+                    char c2 = source.charAt(delimIndex + 1);
+                    switch (c1) {
+                        case '/':
+                            switch(c2) {
+                                case '/':
+                                    inSingleLineComment = true;
+                                    delimIndex++;
+                                    break;
+                                case '*':
+                                    inMultiLineComment = true;
+                                    delimIndex++;
+                                    break;
+                            }
                             break;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
+                        case '*':
+                            if(c2 == '/') {
+                                inMultiLineComment = false;
+                                delimIndex += 2;
+                            }
                             break;
                     }
                 }
@@ -1738,8 +1754,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             //noinspection ConstantConditions
             return null;
         }
-        if (source.startsWith(token, cursor))
+        if (source.startsWith(token, cursor)) {
             cursor += token.length();
+        }
         return token;
     }
 

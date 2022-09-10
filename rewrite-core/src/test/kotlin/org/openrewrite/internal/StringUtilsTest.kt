@@ -20,63 +20,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.internal.StringUtils.*
 
 class StringUtilsTest {
-    @Test
-    fun detectIndentLevel() {
-        assertThat(indentLevel("""
-            |<
-            |   <
-            |   <
-            |   <
-            |<
-        """.trimMargin())).isEqualTo(0)
-
-        assertThat(indentLevel("""
-            |<
-            |   <
-        """.trimMargin())).isEqualTo(3)
-
-        assertThat(indentLevel("""
-            |<
-            |    <
-            |      <
-        """.trimMargin())).isEqualTo(4)
-
-        // ignores the last line if it is all blank
-        assertThat(indentLevel("""
-            class {
-                A field;
-            }
-        """)).isEqualTo(12)
-
-        assertThat(indentLevel("""
-            | <
-            |  <
-            |   <
-            |    <
-        """.trimMargin())).isEqualTo(1)
-
-        assertThat(indentLevel("""
-            | <
-            |  <
-            |    <
-            |    <
-            |      <
-        """.trimMargin())).isEqualTo(1)
-
-        assertThat(indentLevel("""
-            |<
-            |<
-        """.trimMargin())).isEqualTo(0)
-
-        // doesn't consider newlines that occur as the first character on the first line or terminating newlines
-        assertThat(indentLevel("""
-            |
-            |  <
-            |    <
-            |    <
-            |
-        """.trimMargin())).isEqualTo(2)
-    }
 
     @Test
     fun trimIndentBlankLines() {
