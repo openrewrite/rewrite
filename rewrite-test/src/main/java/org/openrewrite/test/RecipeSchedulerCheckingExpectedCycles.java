@@ -51,7 +51,6 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&
                     !before.isEmpty() && !afterList.isEmpty()) {
                 for (int i = 0; i < before.size(); i++) {
-                    S s1 = before.get(i);
                     if(!(afterList.get(i) instanceof Quark)) {
                         assertThat(afterList.get(i).printAllTrimmed())
                                 .as(

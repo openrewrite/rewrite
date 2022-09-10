@@ -25,7 +25,9 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.text.PlainTextParser;
 
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -37,6 +39,8 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Recipe.PANIC;
+import static org.openrewrite.RecipeSchedulerUtils.addRecipesThatMadeChanges;
+import static org.openrewrite.RecipeSchedulerUtils.handleUncaughtException;
 import static org.openrewrite.Tree.randomId;
 
 public interface RecipeScheduler {
@@ -82,6 +86,10 @@ public interface RecipeScheduler {
 
         WatchableExecutionContext ctxWithWatch = new WatchableExecutionContext(ctx);
         for (int i = 0; i < maxCycles; i++) {
+            if (ctx.getMessage(PANIC) != null) {
+                break;
+            }
+
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
@@ -184,8 +192,7 @@ public interface RecipeScheduler {
                 }
             }
         } catch (Throwable t) {
-            ctx.getOnError().accept(t);
-            return before;
+            return handleUncaughtException(recipeStack, before, ctx, recipe, t);
         }
 
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
@@ -241,25 +248,24 @@ public interface RecipeScheduler {
                         afterFile = (S) visitor.visit(afterFile, ctx);
                     }
                 } catch (Throwable t) {
+                    sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
+                    ctx.getOnError().accept(t);
+
                     if (t instanceof UncaughtVisitorException) {
                         UncaughtVisitorException vt = (UncaughtVisitorException) t;
 
                         //noinspection unchecked
                         afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull(afterFile), 0);
+                    } else if (afterFile != null) {
+                        // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
+                        // and instead we add a marker to the top of the source file to record the exception message.
+                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(new UncaughtVisitorExceptionResult(new UncaughtVisitorException(t)),
+                                (acc, m) -> acc));
                     }
-                    sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                    ctx.getOnError().accept(t);
                 }
 
                 if (afterFile != null && afterFile != s) {
-                    List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
-                    recipeStackList.add(recipeStack);
-                    afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
-                            new RecipesThatMadeChanges(randomId(), recipeStackList),
-                            (r1, r2) -> {
-                                r1.getRecipes().addAll(r2.getRecipes());
-                                return r1;
-                            }));
+                    afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
                     sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
                 } else if (afterFile == null) {
                     recipeThatDeletedSourceFile.put(requireNonNull(s).getId(), recipeStack);
@@ -275,7 +281,6 @@ public interface RecipeScheduler {
         // The type of the list is widened at this point, since a source file type may be generated that isn't
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
-
         List<SourceFile> afterWidened;
         try {
             long ownVisitStartTime = System.nanoTime();
@@ -283,8 +288,7 @@ public interface RecipeScheduler {
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
-            ctx.getOnError().accept(t);
-            return before;
+            return handleUncaughtException(recipeStack, before, ctx, recipe, t);
         }
 
         if (afterWidened != after) {
@@ -336,7 +340,7 @@ public interface RecipeScheduler {
                 }
             }
 
-            // when doNext is called conditionally inside of a recipe visitor
+            // when doNext is called conditionally inside a recipe visitor
             if (nextStats == null) {
                 nextStats = new RecipeRunStats(r);
                 runStats.getCalled().add(nextStats);
@@ -355,4 +359,47 @@ public interface RecipeScheduler {
     }
 
     <T> CompletableFuture<T> schedule(Callable<T> fn);
+}
+
+class RecipeSchedulerUtils {
+    public static <S extends SourceFile> S addRecipesThatMadeChanges(Stack<Recipe> recipeStack, S afterFile) {
+        List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+        recipeStackList.add(recipeStack);
+        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
+                new RecipesThatMadeChanges(randomId(), recipeStackList),
+                (r1, r2) -> {
+                    r1.getRecipes().addAll(r2.getRecipes());
+                    return r1;
+                }));
+        return afterFile;
+    }
+
+    public static <S extends SourceFile> List<S> handleUncaughtException(Stack<Recipe> recipeStack, List<S> before, ExecutionContext ctx, Recipe recipe, Throwable t) {
+        ctx.getOnError().accept(t);
+        ctx.putMessage(PANIC, true);
+
+        if (t instanceof UncaughtVisitorException) {
+            UncaughtVisitorException vt = (UncaughtVisitorException) t;
+
+            List<S> exceptionMapped = ListUtils.map(before, sourceFile -> {
+                //noinspection unchecked
+                S afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull((SourceFile) sourceFile), 0);
+                afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
+                return afterFile;
+            });
+            if (exceptionMapped != before) {
+                return exceptionMapped;
+            }
+        }
+
+        // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
+        // and instead we add a new file to record the exception message.
+        S exception = PlainTextParser.builder().build()
+                .parse("Rewrite encountered an uncaught recipe error in " + recipe.getName() + ".")
+                .get(0)
+                .withSourcePath(Paths.get("recipe-exception-" + ctx.incrementAndGetUncaughtExceptionCount() + ".txt"));
+        exception = exception.withMarkers(exception.getMarkers().computeByType(new UncaughtVisitorExceptionResult(new UncaughtVisitorException(t)),
+                (acc, m) -> acc));
+        return ListUtils.concat(before, exception);
+    }
 }

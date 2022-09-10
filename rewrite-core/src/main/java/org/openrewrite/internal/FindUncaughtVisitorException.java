@@ -23,13 +23,15 @@ import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.Method;
 
+import static java.util.Objects.requireNonNull;
+
 public class FindUncaughtVisitorException extends TreeVisitor<Tree, Integer> {
     private final UncaughtVisitorException vt;
     private final Tree nearestTree;
 
     public FindUncaughtVisitorException(UncaughtVisitorException vt) {
         this.vt = vt;
-        this.nearestTree = (Tree) vt.getCursor().getPath(Tree.class::isInstance).next();
+        this.nearestTree = (Tree) requireNonNull(vt.getCursor()).getPath(Tree.class::isInstance).next();
     }
 
     @Override

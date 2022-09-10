@@ -141,9 +141,11 @@ public class Result {
 
         Duration timeSavings = null;
         for (Stack<Recipe> recipesStack : recipes) {
-            Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
-            if (perOccurrence != null) {
-                timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
+            if (recipesStack != null) {
+                Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
+                if (perOccurrence != null) {
+                    timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
+                }
             }
         }
 

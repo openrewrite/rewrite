@@ -17,9 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
 import java.util.ArrayList;
@@ -28,10 +27,75 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RecipeExceptionDemonstration extends Recipe {
-    @Option(displayName = "Method pattern",
+    @Option(displayName = "Throw on matching method pattern",
+            required = false,
             description = "A method pattern that is used to find matching method declarations/invocations.",
             example = "org.mockito.Matchers anyVararg()")
-    String methodPattern;
+    @Nullable
+    String throwOnMethodPattern;
+
+    @Option(displayName = "Throw in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.",
+            required = false)
+    @Nullable
+    Boolean throwOnVisitAll;
+
+    @Option(displayName = "Throw in the recipe's `visit(List<SourceFile>, ExecutionContext)` method inside " +
+            "a visitor internal to that method.",
+            required = false)
+    @Nullable
+    Boolean throwOnVisitAllVisitor;
+
+    @Option(displayName = "Throw on the project-level applicable test.",
+            required = false)
+    @Nullable
+    Boolean throwOnApplicableTest;
+
+    @Option(displayName = "Throw on the project-level applicable test inside a visitor.",
+            required = false)
+    @Nullable
+    Boolean throwOnApplicableTestVisitor;
+
+    @Option(displayName = "Throw on the single-source applicable test.",
+            required = false)
+    @Nullable
+    Boolean throwOnSingleSourceApplicableTest;
+
+    @Option(displayName = "Throw on the single-source applicable test inside a visitor.",
+            required = false)
+    @Nullable
+    Boolean throwOnSingleSourceApplicableTestVisitor;
+
+    @Override
+    @Nullable
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        if (Boolean.TRUE.equals(throwOnApplicableTestVisitor)) {
+            return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public Tree preVisit(Tree tree, ExecutionContext executionContext) {
+                    throw new DemonstrationException("Throwing on the project-level applicable test.");
+                }
+            };
+        } else if (Boolean.TRUE.equals(throwOnApplicableTest)) {
+            throw new DemonstrationException("Throwing on the project-level applicable test.");
+        }
+        return null;
+    }
+
+    @Override
+    @Nullable
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        if (Boolean.TRUE.equals(throwOnSingleSourceApplicableTestVisitor)) {
+            return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public Tree preVisit(Tree tree, ExecutionContext executionContext) {
+                    throw new DemonstrationException("Demonstrating an exception thrown on the single-source applicable test.");
+                }
+            };
+        } else if (Boolean.TRUE.equals(throwOnSingleSourceApplicableTest)) {
+            throw new DemonstrationException("Demonstrating an exception thrown on the single-source applicable test.");
+        }
+        return null;
+    }
 
     @Override
     public String getDisplayName() {
@@ -44,22 +108,43 @@ public class RecipeExceptionDemonstration extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-            final MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
-
-            @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                if (methodMatcher.matches(method)) {
-                    throw new DemonstrationException("Demonstrating an exception thrown on a matching method.");
-                }
-                return super.visitMethodInvocation(method, executionContext);
+    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+        if (Boolean.TRUE.equals(throwOnVisitAllVisitor)) {
+            for (SourceFile sourceFile : before) {
+                new TreeVisitor<Tree, ExecutionContext>() {
+                    @Override
+                    public Tree preVisit(Tree tree, ExecutionContext executionContext) {
+                        throw new DemonstrationException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
+                    }
+                }.visit(sourceFile, ctx);
             }
-        };
+        } else if (Boolean.TRUE.equals(throwOnVisitAll)) {
+            throw new DemonstrationException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
+        }
+        return before;
+    }
+
+    @Override
+    protected TreeVisitor<J, ExecutionContext> getVisitor() {
+        if (throwOnMethodPattern != null) {
+            return new JavaVisitor<ExecutionContext>() {
+                final MethodMatcher methodMatcher = new MethodMatcher(throwOnMethodPattern);
+
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    if (methodMatcher.matches(method)) {
+                        throw new DemonstrationException("Demonstrating an exception thrown on a matching method.");
+                    }
+                    return super.visitMethodInvocation(method, executionContext);
+                }
+            };
+        }
+        return TreeVisitor.noop();
     }
 
     public static class DemonstrationException extends RuntimeException {
         static boolean restrictStackTrace = false;
+
         public DemonstrationException(String message) {
             super(message);
         }

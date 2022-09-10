@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.Getter;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.StringJoiner;
 import java.util.UUID;
@@ -24,12 +25,20 @@ public class UncaughtVisitorException extends RuntimeException {
     @Getter
     private final UUID id = UUID.randomUUID();
 
+    /**
+     * Null if the exception occurs outside a visitor in an applicable test, etc.
+     */
     @Getter
+    @Nullable
     private final Cursor cursor;
 
-    public UncaughtVisitorException(Throwable cause, Cursor cursor) {
+    public UncaughtVisitorException(Throwable cause, @Nullable Cursor cursor) {
         super(cause);
         this.cursor = cursor;
+    }
+
+    public UncaughtVisitorException(Throwable cause) {
+        this(cause, null);
     }
 
     public String getSanitizedStackTrace() {

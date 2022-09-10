@@ -30,6 +30,7 @@ import java.util.function.Supplier;
  */
 public interface ExecutionContext {
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
+    String UNCAUGHT_EXCEPTION_COUNT = "org.openrewrite.uncaughtExceptionCount";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
@@ -89,6 +90,12 @@ public interface ExecutionContext {
     default Recipe getCurrentRecipe() {
         //noinspection ConstantConditions
         return getMessage(CURRENT_RECIPE);
+    }
+
+    default int incrementAndGetUncaughtExceptionCount() {
+        int count = getMessage(UNCAUGHT_EXCEPTION_COUNT, 0) + 1;
+        putMessage(UNCAUGHT_EXCEPTION_COUNT, count);
+        return count;
     }
 
     Consumer<Throwable> getOnError();
