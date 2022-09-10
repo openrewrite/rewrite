@@ -20,7 +20,6 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -34,10 +33,13 @@ public interface Validated extends Iterable<Validated> {
     }
 
     default List<Invalid> failures() {
-        return stream(spliterator(), false)
-                .filter(Validated::isInvalid)
-                .map(v -> (Invalid) v)
-                .collect(Collectors.toList());
+        List<Invalid> list = new ArrayList<>();
+        for (Validated v : this) {
+            if (v.isInvalid()) {
+                list.add((Invalid) v);
+            }
+        }
+        return list;
     }
 
     static Secret validSecret(String property, String value) {
