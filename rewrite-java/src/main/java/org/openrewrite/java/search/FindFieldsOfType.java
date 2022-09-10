@@ -17,10 +17,7 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -28,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -60,8 +58,9 @@ public class FindFieldsOfType extends Recipe {
                 if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
                     return multiVariable;
                 }
-                if (multiVariable.getTypeExpression() != null && hasElementType(multiVariable.getTypeExpression()
-                        .getType(), fullyQualifiedTypeName)) {
+                if (multiVariable.getTypeExpression() != null &&
+                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName) &&
+                        isField(getCursor())) {
                     return multiVariable.withMarkers(multiVariable.getMarkers().searchResult());
                 }
                 return multiVariable;
@@ -76,8 +75,9 @@ public class FindFieldsOfType extends Recipe {
                 if (multiVariable.getTypeExpression() instanceof J.MultiCatch) {
                     return multiVariable;
                 }
-                if (multiVariable.getTypeExpression() != null && hasElementType(multiVariable.getTypeExpression()
-                        .getType(), fullyQualifiedTypeName)) {
+                if (multiVariable.getTypeExpression() != null &&
+                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName)  &&
+                        isField(getCursor())) {
                     vs.add(multiVariable);
                 }
                 return multiVariable;
@@ -87,6 +87,20 @@ public class FindFieldsOfType extends Recipe {
         Set<J.VariableDeclarations> vs = new HashSet<>();
         findVisitor.visit(j, vs);
         return vs;
+    }
+
+    private static boolean isField(Cursor cursor) {
+        Iterator<Object> path = cursor.getPath();
+        while (path.hasNext()) {
+            Object o = path.next();
+            if (o instanceof J.MethodDeclaration) {
+                return false;
+            }
+            if (o instanceof J.ClassDeclaration) {
+                return true;
+            }
+        }
+        return true;
     }
 
     private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {

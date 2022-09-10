@@ -17,10 +17,29 @@ package org.openrewrite.java.search
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface FindFieldsOfTypeTest : JavaRecipeTest {
+interface FindFieldsOfTypeTest : RewriteTest, JavaRecipeTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2199")
+    @Test
+    fun findFieldNotVariable(jp: JavaParser) = assertUnchanged(
+        jp,
+        recipe = FindFieldsOfType("java.io.File"),
+        before = """
+            import java.io.*;
+            public class Test {
+                public static void main(String[] args) {
+                    File f = new File("/dev/null");
+                }
+            }
+        """
+    )
 
     @Test
     fun findPrivateNonInheritedField(jp: JavaParser) = assertChanged(
