@@ -132,7 +132,7 @@ public interface RewriteTest extends SourceSpecs {
         } else {
             executionContext = defaultExecutionContext(sourceSpecs);
         }
-        for(SourceSpec<?> s : sourceSpecs) {
+        for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(executionContext);
         }
 
@@ -197,7 +197,7 @@ public interface RewriteTest extends SourceSpecs {
                         sourceFile.getMarkers().getMarkers(), nextSpec.markers)));
 
                 // Update the default 'main' SourceSet Marker added by the JavaParser with the specs sourceSetName
-                if(nextSpec.sourceSetName != null) {
+                if (nextSpec.sourceSetName != null) {
                     sourceFile = sourceFile.withMarkers((sourceFile.getMarkers().withMarkers(ListUtils.map(sourceFile.getMarkers().getMarkers(), m -> {
                         if (m instanceof SourceSet) {
                             m = ((SourceSet) m).withName(nextSpec.sourceSetName);
@@ -231,8 +231,15 @@ public interface RewriteTest extends SourceSpecs {
         testClassSpec.beforeRecipe.accept(beforeSourceFiles);
         testMethodSpec.beforeRecipe.accept(beforeSourceFiles);
 
+        List<SourceFile> runnableSourceFiles = new ArrayList<>(beforeSourceFiles.size());
+        for (Map.Entry<SourceFile, SourceSpec<?>> sourceFileSpec : specBySourceFile.entrySet()) {
+            if (!sourceFileSpec.getValue().isSkip()) {
+                runnableSourceFiles.add(sourceFileSpec.getKey());
+            }
+        }
+
         RecipeRun recipeRun = recipe.run(
-                beforeSourceFiles,
+                runnableSourceFiles,
                 executionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,
@@ -393,8 +400,8 @@ public interface RewriteTest extends SourceSpecs {
 
 class RewriteTestUtils {
     static boolean groupSourceSpecsByParser(List<Parser.Builder> parserBuilders, Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
-        for(Map.Entry<Parser.Builder, List<SourceSpec<?>>> entry : sourceSpecsByParser.entrySet()) {
-            if(entry.getKey().getSourceFileType().equals(sourceSpec.sourceFileType)) {
+        for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> entry : sourceSpecsByParser.entrySet()) {
+            if (entry.getKey().getSourceFileType().equals(sourceSpec.sourceFileType)) {
                 entry.getValue().add(sourceSpec);
                 return true;
             }

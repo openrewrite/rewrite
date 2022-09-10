@@ -152,7 +152,7 @@ public class UpgradeDependencyVersion extends Recipe {
                         if (dm != null) {
                             String requestedVersion = dm.getRequested().getVersion();
                             if (requestedVersion.startsWith("${")) {
-                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
+                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                                 return t;
                             }
                         }
@@ -161,7 +161,7 @@ public class UpgradeDependencyVersion extends Recipe {
                         if (version.isPresent()) {
                             String requestedVersion = d.getRequested().getVersion();
                             if (requestedVersion != null && requestedVersion.startsWith("${")) {
-                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
+                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                                 return t;
                             }
                             t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(version.get(), newerVersion).visitNonNull(t, 0, getCursor());
@@ -185,7 +185,7 @@ public class UpgradeDependencyVersion extends Recipe {
                         String newerVersion = findNewerVersion(matchedManagedDependency.getGroupId(), matchedManagedDependency.getArtifactId(), matchedManagedDependency.getVersion(), ctx);
                         if (newerVersion != null) {
                             if (requestedVersion.startsWith("${")) {
-                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
+                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                                 return t;
                             }
                             Xml.Tag childVersionTag = t.getChild("version").orElse(null);
@@ -210,7 +210,7 @@ public class UpgradeDependencyVersion extends Recipe {
                                     String newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(), bom.getVersion(), ctx);
                                     if (newerVersion != null) {
                                         if (requestedVersion.startsWith("${")) {
-                                            doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion));
+                                            doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                                             return t;
                                         }
                                         Xml.Tag childVersionTag = t.getChild("version").orElse(null);

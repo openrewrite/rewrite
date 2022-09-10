@@ -50,6 +50,14 @@ public class AddProperty extends Recipe {
     @Nullable
     Boolean preserveExistingValue;
 
+    @Option(displayName = "Trust parent POM",
+            description = "Even if the parent defines a property with the same key, trust it even if the value isn't the same. " +
+                    "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
+            example = "false",
+            required = false)
+    @Nullable
+    Boolean trustParent;
+
     @Override
     public String getDisplayName() {
         return "Add Maven project property";
@@ -58,6 +66,26 @@ public class AddProperty extends Recipe {
     @Override
     public String getDescription() {
         return "Add a new property to the Maven project property.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                String currentValue = getResolutionResult().getPom().getProperties().get(key);
+                boolean trust = Boolean.TRUE.equals(trustParent);
+                if (!trust && !value.equals(currentValue)) {
+                    return document.withMarkers(document.getMarkers().searchResult());
+                } else if (trust) {
+                    String myValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
+                    if (myValue != null && !myValue.equals(value)) {
+                        return document.withMarkers(document.getMarkers().searchResult());
+                    }
+                }
+                return document;
+            }
+        };
     }
 
     @Override

@@ -22,13 +22,8 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.TagNameComparator;
-import org.openrewrite.xml.format.AutoFormatVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -51,6 +46,14 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean addIfMissing;
 
+    @Option(displayName = "Trust parent POM",
+            description = "Even if the parent defines a property with the same key, trust it even if the value isn't the same. " +
+                    "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
+            example = "false",
+            required = false)
+    @Nullable
+    Boolean trustParent;
+
     @Override
     public String getDisplayName() {
         return "Change Maven project property value";
@@ -62,6 +65,26 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                String currentValue = getResolutionResult().getPom().getProperties().get(key);
+                boolean trust = Boolean.TRUE.equals(trustParent);
+                if (!trust && !newValue.equals(currentValue)) {
+                    return document.withMarkers(document.getMarkers().searchResult());
+                } else if (trust) {
+                    String myValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
+                    if (myValue != null && !myValue.equals(newValue)) {
+                        return document.withMarkers(document.getMarkers().searchResult());
+                    }
+                }
+                return document;
+            }
+        };
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             final String propertyName = key.replace("${", "").replace("}", "");
@@ -70,7 +93,7 @@ public class ChangePropertyValue extends Recipe {
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document d = super.visitDocument(document, ctx);
                 if (Boolean.TRUE.equals(addIfMissing)) {
-                    doAfterVisit(new AddProperty(key, newValue, true));
+                    doAfterVisit(new AddProperty(key, newValue, true, false));
                 }
                 return d;
             }

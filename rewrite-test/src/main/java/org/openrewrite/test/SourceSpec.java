@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -98,6 +97,8 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     protected Consumer<T> afterRecipe = t -> {
     };
 
+    protected boolean skip = false;
+
     public SourceSpec<T> path(Path sourcePath) {
         this.sourcePath = sourcePath;
         return this;
@@ -120,6 +121,11 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     public SourceSpec<T> afterRecipe(Consumer<T> afterRecipe) {
         this.afterRecipe = afterRecipe;
+        return this;
+    }
+
+    public SourceSpec<T> skip(@Nullable Boolean skip) {
+        this.skip = Boolean.TRUE.equals(skip);
         return this;
     }
 
