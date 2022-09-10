@@ -110,14 +110,24 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     charData(chardata.getText(), false));
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
-        } else if (ctx.reference() != null && ctx.reference().EntityRef() != null) {
-            cursor += ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
-            return new Xml.CharData(randomId(),
-                    "",
-                    Markers.EMPTY,
-                    false,
-                    ctx.reference().EntityRef().getText(),
-                    "");
+        } else if (ctx.reference() != null) {
+            if (ctx.reference().EntityRef() != null) {
+                cursor += ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
+                return new Xml.CharData(randomId(),
+                        "",
+                        Markers.EMPTY,
+                        false,
+                        ctx.reference().EntityRef().getText(),
+                        "");
+            } else if (ctx.reference().CharRef() != null) {
+                cursor += ctx.reference().CharRef().getSymbol().getStopIndex() + 1;
+                return new Xml.CharData(randomId(),
+                        "",
+                        Markers.EMPTY,
+                        false,
+                        ctx.reference().CharRef().getText(),
+                        "");
+            }
         } else if (ctx.COMMENT() != null) {
             return convert(ctx.COMMENT(), (comment, prefix) -> new Xml.Comment(randomId(),
                     prefix,

@@ -19,14 +19,22 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.internal.StringUtils
+import org.openrewrite.test.RewriteTest
+import org.openrewrite.xml.Assertions.xml
 
-class XmlParserTest {
+class XmlParserTest: RewriteTest {
     private val parser: XmlParser = XmlParser()
 
     private fun assertUnchanged(before: String) {
         val xmlDocument = parser.parse(StringUtils.trimIndent(before)).iterator().next()
         assertThat(xmlDocument.printAll()).`as`("Source should not be changed").isEqualTo(before)
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2189")
+    @Test
+    fun specialCharacters() = rewriteRun(
+        xml("<project>Some &#39;Example&#39;</project>")
+    )
 
     @Test
     fun parseXmlDocument() = assertUnchanged(
