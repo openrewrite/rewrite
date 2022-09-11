@@ -117,7 +117,10 @@ public interface RecipeScheduler {
             SourceFile original = sourceFileIdentities.get(s.getId());
             if (original != s) {
                 if (original == null) {
-                    results.add(new Result(null, s, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
+                    results.add(new Result(null, s, s.getMarkers()
+                            .findFirst(RecipesThatMadeChanges.class)
+                            .orElseThrow(() -> new IllegalStateException("SourceFile was created but no recipe reported making it."))
+                            .getRecipes()));
                 } else {
                     if (original.getMarkers().findFirst(Generated.class).isPresent()) {
                         continue;
@@ -400,6 +403,7 @@ class RecipeSchedulerUtils {
                 .withSourcePath(Paths.get("recipe-exception-" + ctx.incrementAndGetUncaughtExceptionCount() + ".txt"));
         exception = exception.withMarkers(exception.getMarkers().computeByType(new UncaughtVisitorExceptionResult(new UncaughtVisitorException(t)),
                 (acc, m) -> acc));
+        exception = addRecipesThatMadeChanges(recipeStack, exception);
         return ListUtils.concat(before, exception);
     }
 }

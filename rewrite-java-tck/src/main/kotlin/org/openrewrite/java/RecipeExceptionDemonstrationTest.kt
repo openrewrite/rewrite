@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -41,6 +42,9 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 spec
                         .recipe(RecipeExceptionDemonstration("java.util.List add(..)", null, null,
                                 null, null, null, null))
+                        .afterRecipe { run ->
+                            assertThat(run.results[0].recipes.firstOrNull()).isNotNull
+                        }
                         .executionContext(InMemoryExecutionContext())
             },
             java(
@@ -71,6 +75,9 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 spec
                         .recipe(RecipeExceptionDemonstration(null, null, null,
                                 true, null, null, null))
+                        .afterRecipe { run ->
+                            assertThat(run.results[0].recipes.firstOrNull()).isNotNull
+                        }
                         .executionContext(InMemoryExecutionContext())
             },
             java(
@@ -96,6 +103,9 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 spec
                         .recipe(RecipeExceptionDemonstration(null, null, null,
                                 null, null, true, null))
+                        .afterRecipe { run ->
+                            assertThat(run.results[0].recipes.firstOrNull()).isNotNull
+                        }
                         .executionContext(InMemoryExecutionContext())
             },
             java(
@@ -124,6 +134,9 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 spec
                         .recipe(RecipeExceptionDemonstration(null, null, null,
                                 null, true, null, null))
+                        .afterRecipe { run ->
+                            assertThat(run.results[0].recipes.firstOrNull()).isNotNull
+                        }
                         .executionContext(InMemoryExecutionContext())
             },
             java(
@@ -154,6 +167,9 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 spec
                         .recipe(RecipeExceptionDemonstration(null, null, true,
                                 null, null, null, null))
+                        .afterRecipe { run ->
+                            assertThat(run.results[0].recipes.firstOrNull()).isNotNull
+                        }
                         .executionContext(InMemoryExecutionContext())
             },
             java(
@@ -184,6 +200,9 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 spec
                         .recipe(RecipeExceptionDemonstration(null, true, null,
                                 null, null, null, null))
+                        .afterRecipe { run ->
+                            assertThat(run.results[0].recipes.firstOrNull()).isNotNull
+                        }
                         .executionContext(InMemoryExecutionContext())
             },
             java(
