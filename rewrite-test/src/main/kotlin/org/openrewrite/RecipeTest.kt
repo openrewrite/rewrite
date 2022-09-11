@@ -205,14 +205,14 @@ interface RecipeTest<T : SourceFile> {
         }
 
         override fun <S : SourceFile?> scheduleVisit(
-            runStats: RecipeRunStats,
-            recipeStack: Stack<Recipe>,
-            before: MutableList<S>,
-            ctx: ExecutionContext,
-            recipeThatDeletedSourceFile: MutableMap<UUID, Stack<Recipe>>
+                runStats: RecipeRunStats,
+                recipeStack: Stack<Recipe>,
+                before: MutableList<S>,
+                ctx: ExecutionContext,
+                recipeThatAddedOrDeletedSourceFile: MutableMap<UUID, Stack<Recipe>>
         ): MutableList<S> {
             ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges)
-            val afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, recipeThatDeletedSourceFile)
+            val afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, recipeThatAddedOrDeletedSourceFile)
             if (afterList !== before) {
                 cyclesThatResultedInChanges = cyclesThatResultedInChanges.inc()
                 if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&

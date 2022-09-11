@@ -35,8 +35,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singleton;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.RecipeSchedulerUtils.addRecipesThatMadeChanges;
@@ -80,7 +79,7 @@ public interface RecipeScheduler {
                 .register(Metrics.globalRegistry)
                 .record(before.size());
 
-        Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile = new HashMap<>();
+        Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile = new HashMap<>();
         List<? extends SourceFile> acc = before;
         List<? extends SourceFile> after = acc;
 
@@ -93,7 +92,7 @@ public interface RecipeScheduler {
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
-            after = scheduleVisit(recipeRun.getStats(), recipeStack, acc, ctxWithWatch, recipeThatDeletedSourceFile);
+            after = scheduleVisit(recipeRun.getStats(), recipeStack, acc, ctxWithWatch, recipeThatAddedOrDeletedSourceFile);
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
@@ -117,10 +116,7 @@ public interface RecipeScheduler {
             SourceFile original = sourceFileIdentities.get(s.getId());
             if (original != s) {
                 if (original == null) {
-                    results.add(new Result(null, s, s.getMarkers()
-                            .findFirst(RecipesThatMadeChanges.class)
-                            .orElseThrow(() -> new IllegalStateException("SourceFile was created but no recipe reported making it."))
-                            .getRecipes()));
+                    results.add(new Result(null, s, singletonList(recipeThatAddedOrDeletedSourceFile.get(s.getId()))));
                 } else {
                     if (original.getMarkers().findFirst(Generated.class).isPresent()) {
                         continue;
@@ -154,7 +150,7 @@ public interface RecipeScheduler {
         // removed files
         for (SourceFile s : before) {
             if (!afterIds.contains(s.getId()) && !s.getMarkers().findFirst(Generated.class).isPresent()) {
-                results.add(new Result(s, null, singleton(recipeThatDeletedSourceFile.get(s.getId()))));
+                results.add(new Result(s, null, singleton(recipeThatAddedOrDeletedSourceFile.get(s.getId()))));
             }
         }
 
@@ -165,7 +161,7 @@ public interface RecipeScheduler {
                                                          Stack<Recipe> recipeStack,
                                                          List<S> before,
                                                          ExecutionContext ctx,
-                                                         Map<UUID, Stack<Recipe>> recipeThatDeletedSourceFile) {
+                                                         Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile) {
         runStats.calls.incrementAndGet();
         long startTime = System.nanoTime();
         Recipe recipe = recipeStack.peek();
@@ -195,7 +191,7 @@ public interface RecipeScheduler {
                 }
             }
         } catch (Throwable t) {
-            return handleUncaughtException(recipeStack, before, ctx, recipe, t);
+            return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
         }
 
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
@@ -271,7 +267,7 @@ public interface RecipeScheduler {
                     afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
                     sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
                 } else if (afterFile == null) {
-                    recipeThatDeletedSourceFile.put(requireNonNull(s).getId(), recipeStack);
+                    recipeThatAddedOrDeletedSourceFile.put(requireNonNull(s).getId(), recipeStack);
                     sample.stop(MetricsHelper.successTags(timer, "deleted").register(Metrics.globalRegistry));
                 } else {
                     sample.stop(MetricsHelper.successTags(timer, "unchanged").register(Metrics.globalRegistry));
@@ -291,7 +287,7 @@ public interface RecipeScheduler {
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
-            return handleUncaughtException(recipeStack, before, ctx, recipe, t);
+            return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
         }
 
         if (afterWidened != after) {
@@ -303,7 +299,7 @@ public interface RecipeScheduler {
                 SourceFile original = originalMap.get(s.getId());
                 if (original == null) {
                     // a new source file generated
-                    recipeThatDeletedSourceFile.put(s.getId(), recipeStack);
+                    recipeThatAddedOrDeletedSourceFile.put(s.getId(), recipeStack);
                 } else if (s != original) {
                     List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
                     recipeStackList.add(recipeStack);
@@ -320,7 +316,7 @@ public interface RecipeScheduler {
             for (SourceFile maybeDeleted : after) {
                 if (!afterWidened.contains(maybeDeleted)) {
                     // a source file deleted
-                    recipeThatDeletedSourceFile.put(maybeDeleted.getId(), recipeStack);
+                    recipeThatAddedOrDeletedSourceFile.put(maybeDeleted.getId(), recipeStack);
                 }
             }
         }
@@ -350,7 +346,7 @@ public interface RecipeScheduler {
             }
 
             afterWidened = scheduleVisit(requireNonNull(nextStats), nextStack, afterWidened,
-                    ctx, recipeThatDeletedSourceFile);
+                    ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
         long totalTime = System.nanoTime() - startTime;
@@ -377,7 +373,12 @@ class RecipeSchedulerUtils {
         return afterFile;
     }
 
-    public static <S extends SourceFile> List<S> handleUncaughtException(Stack<Recipe> recipeStack, List<S> before, ExecutionContext ctx, Recipe recipe, Throwable t) {
+    public static <S extends SourceFile> List<S> handleUncaughtException(Stack<Recipe> recipeStack,
+                                                                         Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile,
+                                                                         List<S> before,
+                                                                         ExecutionContext ctx,
+                                                                         Recipe recipe,
+                                                                         Throwable t) {
         ctx.getOnError().accept(t);
         ctx.putMessage(PANIC, true);
 
@@ -403,7 +404,7 @@ class RecipeSchedulerUtils {
                 .withSourcePath(Paths.get("recipe-exception-" + ctx.incrementAndGetUncaughtExceptionCount() + ".txt"));
         exception = exception.withMarkers(exception.getMarkers().computeByType(new UncaughtVisitorExceptionResult(new UncaughtVisitorException(t)),
                 (acc, m) -> acc));
-        exception = addRecipesThatMadeChanges(recipeStack, exception);
+        recipeThatAddedOrDeletedSourceFile.put(exception.getId(), recipeStack);
         return ListUtils.concat(before, exception);
     }
 }
