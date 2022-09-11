@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
@@ -126,7 +127,7 @@ public class RecipeExceptionDemonstration extends Recipe {
 
     @Override
     protected TreeVisitor<J, ExecutionContext> getVisitor() {
-        if (throwOnMethodPattern != null) {
+        if (!StringUtils.isBlank(throwOnMethodPattern)) {
             return new JavaVisitor<ExecutionContext>() {
                 final MethodMatcher methodMatcher = new MethodMatcher(throwOnMethodPattern);
 
