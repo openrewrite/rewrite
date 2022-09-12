@@ -388,7 +388,9 @@ class RecipeSchedulerUtils {
             List<S> exceptionMapped = ListUtils.map(before, sourceFile -> {
                 //noinspection unchecked
                 S afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull((SourceFile) sourceFile), 0);
-                afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
+                if (afterFile != sourceFile) {
+                    afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
+                }
                 return afterFile;
             });
             if (exceptionMapped != before) {
