@@ -2355,8 +2355,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             spec.recipe(toRecipe {
                 object : JavaVisitor<ExecutionContext>() {
                     private var TO_STRING = MethodMatcher("java.lang.String toString()")
-                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}")
-                        .doBeforeParseTemplate(::println).build()
+                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
 
                     override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
                         val mi = super.visitMethodInvocation(method, ctx) as J
