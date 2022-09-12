@@ -493,7 +493,7 @@ public class BlockStatementTemplateGenerator {
             if (trimmed == null || trimmed.getMarkers().findFirst(RemoveTreeMarker.class).isPresent()) {
                 return null;
             }
-            return j;
+            return trimmed;
         }
 
         @Value
