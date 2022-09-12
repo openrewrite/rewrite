@@ -18,7 +18,10 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress(
     "SizeReplaceableByIsEmpty",
@@ -32,9 +35,33 @@ import org.openrewrite.java.JavaRecipeTest
     "ResultOfMethodCallIgnored",
     "Convert2MethodRef"
 )
-interface IsEmptyCallOnCollectionsTest : JavaRecipeTest {
+interface IsEmptyCallOnCollectionsTest : RewriteTest, JavaRecipeTest {
     override val recipe: Recipe
         get() = IsEmptyCallOnCollections()
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(IsEmptyCallOnCollections())
+    }
+
+    @Test
+    fun sizeOnClassImplementationCollection() = rewriteRun(
+            java("""
+                import java.util.ArrayList;
+                class Test extends ArrayList<String> {
+                    public boolean isZeroSize() {
+                        return size() == 0;
+                    }
+                }
+            """,
+            """
+                import java.util.ArrayList;
+                class Test extends ArrayList<String> {
+                    public boolean isZeroSize() {
+                        return isEmpty();
+                    }
+                }
+            """)
+    )
 
     @Test
     fun isEmptyCallOnCollections() = assertChanged(

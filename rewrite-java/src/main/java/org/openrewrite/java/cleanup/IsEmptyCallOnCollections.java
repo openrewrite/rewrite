@@ -63,6 +63,8 @@ public class IsEmptyCallOnCollections extends Recipe {
         return new JavaVisitor<ExecutionContext>() {
             final JavaTemplate isEmpty = JavaTemplate.builder(this::getCursor, "#{}#{any(java.util.Collection)}.isEmpty()")
                     .build();
+            final JavaTemplate isEmptyNoReceiver = JavaTemplate.builder(this::getCursor, "#{}isEmpty()")
+                    .build();
 
             @Override
             public J visitBinary(J.Binary binary, ExecutionContext ctx) {
@@ -71,10 +73,11 @@ public class IsEmptyCallOnCollections extends Recipe {
                         if (isZero(binary.getLeft()) || isZero(binary.getRight())) {
                             J.MethodInvocation sizeCall = (J.MethodInvocation) (COLLECTION_SIZE.matches(binary.getLeft()) ?
                                     binary.getLeft() : binary.getRight());
-                            return sizeCall.withTemplate(isEmpty, sizeCall.getCoordinates().replace(),
-                                            binary.getOperator() == J.Binary.Type.Equal ? "" : "!",
-                                            sizeCall.getSelect())
-                                    .withPrefix(binary.getPrefix());
+                            String op = binary.getOperator() == J.Binary.Type.Equal ? "" : "!";
+                            return (sizeCall.getSelect() == null ?
+                                sizeCall.withTemplate(isEmptyNoReceiver, sizeCall.getCoordinates().replace(), op) :
+                                sizeCall.withTemplate(isEmpty, sizeCall.getCoordinates().replace(), op, sizeCall.getSelect())
+                            ).withPrefix(binary.getPrefix());
                         }
                     }
                 }
