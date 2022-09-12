@@ -112,7 +112,9 @@ public class MavenPomDownloader {
                 .tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
-        for (MavenRepository repo : distinctNormalizedRepositories(repositories, containingPom, null)) {
+        Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
+        List<MavenDownloadingException> webRequestFailures = null;
+        for (MavenRepository repo : normalizedRepos) {
             String version = gav.getVersion();
             if (version != null) {
                 if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
@@ -148,8 +150,12 @@ public class MavenPomDownloader {
                             // If the request resulted in a common client-side error, cache a null result, as this is
                             // likely to continue to occur.
                             mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
-                        } catch (Throwable ignored) {
+                        } catch (Throwable exception) {
                             // various kinds of connection failures
+                            if (webRequestFailures == null) {
+                                webRequestFailures = new ArrayList<>();
+                            }
+                            webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
                         }
                     }
                 }
@@ -161,14 +167,31 @@ public class MavenPomDownloader {
                         mavenMetadata = mergeMetadata(mavenMetadata, result.get());
                     }
                 }
-            } catch (Exception ignored) {
-                // any download or marshaling failure
+            } catch (Exception exception) {
+                // various kinds of connection failures
+                if (webRequestFailures == null) {
+                    webRequestFailures = new ArrayList<>();
+                }
+                webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
             }
         }
 
         if (mavenMetadata == null) {
             sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-            throw new MavenDownloadingException("Unable to download metadata " + gav);
+
+            StringBuilder message = new StringBuilder("Unable to Download metadata for [").append(gav).append("] from the following repositories :");
+
+            for (MavenRepository repository : normalizedRepos) {
+                message.append("\n  ").append(repository.getUri());
+            }
+
+            if (webRequestFailures != null) {
+                message.append("\nMetadata download failures:");
+                for (MavenDownloadingException e : webRequestFailures) {
+                    message.append("\n  ").append(e.getMessage());
+                }
+            }
+            throw new MavenDownloadingException(message.toString());
         }
 
         sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
@@ -307,7 +330,7 @@ public class MavenPomDownloader {
             ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
         }
 
-        throw new MavenDownloadingException("Unable to download dependency " + gav + " from the following repositories :\n  - "
+        throw new MavenDownloadingException("Unable to download dependency [" + gav + "] from the following repositories :\n  - "
                 + normalizedRepos.stream().map(MavenRepository::getUri).collect(Collectors.joining("\n  - ")));
     }
 
