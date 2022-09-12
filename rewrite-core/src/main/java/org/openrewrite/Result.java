@@ -66,8 +66,8 @@ public class Result {
     @Nullable
     private Path relativeTo;
 
-    public List<UncaughtVisitorException> getRecipeErrors() {
-        List<UncaughtVisitorException> exceptions = new ArrayList<>();
+    public List<RecipeRunException> getRecipeErrors() {
+        List<RecipeRunException> exceptions = new ArrayList<>();
         new TreeVisitor<Tree, Integer>() {
             @Nullable
             @Override
@@ -76,7 +76,7 @@ public class Result {
                     try {
                         Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
                         Markers markers = (Markers) getMarkers.invoke(tree);
-                        markers.findFirst(UncaughtVisitorExceptionResult.class)
+                        markers.findFirst(RecipeRunExceptionResult.class)
                                 .ifPresent(e -> exceptions.add(e.getException()));
                     } catch (Throwable ignored) {
                     }

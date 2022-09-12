@@ -21,7 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.StringJoiner;
 import java.util.UUID;
 
-public class UncaughtVisitorException extends RuntimeException {
+public class RecipeRunException extends RuntimeException {
     @Getter
     private final UUID id = UUID.randomUUID();
 
@@ -32,12 +32,12 @@ public class UncaughtVisitorException extends RuntimeException {
     @Nullable
     private final Cursor cursor;
 
-    public UncaughtVisitorException(Throwable cause, @Nullable Cursor cursor) {
+    public RecipeRunException(Throwable cause, @Nullable Cursor cursor) {
         super(cause);
         this.cursor = cursor;
     }
 
-    public UncaughtVisitorException(Throwable cause) {
+    public RecipeRunException(Throwable cause) {
         this(cause, null);
     }
 

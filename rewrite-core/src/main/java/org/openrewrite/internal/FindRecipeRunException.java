@@ -17,21 +17,21 @@ package org.openrewrite.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.UncaughtVisitorException;
-import org.openrewrite.UncaughtVisitorExceptionResult;
+import org.openrewrite.RecipeRunException;
+import org.openrewrite.RecipeRunExceptionResult;
 import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.Method;
 
 import static java.util.Objects.requireNonNull;
 
-public class FindUncaughtVisitorException extends TreeVisitor<Tree, Integer> {
-    private final UncaughtVisitorException vt;
+public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
+    private final RecipeRunException vt;
     private final Tree nearestTree;
 
-    public FindUncaughtVisitorException(UncaughtVisitorException vt) {
-        this.vt = vt;
-        this.nearestTree = (Tree) requireNonNull(vt.getCursor()).getPath(Tree.class::isInstance).next();
+    public FindRecipeRunException(RecipeRunException rre) {
+        this.vt = rre;
+        this.nearestTree = (Tree) requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance).next();
     }
 
     @Override
@@ -42,7 +42,7 @@ public class FindUncaughtVisitorException extends TreeVisitor<Tree, Integer> {
                 Method withMarkers = tree.getClass().getDeclaredMethod("withMarkers", Markers.class);
                 Markers markers = (Markers) getMarkers.invoke(tree);
                 return (Tree) withMarkers.invoke(tree, markers
-                        .computeByType(new UncaughtVisitorExceptionResult(vt), (s1, s2) -> s1 == null ? s2 : s1));
+                        .computeByType(new RecipeRunExceptionResult(vt), (s1, s2) -> s1 == null ? s2 : s1));
             } catch (Throwable ignored) {
             }
         }
