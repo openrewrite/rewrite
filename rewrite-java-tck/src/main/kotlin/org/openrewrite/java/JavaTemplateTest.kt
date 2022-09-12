@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("DuplicatedCode", "ConstantConditions")
+@file:Suppress("DuplicatedCode", "ConstantConditions", "JUnitMalformedDeclaration", "UnusedAssignment",
+    "InstantiationOfUtilityClass", "StatementWithEmptyBody", "StringOperationCanBeSimplified"
+)
 
 package org.openrewrite.java
 
@@ -38,7 +40,6 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     fun templateStatementIsWithinTryWithResourcesBlock() = assertChanged(
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
                 override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J {
                     var nc = super.visitNewClass(newClass, p)
                     val md: J.MethodDeclaration? = cursor.firstEnclosing(J.MethodDeclaration::class.java)
@@ -1987,7 +1988,6 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         "UnnecessaryLocalVariable",
         "CachedNumberConstructorCall",
         "UnnecessaryTemporaryOnConversionToString",
-        "deprecation",
         "ResultOfMethodCallIgnored"
     )
     fun replaceNamedVariableInitializerMethodInvocation(jp: JavaParser.Builder<*, *>) = assertChanged(
@@ -2068,8 +2068,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         "UnnecessaryBoxing",
         "UnnecessaryLocalVariable",
         "CachedNumberConstructorCall",
-        "UnnecessaryTemporaryOnConversionToString",
-        "deprecation"
+        "UnnecessaryTemporaryOnConversionToString"
     )
     fun lambdaIsVariableInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.logCompilationWarningsAndErrors(true).build(),
