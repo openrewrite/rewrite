@@ -24,6 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
@@ -119,7 +120,7 @@ public class BlockStatementTemplateGenerator {
                         } else {
                             done = true;
                         }
-                        return trimmed;
+                        return t;
                     }
 
                     List<Comment> comments = t.getPrefix().getComments();
@@ -135,7 +136,7 @@ public class BlockStatementTemplateGenerator {
                             if (trimmed != null) {
                                 js.add(trimmed.withPrefix(trimmed.getPrefix().withComments(comments.subList(i + 1, comments.size()))));
                             }
-                            return trimmed;
+                            return t;
                         }
                     }
                 }
@@ -319,9 +320,11 @@ public class BlockStatementTemplateGenerator {
                     after.append(">()");
                 }
             }
-//            else if (m.getSelect() == prior) {
-//                after.append("." + m.withSelect(null).withComments(comments).printTrimmed(cursor));
-//            }
+            else if (m.getSelect() == prior) {
+                List<Comment> comments = new ArrayList<>(1);
+                comments.add(new TextComment(true, STOP_COMMENT, "", Markers.EMPTY));
+                after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor));
+            }
         } else if(j instanceof J.Return) {
             before.insert(0, "return ");
             after.append(";");
@@ -480,8 +483,6 @@ public class BlockStatementTemplateGenerator {
 
     // Visitor for removing any trees having or following the `STOP_COMMENT`
     private static class TemplatedTreeTrimmer extends JavaVisitor<Integer> {
-        private boolean foundStop;
-
         private boolean stopCommentExists(@Nullable J j) {
             if (j != null) {
                 for (Comment comment : j.getComments()) {
@@ -494,13 +495,26 @@ public class BlockStatementTemplateGenerator {
         }
 
         @Override
-        public @Nullable J visit(@Nullable Tree tree, Integer integer) {
-            J j = super.visit(tree, integer);
-            if (foundStop || stopCommentExists(j)) {
-                foundStop = true;
-                return null;
+        public J visitIdentifier(J.Identifier ident, Integer integer) {
+            J.Identifier id = (J.Identifier)super.visitIdentifier(ident, integer);
+            if (stopCommentExists(id)) {
+                Cursor parent = getCursor().getParent();
+                if (parent != null && !(parent.getValue() instanceof J.MethodInvocation)) {
+                    //noinspection ConstantConditions
+                    return null;
+                }
             }
-            return j;
+            return id;
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+            J.MethodInvocation mi = (J.MethodInvocation)super.visitMethodInvocation(method, integer);
+            if (stopCommentExists(mi.getName())) {
+                //noinspection ConstantConditions
+                return mi.getSelect();
+            }
+            return mi;
         }
     }
 }

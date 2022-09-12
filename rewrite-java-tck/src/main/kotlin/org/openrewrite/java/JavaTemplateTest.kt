@@ -23,7 +23,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.java.tree.*
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.Space
+import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.test.RewriteTest
 import java.util.Comparator.comparing
 
@@ -2338,6 +2341,54 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             class T {
                 void m() {
                     for (String s : Collections.emptyList()) {}
+                }
+            }
+            """
+        )
+    )
+
+    @Suppress("StringOperationCanBeSimplified")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2185")
+    @Test
+    fun chainedMethodInvocationsAsNewClassArgument() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaVisitor<ExecutionContext>() {
+                    private var TO_STRING = MethodMatcher("java.lang.String toString()")
+                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
+
+                    override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
+                        val mi = super.visitMethodInvocation(method, ctx) as J
+                        if (mi is J.MethodInvocation && TO_STRING.matches(mi)) {
+                            return mi.withTemplate(t, mi.coordinates.replace(), mi.select)
+                        }
+                        return mi
+                    }
+                }
+            })
+        },
+        java(
+            """
+            import java.util.ArrayList;
+            import java.util.Collections;
+            public class T {
+                void m(String arg) {
+                    U u = new U(arg.toString().toCharArray());
+                }
+                class U {
+                    U(char[] chars){}
+                }
+            }
+            """,
+            """
+            import java.util.ArrayList;
+            import java.util.Collections;
+            public class T {
+                void m(String arg) {
+                    U u = new U(arg.toCharArray());
+                }
+                class U {
+                    U(char[] chars){}
                 }
             }
             """
