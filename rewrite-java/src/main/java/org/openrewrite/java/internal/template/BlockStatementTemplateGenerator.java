@@ -17,13 +17,17 @@ package org.openrewrite.java.internal.template;
 
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
+import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
@@ -87,7 +91,6 @@ public class BlockStatementTemplateGenerator {
         List<J2> js = new ArrayList<>();
 
         new JavaIsoVisitor<Integer>() {
-            final TemplatedTreeTrimmer treeTrimmer = new TemplatedTreeTrimmer();
             boolean done = false;
 
             @Nullable
@@ -114,7 +117,7 @@ public class BlockStatementTemplateGenerator {
 
                     if (blockEnclosingTemplateComment != null) {
                         //noinspection unchecked
-                        J2 trimmed = (J2) treeTrimmer.visit(t, 0);
+                        J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree(t);
                         if (trimmed != null) {
                             js.add(trimmed);
                         } else {
@@ -129,7 +132,7 @@ public class BlockStatementTemplateGenerator {
                         if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
                             blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
                             //noinspection unchecked
-                            J2 trimmed = (J2) treeTrimmer.visit(t, 0);
+                            J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree(t);
                             if (t != trimmed) {
                                 done = true;
                             }
@@ -237,7 +240,7 @@ public class BlockStatementTemplateGenerator {
                         }
                         beforeSegments.append(valueOfType(arg.getType())).append(",");
                     } else {
-                        afterSegments.append(",").append(valueOfType(arg.getType()));
+                        afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
                     }
                 }
                 afterSegments.append(")");
@@ -482,39 +485,57 @@ public class BlockStatementTemplateGenerator {
     }
 
     // Visitor for removing any trees having or following the `STOP_COMMENT`
-    private static class TemplatedTreeTrimmer extends JavaVisitor<Integer> {
-        private boolean stopCommentExists(@Nullable J j) {
-            if (j != null) {
-                for (Comment comment : j.getComments()) {
-                    if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
-                        return true;
+    private static class TemplatedTreeTrimmer {
+
+        @Nullable
+        static J trimTree(J j) {
+            J trimmed = new TemplatedTreeTrimmerVisitor().visit(j, 0);
+            if (trimmed == null || trimmed.getMarkers().findFirst(RemoveTreeMarker.class).isPresent()) {
+                return null;
+            }
+            return j;
+        }
+
+        @Value
+        @AllArgsConstructor
+        private static class RemoveTreeMarker implements Marker {
+            @With
+            UUID id;
+        }
+
+        private static class TemplatedTreeTrimmerVisitor extends JavaVisitor<Integer> {
+            private boolean stopCommentExists(@Nullable J j) {
+                if (j != null) {
+                    for (Comment comment : j.getComments()) {
+                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                            return true;
+                        }
                     }
                 }
+                return false;
             }
-            return false;
-        }
 
-        @Override
-        public J visitIdentifier(J.Identifier ident, Integer integer) {
-            J.Identifier id = (J.Identifier)super.visitIdentifier(ident, integer);
-            if (stopCommentExists(id)) {
-                Cursor parent = getCursor().getParent();
-                if (parent != null && !(parent.getValue() instanceof J.MethodInvocation)) {
-                    //noinspection ConstantConditions
-                    return null;
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, Integer integer) {
+                J j = super.visit(tree, integer);
+                if (stopCommentExists(j)) {
+                    Cursor parent = getCursor().getParent();
+                    if (parent == null || !(parent.getValue() instanceof J.MethodInvocation)) {
+                        return j.withMarkers(j.getMarkers().addIfAbsent(new RemoveTreeMarker(Tree.randomId())));
+                    }
                 }
+                return j;
             }
-            return id;
-        }
 
-        @Override
-        public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-            J.MethodInvocation mi = (J.MethodInvocation)super.visitMethodInvocation(method, integer);
-            if (stopCommentExists(mi.getName())) {
-                //noinspection ConstantConditions
-                return mi.getSelect();
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                J.MethodInvocation mi = (J.MethodInvocation)super.visitMethodInvocation(method, integer);
+                if (stopCommentExists(mi.getName())) {
+                    //noinspection ConstantConditions
+                    return mi.getSelect();
+                }
+                return mi;
             }
-            return mi;
         }
     }
 }

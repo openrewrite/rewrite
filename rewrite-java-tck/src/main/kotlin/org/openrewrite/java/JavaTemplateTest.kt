@@ -2394,4 +2394,47 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             """
         )
     )
+
+    @Test
+    fun chainedMethodInvocationsAsNewClassArgument2() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaVisitor<ExecutionContext>() {
+                    private var TO_STRING = MethodMatcher("java.lang.String toString()")
+                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}")
+                        .doBeforeParseTemplate(::println).build()
+
+                    override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
+                        val mi = super.visitMethodInvocation(method, ctx) as J
+                        if (mi is J.MethodInvocation && TO_STRING.matches(mi)) {
+                            return mi.withTemplate(t, mi.coordinates.replace(), mi.select)
+                        }
+                        return mi
+                    }
+                }
+            })
+        },
+        java(
+            """
+            class T {
+                void m(String jsonPayload) {
+                    HttpEntity entity = new HttpEntity(jsonPayload.toString(), 0);
+                }
+                class HttpEntity {
+                    HttpEntity(String s, int i){}
+                }
+            }
+            """,
+            """
+            class T {
+                void m(String jsonPayload) {
+                    HttpEntity entity = new HttpEntity(jsonPayload, 0);
+                }
+                class HttpEntity {
+                    HttpEntity(String s, int i){}
+                }
+            }
+            """
+        )
+    )
 }
