@@ -120,7 +120,7 @@ public class BlockStatementTemplateGenerator {
                         } else {
                             done = true;
                         }
-                        return trimmed;
+                        return t;
                     }
 
                     List<Comment> comments = t.getPrefix().getComments();
@@ -136,7 +136,7 @@ public class BlockStatementTemplateGenerator {
                             if (trimmed != null) {
                                 js.add(trimmed.withPrefix(trimmed.getPrefix().withComments(comments.subList(i + 1, comments.size()))));
                             }
-                            return trimmed;
+                            return t;
                         }
                     }
                 }
