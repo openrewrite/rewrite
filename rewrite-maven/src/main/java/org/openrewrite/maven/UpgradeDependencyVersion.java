@@ -76,14 +76,6 @@ public class UpgradeDependencyVersion extends Recipe {
     @Nullable
     Boolean overrideManagedVersion;
 
-    @Option(displayName = "Metadata failure mode",
-            description = "In the event that metadata for a matching dependency cannot be determined, this option determines how to handle the failure",
-            example = "fail",
-            valid = {"ignore", "warn", "fail"},
-            required = false)
-    @Nullable
-    String metadataFailureMode;
-
     @SuppressWarnings("ConstantConditions")
     @Override
     public Validated validate() {
@@ -236,14 +228,8 @@ public class UpgradeDependencyVersion extends Recipe {
                     }
                 }
             } catch (MavenDownloadingException exception) {
-                FailureMode failureMode = FailureMode.getFailureMode(metadataFailureMode);
-                if (failureMode == FailureMode.FAIL) {
-                    throw exception;
-                } else if (failureMode == FailureMode.IGNORE) {
-                    ctx.getOnError().accept(exception);
-                } else if (failureMode == FailureMode.WARN) {
-                    return t.withMarkers(t.getMarkers().searchResult(UncaughtVisitorException.getSanitizedStackTrace(exception)));
-                }
+                ctx.getOnError().accept(exception);
+                return t.withMarkers(t.getMarkers().searchResult(UncaughtVisitorException.getSanitizedStackTrace(exception)));
             }
             return t;
         }
@@ -267,21 +253,4 @@ public class UpgradeDependencyVersion extends Recipe {
             }
         }
     }
-
-    private enum FailureMode {
-        IGNORE,
-        WARN,
-        FAIL;
-
-        private static FailureMode getFailureMode(@Nullable String configuration) {
-            if ("ignore".equals(configuration)) {
-                return FailureMode.IGNORE;
-            } else if ("warn".equals(configuration)) {
-                return FailureMode.WARN;
-            } else {
-                return FailureMode.FAIL;
-            }
-        }
-    }
-
 }
