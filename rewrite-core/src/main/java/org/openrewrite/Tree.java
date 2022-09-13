@@ -24,6 +24,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
+import java.lang.reflect.Method;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -129,4 +130,29 @@ public interface Tree {
             return null;
         }
     }
+
+    @SuppressWarnings("unchecked")
+    default <T extends Tree> T withException(Throwable throwable, @Nullable ExecutionContext ctx) {
+        if (ctx != null) {
+            ctx.putMessage(Recipe.PANIC, "true");
+        }
+        RecipeRunException rre;
+        if (throwable instanceof RecipeRunException) {
+            rre = (RecipeRunException) throwable;
+        } else {
+            rre = new RecipeRunException(throwable);
+        }
+
+        try {
+            Method getMarkers = this.getClass().getDeclaredMethod("getMarkers");
+            Method withMarkers = this.getClass().getDeclaredMethod("withMarkers", Markers.class);
+            Markers markers = (Markers) getMarkers.invoke(this);
+            return (T) withMarkers.invoke(this, markers
+                    .computeByType(new RecipeRunExceptionResult(rre), (s1, s2) -> s1 == null ? s2 : s1));
+        } catch (Throwable ignored) {
+            return (T) this;
+        }
+    }
+
+
 }

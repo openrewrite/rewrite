@@ -19,13 +19,23 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.RecipeRunException;
 import org.openrewrite.RecipeRunExceptionResult;
-import org.openrewrite.marker.Markers;
-
-import java.lang.reflect.Method;
+import org.openrewrite.marker.Marker;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 
 public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
+
+    private static final TreeVisitor<Tree, AtomicBoolean> hasRecipeRunExceptionVisitor = new TreeVisitor<Tree, AtomicBoolean>() {
+        @Override
+        public <M extends Marker> M visitMarker(Marker marker, AtomicBoolean atomicBoolean) {
+            if (marker instanceof RecipeRunExceptionResult) {
+                atomicBoolean.set(true);
+            }
+            return super.visitMarker(marker,atomicBoolean);
+        }
+    };
+
     private final RecipeRunException vt;
     private final Tree nearestTree;
 
@@ -37,15 +47,14 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
     @Override
     public Tree preVisit(Tree tree, Integer integer) {
         if (tree == nearestTree) {
-            try {
-                Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
-                Method withMarkers = tree.getClass().getDeclaredMethod("withMarkers", Markers.class);
-                Markers markers = (Markers) getMarkers.invoke(tree);
-                return (Tree) withMarkers.invoke(tree, markers
-                        .computeByType(new RecipeRunExceptionResult(vt), (s1, s2) -> s1 == null ? s2 : s1));
-            } catch (Throwable ignored) {
-            }
+            return tree.withException(vt, null);
         }
         return tree;
+    }
+
+    public static boolean hasRecipeRunException(Tree tree) {
+        AtomicBoolean hasException = new AtomicBoolean(false);
+        hasRecipeRunExceptionVisitor.visit(tree, hasException);
+        return hasException.get();
     }
 }
