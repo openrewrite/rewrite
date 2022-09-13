@@ -337,6 +337,12 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
                 after.append(";");
             }
+        } else if (j instanceof J.WhileLoop) {
+            J.WhileLoop wl = (J.WhileLoop)j;
+            if(referToSameElement(prior, wl.getCondition())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
+            }
         } else if(j instanceof J.Assignment) {
             J.Assignment as = (J.Assignment)j;
             if(referToSameElement(prior, as.getAssignment())) {
