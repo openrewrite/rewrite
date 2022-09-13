@@ -25,10 +25,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
-import org.openrewrite.java.tree.Space
-import org.openrewrite.java.tree.TypeUtils
+import org.openrewrite.java.tree.*
 import org.openrewrite.test.RewriteTest
 import java.util.Comparator.comparing
 
@@ -2435,5 +2432,45 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             }
             """
         )
+    )
+
+    @Suppress("LoopConditionNotUpdatedInsideLoop")
+    @Test
+    fun templatingWhileLoopCondition() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaVisitor<ExecutionContext>() {
+                    override fun visitBinary(binary: J.Binary, p: ExecutionContext): J {
+                        if (binary.left is J.MethodInvocation) {
+                            val mi = binary.left as J.MethodInvocation
+                            return binary.withTemplate(
+                                JavaTemplate.builder(this::getCursor, "!#{any(java.util.List)}.isEmpty()")
+                                    .build(), mi.coordinates.replace(), mi.select
+                            )
+                        } else if (binary.left is J.Unary) {
+                            return binary.left
+                        }
+                        return binary
+                    }
+                }
+            })
+            spec.expectedCyclesThatMakeChanges(2)
+        },
+        java("""
+            import java.util.List;
+            class T {
+                void m(List<?> l) {
+                    while (l.size() != 0) {}
+                }
+            }
+        """,
+        """
+            import java.util.List;
+            class T {
+                void m(List<?> l) {
+                    while (!l.isEmpty()) {}
+                }
+            }
+        """)
     )
 }
