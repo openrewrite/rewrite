@@ -246,11 +246,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 afterVisit = null;
             }
         } catch (Throwable e) {
-            if (e instanceof UncaughtVisitorException) {
+            if (e instanceof RecipeRunException) {
                 // bubbling up from lower in the tree
                 throw e;
             }
-            throw new UncaughtVisitorException(e, getCursor());
+            throw new RecipeRunException(e, getCursor());
         }
 
         //noinspection unchecked

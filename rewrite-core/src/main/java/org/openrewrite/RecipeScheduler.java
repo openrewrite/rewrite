@@ -18,7 +18,7 @@ package org.openrewrite;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
-import org.openrewrite.internal.FindUncaughtVisitorException;
+import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MarkerIdPrinter;
 import org.openrewrite.internal.MetricsHelper;
@@ -250,15 +250,15 @@ public interface RecipeScheduler {
                     sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                     ctx.getOnError().accept(t);
 
-                    if (t instanceof UncaughtVisitorException) {
-                        UncaughtVisitorException vt = (UncaughtVisitorException) t;
+                    if (t instanceof RecipeRunException) {
+                        RecipeRunException vt = (RecipeRunException) t;
 
                         //noinspection unchecked
-                        afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull(afterFile), 0);
+                        afterFile = (S) new FindRecipeRunException(vt).visitNonNull(requireNonNull(afterFile), 0);
                     } else if (afterFile != null) {
                         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
                         // and instead we add a marker to the top of the source file to record the exception message.
-                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(new UncaughtVisitorExceptionResult(new UncaughtVisitorException(t)),
+                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(new RecipeRunExceptionResult(new RecipeRunException(t)),
                                 (acc, m) -> acc));
                     }
                 }
@@ -382,12 +382,12 @@ class RecipeSchedulerUtils {
         ctx.getOnError().accept(t);
         ctx.putMessage(PANIC, true);
 
-        if (t instanceof UncaughtVisitorException) {
-            UncaughtVisitorException vt = (UncaughtVisitorException) t;
+        if (t instanceof RecipeRunException) {
+            RecipeRunException vt = (RecipeRunException) t;
 
             List<S> exceptionMapped = ListUtils.map(before, sourceFile -> {
                 //noinspection unchecked
-                S afterFile = (S) new FindUncaughtVisitorException(vt).visitNonNull(requireNonNull((SourceFile) sourceFile), 0);
+                S afterFile = (S) new FindRecipeRunException(vt).visitNonNull(requireNonNull((SourceFile) sourceFile), 0);
                 if (afterFile != sourceFile) {
                     afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
                 }
@@ -404,7 +404,7 @@ class RecipeSchedulerUtils {
                 .parse("Rewrite encountered an uncaught recipe error in " + recipe.getName() + ".")
                 .get(0)
                 .withSourcePath(Paths.get("recipe-exception-" + ctx.incrementAndGetUncaughtExceptionCount() + ".txt"));
-        exception = exception.withMarkers(exception.getMarkers().computeByType(new UncaughtVisitorExceptionResult(new UncaughtVisitorException(t)),
+        exception = exception.withMarkers(exception.getMarkers().computeByType(new RecipeRunExceptionResult(new RecipeRunException(t)),
                 (acc, m) -> acc));
         recipeThatAddedOrDeletedSourceFile.put(exception.getId(), recipeStack);
         return ListUtils.concat(before, exception);

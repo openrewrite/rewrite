@@ -18,11 +18,11 @@ package org.openrewrite;
 import lombok.Getter;
 import org.openrewrite.marker.SearchResult;
 
-public class UncaughtVisitorExceptionResult extends SearchResult {
+public class RecipeRunExceptionResult extends SearchResult {
     @Getter
-    private final UncaughtVisitorException exception;
+    private final RecipeRunException exception;
 
-    public UncaughtVisitorExceptionResult(UncaughtVisitorException exception) {
+    public RecipeRunExceptionResult(RecipeRunException exception) {
         super(exception.getId(), exception.getSanitizedStackTrace());
         this.exception = exception;
     }

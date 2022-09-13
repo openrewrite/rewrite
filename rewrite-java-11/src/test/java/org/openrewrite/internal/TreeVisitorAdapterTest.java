@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.UncaughtVisitorException;
+import org.openrewrite.RecipeRunException;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -41,18 +41,18 @@ public class TreeVisitorAdapterTest {
     void findUncaught() {
         J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}").get(0);
 
-        AtomicReference<UncaughtVisitorException> e = new AtomicReference<>();
+        AtomicReference<RecipeRunException> e = new AtomicReference<>();
         new JavaVisitor<Integer>() {
             @Override
             public J visitIdentifier(J.Identifier ident, Integer p) {
-                e.set(new UncaughtVisitorException(new IllegalStateException("boom"), getCursor()));
+                e.set(new RecipeRunException(new IllegalStateException("boom"), getCursor()));
                 return super.visitIdentifier(ident, p);
             }
         }.visit(cu, 0);
 
         //noinspection unchecked
         JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(
-                new FindUncaughtVisitorException(e.get()), JavaVisitor.class);
+                new FindRecipeRunException(e.get()), JavaVisitor.class);
 
         jv.visitNonNull(cu, 0);
     }
