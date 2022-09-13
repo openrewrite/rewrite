@@ -41,12 +41,12 @@ public class RecipeRunException extends RuntimeException {
         this(cause, null);
     }
 
-    public static String getSanitizedStackTrace(Throwable cause) {
+    public String getSanitizedStackTrace() {
         StringJoiner sanitized = new StringJoiner("\n");
-        sanitized.add(cause.getClass().getName() + ": " + cause.getLocalizedMessage());
+        sanitized.add(getCause().getClass().getName() + ": " + getCause().getLocalizedMessage());
 
         int i = 0;
-        for (StackTraceElement stackTraceElement : cause.getStackTrace()) {
+        for (StackTraceElement stackTraceElement : getCause().getStackTrace()) {
             if (stackTraceElement.getClassName().equals(RecipeScheduler.class.getName())) {
                 break;
             }

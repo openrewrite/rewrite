@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.LatestPatch;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -228,14 +229,22 @@ public class UpgradeDependencyVersion extends Recipe {
                     }
                 }
             } catch (MavenDownloadingException exception) {
-                ctx.getOnError().accept(exception);
-                return t.withMarkers(t.getMarkers().searchResult(UncaughtVisitorException.getSanitizedStackTrace(exception)));
+                return t.withException(exception, ctx);
             }
             return t;
         }
 
         @Nullable
         private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) {
+
+            if (versionComparator instanceof LatestPatch) {
+                //In the case of latest patch, a new version can only be derived if the current version is a semantic
+                //version. Check if the current version is valid candidate before attempting to download metadata.
+                if (!versionComparator.isValid(version, version)) {
+                    return null;
+                }
+            }
+
             try {
                 MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                 List<String> versions = new ArrayList<>();

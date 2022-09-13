@@ -134,6 +134,7 @@ public interface Tree {
     @SuppressWarnings("unchecked")
     default <T extends Tree> T withException(Throwable throwable, @Nullable ExecutionContext ctx) {
         if (ctx != null) {
+            ctx.getOnError().accept(throwable);
             ctx.putMessage(Recipe.PANIC, "true");
         }
         RecipeRunException rre;
