@@ -143,6 +143,14 @@ public class BlockStatementTemplateGenerator {
                         }
                     }
                 }
+                // Catch any templated trees having a STOP_COMMENT which are missed due to invalid type information
+                else if (tree != null && !js.isEmpty()){
+                    //noinspection unchecked
+                    J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree((J) tree);
+                    if (trimmed != tree) {
+                        done = true;
+                    }
+                }
 
                 return super.visit(tree, p);
             }
