@@ -25,7 +25,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.java.tree.*
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.Space
+import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.test.RewriteTest
 import java.util.Comparator.comparing
 
@@ -2469,6 +2472,55 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             class T {
                 void m(List<?> l) {
                     while (!l.isEmpty()) {}
+                }
+            }
+        """)
+    )
+
+    @Suppress("BigDecimalLegacyMethod", "deprecation")
+    @Test
+    fun javaTemplateControlsSemiColons() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaVisitor<ExecutionContext>() {
+                    var BIG_DECIMAL_SET_SCALE = MethodMatcher("java.math.BigDecimal setScale(int, int)")
+                    var twoArgScale = JavaTemplate.builder({ cursor }, "#{any(int)}, #{}")
+                        .imports("java.math.RoundingMode")
+                        .doBeforeParseTemplate { x: String? -> println(x) }
+                        .build()
+
+                    override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
+                        var mi = super.visitMethodInvocation(method, p) as J.MethodInvocation
+                        if (BIG_DECIMAL_SET_SCALE.matches(mi)) {
+                            mi = mi.withTemplate(
+                                twoArgScale, mi.getCoordinates().replaceArguments(),
+                                mi.getArguments().get(0), "RoundingMode.HALF_UP"
+                            )
+                        }
+                        return mi
+                    }
+                }
+            })
+        },
+        java("""
+            import java.math.BigDecimal;
+            import java.math.RoundingMode;
+            
+            class A {
+                void m() {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append((new BigDecimal(0).setScale(1, BigDecimal.ROUND_HALF_UP).doubleValue())).append("|");
+                }
+            }
+        """,
+            """
+            import java.math.BigDecimal;
+            import java.math.RoundingMode;
+            
+            class A {
+                void m() {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append((new BigDecimal(0).setScale(1, RoundingMode.HALF_UP).doubleValue())).append("|");
                 }
             }
         """)

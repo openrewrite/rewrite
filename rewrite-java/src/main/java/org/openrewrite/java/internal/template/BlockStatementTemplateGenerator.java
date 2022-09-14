@@ -143,6 +143,14 @@ public class BlockStatementTemplateGenerator {
                         }
                     }
                 }
+                // Catch any trees having a STOP_COMMENT that are not an instance of `expected`
+                else if (tree != null && !js.isEmpty()){
+                    //noinspection unchecked
+                    J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree((J) tree);
+                    if (trimmed != tree) {
+                        done = true;
+                    }
+                }
 
                 return super.visit(tree, p);
             }
