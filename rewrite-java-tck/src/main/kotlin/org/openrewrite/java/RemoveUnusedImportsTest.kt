@@ -48,14 +48,16 @@ interface RemoveUnusedImportsTest : JavaRecipeTest, RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1798")
     @Test
     fun doNotRemoveInnerClassInSamePackage() = rewriteRun(
-        java("""
+        java(
+            """
             package java.util;
 
             import java.util.Map.Entry;
 
             public abstract class MyMapEntry<K, V> implements Entry<K, V> {
             }
-        """)
+        """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1052")
@@ -755,5 +757,145 @@ interface RemoveUnusedImportsTest : JavaRecipeTest, RewriteTest {
                 }
             }
         """
+    )
+
+    @Test
+    fun removeMultipleDirectImports(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.Collection;
+            import java.util.Collection;
+
+            import static java.util.Collections.emptyList;
+            import static java.util.Collections.emptyList;
+
+            class A {
+               Collection<Integer> c = emptyList();
+            }
+        """,
+        after = """
+            import java.util.Collection;
+
+            import static java.util.Collections.emptyList;
+
+            class A {
+               Collection<Integer> c = emptyList();
+            }
+        """
+    )
+
+    @Test
+    fun removeMultipleWildcardImports(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.*;
+            import java.util.*;
+
+            import static java.util.Collections.emptyList;
+
+            class A {
+               Collection<Integer> c = emptyList();
+               Set<Integer> s = new HashSet<>();
+               List<String> l = Arrays.asList("a","b","c");
+            }
+        """,
+        after = """
+            import java.util.*;
+
+            import static java.util.Collections.emptyList;
+
+            class A {
+               Collection<Integer> c = emptyList();
+               Set<Integer> s = new HashSet<>();
+               List<String> l = Arrays.asList("a","b","c");
+            }
+        """
+    )
+
+    @Test
+    fun removeWildcardImportWithDirectImport(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.*;
+            import java.util.Collection;
+
+            import static java.util.Collections.*;
+            import static java.util.Collections.emptyList;
+
+            class A {
+               Collection<Integer> c = emptyList();
+            }
+        """,
+        after = """
+            import java.util.Collection;
+
+            import static java.util.Collections.emptyList;
+
+            class A {
+               Collection<Integer> c = emptyList();
+            }
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Test
+    fun removeDirectImportWithWildcardImport(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.Set;
+            import java.util.*;
+
+            import static java.util.Collections.emptyList;
+            import static java.util.Collections.*;
+
+            class A {
+               Collection<Integer> c = emptyList();
+               Set<Integer> s = emptySet();
+               List<String> l = Arrays.asList("c","b","a");
+               Iterator<Short> i = emptyIterator();
+            }
+        """,
+        after = """
+            import java.util.*;
+
+            import static java.util.Collections.*;
+
+            class A {
+               Collection<Integer> c = emptyList();
+               Set<Integer> s = emptySet();
+               List<String> l = Arrays.asList("c","b","a");
+               Iterator<Short> i = emptyIterator();
+            }
+        """
+    )
+
+    @Test
+    fun removeMultipleImportsWhileUnfoldingWildcard(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.Set;
+            import java.util.*;
+
+            import static java.util.Collections.emptyList;
+            import static java.util.Collections.*;
+
+            class A {
+               Collection<Integer> c = emptyList();
+               Set<Integer> s = emptySet();
+            }
+        """,
+        after = """
+            import java.util.Set;
+            import java.util.Collection;
+
+            import static java.util.Collections.emptyList;
+            import static java.util.Collections.emptySet;
+
+            class A {
+               Collection<Integer> c = emptyList();
+               Set<Integer> s = emptySet();
+            }
+        """,
+        expectedCyclesThatMakeChanges = 2
     )
 }
