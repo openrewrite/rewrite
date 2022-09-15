@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -93,16 +94,12 @@ public class UseStringReplace extends Recipe {
                     //Checks if the String literal may not be a regular expression,
                     //if so, then change the method invocation name
                     if (Objects.nonNull(value) && !mayBeRegExp(value)) {
-                        List<Expression> arguments = new ArrayList<>(invocation.getArguments());
                         String unEscapedLiteral = unEscapeCharacters(value);
-                        if (unEscapedLiteral.contains("\"")) {
-                            unEscapedLiteral = unEscapedLiteral.replace("\"", "\\\"");
-                        }
-                        arguments.set(0, literal.withValue(unEscapedLiteral).withValueSource(String.format("\"%s\"", unEscapedLiteral)));
-
-                        return invocation
+                        invocation = invocation
                                 .withName(invocation.getName().withSimpleName(REPLACE_METHOD_NAME))
-                                .withArguments(arguments);
+                                .withArguments(ListUtils.mapFirst(invocation.getArguments(), arg -> ((J.Literal) arg)
+                                        .withValue(unEscapedLiteral)
+                                        .withValueSource(toValueSource(unEscapedLiteral))));
                     }
                 }
             }
@@ -124,7 +121,33 @@ public class UseStringReplace extends Recipe {
             return argument.replace("\\\\", "\\")
                     .replace("\\\"", "\"")
                     .replace("\\'", "'")
-                    .replace("\\", "");
+                    .replace("\\", "")
+                    .replace("\"", "\\\"");
+        }
+
+        private String toValueSource(String value) {
+            List<Character> characterList = new ArrayList<>();
+            for (char c : value.toCharArray()) {
+                if (c == 9) {
+                    characterList.add('\\');
+                    characterList.add('t');
+                } else if (c == 10) {
+                    characterList.add('\\');
+                    characterList.add('n');
+                } else if (c == 13) {
+                    characterList.add('\\');
+                    characterList.add('r');
+                } else {
+                    characterList.add(c);
+                }
+            }
+            char[] valueSourceChars = new char[characterList.size() + 2];
+            valueSourceChars[0] = '"';
+            valueSourceChars[valueSourceChars.length -1] = '"';
+            for (int i = 0; i < characterList.size(); i++) {
+                valueSourceChars[i+1] = characterList.get(i);
+            }
+            return new String(valueSourceChars);
         }
     }
 }

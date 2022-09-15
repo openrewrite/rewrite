@@ -25,6 +25,23 @@ interface UseStringReplaceTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = UseStringReplace()
 
+
+    @Suppress("ReplaceOnLiteralHasNoEffect")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2222")
+    @Test
+    fun literalValueSourceAccountsForEscapeCharacters() = assertChanged(
+        before = """
+            class A {
+                String s = "".replaceAll("\n","\r\n");
+            }
+        """,
+        after = """
+            class A {
+                String s = "".replace("\n","\r\n");
+            }
+        """
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1781")
     @Test
     fun replaceAllContainsEscapedQuotes() = assertChanged(
@@ -72,7 +89,7 @@ interface UseStringReplaceTest : JavaRecipeTest {
                 class Test {
                     public void method() {
                         String someText = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
-                        String newText = someText.replaceAll("Bob is\\.", "It's");
+                        String newText = someText.replaceAll("Bob\s is\\.", "It's");
                     }
                 }
             """,
@@ -80,7 +97,7 @@ interface UseStringReplaceTest : JavaRecipeTest {
                 class Test {
                     public void method() {
                         String someText = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
-                        String newText = someText.replace("Bob is.", "It's");
+                        String newText = someText.replace("Bob  is.", "It's");
                     }
                 }
             """
