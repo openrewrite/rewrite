@@ -2400,8 +2400,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             spec.recipe(toRecipe {
                 object : JavaVisitor<ExecutionContext>() {
                     private var TO_STRING = MethodMatcher("java.lang.String toString()")
-                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}")
-                        .doBeforeParseTemplate(::println).build()
+                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
 
                     override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
                         val mi = super.visitMethodInvocation(method, ctx) as J
@@ -2477,7 +2476,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         """)
     )
 
-    @Suppress("BigDecimalLegacyMethod", "deprecation")
+    @Suppress("BigDecimalLegacyMethod")
     @Test
     fun javaTemplateControlsSemiColons() = rewriteRun(
         { spec ->
@@ -2485,9 +2484,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 object : JavaVisitor<ExecutionContext>() {
                     var BIG_DECIMAL_SET_SCALE = MethodMatcher("java.math.BigDecimal setScale(int, int)")
                     var twoArgScale = JavaTemplate.builder({ cursor }, "#{any(int)}, #{}")
-                        .imports("java.math.RoundingMode")
-                        .doBeforeParseTemplate { x: String? -> println(x) }
-                        .build()
+                        .imports("java.math.RoundingMode").build()
 
                     override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                         var mi = super.visitMethodInvocation(method, p) as J.MethodInvocation
