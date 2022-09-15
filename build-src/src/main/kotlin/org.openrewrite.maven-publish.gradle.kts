@@ -30,3 +30,32 @@ signing {
     useInMemoryPgpKeys(signingKey, signingPassword)
     sign(publishing.publications["nebula"])
 }
+
+configure<PublishingExtension> {
+    publications {
+        named("nebula", MavenPublication::class.java) {
+            suppressPomMetadataWarningsFor("runtimeElements")
+
+            pom.withXml {
+                (asElement().getElementsByTagName("dependencies").item(0) as org.w3c.dom.Element).let { dependencies ->
+                    dependencies.getElementsByTagName("dependency").let { dependencyList ->
+                        var i = 0
+                        var length = dependencyList.length
+                        while (i < length) {
+                            (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
+                                if ((dependency.getElementsByTagName("scope").item(0) as org.w3c.dom.Element).textContent == "provided" ||
+                                        (dependency.getElementsByTagName("groupId").item(0) as org.w3c.dom.Element).textContent == "org.projectlombok"
+                                ) {
+                                    dependencies.removeChild(dependency)
+                                    i--
+                                    length--
+                                }
+                            }
+                            i++
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
