@@ -15,7 +15,6 @@
  */
 package org.openrewrite.hcl.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
@@ -78,7 +77,6 @@ public class AttributeSpaceVisitor<P> extends HclIsoVisitor<P> {
         return a;
     }
 
-    @NotNull
     private List<Hcl.Attribute> getSiblingAttributes(final Hcl parent) {
         List<Hcl.Attribute> allAttributes = new ArrayList<>();
         if (parent instanceof Hcl.Block) {
