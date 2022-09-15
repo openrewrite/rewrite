@@ -741,7 +741,7 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
                 <version>1</version>
                 <properties>
                     <guava.version>28.0-jre</guava.version>
-                    <spring.version>5.3.22</spring.version>
+                    <spring.version>5.3.23</spring.version>
                     <spring.artifact-id>spring-jdbc</spring.artifact-id>
                 </properties>
                 <dependencies>
