@@ -69,7 +69,7 @@ public class ChangeMethodName extends Recipe {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 if(Boolean.TRUE.equals(ignoreDefinition)) {
-                    J j = new UsesMethod<>(methodPattern, matchOverrides).visitNonNull(cu, executionContext);
+                    J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, executionContext);
                     if(cu != j) {
                         return cu;
                     }
