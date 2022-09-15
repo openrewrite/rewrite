@@ -43,7 +43,8 @@ configure<PublishingExtension> {
                         var length = dependencyList.length
                         while (i < length) {
                             (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
-                                if ((dependency.getElementsByTagName("scope").item(0) as org.w3c.dom.Element).textContent == "provided" ||
+                                val scope = dependency.getElementsByTagName("scope").item(0)
+                                if (scope != null && (scope as org.w3c.dom.Element).textContent == "provided" ||
                                         (dependency.getElementsByTagName("groupId").item(0) as org.w3c.dom.Element).textContent == "org.projectlombok"
                                 ) {
                                     dependencies.removeChild(dependency)
