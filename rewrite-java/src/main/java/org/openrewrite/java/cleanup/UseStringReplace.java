@@ -15,10 +15,11 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.apache.commons.text.StringEscapeUtils;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -92,10 +93,11 @@ public class UseStringReplace extends Recipe {
                     //if so, then change the method invocation name
                     if (Objects.nonNull(value) && !mayBeRegExp(value)) {
                         String unEscapedLiteral = unEscapeCharacters(value);
-                        invocation = invocation.withTemplate(JavaTemplate.builder(this::getCursor,
-                                "#{any(java.lang.String)}.replace(\"#{}\", #{any(java.lang.String)})")
-                                .doBeforeParseTemplate(System.out::println).build(),
-                                invocation.getCoordinates().replace(), invocation.getSelect(), unEscapedLiteral, invocation.getArguments().get(1));
+                        invocation = invocation
+                                .withName(invocation.getName().withSimpleName("replace"))
+                                .withArguments(ListUtils.mapFirst(invocation.getArguments(), arg -> ((J.Literal) arg)
+                                        .withValue(unEscapedLiteral)
+                                        .withValueSource(String.format("\"%s\"", StringEscapeUtils.escapeJava(unEscapedLiteral)))));
                     }
                 }
             }
@@ -117,8 +119,7 @@ public class UseStringReplace extends Recipe {
             return argument.replace("\\\\", "\\")
                     .replace("\\\"", "\"")
                     .replace("\\'", "'")
-                    .replace("\\", "")
-                    .replace("\"", "\\\"");
+                    .replace("\\", "");
         }
     }
 }
