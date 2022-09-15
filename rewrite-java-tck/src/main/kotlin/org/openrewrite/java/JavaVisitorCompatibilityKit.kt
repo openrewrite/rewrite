@@ -35,6 +35,7 @@ import org.openrewrite.java.tree.TypeTreeTest
 // Tests are in alphabetical order.
 //----------------------------------------------------------------------------------------
 
+@Suppress("unused")
 @ExtendWith(JavaParserResolver::class)
 abstract class JavaVisitorCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
@@ -518,6 +519,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class UnnecessaryPrimitiveAnnotationsTck : UnnecessaryPrimitiveAnnotationsTest
+
+    @Nested
+    inner class UnnecessaryCatchTck : UnnecessaryCatchTest
 
     @Nested
     inner class UnnecessaryCloseInTryWithResourcesTck : UnnecessaryCloseInTryWithResourcesTest
