@@ -121,6 +121,11 @@ public interface Hcl extends Tree {
         @Getter
         Expression value;
 
+        @With
+        @Getter
+        @Nullable
+        Empty comma;
+
         @Override
         public <P> Hcl acceptHcl(HclVisitor<P> v, P p) {
             return v.visitAttribute(this, p);
@@ -160,7 +165,7 @@ public interface Hcl extends Tree {
             }
 
             public Attribute withType(HclLeftPadded<Type> type) {
-                return t.type == type ? t : new Attribute(t.id, t.prefix, t.markers, t.name, type, t.value);
+                return t.type == type ? t : new Attribute(t.id, t.prefix, t.markers, t.name, type, t.value, t.comma);
             }
         }
     }

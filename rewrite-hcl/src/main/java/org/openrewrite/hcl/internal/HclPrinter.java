@@ -87,6 +87,10 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
         p.out.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
         visit(attribute.getValue(), p);
+        if (attribute.getComma() != null) {
+            visitSpace(attribute.getComma().getPrefix(), Space.Location.OBJECT_VALUE_ATTRIBUTE_COMMA, p);
+            p.out.append(",");
+        }
         return attribute;
     }
 
@@ -291,7 +295,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visitSpace(objectValue.getPrefix(), Space.Location.OBJECT_VALUE, p);
         visitMarkers(objectValue.getMarkers(), p);
         visitContainer("{", objectValue.getPadding().getAttributes(), HclContainer.Location.OBJECT_VALUE_ATTRIBUTES,
-                ",", "}", p);
+                "", "}", p);
         return objectValue;
     }
 

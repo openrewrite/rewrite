@@ -203,18 +203,6 @@ public interface HCLParserListener extends ParseTreeListener {
 	 */
 	void exitIndexAccessExpression(HCLParser.IndexAccessExpressionContext ctx);
 	/**
-	 * Enter a parse tree produced by the {@code BlockExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
-	 * @param ctx the parse tree
-	 */
-	void enterBlockExpression(HCLParser.BlockExpressionContext ctx);
-	/**
-	 * Exit a parse tree produced by the {@code BlockExpression}
-	 * labeled alternative in {@link HCLParser#exprTerm}.
-	 * @param ctx the parse tree
-	 */
-	void exitBlockExpression(HCLParser.BlockExpressionContext ctx);
-	/**
 	 * Enter a parse tree produced by the {@code ForExpression}
 	 * labeled alternative in {@link HCLParser#exprTerm}.
 	 * @param ctx the parse tree

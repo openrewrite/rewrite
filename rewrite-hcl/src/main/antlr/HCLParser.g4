@@ -54,7 +54,6 @@ exprTerm
     | exprTerm getAttr              #AttributeAccessExpression
     | exprTerm splat                #SplatExpression
     | LPAREN expression RPAREN      #ParentheticalExpression
-    | blockExpr                     #BlockExpression
     ;
 
 blockExpr
@@ -83,11 +82,11 @@ tuple
     ;
 
 object
-    : LBRACE (objectelem (COMMA objectelem)* COMMA?)? RBRACE
+    : LBRACE objectelem* RBRACE
     ;
 
 objectelem
-    : (Identifier | LPAREN Identifier RPAREN) (ASSIGN | COLON) expression
+    : (Identifier | LPAREN Identifier RPAREN | QUOTE quotedTemplatePart* QUOTE) (ASSIGN | COLON) expression COMMA?
     ;
 
 // For Expressions

@@ -80,7 +80,7 @@ class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     @Override
     @Nullable
     public Hcl preVisit(Hcl tree, P p) {
-        if (tree instanceof Hcl.Block) {
+        if (tree instanceof Hcl.Block || tree instanceof Hcl.ObjectValue) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else {
             getCursor().putMessage("indentType", IndentType.ALIGN);
@@ -103,7 +103,7 @@ class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                 <IndentType>getNearestMessage("indentType")).orElse(IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
-        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_CLOSE);
+        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_CLOSE)|| loc.equals(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX);
 
         if (alignBlockToParent) {
             indentType = IndentType.ALIGN;
@@ -226,6 +226,16 @@ class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         return js == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
                 HclContainer.build(before, js, container.getMarkers());
+    }
+
+
+    @Override
+    public Hcl.Attribute visitAttribute(final Hcl.Attribute attribute, final P p) {
+        Hcl.Attribute a = attribute;
+        if (attribute.getComma() != null) {
+            a =  attribute.withComma(attribute.getComma().withPrefix(Space.EMPTY));
+        }
+        return super.visitAttribute(a, p);
     }
 
     private Space indentTo(Space space, int column, Space.Location spaceLocation) {
