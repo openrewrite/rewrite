@@ -18,16 +18,14 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -73,7 +71,6 @@ public class UseStringReplace extends Recipe {
     private static class UseStringReplaceVisitor extends JavaVisitor<ExecutionContext> {
 
         private static final MethodMatcher REPLACE_ALL = new MethodMatcher("java.lang.String replaceAll(..)");
-        private static final String REPLACE_METHOD_NAME = "replace";
         private static final Pattern ESCAPED_CHARACTER = Pattern.compile("\\\\\\.");
         private static final Pattern METACHARACTERS = Pattern.compile("[(\\[{\\\\^\\-=$!|\\]})?*+.]");
         private static final Pattern CHARACTER_CLASSES = Pattern.compile("\\\\d|\\\\D|\\\\s|\\\\S|\\\\w|\\\\W");
@@ -95,11 +92,10 @@ public class UseStringReplace extends Recipe {
                     //if so, then change the method invocation name
                     if (Objects.nonNull(value) && !mayBeRegExp(value)) {
                         String unEscapedLiteral = unEscapeCharacters(value);
-                        invocation = invocation
-                                .withName(invocation.getName().withSimpleName(REPLACE_METHOD_NAME))
-                                .withArguments(ListUtils.mapFirst(invocation.getArguments(), arg -> ((J.Literal) arg)
-                                        .withValue(unEscapedLiteral)
-                                        .withValueSource(toValueSource(unEscapedLiteral))));
+                        invocation = invocation.withTemplate(JavaTemplate.builder(this::getCursor,
+                                "#{any(java.lang.String)}.replace(\"#{}\", #{any(java.lang.String)})")
+                                .doBeforeParseTemplate(System.out::println).build(),
+                                invocation.getCoordinates().replace(), invocation.getSelect(), unEscapedLiteral, invocation.getArguments().get(1));
                     }
                 }
             }
@@ -123,31 +119,6 @@ public class UseStringReplace extends Recipe {
                     .replace("\\'", "'")
                     .replace("\\", "")
                     .replace("\"", "\\\"");
-        }
-
-        private String toValueSource(String value) {
-            List<Character> characterList = new ArrayList<>();
-            for (char c : value.toCharArray()) {
-                if (c == 9) {
-                    characterList.add('\\');
-                    characterList.add('t');
-                } else if (c == 10) {
-                    characterList.add('\\');
-                    characterList.add('n');
-                } else if (c == 13) {
-                    characterList.add('\\');
-                    characterList.add('r');
-                } else {
-                    characterList.add(c);
-                }
-            }
-            char[] valueSourceChars = new char[characterList.size() + 2];
-            valueSourceChars[0] = '"';
-            valueSourceChars[valueSourceChars.length -1] = '"';
-            for (int i = 0; i < characterList.size(); i++) {
-                valueSourceChars[i+1] = characterList.get(i);
-            }
-            return new String(valueSourceChars);
         }
     }
 }

@@ -89,7 +89,7 @@ interface UseStringReplaceTest : JavaRecipeTest {
                 class Test {
                     public void method() {
                         String someText = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
-                        String newText = someText.replaceAll("Bob\s is\\.", "It's");
+                        String newText = someText.replaceAll("Bob is\\.", "It's");
                     }
                 }
             """,
@@ -97,7 +97,7 @@ interface UseStringReplaceTest : JavaRecipeTest {
                 class Test {
                     public void method() {
                         String someText = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
-                        String newText = someText.replace("Bob  is.", "It's");
+                        String newText = someText.replace("Bob is.", "It's");
                     }
                 }
             """
