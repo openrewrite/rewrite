@@ -121,13 +121,19 @@ public class RemoveUnusedImports extends Recipe {
                 importUsage.add(singleUsage);
             }
 
-            // whenever an import statement is found to be used it should be marked true
+            // whenever an import statement is found to be used and not already in use it should be marked true
+            Set<String> checkedImports = new HashSet<>();
+            Set<String> usedWildcardImports = new HashSet<>();
+            Set<String> usedStaticWildcardImports = new HashSet<>();
             for (ImportUsage anImport : importUsage) {
                 J.Import elem = anImport.imports.get(0).getElement();
                 J.FieldAccess qualid = elem.getQualid();
                 J.Identifier name = qualid.getName();
 
-                if (elem.isStatic()) {
+                if (checkedImports.contains(elem.toString())) {
+                    anImport.used = false;
+                    changed = true;
+                } else if (elem.isStatic()) {
                     SortedSet<String> methodsAndFields = methodsAndFieldsByTypeName.get(elem.getTypeName());
 
                     String outerType = elem.getTypeName();
@@ -147,6 +153,7 @@ public class RemoveUnusedImports extends Recipe {
                     } else if ("*".equals(qualid.getSimpleName())) {
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
+                            usedStaticWildcardImports.add(elem.getTypeName());
                         } else if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
                                 (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
@@ -174,6 +181,8 @@ public class RemoveUnusedImports extends Recipe {
                                     .getElement().withPrefix(elem.getPrefix())));
 
                             changed = true;
+                        } else {
+                            usedStaticWildcardImports.add(elem.getTypeName());
                         }
                     } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
                             methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) {
@@ -191,6 +200,7 @@ public class RemoveUnusedImports extends Recipe {
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
+                            usedWildcardImports.add(elem.getPackageName());
                         } else if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
@@ -207,6 +217,8 @@ public class RemoveUnusedImports extends Recipe {
                                     .getElement().withPrefix(elem.getPrefix())));
 
                             changed = true;
+                        } else {
+                            usedWildcardImports.add(elem.getPackageName());
                         }
                     } else if (types.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
@@ -216,6 +228,25 @@ public class RemoveUnusedImports extends Recipe {
                     })) {
                         anImport.used = false;
                         changed = true;
+                    }
+                }
+                checkedImports.add(elem.toString());
+            }
+
+            // Do not use direct imports that are imported by a wildcard import
+            for (ImportUsage anImport : importUsage) {
+                J.Import elem = anImport.imports.get(0).getElement();
+                if (!"*".equals(elem.getQualid().getSimpleName())) {
+                    if (elem.isStatic()) {
+                        if (usedStaticWildcardImports.contains(elem.getTypeName())) {
+                            anImport.used = false;
+                            changed = true;
+                        }
+                    } else {
+                        if (usedWildcardImports.contains(elem.getPackageName())) {
+                            anImport.used = false;
+                            changed = true;
+                        }
                     }
                 }
             }
