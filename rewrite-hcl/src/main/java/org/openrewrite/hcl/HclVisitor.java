@@ -56,7 +56,7 @@ public class HclVisitor<P> extends TreeVisitor<Hcl, P> {
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ATTRIBUTE, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         a = (Hcl.Attribute) visitBodyContent(a, p);
-        a = a.withName((Hcl.Identifier) visit(a.getName(), p));
+        a = a.withName((Expression) visit(a.getName(), p));
         visitSpace(a.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
         a = a.withValue((Expression) visit(a.getValue(), p));
         return a;
