@@ -105,12 +105,14 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                     // Does not apply to for loop controls.
                     !(parentScope.getValue() instanceof J.ForLoop.Control) &&
                     // Does not apply to catches with 1 character.
-                    !((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) && variable.getSimpleName().length() == 1) &&
-                    // Name does not match camelCase pattern.
-                    !LOWER_CAMEL.matches(variable.getSimpleName())) {
+                    !((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) && variable.getSimpleName().length() == 1)) {
 
-                String toName = LOWER_CAMEL.format(variable.getSimpleName());
-                ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
+                if (!LOWER_CAMEL.matches(variable.getSimpleName())) {
+                    String toName = LOWER_CAMEL.format(variable.getSimpleName());
+                    ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
+                } else {
+                    ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(variable.getSimpleName());
+                }
             }
 
             return variable;

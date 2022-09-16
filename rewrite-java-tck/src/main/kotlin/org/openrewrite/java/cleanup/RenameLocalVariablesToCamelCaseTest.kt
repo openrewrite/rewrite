@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -24,6 +25,22 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
     override val recipe: Recipe?
         get() = RenameLocalVariablesToCamelCase()
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2227")
+    @Test
+    fun lowerCamelVariableHasNonLowerCamelVariableSibling(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class A {
+                void m()  {
+                    boolean secure = _secure > 0;
+                    final int _secure = 0;
+                    
+                    int _notSecure = 0;
+                    boolean notSecure = _notSecure < 1;
+                }
+            }
+        """
+    )
     @Test
     fun renameAllCapsAcronyms(jp: JavaParser) = assertChanged(
         jp,
