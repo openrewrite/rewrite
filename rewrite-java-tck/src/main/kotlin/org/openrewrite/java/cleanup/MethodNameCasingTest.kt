@@ -269,4 +269,22 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `keep camel case when removing leading underscore`() = assertChanged(
+        before = """
+            class Test {
+                private void _theMethod() {
+                
+                }
+            }
+        """,
+        after = """
+            class Test {
+                private void theMethod() {
+                
+                }
+            }
+        """
+    );
 }
