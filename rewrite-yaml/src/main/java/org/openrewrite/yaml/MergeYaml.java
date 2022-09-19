@@ -54,8 +54,8 @@ public class MergeYaml extends Recipe {
     String fileMatcher;
 
     @Incubating(since = "7.30.0")
-    @Option(displayName = "Optional name of a property which will be used to identify objects (mapping)",
-            description = "When merging entries of a sequence, what is the key to match on? Defaults to null.",
+    @Option(displayName = "Object identifying property",
+            description = "Name of a property which will be used to identify objects (mapping). This serves as the key to match on when merging entries of a sequence.",
             required = false,
             example = "name")
     @Nullable
