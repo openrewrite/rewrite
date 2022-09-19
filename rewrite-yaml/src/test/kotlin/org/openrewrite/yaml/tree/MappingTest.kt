@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.yaml.YamlParser
+import org.openrewrite.yaml.tree.Yaml.Scalar
 
 @Suppress("YAMLUnusedAnchor")
 class MappingTest: YamlParserTest {
@@ -47,7 +48,7 @@ class MappingTest: YamlParserTest {
                 name : org.openrewrite.text.ChangeTextToJon
             """,
             afterConditions = { y ->
-                Assertions.assertThat((y.documents[0].block as Yaml.Mapping).entries.map { it.key.value })
+                Assertions.assertThat((y.documents[0].block as Yaml.Mapping).entries.map { (it.key as Scalar).value })
                         .containsExactly("type", "name")
             }
     )
@@ -60,7 +61,7 @@ class MappingTest: YamlParserTest {
             """,
             afterConditions = { y ->
                 val mapping = y.documents[0].block as Yaml.Mapping
-                Assertions.assertThat(mapping.entries.map { it.key.value }).containsExactly("type")
+                Assertions.assertThat(mapping.entries.map { (it.key as Scalar).value }).containsExactly("type")
                 Assertions.assertThat(mapping.entries[0].value).isInstanceOf(Yaml.Mapping::class.java)
             }
     )
@@ -219,7 +220,6 @@ class MappingTest: YamlParserTest {
         config: [first: *first, stage: *stage, last: *last]
     """)
 
-    @Disabled
     @Test
     fun scalarKeyAnchor() = assertRoundTrip("""
         foo:
@@ -238,7 +238,14 @@ class MappingTest: YamlParserTest {
           - end: end
     """)
 
-    @Disabled
+    @Test
+    fun aliasEntryKey() = assertRoundTrip("""
+        bar:
+          &abc yo: friend
+        baz:
+          *abc: friendly
+    """)
+
     @Test
     fun scalarKeyAnchorInBrackets() = assertRoundTrip("""
         foo: [start: start, &anchor buz: buz, *anchor: baz, end: end]

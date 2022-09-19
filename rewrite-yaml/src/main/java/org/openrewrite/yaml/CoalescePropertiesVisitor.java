@@ -30,6 +30,9 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
 
     @Override
     public Yaml.Document visitDocument(Yaml.Document document, P p) {
+        if (document != new ReplaceAliasWithAnchorValueVisitor<P>().visit(document, p)) {
+            return document;
+        }
         findIndent.visit(document, p);
         return super.visitDocument(document, p);
     }
@@ -47,7 +50,7 @@ public class CoalescePropertiesVisitor<P> extends YamlIsoVisitor<P> {
                 if (valueMapping.getEntries().size() == 1) {
                     Yaml.Mapping.Entry subEntry = valueMapping.getEntries().iterator().next();
                     if (!subEntry.getPrefix().contains("#")) {
-                        Yaml.Scalar coalescedKey = entry.getKey().withValue(entry.getKey().getValue() + "." + subEntry.getKey().getValue());
+                        Yaml.Scalar coalescedKey = ((Yaml.Scalar) entry.getKey()).withValue(entry.getKey().getValue() + "." + subEntry.getKey().getValue());
 
                         entries.add(entry.withKey(coalescedKey)
                                 .withValue(subEntry.getValue()));

@@ -55,6 +55,8 @@ public class JsonPathMatcher {
         LinkedList<Tree> cursorPath = cursor.getPathAsStream()
                 .filter(o -> o instanceof Tree)
                 .map(Tree.class::cast)
+                .map(t -> new ReplaceAliasWithAnchorValueVisitor<Integer>()
+                        .visitNonNull(t, 0))
                 .collect(Collectors.toCollection(LinkedList::new));
         if (cursorPath.isEmpty()) {
             return Optional.empty();
@@ -78,14 +80,22 @@ public class JsonPathMatcher {
     }
 
     public boolean matches(Cursor cursor) {
-        List<Object> cursorPath = cursor.getPathAsStream().collect(Collectors.toList());
+        Object cursorValue = new ReplaceAliasWithAnchorValueVisitor<Integer>().visit((Tree)cursor.getValue(), 0);
+        List<Object> cursorPath = cursor.getPathAsStream()
+                .map(cp -> {
+                    if (cp instanceof Yaml) {
+                        cp = new ReplaceAliasWithAnchorValueVisitor<Integer>().visit((Yaml) cp, 0);
+                    }
+                    return cp;
+                })
+                .collect(Collectors.toList());
         return find(cursor).map(o -> {
             if (o instanceof List) {
                 //noinspection unchecked
                 List<Object> l = (List<Object>) o;
-                return !disjoint(l, cursorPath) && l.contains(cursor.getValue());
+                return !disjoint(l, cursorPath) && l.contains(cursorValue);
             } else {
-                return Objects.equals(o, cursor.getValue());
+                return Objects.equals(o, cursorValue);
             }
         }).orElse(false);
     }
