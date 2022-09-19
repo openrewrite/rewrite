@@ -37,6 +37,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                     description: a description
             """.trimIndent(),
             false,
+            null,
             null
         ),
         before = "",
@@ -60,6 +61,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                     description: a description
             """.trimIndent(),
             false,
+            null,
             null
         ),
         before = """
@@ -87,6 +89,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                         age: 7
             """.trimIndent(),
             false,
+            null,
             null
         ),
         before = """
@@ -120,7 +123,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                         list:
                           - item 2
                     """,
-                    false, null
+                    false, null, null
                 )
             )
         },
@@ -151,7 +154,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                         list:
                           - item 2
                     """,
-                    true, null
+                    true, null, null
                 )
             )
         },
@@ -172,6 +175,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
               bucketPolicyOnly: true
             """.trimIndent(),
             false,
+            null,
             null
         ),
         before = """
@@ -201,6 +205,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                         age: 7
             """.trimIndent(),
             false,
+            null,
             null
         ),
         before = """
@@ -230,6 +235,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
             "spec: 0",
             true,
             null,
+            null
         ),
         before = """
           apiVersion: policy/v1beta1
@@ -248,6 +254,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
             "$.spec.containers",
             "imagePullPolicy: Always",
             true,
+            null,
             null
         ),
         before = """
@@ -272,6 +279,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
             "$.spec.containers[?(@.name == 'pod-0')]",
             "imagePullPolicy: Always",
             true,
+            null,
             null
         ),
         before = """
@@ -300,6 +308,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                 privileged: false
             """.trimIndent(),
             true,
+            null,
             null
         ),
         before = """
@@ -330,6 +339,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                 privileged: false
             """.trimIndent(),
             true,
+            null,
             null
         ),
         before = """
@@ -357,6 +367,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                 cache: 'gradle'
             """.trimIndent(),
             false,
+            null,
             null
         ),
         before = """
@@ -393,6 +404,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                         - Mangrove
             """.trimIndent(),
             true,
+            null,
             null
         ),
         before = """
@@ -430,6 +442,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                        - 2
             """.trimIndent(),
             true,
+            null,
             null
         ),
         before = """
@@ -461,6 +474,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
                   nnmap2: v222
             """.trimIndent(),
             true,
+            null,
             null
         ),
         before = """
@@ -486,6 +500,233 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
+    fun mergeSequenceMapAddAdditionalObject() = assertChanged(
+        recipe = MergeYaml(
+            "$.testing",
+            """
+              table:
+                - name: jdk_version
+                  value: 18
+            """.trimIndent(),
+            false,
+            null,
+            "name"
+        ),
+        before = """
+            testing:
+              table:
+                - name: build_tool
+                  row2key2: maven
+            """,
+        after = """
+            testing:
+              table:
+                - name: build_tool
+                  row2key2: maven
+                - name: jdk_version
+                  value: 18
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
+    fun mergeSequenceMapAddObject() = assertChanged(
+        recipe = MergeYaml(
+            "$.testing",
+            """
+              table:
+                - name: jdk_version
+                  value: 18
+            """.trimIndent(),
+            false,
+            null,
+            "name"
+        ),
+        before = """
+            testing:
+              another: value
+        """,
+        after = """
+            testing:
+              another: value
+              table:
+                - name: jdk_version
+                  value: 18
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
+    fun mergeSequenceMapAddObjectFromRoot() = assertChanged(
+        recipe = MergeYaml(
+            "$",
+            """
+            testing:
+              table:
+                - name: jdk_version
+                  value: 18
+            """.trimIndent(),
+            false,
+            null,
+            null
+        ),
+        before = """
+        """,
+        after = """
+            testing:
+              table:
+                - name: jdk_version
+                  value: 18
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
+    fun mergeSequenceMapWhenOneIdenticalObjectExistsTheSecondIsAdded() = assertChanged(
+        recipe = MergeYaml(
+            "$.testing",
+            """
+              table:
+                - name: jdk_version
+                  value: 18
+                - name: build_tool
+                  row2key2: maven
+            """.trimIndent(),
+            false,
+            null,
+            "name"
+        ),
+        before = """
+            testing:
+              table:
+                - name: jdk_version
+                  value: 18
+        """,
+        after = """
+            testing:
+              table:
+                - name: jdk_version
+                  value: 18
+                - name: build_tool
+                  row2key2: maven
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
+    fun mergeSequenceMapWhenOneDifferentObjectExistsValuesAreChanged() = assertChanged(
+        recipe = MergeYaml(
+            "$.testing",
+            """
+              table:
+                - name: jdk_version
+                  value: 17
+            """.trimIndent(),
+            false,
+            null,
+            "name"
+        ),
+        before = """
+            testing:
+              table:
+                - name: jdk_version
+                  value: 18
+        """,
+        after = """
+            testing:
+              table:
+                - name: jdk_version
+                  value: 17
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
+    fun mergeSequenceMapAddComplexMapping() = assertChanged(
+        recipe = MergeYaml(
+            "$.spec",
+            """
+              serviceClaims:
+                - name: db02
+                  ref:
+                    apiVersion: sql.tanzu.vmware.com/v1
+                    kind: Postgres
+                    name: customer-profile-database-02
+            """.trimIndent(),
+            false,
+            null,
+            "name"
+        ),
+        before = """
+            spec:
+              serviceClaims:
+                - name: db
+                  ref:
+                    apiVersion: sql.tanzu.vmware.com/v1
+                    kind: Postgres
+                    name: customer-profile-database
+        """,
+        after = """
+            spec:
+              serviceClaims:
+                - name: db
+                  ref:
+                    apiVersion: sql.tanzu.vmware.com/v1
+                    kind: Postgres
+                    name: customer-profile-database
+                - name: db02
+                  ref:
+                    apiVersion: sql.tanzu.vmware.com/v1
+                    kind: Postgres
+                    name: customer-profile-database-02
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2157")
+    @Test
+    fun mergeSequenceMapChangeComplexMapping() = assertChanged(
+        recipe = MergeYaml(
+            "$.spec",
+            """
+              serviceClaims:
+                - name: db
+                  ref:
+                    apiVersion: sql.tanzu.vmware.com/v2
+                    kind: MySQL
+                    name: relation-profile-database
+            """.trimIndent(),
+            false,
+            null,
+            "name"
+        ),
+        before = """
+            spec:
+              serviceClaims:
+                - name: db
+                  ref:
+                    apiVersion: sql.tanzu.vmware.com/v1
+                    kind: Postgres
+                    name: customer-profile-database
+        """,
+        after = """
+            spec:
+              serviceClaims:
+                - name: db
+                  ref:
+                    apiVersion: sql.tanzu.vmware.com/v2
+                    kind: MySQL
+                    name: relation-profile-database
+        """,
+        expectedCyclesThatMakeChanges = 2
+    )
+
     @Test
     fun changeOnlyMatchingFile(@TempDir tempDir: Path) {
         val matchingFile = tempDir.resolve("a.yml").toFile().apply {
@@ -495,7 +736,7 @@ class MergeYamlTest : YamlRecipeTest, RewriteTest {
             writeText("apiVersion: policy/v1beta1")
         }
 
-        val recipe = MergeYaml("$", "spec: 0", true, "**/a.yml")
+        val recipe = MergeYaml("$", "spec: 0", true, "**/a.yml", null)
         assertChanged(
             recipe = recipe,
             before = matchingFile,
