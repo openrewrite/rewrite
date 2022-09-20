@@ -399,4 +399,20 @@ interface MethodMatcherTest {
         val testMethod = classDecl.body.statements[0] as J.MethodDeclaration
         return testMethod.body!!.statements[0] as J.MethodInvocation
     }
+    @Test
+    fun arrayExample(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            package com.yourorg;
+
+            class Foo {
+                void bar(String[] s) {}
+            }
+        """
+        ).first()
+        val classDecl = cu.classes.first()
+        val methodDecl = classDecl.body.statements[0] as J.MethodDeclaration
+        assertEquals("MethodDeclaration{com.yourorg.Foo{name=bar,return=void,parameters=[java.lang.String[]]}}", methodDecl.toString())
+        assertTrue(MethodMatcher("com.yourorg.Foo bar(String[])").matches(methodDecl, classDecl))
+    }
 }
