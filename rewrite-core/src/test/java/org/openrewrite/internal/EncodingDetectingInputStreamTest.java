@@ -18,6 +18,8 @@ package org.openrewrite.internal;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.List;
@@ -58,6 +60,16 @@ public class EncodingDetectingInputStreamTest {
         // Range 2: 0x80 - 0xBF == "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”·–—˜™š›œžŸ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿"
         // A character in range 1 followed by a character in range 2 encoded in Windows-1252 will be detected as UTF-8.
         assertThat(read("À€", WINDOWS_1252).getCharset()).isEqualTo(UTF_8);
+    }
+
+    @Test
+    void acceptExternallySetCharset() throws IOException {
+        try (InputStream inputStream = new ByteArrayInputStream("À€".getBytes(WINDOWS_1252));
+             EncodingDetectingInputStream is = new EncodingDetectingInputStream(inputStream, ISO_8859_1)
+        ) {
+            is.readFully();
+            assertThat(is.getCharset()).isEqualTo(ISO_8859_1);
+        }
     }
 
     @Test
