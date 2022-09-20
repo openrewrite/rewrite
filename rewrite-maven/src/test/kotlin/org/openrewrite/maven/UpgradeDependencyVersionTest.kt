@@ -908,4 +908,71 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
             </project>
         """
     )
+
+    @Test
+    fun deriveFromNexus() = assertUnchanged(
+        recipe = UpgradeDependencyVersion(
+            "*",
+            "*",
+            "latest.patch", null, null),
+        before = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>net.sourceforge.saxon</groupId>
+                            <artifactId>saxon</artifactId>
+                            <version>9.1.0.8</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+    )
+
+    @Test
+    fun deriveFromNexusUpgrade() = assertChanged(
+        recipe = UpgradeDependencyVersion(
+            "*",
+            "*",
+            "latest.patch", null, null),
+        before = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>net.sourceforge.orbroker</groupId>
+                            <artifactId>orbroker</artifactId>
+                            <version>2.0.3</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """,
+        after = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>net.sourceforge.orbroker</groupId>
+                            <artifactId>orbroker</artifactId>
+                            <version>2.0.4</version>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """
+
+    )
+
+
 }

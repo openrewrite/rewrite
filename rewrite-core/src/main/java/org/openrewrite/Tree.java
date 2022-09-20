@@ -135,7 +135,6 @@ public interface Tree {
     default <T extends Tree> T withException(Throwable throwable, @Nullable ExecutionContext ctx) {
         if (ctx != null) {
             ctx.getOnError().accept(throwable);
-            ctx.putMessage(Recipe.PANIC, "true");
         }
         RecipeRunException rre;
         if (throwable instanceof RecipeRunException) {

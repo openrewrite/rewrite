@@ -15,20 +15,25 @@
  */
 package org.openrewrite.maven.internal;
 
+import org.openrewrite.internal.lang.Nullable;
+
 public class MavenClientSideException extends MavenDownloadingException {
-    public MavenClientSideException(String message) {
-        super(message);
+
+    @Nullable
+    Integer responseCode;
+
+    public MavenClientSideException(String message, @Nullable Integer responseCode) {
+        super(message + (responseCode == null ? "" : ": " + responseCode));
+        this.responseCode = responseCode;
     }
 
-    public MavenClientSideException(String message, Throwable cause) {
-        super(message, cause);
+    public MavenClientSideException(String message, @Nullable Integer responseCode, Throwable cause) {
+        super(message + (responseCode == null ? "" : ": " + responseCode), cause);
+        this.responseCode = responseCode;
     }
 
-    public MavenClientSideException(String message, Object... args) {
-        super(String.format(message, args));
-    }
-
-    public MavenClientSideException(Throwable throwable) {
-        super(throwable);
+    @Nullable
+    public Integer getResponseCode() {
+        return responseCode;
     }
 }

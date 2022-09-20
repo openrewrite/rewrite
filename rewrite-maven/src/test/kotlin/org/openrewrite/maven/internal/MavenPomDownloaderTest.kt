@@ -70,7 +70,8 @@ class MavenPomDownloaderTest {
                 true,
                 false,
                 null,
-                null
+                null,
+                false
             )
             val normalizedRepo = downloader.normalizeRepository(originalRepo, null)
             assertThat(normalizedRepo).isEqualTo(originalRepo)
@@ -81,7 +82,7 @@ class MavenPomDownloaderTest {
     fun normalizeRejectConnectException() {
         val downloader = MavenPomDownloader(emptyMap(), ctx)
         val normalizedRepository = downloader.normalizeRepository(
-            MavenRepository("id", "https://localhost", true, true, false, null, null),
+            MavenRepository("id", "https://localhost", true, true, false, null, null, false),
             null
         )
         assertThat(normalizedRepository).isEqualTo(null)
@@ -102,7 +103,8 @@ class MavenPomDownloaderTest {
                         true,
                         false,
                         null,
-                        null
+                        null,
+                        false
                     ),
                     MavenRepository(
                         "id2",
@@ -111,7 +113,8 @@ class MavenPomDownloaderTest {
                         true,
                         false,
                         null,
-                        null
+                        null,
+                        false
                     )
                 )
 
