@@ -172,7 +172,7 @@ public class MavenSettings {
             return MAVEN_LOCAL_DEFAULT;
         }
         if (mavenLocal == null) {
-            mavenLocal = new MavenRepository("local", asUriString(localRepository), true, true, true, null, null);
+            mavenLocal = new MavenRepository("local", asUriString(localRepository), true, true, true, null, null, false);
         }
         return mavenLocal;
     }

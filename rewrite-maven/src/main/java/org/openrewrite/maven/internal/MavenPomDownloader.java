@@ -85,7 +85,7 @@ public class MavenPomDownloader {
                         } else if (response.getCode() >= 400 && response.getCode() <= 404) {
                             //Throw a different exception for client-side failures to allow downstream callers to handle those
                             //differently.
-                            throw new MavenClientSideException("Failed to download " + request.getUrl() + ": " + response.getCode());
+                            throw new MavenClientSideException("Failed to download " + request.getUrl(), response.getCode());
                         }
                         throw new MavenDownloadingException("Failed to download " + request.getUrl() + ": " + response.getCode());
                     }
@@ -124,8 +124,9 @@ public class MavenPomDownloader {
                 }
             }
 
+            Optional<MavenMetadata> result = null;
             try {
-                Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
+                result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
                 if (result == null) {
 
                     String scheme = URI.create(repo.getUri()).getScheme();
@@ -160,19 +161,46 @@ public class MavenPomDownloader {
                     }
                 }
 
-                if (result != null && result.isPresent()) {
-                    if (mavenMetadata == null) {
-                        mavenMetadata = result.get();
-                    } else {
-                        mavenMetadata = mergeMetadata(mavenMetadata, result.get());
-                    }
-                }
             } catch (Exception exception) {
                 // various kinds of connection failures
                 if (webRequestFailures == null) {
                     webRequestFailures = new ArrayList<>();
                 }
                 webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
+            }
+
+            if ((result == null || !result.isPresent()) && gav.getVersion() == null) {
+
+                //If there is no metadata, attempt to derive the metadata. This only appears to be possible with Nexus.
+                //NOTE: we do not attempt to generate snapshot metadata when the version is populated
+                try {
+                    result = deriveMetadata(gav, repo);
+                    if (result.isPresent()) {
+                        repo.setDeriveMetadataIfMissing(true);
+                    }
+                } catch (MavenClientSideException exception) {
+                    if (exception.getResponseCode() != null && exception.getResponseCode() != 404) {
+                        //If access was denied, do not attempt to derive metadata from this repository.
+                        repo.setDeriveMetadataIfMissing(false);
+                        if (webRequestFailures == null) {
+                            webRequestFailures = new ArrayList<>();
+                        }
+                        webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
+                    }
+                } catch (Throwable exception) {
+                    // various kinds of connection failures
+                    if (webRequestFailures == null) {
+                        webRequestFailures = new ArrayList<>();
+                    }
+                    webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
+                }
+            }
+            if (result != null && result.isPresent()) {
+                if (mavenMetadata == null) {
+                    mavenMetadata = result.get();
+                } else {
+                    mavenMetadata = mergeMetadata(mavenMetadata, result.get());
+                }
             }
         }
 
@@ -196,6 +224,85 @@ public class MavenPomDownloader {
 
         sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
         return mavenMetadata;
+    }
+
+    /**
+     * This method will attempt to generate the metadata by navigating the repository's directory structure.
+     * Currently, the only repository I can find that has missing maven-metadata.xml is Nexus. Both Artifactory
+     * and JitPack appear to always publish the metadata. So this method is currently tailored towards Nexus and how
+     * it publishes html index pages.
+     *
+     * @param gav The artifact coordinates that will be derived.
+     * @param repo The repository that will be queried for directory results
+     * @return An optional MavenMetadata.
+     */
+    private Optional<MavenMetadata> deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws Throwable {
+        if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
+            // Do not derive metadata if we cannot navigate/browse the artifacts.
+            // Do not derive metadata if a specific version has been defined.
+            return Optional.empty();
+        }
+
+        String scheme = URI.create(repo.getUri()).getScheme();
+        String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
+                     gav.getGroupId().replace('.', '/') + '/' +
+                     gav.getArtifactId();
+
+        MavenMetadata.Versioning versioning = null;
+        if (!"file".equals(scheme)) {
+            // Only compute the metadata for http-based repositories.
+            String responseBody = new String(requestAsAuthenticatedOrAnonymous(repo, uri));
+            versioning = htmlIndexToVersioning(responseBody, uri);
+        }
+
+        if (versioning == null) {
+            return Optional.empty();
+        } else {
+            return Optional.of(new MavenMetadata(versioning));
+        }
+    }
+
+    @Nullable
+    private MavenMetadata.Versioning htmlIndexToVersioning(String responseBody, String uri) {
+
+        // A very primitive approach, this just finds hrefs with trailing "/",
+        List<String> versions = new ArrayList<>();
+        int start = responseBody.indexOf("<a href=\"");
+        while (start > 0) {
+            start = start + 9;
+            int end = responseBody.indexOf("\">", start);
+            if (end < 0) {
+                break;
+            }
+            String href = responseBody.substring(start, end).trim();
+            if (href.endsWith("/")) {
+                //Only look for hrefs that have directories (the directory names are the versions)
+                versions.add(hrefToVersion(href, uri));
+            }
+
+            start = responseBody.indexOf("<a href=\"", end);
+        }
+        if (versions.isEmpty()) {
+            return null;
+        }
+
+        return new MavenMetadata.Versioning(versions, null, null);
+    }
+
+    String hrefToVersion(String href, String rootUri) {
+        String version;
+        if (href.startsWith(rootUri)) {
+            //intentionally length + 1 to exclude "/"
+            version = href.substring(rootUri.length());
+        } else {
+            version = href;
+        }
+
+        if (version.endsWith("/")) {
+            return version.substring(0, version.length() - 1);
+        } else {
+            return version;
+        }
     }
 
     @NonNull

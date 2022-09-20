@@ -426,7 +426,8 @@ public class ResolvedPom {
                             incomingRepository.isSnapshots(),
                             incomingRepository.isKnownToExist(),
                             incomingRepository.getUsername(),
-                            incomingRepository.getPassword()
+                            incomingRepository.getPassword(),
+                            incomingRepository.getDeriveMetadataIfMissing()
                     );
 
                     if (incoming.getId() != null) {
