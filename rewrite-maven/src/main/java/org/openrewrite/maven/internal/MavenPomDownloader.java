@@ -172,8 +172,8 @@ public class MavenPomDownloader {
 
             if ((result == null || !result.isPresent()) && gav.getVersion() == null) {
 
-                //If there is no metadata, attempt to derive the metadata. This only appears to be possible with Nexus.
-                //NOTE: we do not attempt to generate snapshot metadata when the version is populated
+                // If there is no metadata, attempt to derive the metadata
+                // NOTE: we do not attempt to generate snapshot metadata when the version is populated
                 try {
                     result = deriveMetadata(gav, repo);
                     if (result.isPresent()) {
@@ -186,7 +186,7 @@ public class MavenPomDownloader {
                     }
                 } catch (MavenClientSideException exception) {
                     if (exception.getResponseCode() != null && exception.getResponseCode() != 404) {
-                        //If access was denied, do not attempt to derive metadata from this repository.
+                        // If access was denied, do not attempt to derive metadata from this repository.
                         repo.setDeriveMetadataIfMissing(false);
                         if (webRequestFailures == null) {
                             webRequestFailures = new ArrayList<>();
