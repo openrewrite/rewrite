@@ -18,6 +18,7 @@ package org.openrewrite.maven.internal;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
@@ -177,6 +178,11 @@ public class MavenPomDownloader {
                     result = deriveMetadata(gav, repo);
                     if (result.isPresent()) {
                         repo.setDeriveMetadataIfMissing(true);
+                        Counter.builder("derivedMetadata")
+                                .tag("repositoryUri", repo.getUri())
+                                .tag("group", gav.getGroupId())
+                                .tag("artifact", gav.getArtifactId())
+                                .register(Metrics.globalRegistry);
                     }
                 } catch (MavenClientSideException exception) {
                     if (exception.getResponseCode() != null && exception.getResponseCode() != 404) {
