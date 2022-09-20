@@ -159,7 +159,9 @@ public class ImportLayoutStyle implements JavaStyle {
                     // Use the "before" import to determine insertion point.
                     // Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
-                        if (before.getElement().equals(originalImports.get(j).getElement())) {
+                        if (after != null && after.getElement().equals(originalImports.get(j).getElement())) {
+                            break;
+                        } else if (before.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j + 1;
                             after = insertPosition < originalImports.size() ? originalImports.get(insertPosition) : null;
                             break;
@@ -181,25 +183,27 @@ public class ImportLayoutStyle implements JavaStyle {
         }
 
         AtomicBoolean isNewBlock = new AtomicBoolean(false);
-        if (before == null) {
-            if (pkg != null) {
-                Space prefix = originalImports.get(0).getElement().getPrefix();
-                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
-            }
-        } else if (block(before) != addToBlock) {
-            boolean isFound = false;
-            for (int j = insertPosition; j < originalImports.size(); j++) {
-                if (block(originalImports.get(j)) == addToBlock) {
-                    insertPosition = j;
-                    after = originalImports.get(j);
-                    isFound = true;
-                    break;
+        if (!(insertPosition == 0 && pkg == null)) {
+            if (before == null) {
+                if (pkg != null) {
+                    Space prefix = originalImports.get(0).getElement().getPrefix();
+                    paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(prefix));
                 }
+            } else if (block(before) != addToBlock) {
+                boolean isFound = false;
+                for (int j = insertPosition; j < originalImports.size(); j++) {
+                    if (block(originalImports.get(j)) == addToBlock) {
+                        insertPosition = j;
+                        after = originalImports.get(j);
+                        isFound = true;
+                        break;
+                    }
+                }
+                isNewBlock.set(!isFound);
+                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
+            } else {
+                paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
             }
-            isNewBlock.set(!isFound);
-            paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n\n")));
-        } else {
-            paddedToAdd = paddedToAdd.withElement(paddedToAdd.getElement().withPrefix(Space.format("\n")));
         }
 
         List<JRightPadded<J.Import>> checkConflicts = new ArrayList<>(originalImports);

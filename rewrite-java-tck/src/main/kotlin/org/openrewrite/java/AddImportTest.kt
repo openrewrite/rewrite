@@ -27,6 +27,57 @@ interface AddImportTest : JavaRecipeTest {
         .map { add -> toRecipe(add) }
         .reduce { r1, r2 -> return r1.doNext(r2) }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
+    @Test
+    fun addToFirstPositionOfNonIdeallyOrderedBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+                { AddImport("org.junit.jupiter.api.Assertions", "assertFalse", false) }
+        ),
+        before = """
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+
+            import org.junit.Test;
+
+            public class MyTest {
+            }
+        """,
+        after = """
+            import static org.junit.jupiter.api.Assertions.assertFalse;
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+
+            import org.junit.Test;
+
+            public class MyTest {
+            }
+        """
+    )
+
+    @Test
+    fun addImportBeforeImportWithSameInsertIndex(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            { AddImport("org.junit.jupiter.api.Assertions", "assertFalse", false) }
+        ),
+        before = """
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+
+            import org.junit.Test;
+
+            public class MyTest {
+            }
+        """,
+        after = """
+            import static org.junit.jupiter.api.Assertions.assertFalse;
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+
+            import org.junit.Test;
+
+            public class MyTest {
+            }
+        """
+    )
+    
     @Test
     fun dontDuplicateImports(jp: JavaParser) = assertChanged(
         jp,
