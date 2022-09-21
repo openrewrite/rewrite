@@ -37,10 +37,6 @@ import static java.util.stream.Collectors.toList;
 
 public interface Parser<S extends SourceFile> {
     default List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
-        return parse(sourceFiles, relativeTo, ctx, null);
-    }
-
-    default List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx, @Nullable Charset charset) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
                         .map(sourceFile -> new Input(sourceFile, () -> {
@@ -49,7 +45,7 @@ public interface Parser<S extends SourceFile> {
                                     } catch (IOException e) {
                                         throw new UncheckedIOException(e);
                                     }
-                                }, charset)
+                                })
                         )
                         .collect(toList()),
                 relativeTo,
@@ -62,17 +58,12 @@ public interface Parser<S extends SourceFile> {
     }
 
     default List<S> parse(ExecutionContext ctx, String... sources) {
-        return parse(ctx, StandardCharsets.UTF_8, sources);
-    }
-
-    default List<S> parse(ExecutionContext ctx, Charset charset, String... sources) {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
                                 sourcePathFromSourceText(Paths.get(Long.toString(System.nanoTime())), source), null,
-                                () -> new ByteArrayInputStream(source.getBytes(charset)),
-                                true,
-                                charset
+                                () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
+                                true
                         )
                 ).collect(toList()),
                 null,
@@ -119,7 +110,6 @@ public interface Parser<S extends SourceFile> {
         private final boolean synthetic;
         private final Path path;
         private final Supplier<InputStream> source;
-        private final @Nullable Charset charset;
 
         @Getter
         @Nullable
@@ -129,24 +119,15 @@ public interface Parser<S extends SourceFile> {
             this(path, FileAttributes.fromPath(path), source, false);
         }
 
-        public Input(Path path, Supplier<InputStream> source, @Nullable Charset charset) {
-            this(path, FileAttributes.fromPath(path), source, false, charset);
-        }
-
         public Input(Path path, @Nullable FileAttributes fileAttributes, Supplier<InputStream> source) {
             this(path, fileAttributes, source, false);
         }
 
         public Input(Path path, @Nullable FileAttributes fileAttributes, Supplier<InputStream> source, boolean synthetic) {
-            this(path, fileAttributes, source, synthetic, null);
-        }
-
-        public Input(Path path, @Nullable FileAttributes fileAttributes, Supplier<InputStream> source, boolean synthetic, @Nullable Charset charset) {
             this.path = path;
             this.fileAttributes = fileAttributes;
             this.source = source;
             this.synthetic = synthetic;
-            this.charset = charset;
         }
 
         public static Input fromString(String source) {
@@ -157,8 +138,7 @@ public interface Parser<S extends SourceFile> {
             return new Input(
                     Paths.get(Long.toString(System.nanoTime())), null,
                     () -> new ByteArrayInputStream(source.getBytes(charset)),
-                    true,
-                    charset
+                    true
             );
         }
 
@@ -191,7 +171,7 @@ public interface Parser<S extends SourceFile> {
         }
 
         public EncodingDetectingInputStream getSource() {
-            return new EncodingDetectingInputStream(source.get(), charset);
+            return new EncodingDetectingInputStream(source.get());
         }
 
         public boolean isSynthetic() {
