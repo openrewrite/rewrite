@@ -102,7 +102,7 @@ public interface Parser<S extends SourceFile> {
      * otherwise returns {@link java.nio.charset.StandardCharsets#UTF_8}
      */
     default Charset getCharset(ExecutionContext ctx) {
-        Charset charset = ((ParsingExecutionContextView) ctx).getCharset();
+        Charset charset = new ParsingExecutionContextView(ctx).getCharset();
         return charset == null ? StandardCharsets.UTF_8 : charset;
     }
 
