@@ -69,15 +69,17 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             .description("The time spent parsing a YAML file")
                             .tag("file.type", "YAML");
                     Timer.Sample sample = Timer.start();
+                    Path path = sourceFile.getRelativePath(relativeTo);
                     try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
-                        Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                        Yaml.Documents yaml = parseFromInput(path, is);
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, yaml);
                         yaml.withFileAttributes(sourceFile.getFileAttributes());
                         return yaml;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
+                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
+                        ParsingExecutionContextView.view(ctx).parseFailure(path, t);
                         return null;
                     }
                 })

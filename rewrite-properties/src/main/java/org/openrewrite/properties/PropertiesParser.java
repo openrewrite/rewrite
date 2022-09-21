@@ -49,12 +49,13 @@ public class PropertiesParser implements Parser<Properties.File> {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
+                    Path path = sourceFile.getRelativePath(relativeTo);
                     Timer.Builder timer = Timer.builder("rewrite.parse")
                             .description("The time spent parsing a properties file")
                             .tag("file.type", "Properties");
                     Timer.Sample sample = Timer.start();
                     try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
-                        Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is)
+                        Properties.File file = parseFromInput(path, is)
                                 .withFileAttributes(sourceFile.getFileAttributes());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, file);
@@ -62,6 +63,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
+                        ParsingExecutionContextView.view(ctx).parseFailure(path, t);
                         return null;
                     }
                 })

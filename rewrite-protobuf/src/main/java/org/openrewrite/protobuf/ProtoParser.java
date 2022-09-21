@@ -48,6 +48,7 @@ public class ProtoParser implements Parser<Proto.Document> {
                             .description("The time spent parsing a Protobuf file")
                             .tag("file.type", "Proto");
                     Timer.Sample sample = Timer.start();
+                    Path path = sourceFile.getRelativePath(relativeTo);
                     try {
                         EncodingDetectingInputStream is = sourceFile.getSource(ctx);
                         String sourceStr = is.readFully();
@@ -62,7 +63,7 @@ public class ProtoParser implements Parser<Proto.Document> {
                         }
 
                         Proto.Document document = new ProtoParserVisitor(
-                                sourceFile.getRelativePath(relativeTo),
+                                path,
                                 sourceFile.getFileAttributes(),
                                 sourceStr,
                                 is.getCharset(),
@@ -73,7 +74,8 @@ public class ProtoParser implements Parser<Proto.Document> {
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
+                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
+                        ParsingExecutionContextView.view(ctx).parseFailure(path, t);
                         return null;
                     }
                 })

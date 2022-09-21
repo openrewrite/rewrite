@@ -17,13 +17,25 @@ package org.openrewrite.tree;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseExceptionResult;
+import org.openrewrite.Tree;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.quark.Quark;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.charset.Charset;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
+
     private static final String CHARSET = "org.openrewrite.parser.charset";
+
+    private static final String PARSING_FAILURES = "org.openrewrite.core.parsingFailures";
 
     public ParsingExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -43,6 +55,27 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
 
     public ParsingEventListener getParsingListener() {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
+    }
+
+    @SuppressWarnings("UnusedReturnValue")
+    public ParsingExecutionContextView parseFailure(Path path, Throwable t) {
+        if(path.isAbsolute()) {
+            throw new RuntimeException("Relative paths only");
+        }
+        putMessageInCollection(PARSING_FAILURES,
+                new Quark(Tree.randomId(), path, Markers.EMPTY.addIfAbsent(new ParseExceptionResult(t)), null, null),
+                ArrayList::new);
+        return this;
+    }
+
+    @SuppressWarnings("unused")
+    public List<Quark> getParseFailures() {
+        return getMessage(PARSING_FAILURES, Collections.emptyList());
+    }
+
+    @SuppressWarnings("unused")
+    public List<Quark> pollParseFailures() {
+        return pollMessage(PARSING_FAILURES, Collections.emptyList());
     }
 
     public ParsingExecutionContextView setCharset(@Nullable Charset charset) {
