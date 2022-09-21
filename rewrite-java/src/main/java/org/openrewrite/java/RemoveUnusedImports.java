@@ -243,7 +243,7 @@ public class RemoveUnusedImports extends Recipe {
                             changed = true;
                         }
                     } else {
-                        if (usedWildcardImports.contains(elem.getPackageName())) {
+                        if (usedWildcardImports.contains(elem.getPackageName()) && !elem.getTypeName().contains("$")) {
                             anImport.used = false;
                             changed = true;
                         }
