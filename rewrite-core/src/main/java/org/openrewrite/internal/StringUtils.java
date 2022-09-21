@@ -23,7 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedMap;
@@ -236,7 +236,7 @@ public class StringUtils {
      * @param inputStream An input stream.
      * @return A UTF-8 encoded string.
      */
-    public static String readFully(InputStream inputStream) {
+    public static String readFully(InputStream inputStream, Charset charset) {
         try (InputStream is = inputStream) {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buffer = new byte[4096];
@@ -246,7 +246,7 @@ public class StringUtils {
             }
 
             byte[] bytes = bos.toByteArray();
-            return new String(bytes, 0, bytes.length, StandardCharsets.UTF_8);
+            return new String(bytes, 0, bytes.length, charset);
         } catch (IOException e) {
             throw new UnsupportedOperationException(e);
         }

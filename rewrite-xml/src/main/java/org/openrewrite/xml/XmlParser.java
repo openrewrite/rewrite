@@ -50,7 +50,7 @@ public class XmlParser implements Parser<Xml.Document> {
                     Timer.Sample sample = Timer.start();
 
                     try {
-                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
                         String sourceStr = is.readFully();
 
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(

@@ -26,6 +26,7 @@ import org.openrewrite.marker.Markers;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -73,7 +74,7 @@ public interface Remote extends SourceFile {
 
     @Override
     default <P> String printAll(P p) {
-        return StringUtils.readFully(getInputStream(new HttpUrlConnectionSender()));
+        return StringUtils.readFully(getInputStream(new HttpUrlConnectionSender()), StandardCharsets.UTF_8);
     }
 
     @Override

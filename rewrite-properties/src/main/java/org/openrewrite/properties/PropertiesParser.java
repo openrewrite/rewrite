@@ -53,7 +53,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                             .description("The time spent parsing a properties file")
                             .tag("file.type", "Properties");
                     Timer.Sample sample = Timer.start();
-                    try (EncodingDetectingInputStream is = sourceFile.getSource()) {
+                    try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
                         Properties.File file = parseFromInput(sourceFile.getRelativePath(relativeTo), is)
                                 .withFileAttributes(sourceFile.getFileAttributes());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));

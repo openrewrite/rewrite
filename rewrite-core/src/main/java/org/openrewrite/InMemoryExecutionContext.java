@@ -43,7 +43,8 @@ public class InMemoryExecutionContext implements ExecutionContext {
 
     public InMemoryExecutionContext(Consumer<Throwable> onError,
                                     Function<Integer, Duration> runTimeout) {
-        this(onError, runTimeout, (throwable, ctx) -> {});
+        this(onError, runTimeout, (throwable, ctx) -> {
+        });
     }
 
     public InMemoryExecutionContext(Consumer<Throwable> onError, Function<Integer, Duration> runTimeout, BiConsumer<Throwable, ExecutionContext> onTimeout) {
@@ -53,8 +54,12 @@ public class InMemoryExecutionContext implements ExecutionContext {
     }
 
     @Override
-    public void putMessage(String key, Object value) {
-        messages.put(key, value);
+    public void putMessage(String key, @Nullable Object value) {
+        if (value == null) {
+            messages.remove(key);
+        } else {
+            messages.put(key, value);
+        }
     }
 
     @Override

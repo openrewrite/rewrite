@@ -17,7 +17,7 @@ package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingEventListener;
@@ -36,16 +36,18 @@ public class PlainTextParser implements Parser<PlainText> {
         List<PlainText> plainTexts = new ArrayList<>();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         for (Input source : sources) {
+            EncodingDetectingInputStream is = source.getSource(ctx);
+            String sourceText = is.readFully();
             PlainText plainText = new PlainText(randomId(),
                     relativeTo == null ?
                             source.getPath() :
                             relativeTo.relativize(source.getPath()).normalize(),
                     Markers.EMPTY,
-                    source.getSource().getCharset().name(),
-                    source.getSource().isCharsetBomMarked(),
+                    is.getCharset().name(),
+                    is.isCharsetBomMarked(),
                     source.getFileAttributes(),
                     null,
-                    source.getSource().readFully());
+                    sourceText);
             plainTexts.add(plainText);
             parsingListener.parsed(source, plainText);
         }

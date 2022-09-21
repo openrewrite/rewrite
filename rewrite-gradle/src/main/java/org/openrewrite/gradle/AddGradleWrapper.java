@@ -32,6 +32,7 @@ import org.openrewrite.properties.PropertiesParser;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.text.PlainText;
 
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -136,14 +137,14 @@ public class AddGradleWrapper extends Recipe {
         if (needsGradleShellScript) {
             PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false,
                     wrapperScriptAttributes, null,
-                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew")));
+                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew"), StandardCharsets.UTF_8));
             gradleWrapperFiles.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
             PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY, null, false,
                     wrapperScriptAttributes, null,
-                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")));
+                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat"), StandardCharsets.UTF_8));
             gradleWrapperFiles.add(gradlewBat);
         }
 

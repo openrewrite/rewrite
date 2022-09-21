@@ -17,10 +17,14 @@ package org.openrewrite.tree;
 
 import org.openrewrite.DelegatingExecutionContext;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.lang.Nullable;
+
+import java.nio.charset.Charset;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
-    
+    private static final String CHARSET = "org.openrewrite.parser.charset";
+
     public ParsingExecutionContextView(ExecutionContext delegate) {
         super(delegate);
     }
@@ -39,5 +43,15 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
 
     public ParsingEventListener getParsingListener() {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
+    }
+
+    public ParsingExecutionContextView setCharset(@Nullable Charset charset) {
+        putMessage(CHARSET, charset);
+        return this;
+    }
+
+    @Nullable
+    public Charset getCharset() {
+        return getMessage(CHARSET);
     }
 }

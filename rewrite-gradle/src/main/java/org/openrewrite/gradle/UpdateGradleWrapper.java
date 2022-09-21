@@ -121,7 +121,7 @@ public class UpdateGradleWrapper extends Recipe {
         List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                 PlainText gradlew = (PlainText) setExecutable(sourceFile);
-                String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));
+                String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"), sourceFile.getCharset());
                 if (!gradlewText.equals(gradlew.getText())) {
                     gradlew = gradlew.withText(gradlewText);
                 }
@@ -129,7 +129,7 @@ public class UpdateGradleWrapper extends Recipe {
             }
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                 PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
-                String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"));
+                String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"), sourceFile.getCharset());
                 if (!gradlewBatText.equals(gradlewBat.getText())) {
                     gradlewBat = gradlewBat.withText(gradlewBatText);
                 }

@@ -57,7 +57,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                             .tag("file.type", "HCL");
                     Timer.Sample sample = Timer.start();
                     try {
-                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
                         String sourceStr = is.readFully();
 
                         HCLLexer lexer = new HCLLexer(CharStreams.fromString(sourceStr));

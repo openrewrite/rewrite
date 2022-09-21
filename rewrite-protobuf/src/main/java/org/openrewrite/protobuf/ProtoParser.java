@@ -49,7 +49,7 @@ public class ProtoParser implements Parser<Proto.Document> {
                             .tag("file.type", "Proto");
                     Timer.Sample sample = Timer.start();
                     try {
-                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
                         String sourceStr = is.readFully();
                         Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
                                 CharStreams.fromString(sourceStr))));

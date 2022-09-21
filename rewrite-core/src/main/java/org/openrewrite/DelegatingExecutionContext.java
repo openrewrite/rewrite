@@ -28,7 +28,7 @@ public class DelegatingExecutionContext implements ExecutionContext {
     }
 
     @Override
-    public void putMessage(String key, Object value) {
+    public void putMessage(String key, @Nullable Object value) {
         delegate.putMessage(key, value);
     }
 
