@@ -178,7 +178,7 @@ public class MavenPomDownloader {
                     result = deriveMetadata(gav, repo);
                     if (result.isPresent()) {
                         repo.setDeriveMetadataIfMissing(true);
-                        Counter.builder("derivedMetadata")
+                        Counter.builder("rewrite-derived-metatdata")
                                 .tag("repositoryUri", repo.getUri())
                                 .tag("group", gav.getGroupId())
                                 .tag("artifact", gav.getArtifactId())
