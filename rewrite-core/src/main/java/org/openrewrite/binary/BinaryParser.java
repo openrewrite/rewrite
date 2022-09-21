@@ -46,7 +46,7 @@ public class BinaryParser implements Parser<Binary> {
                         Markers.EMPTY,
                         source.getFileAttributes(),
                         null,
-                        readAllBytes(source.getSource())));
+                        readAllBytes(source.getSource(ctx))));
             } catch (Exception e) {
                 ParsingExecutionContextView.view(ctx).parseFailure(path, e);
                 ctx.getOnError().accept(e);

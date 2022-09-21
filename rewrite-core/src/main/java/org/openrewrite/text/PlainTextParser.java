@@ -37,6 +37,7 @@ public class PlainTextParser implements Parser<PlainText> {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         for (Input source : sources) {
             Path path = source.getRelativePath(relativeTo);
+            EncodingDetectingInputStream is = source.getSource(ctx);
             try {
                 EncodingDetectingInputStream is = source.getSource(ctx);
                 PlainText plainText = new PlainText(randomId(),

@@ -37,6 +37,8 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
 
     private static final String PARSING_FAILURES = "org.openrewrite.core.parsingFailures";
 
+    private static final String CHARSET = "org.openrewrite.parser.charset";
+
     public ParsingExecutionContextView(ExecutionContext delegate) {
         super(delegate);
     }
@@ -55,6 +57,16 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
 
     public ParsingEventListener getParsingListener() {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
+    }
+
+    public ParsingExecutionContextView setCharset(@Nullable Charset charset) {
+        putMessage(CHARSET, charset);
+        return this;
+    }
+
+    @Nullable
+    public Charset getCharset() {
+        return getMessage(CHARSET);
     }
 
     @SuppressWarnings("UnusedReturnValue")
