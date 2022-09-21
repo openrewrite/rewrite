@@ -180,7 +180,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
                             JavaType.Primitive.Void.equals(md.getReturnTypeExpression().getType()) &&
 
                             // note that the matcher for "main(String)" will match on "main(String[]) as expected.
-                            new MethodMatcher(c.getType().getFullyQualifiedName() + " main(String)")
+                            new MethodMatcher(c.getType().getFullyQualifiedName() + " main(String\\[\\])")
                                     .matches(md, c)) {
                         return true;
                     }

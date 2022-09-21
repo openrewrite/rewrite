@@ -269,4 +269,87 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
             """
         )
     )
+
+    @Test
+    fun `keep camel case when removing leading underscore`() = assertChanged(
+        before = """
+            class Test {
+                private void _theMethod() {
+                
+                }
+            }
+        """,
+        after = """
+            class Test {
+                private void theMethod() {
+                
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `keep camel case when removing leading underscore 2`() = assertChanged(
+        before = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> _getNames() {
+                    List<String> result = new ArrayList<>();
+                    result.add("Alice");
+                    result.add("Bob");
+                    result.add("Carol");
+                    return result;
+                }
+                
+                public void run() {
+                    for (String n: _getNames()) {
+                        System.out.println(n);
+                    }
+                }
+            }
+        """,
+        after = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> getNames() {
+                    List<String> result = new ArrayList<>();
+                    result.add("Alice");
+                    result.add("Bob");
+                    result.add("Carol");
+                    return result;
+                }
+                
+                public void run() {
+                    for (String n: getNames()) {
+                        System.out.println(n);
+                    }
+                }
+            }
+        """
+    )
+    @Test
+    fun `change name of method with array argument`() = assertChanged(
+        before = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> _getNames(String[] names) {
+                    List<String> result = new ArrayList<>(Arrays.asList(names));
+                    return result;
+                }
+            }
+        """,
+        after = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> getNames(String[] names) {
+                    List<String> result = new ArrayList<>(Arrays.asList(names));
+                    return result;
+                }
+            }
+        """
+    )
 }
