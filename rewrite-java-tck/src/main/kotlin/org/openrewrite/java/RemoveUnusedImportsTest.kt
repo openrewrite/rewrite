@@ -898,4 +898,23 @@ interface RemoveUnusedImportsTest : JavaRecipeTest, RewriteTest {
         """,
         expectedCyclesThatMakeChanges = 2
     )
+
+    @Test
+    fun keepInnerClassImports(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.*;
+            import java.util.Map.Entry;
+
+            import static java.util.Collections.*;
+
+            class A {
+               Collection<Integer> c = emptyList();
+               Set<Integer> s = emptySet();
+               List<String> l = Arrays.asList("c","b","a");
+               Iterator<Short> i = emptyIterator();
+               Entry<String, Integer> entry;
+            }
+        """
+    )
 }
