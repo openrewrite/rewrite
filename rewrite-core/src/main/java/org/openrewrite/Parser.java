@@ -103,13 +103,8 @@ public interface Parser<S extends SourceFile> {
      * the {@link ParsingExecutionContextView#getCharset()}
      */
     default Charset getCharset(ExecutionContext ctx) {
-        if (ctx instanceof ParsingExecutionContextView) {
-            ParsingExecutionContextView parsingExecutionContextView = (ParsingExecutionContextView) ctx;
-            if (parsingExecutionContextView.getCharset() != null) {
-                return parsingExecutionContextView.getCharset();
-            }
-        }
-        return StandardCharsets.UTF_8;
+        Charset charset = ((ParsingExecutionContextView) ctx).getCharset();
+        return charset == null ? StandardCharsets.UTF_8 : charset;
     }
 
 
