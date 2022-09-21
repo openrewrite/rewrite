@@ -39,7 +39,7 @@ import static java.util.Collections.singletonList;
 @Disabled("Test disabled until we can solve how to load the tests in a classloader that allows access to internal types.")
 public class Java17TypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(
-      Java17TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"));
+      Java17TypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java"), StandardCharsets.UTF_8);
 
     private static final JCTree.JCCompilationUnit cu = ReloadableJava17Parser.builder()
       .logCompilationWarningsAndErrors(true)

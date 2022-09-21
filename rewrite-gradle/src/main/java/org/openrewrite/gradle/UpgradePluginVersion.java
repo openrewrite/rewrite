@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -128,7 +129,7 @@ public class UpgradePluginVersion extends Recipe {
         try (HttpSender.Response response = httpSender.send(httpSender.get(uri).build())) {
             if (response.isSuccessful()) {
                 @Language("xml")
-                String responseBody = StringUtils.readFully(response.getBody());
+                String responseBody = StringUtils.readFully(response.getBody(), StandardCharsets.UTF_8);
 
                 List<String> versions = new ArrayList<>();
                 Matcher matcher = Pattern.compile("href=\"/plugin/" + pluginId + "/([^\"]+)\"").matcher(responseBody);

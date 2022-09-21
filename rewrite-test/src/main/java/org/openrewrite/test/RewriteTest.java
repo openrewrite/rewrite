@@ -28,7 +28,6 @@ import org.openrewrite.remote.Remote;
 import org.openrewrite.scheduling.DirectScheduler;
 
 import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
@@ -172,7 +171,7 @@ public interface RewriteTest extends SourceSpecs {
                 } else {
                     sourcePath = parser.sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
                 }
-                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(StandardCharsets.UTF_8))));
+                inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(executionContext)))));
             }
 
             Path relativeTo = testMethodSpec.relativeTo == null ? testClassSpec.relativeTo : testMethodSpec.relativeTo;
@@ -215,7 +214,7 @@ public interface RewriteTest extends SourceSpecs {
                                         "the printed source didn't match the original source code. This means there is a bug in the " +
                                         "parser implementation itself. Please open an issue to report this, providing a sample of the " +
                                         "code that generated this error!")
-                                .isEqualTo(StringUtils.readFully(input.getSource(executionContext)));
+                                .isEqualTo(StringUtils.readFully(input.getSource(executionContext), parser.getCharset(executionContext)));
                     }
                 }
 

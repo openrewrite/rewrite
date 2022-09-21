@@ -20,11 +20,12 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTypeSignatureBuilderTest
 import org.openrewrite.java.asParameterized
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder
+import java.nio.charset.StandardCharsets
 
 class DefaultJavaTypeSignatureBuilderTest : JavaTypeSignatureBuilderTest {
     companion object {
         private val goat = StringUtils.readFully(
-            DefaultJavaTypeSignatureBuilderTest::class.java.getResourceAsStream("/JavaTypeGoat.java")
+            DefaultJavaTypeSignatureBuilderTest::class.java.getResourceAsStream("/JavaTypeGoat.java"), StandardCharsets.UTF_8
         )
 
         private val goatCu = JavaParser.fromJavaVersion()

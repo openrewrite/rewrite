@@ -98,6 +98,22 @@ public interface Parser<S extends SourceFile> {
     }
 
     /**
+     * Returns {@link java.nio.charset.StandardCharsets#UTF_8} unless the ctx is an instance of
+     * {@link ParsingExecutionContextView} in which case it will return the charset from
+     * the {@link ParsingExecutionContextView#getCharset()}
+     */
+    default Charset getCharset(ExecutionContext ctx) {
+        if (ctx instanceof ParsingExecutionContextView) {
+            ParsingExecutionContextView parsingExecutionContextView = (ParsingExecutionContextView) ctx;
+            if (parsingExecutionContextView.getCharset() != null) {
+                return parsingExecutionContextView.getCharset();
+            }
+        }
+        return StandardCharsets.UTF_8;
+    }
+
+
+    /**
      * A source input. {@link Input#path} may be a synthetic path and not
      * represent a resolvable path on disk, as is the case when parsing sources
      * from BigQuery (we have a relative path from the original Github repository
@@ -153,11 +169,12 @@ public interface Parser<S extends SourceFile> {
         }
 
         @SuppressWarnings("unused")
-        public static List<Input> fromResource(String resource, String delimiter) {
-            return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource))).split(delimiter))
+        public static List<Input> fromResource(String resource, String delimiter, @Nullable Charset charset) {
+            Charset resourceCharset = charset == null ? StandardCharsets.UTF_8 : charset;
+            return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource)), resourceCharset).split(delimiter))
                     .map(source -> new Parser.Input(
                             Paths.get(Long.toString(System.nanoTime())), null,
-                            () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
+                            () -> new ByteArrayInputStream(source.getBytes(resourceCharset)),
                             true
                     ))
                     .collect(toList());

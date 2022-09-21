@@ -17,6 +17,7 @@ package org.openrewrite.java.isolated;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;

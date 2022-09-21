@@ -175,7 +175,7 @@ class ReloadableJava8Parser implements JavaParser {
                                             throw new IllegalStateException(
                                                     "Call reset() on JavaParser before parsing another set of source files that " +
                                                     "have some of the same fully qualified names. Source file [" +
-                                                    input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx)) + "\n]", e);
+                                                    input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx), getCharset(ctx)) + "\n]", e);
                                         }
                                         throw e;
                                     }
