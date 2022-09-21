@@ -39,7 +39,7 @@ public class WatchableExecutionContext implements ExecutionContext {
     }
 
     @Override
-    public void putMessage(String key, Object value) {
+    public void putMessage(String key, @Nullable Object value) {
         hasNewMessages = true;
         delegate.putMessage(key, value);
     }

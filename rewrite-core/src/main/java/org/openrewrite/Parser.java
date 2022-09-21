@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -170,8 +171,17 @@ public interface Parser<S extends SourceFile> {
             return relativeTo == null ? path : relativeTo.relativize(path);
         }
 
+        /**
+         * @deprecated Use {@link #getSource(ExecutionContext)} instead which
+         * incorporates overrides of charset.
+         */
+        @Deprecated
         public EncodingDetectingInputStream getSource() {
-            return new EncodingDetectingInputStream(source.get());
+            return getSource(new InMemoryExecutionContext());
+        }
+
+        public EncodingDetectingInputStream getSource(ExecutionContext ctx) {
+            return new EncodingDetectingInputStream(source.get(), ParsingExecutionContextView.view(ctx).getCharset());
         }
 
         public boolean isSynthetic() {

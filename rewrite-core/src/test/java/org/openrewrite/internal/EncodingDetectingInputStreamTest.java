@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.List;
@@ -31,49 +32,61 @@ public class EncodingDetectingInputStreamTest {
     private static final Charset WINDOWS_1252 = Charset.forName("Windows-1252");
 
     @Test
-    void detectUTF8Bom() {
+    void detectUTF8Bom() throws IOException {
         String bom = "ï»¿";
-        assertThat(read(bom, UTF_8).isCharsetBomMarked()).isTrue();
-    }
-
-    @Test
-    void isUtf8() {
-        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
-        for (String accent : accents) {
-            assertThat(read(accent, UTF_8).getCharset()).isEqualTo(UTF_8);
+        try (EncodingDetectingInputStream is = read(bom, UTF_8)) {
+            assertThat(is.isCharsetBomMarked()).isTrue();
         }
     }
 
     @Test
-    void isWindows1252() {
+    void isUtf8() throws IOException {
         List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
         for (String accent : accents) {
-            assertThat(read(accent, WINDOWS_1252).getCharset()).isEqualTo(WINDOWS_1252);
+            try (EncodingDetectingInputStream is = read(accent, UTF_8)) {
+                assertThat(is.getCharset()).isEqualTo(UTF_8);
+            }
         }
     }
 
     @Test
-    void oddPairInWindows1252() {
+    void isWindows1252() throws IOException {
+        List<String> accents = Arrays.asList("Café", "Lýðræðisríki");
+        for (String accent : accents) {
+            try (EncodingDetectingInputStream is = read(accent, WINDOWS_1252)) {
+                assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+            }
+        }
+    }
+
+    @Test
+    void oddPairInWindows1252() throws IOException {
         // Range 1: 0xC0 - 0xDF == "ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß"
         // Range 2: 0x80 - 0xBF == "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”·–—˜™š›œžŸ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿"
         // A character in range 1 followed by a character in range 2 encoded in Windows-1252 will be detected as UTF-8.
-        assertThat(read("À€", WINDOWS_1252).getCharset()).isEqualTo(UTF_8);
-    }
-
-    @Test
-    void utf8Characters() {
-        for (int i = 192; i < 2048; i++) {
-            String c = Character.toString((char) i);
-            assertThat(read(c, UTF_8).getCharset()).isEqualTo(UTF_8);
+        try (EncodingDetectingInputStream is = read("À€", WINDOWS_1252)) {
+            assertThat(is.getCharset()).isEqualTo(UTF_8);
         }
     }
 
     @Test
-    void windows1252SpecialCharacters() {
+    void utf8Characters() throws IOException {
+        for (int i = 192; i < 2048; i++) {
+            String c = Character.toString((char) i);
+            try (EncodingDetectingInputStream is = read(c, UTF_8)) {
+                assertThat(is.getCharset()).isEqualTo(UTF_8);
+            }
+        }
+    }
+
+    @Test
+    void windows1252SpecialCharacters() throws IOException {
         String specialCharacters = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”·–—˜™š›œžŸ¡¢£¤¥¦§¨©ª«¬®¯°±²³´µ¶·¸¹º»¼½¾¿";
         for (char c : specialCharacters.toCharArray()) {
             String parse = String.valueOf(c);
-            assertThat(read(parse, WINDOWS_1252).getCharset()).isEqualTo(WINDOWS_1252);
+            try (EncodingDetectingInputStream is = read(parse, WINDOWS_1252)) {
+                assertThat(is.getCharset()).isEqualTo(WINDOWS_1252);
+            }
         }
     }
 
@@ -91,7 +104,7 @@ public class EncodingDetectingInputStreamTest {
     }
 
     private EncodingDetectingInputStream read(String s, Charset charset) {
-        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(s.getBytes(charset)));
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(s.getBytes(charset)), null);
         is.readFully();
         return is;
     }

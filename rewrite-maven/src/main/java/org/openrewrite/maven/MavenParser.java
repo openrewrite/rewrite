@@ -84,7 +84,7 @@ public class MavenParser implements Parser<Xml.Document> {
             Path pomPath = (relativeTo == null) ?
                     source.getPath() :
                     relativeTo.relativize(source.getPath());
-            Pom pom = RawPom.parse(source.getSource(), null)
+            Pom pom = RawPom.parse(source.getSource(ctx), null)
                     .toPom(pomPath, null);
             if (relativeTo != null) {
                 if (pom.getProperties() == null || pom.getProperties().isEmpty()) {

@@ -17,6 +17,7 @@ package org.openrewrite.java.isolated;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
@@ -41,9 +42,12 @@ public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
     @Getter
     private final Parser.Input input;
 
-    public ReloadableJava17ParserInputFileObject(Parser.Input input) {
+    private final ExecutionContext ctx;
+
+    public ReloadableJava17ParserInputFileObject(Parser.Input input, ExecutionContext ctx) {
         this.input = input;
         this.path = input.getPath();
+        this.ctx = ctx;
     }
 
     @Override
@@ -66,7 +70,7 @@ public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
 
     @Override
     public InputStream openInputStream() {
-        return input.getSource();
+        return input.getSource(ctx);
     }
 
     @Override
@@ -76,12 +80,12 @@ public class ReloadableJava17ParserInputFileObject implements JavaFileObject {
 
     @Override
     public Reader openReader(boolean ignoreEncodingErrors) {
-        return new InputStreamReader(input.getSource());
+        return new InputStreamReader(input.getSource(ctx));
     }
 
     @Override
     public CharSequence getCharContent(boolean ignoreEncodingErrors) {
-        return input.getSource().readFully();
+        return input.getSource(ctx).readFully();
     }
 
     @Override

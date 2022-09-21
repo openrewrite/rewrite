@@ -103,7 +103,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         compiled.getInput().getRelativePath(relativeTo),
                         compiled.getInput().getFileAttributes(),
-                        compiled.getInput().getSource(),
+                        compiled.getInput().getSource(ctx),
                         typeCache,
                         ctx
                 );
@@ -138,7 +138,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             ErrorCollector errorCollector = new ErrorCollector(configuration);
             SourceUnit unit = new SourceUnit(
                     "doesntmatter",
-                    new InputStreamReaderSource(input.getSource(), configuration),
+                    new InputStreamReaderSource(input.getSource(ctx), configuration),
                     configuration,
                     null,
                     errorCollector

@@ -41,9 +41,12 @@ public class ReloadableJava11ParserInputFileObject implements JavaFileObject {
     @Getter
     private final Parser.Input input;
 
-    public ReloadableJava11ParserInputFileObject(Parser.Input input) {
+    private final ExecutionContext ctx;
+
+    public ReloadableJava11ParserInputFileObject(Parser.Input input, ExecutionContext ctx) {
         this.input = input;
         this.path = input.getPath();
+        this.ctx = ctx;
     }
 
     @Override
@@ -66,7 +69,7 @@ public class ReloadableJava11ParserInputFileObject implements JavaFileObject {
 
     @Override
     public InputStream openInputStream() {
-        return input.getSource();
+        return input.getSource(ctx);
     }
 
     @Override
@@ -76,7 +79,7 @@ public class ReloadableJava11ParserInputFileObject implements JavaFileObject {
 
     @Override
     public Reader openReader(boolean ignoreEncodingErrors) {
-        return new InputStreamReader(input.getSource());
+        return new InputStreamReader(input.getSource(ctx));
     }
 
     @Override

@@ -68,7 +68,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                                 () -> new SequenceInputStream(
                                         Collections.enumeration(Arrays.asList(
                                                 new ByteArrayInputStream(PREAMBLE),
-                                                source.getSource(),
+                                                source.getSource(ctx),
                                                 new ByteArrayInputStream(new byte[]{'}', '}'})
                                         ))
                                 ),

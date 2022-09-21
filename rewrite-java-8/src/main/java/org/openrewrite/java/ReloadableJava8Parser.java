@@ -169,13 +169,13 @@ class ReloadableJava8Parser implements JavaParser {
                                 .register(Metrics.globalRegistry)
                                 .record(() -> {
                                     try {
-                                        return compiler.parse(new Java8ParserInputFileObject(input));
+                                        return compiler.parse(new Java8ParserInputFileObject(input, ctx));
                                     } catch (IllegalStateException e) {
                                         if ("endPosTable already set".equals(e.getMessage())) {
                                             throw new IllegalStateException(
                                                     "Call reset() on JavaParser before parsing another set of source files that " +
                                                     "have some of the same fully qualified names. Source file [" +
-                                                    input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource()) + "\n]", e);
+                                                    input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx)) + "\n]", e);
                                         }
                                         throw e;
                                     }
@@ -199,7 +199,7 @@ class ReloadableJava8Parser implements JavaParser {
                         ReloadableJava8ParserVisitor parser = new ReloadableJava8ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 input.getFileAttributes(),
-                                input.getSource(),
+                                input.getSource(ctx),
                                 styles,
                                 typeCache,
                                 ctx,

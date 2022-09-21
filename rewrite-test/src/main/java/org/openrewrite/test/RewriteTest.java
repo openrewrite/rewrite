@@ -215,7 +215,7 @@ public interface RewriteTest extends SourceSpecs {
                                         "the printed source didn't match the original source code. This means there is a bug in the " +
                                         "parser implementation itself. Please open an issue to report this, providing a sample of the " +
                                         "code that generated this error!")
-                                .isEqualTo(StringUtils.readFully(input.getSource()));
+                                .isEqualTo(StringUtils.readFully(input.getSource(executionContext)));
                     }
                 }
 

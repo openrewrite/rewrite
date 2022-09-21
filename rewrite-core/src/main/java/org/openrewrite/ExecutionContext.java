@@ -44,7 +44,7 @@ public interface ExecutionContext {
         return getMessage("org.openrewrite.internal.treeObservers", Collections.<TreeObserver.Subscription>emptySet());
     }
 
-    void putMessage(String key, Object value);
+    void putMessage(String key, @Nullable Object value);
 
     @Nullable <T> T getMessage(String key);
 
