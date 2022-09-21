@@ -98,9 +98,8 @@ public interface Parser<S extends SourceFile> {
     }
 
     /**
-     * Returns {@link java.nio.charset.StandardCharsets#UTF_8} unless the ctx is an instance of
-     * {@link ParsingExecutionContextView} in which case it will return the charset from
-     * the {@link ParsingExecutionContextView#getCharset()}
+     * Returns the ExecutionContext charset if its defined
+     * otherwise returns {@link java.nio.charset.StandardCharsets#UTF_8}
      */
     default Charset getCharset(ExecutionContext ctx) {
         Charset charset = ((ParsingExecutionContextView) ctx).getCharset();
