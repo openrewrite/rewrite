@@ -34,6 +34,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private final Yaml scope;
     private final Yaml incoming;
     private final boolean acceptTheirs;
+
+    @Nullable
     private final String objectIdentifyingProperty;
 
     public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs,@Nullable String objectIdentifyingProperty) {
@@ -78,7 +80,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     private boolean keyMatches(Yaml.Mapping m1, Yaml.Mapping m2) {
         Optional<String> nameToAdd = m2.getEntries().stream()
-                .filter(e -> objectIdentifyingProperty.equals(e.getKey().getValue()))
+                .filter(e -> objectIdentifyingProperty != null && objectIdentifyingProperty.equals(e.getKey().getValue()))
                 .map(e -> ((Yaml.Scalar) e.getValue()).getValue())
                 .findAny();
 
