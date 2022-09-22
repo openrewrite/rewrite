@@ -163,6 +163,10 @@ public interface Parser<S extends SourceFile> {
         }
 
         @SuppressWarnings("unused")
+        public static List<Input> fromResource(String resource, String delimiter) {
+            return fromResource(resource, delimiter, StandardCharsets.UTF_8);
+        }
+
         public static List<Input> fromResource(String resource, String delimiter, @Nullable Charset charset) {
             Charset resourceCharset = charset == null ? StandardCharsets.UTF_8 : charset;
             return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource)), resourceCharset).split(delimiter))
