@@ -52,7 +52,33 @@ interface AddImportTest : JavaRecipeTest {
             }
         """
     )
-    
+    @Test
+    fun importIsAddedToCorrectBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            { AddImport("org.mockito.junit.jupiter.MockitoExtension", null, false) }
+        ),
+        before = """
+            import java.util.List;
+
+            import org.junit.jupiter.api.extension.ExtendWith;
+            import org.mockito.Mock;
+
+            public class MyTest {
+            }
+        """,
+        after = """
+            import java.util.List;
+
+            import org.junit.jupiter.api.extension.ExtendWith;
+            import org.mockito.Mock;
+            import org.mockito.junit.jupiter.MockitoExtension;
+
+            public class MyTest {
+            }
+        """
+    )
+
     @Test
     fun dontDuplicateImports(jp: JavaParser) = assertChanged(
         jp,
