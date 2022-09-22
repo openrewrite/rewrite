@@ -124,7 +124,7 @@ public class MavenPomDownloader {
                     continue;
                 }
             }
-
+            boolean repoFailure = false;
             Optional<MavenMetadata> result = null;
             try {
                 result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
@@ -156,6 +156,7 @@ public class MavenPomDownloader {
                     if (webRequestFailures == null) {
                         webRequestFailures = new ArrayList<>();
                     }
+                    repoFailure = true;
                     webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
                 }
             }
@@ -182,11 +183,12 @@ public class MavenPomDownloader {
                     if (webRequestFailures == null) {
                         webRequestFailures = new ArrayList<>();
                     }
+                    repoFailure = true;
                     webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
                 }
             }
 
-            //Merge metadata from repository and cache metadata result.
+            // Merge metadata from repository and cache metadata result.
             if (result != null && result.isPresent()) {
                 if (mavenMetadata == null) {
                     mavenMetadata = result.get();
@@ -194,8 +196,9 @@ public class MavenPomDownloader {
                     mavenMetadata = mergeMetadata(mavenMetadata, result.get());
                 }
                 mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, result.get());
-            } else if (webRequestFailures == null) {
-                //If there were no fatal failures, cache an empty result.
+            } else if (!repoFailure) {
+                // If there was no fatal failure while attempting to find metadata and there was no metadata retrieved
+                // from the current repo, cache an empty result.
                 mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
             }
         }
