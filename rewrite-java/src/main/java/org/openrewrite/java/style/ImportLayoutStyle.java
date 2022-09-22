@@ -159,7 +159,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     // Use the "before" import to determine insertion point.
                     // Find the import in the original list to establish insertion position.
                     for (int j = 0; j < originalImports.size(); j++) {
-                        if (after != null && after.getElement().equals(originalImports.get(j).getElement())) {
+                        if (after != null && after.getElement().equals(originalImports.get(j).getElement()) && addToBlock.accept(after)) {
                             break;
                         } else if (before.getElement().equals(originalImports.get(j).getElement())) {
                             insertPosition = j + 1;
