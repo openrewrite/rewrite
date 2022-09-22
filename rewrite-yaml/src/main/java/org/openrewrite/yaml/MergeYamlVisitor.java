@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -35,7 +36,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private final boolean acceptTheirs;
     private final String objectIdentifyingProperty;
 
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, String objectIdentifyingProperty) {
+    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs,@Nullable String objectIdentifyingProperty) {
         this(scope, new YamlParser().parse(yamlString).get(0).getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
     }
 
