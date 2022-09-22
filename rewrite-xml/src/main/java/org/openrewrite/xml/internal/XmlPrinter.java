@@ -85,6 +85,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         visitMarkers(attribute.getMarkers(), p);
         p.out.append(attribute.getKey().getPrefix())
                 .append(attribute.getKeyAsString())
+                .append(attribute.getBeforeEquals())
                 .append('=')
                 .append(attribute.getValue().getPrefix())
                 .append(valueDelim)
