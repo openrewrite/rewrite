@@ -55,8 +55,8 @@ public interface ManagedDependency {
             return gav.getArtifactId();
         }
 
+        @Nullable
         public String getVersion() {
-            assert gav.getVersion() != null;
             return gav.getVersion();
         }
 
@@ -80,8 +80,8 @@ public interface ManagedDependency {
             return gav.getArtifactId();
         }
 
+        @Nullable
         public String getVersion() {
-            assert gav.getVersion() != null;
             return gav.getVersion();
         }
 
@@ -96,6 +96,7 @@ public interface ManagedDependency {
 
     String getArtifactId();
 
+    @Nullable
     String getVersion();
 
     <D extends ManagedDependency> D withVersion(String version);

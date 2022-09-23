@@ -123,6 +123,7 @@ public class UpgradeDependencyVersion extends Recipe {
         private final Set<GroupArtifact> projectArtifacts;
 
         private UpgradeDependencyVersionVisitor(Set<GroupArtifact> projectArtifacts) {
+            //noinspection ConstantConditions
             versionComparator = Semver.validate(newVersion, versionPattern).getValue();
             assert versionComparator != null;
             this.projectArtifacts = projectArtifacts;
@@ -154,7 +155,7 @@ public class UpgradeDependencyVersion extends Recipe {
                             ResolvedManagedDependency dm = findManagedDependency(t);
                             if (dm != null) {
                                 String requestedVersion = dm.getRequested().getVersion();
-                                if (requestedVersion.startsWith("${")) {
+                                if (requestedVersion != null && requestedVersion.startsWith("${")) {
                                     doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                                     return t;
                                 }
@@ -183,17 +184,18 @@ public class UpgradeDependencyVersion extends Recipe {
                         if (!projectArtifacts.contains(new GroupArtifact(matchedManagedDependency.getGroupId(), matchedManagedDependency.getArtifactId())) &&
                             matchesGlob(matchedManagedDependency.getGroupId(), groupId) && matchesGlob(matchedManagedDependency.getArtifactId(), artifactId)) {
 
-                            String requestedVersion = matchedManagedDependency.getRequested().getVersion();
-                            assert (matchedManagedDependency.getVersion() != null);
-                            String newerVersion = findNewerVersion(matchedManagedDependency.getGroupId(), matchedManagedDependency.getArtifactId(), matchedManagedDependency.getVersion(), ctx);
-                            if (newerVersion != null) {
-                                if (requestedVersion.startsWith("${")) {
-                                    doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
-                                    return t;
-                                }
-                                Xml.Tag childVersionTag = t.getChild("version").orElse(null);
-                                if (childVersionTag != null) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(childVersionTag, newerVersion).visitNonNull(t, 0, getCursor());
+                            if (matchedManagedDependency.getVersion() != null) {
+                                String requestedVersion = matchedManagedDependency.getRequested().getVersion();
+                                String newerVersion = findNewerVersion(matchedManagedDependency.getGroupId(), matchedManagedDependency.getArtifactId(), matchedManagedDependency.getVersion(), ctx);
+                                if (newerVersion != null) {
+                                    if (requestedVersion != null && requestedVersion.startsWith("${")) {
+                                        doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
+                                        return t;
+                                    }
+                                    Xml.Tag childVersionTag = t.getChild("version").orElse(null);
+                                    if (childVersionTag != null) {
+                                        t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(childVersionTag, newerVersion).visitNonNull(t, 0, getCursor());
+                                    }
                                 }
                             }
                         }
@@ -212,7 +214,7 @@ public class UpgradeDependencyVersion extends Recipe {
                                         String requestedVersion = dm.getRequestedBom().getVersion();
                                         String newerVersion = findNewerVersion(bom.getGroupId(), bom.getArtifactId(), bom.getVersion(), ctx);
                                         if (newerVersion != null) {
-                                            if (requestedVersion.startsWith("${")) {
+                                            if (requestedVersion != null && requestedVersion.startsWith("${")) {
                                                 doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                                                 return t;
                                             }

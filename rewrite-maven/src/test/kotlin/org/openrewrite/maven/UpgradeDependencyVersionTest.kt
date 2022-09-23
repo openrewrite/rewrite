@@ -974,5 +974,26 @@ class UpgradeDependencyVersionTest : MavenRecipeTest {
 
     )
 
-
+    @Test
+    fun noManagedVersion() = assertUnchanged(
+        recipe = UpgradeDependencyVersion(
+            "*",
+            "*",
+            "latest.patch", null, null),
+        before = """
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>net.sourceforge.orbroker</groupId>
+                            <artifactId>orbroker</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+        """,
+    )
 }
