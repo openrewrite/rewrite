@@ -496,8 +496,14 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         char c = chars[i];
                         if (c == '\n') {
                             multiline.append(c);
-                            for (int j = 0; j < Math.abs(shift) && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
-                                i++;
+                            for (int j = 0; j < Math.abs(shift); j++) {
+                                // negative shift exceeds available whitespace
+                                if (chars.length <= i+j+1) {
+                                    multiline.append(indent(margin, shift));
+                                    return indentComment(textComment.withText(multiline.toString()), "", j);
+                                } else if (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t') {
+                                    i++;
+                                }
                             }
                         } else {
                             multiline.append(c);
