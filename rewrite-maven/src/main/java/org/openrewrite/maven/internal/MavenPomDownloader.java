@@ -40,7 +40,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -114,7 +113,7 @@ public class MavenPomDownloader {
 
         MavenMetadata mavenMetadata = null;
         Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
-        List<MavenDownloadingException> webRequestFailures = null;
+        List<String> webRequestFailures = null;
         for (MavenRepository repo : normalizedRepos) {
             String version = gav.getVersion();
             if (version != null) {
@@ -157,7 +156,7 @@ public class MavenPomDownloader {
                         webRequestFailures = new ArrayList<>();
                     }
                     repoFailure = true;
-                    webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
+                    webRequestFailures.add("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage());
                 }
             }
 
@@ -184,7 +183,7 @@ public class MavenPomDownloader {
                         webRequestFailures = new ArrayList<>();
                     }
                     repoFailure = true;
-                    webRequestFailures.add(new MavenDownloadingException("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage()));
+                    webRequestFailures.add("Unable to retrieve metadata from [" + repo.getUri() + "]. " + exception.getMessage());
                 }
             }
 
@@ -214,8 +213,8 @@ public class MavenPomDownloader {
 
             if (webRequestFailures != null) {
                 message.append("\nMetadata download failures:");
-                for (MavenDownloadingException e : webRequestFailures) {
-                    message.append("\n  ").append(e.getMessage());
+                for (String failure : webRequestFailures) {
+                    message.append("\n  ").append(failure);
                 }
             }
             throw new MavenDownloadingException(message.toString());
@@ -362,6 +361,7 @@ public class MavenPomDownloader {
                 .tag("artifact.id", gav.getArtifactId())
                 .tag("type", "pom");
 
+        List<String> webRequestFailures = null;
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         for (MavenRepository repo : normalizedRepos) {
             ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(
@@ -422,8 +422,13 @@ public class MavenPomDownloader {
                     return pom;
                 } catch (MavenClientSideException exception) {
                     mavenCache.putPom(resolvedGav, null);
-                } catch (Throwable ignored) {
+                } catch (Throwable exception) {
                     // various kinds of connection failures
+                    if (webRequestFailures == null) {
+                        webRequestFailures = new ArrayList<>();
+                    }
+
+                    webRequestFailures.add("Unable to retrieve dependency from [" + repo.getUri() + "]. " + exception.getMessage());
                 }
             } else if (result.isPresent()) {
                 sample.stop(timer.tags("outcome", "cached").register(Metrics.globalRegistry));
@@ -436,8 +441,20 @@ public class MavenPomDownloader {
             ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
         }
 
-        throw new MavenDownloadingException("Unable to download dependency [" + gav + "] from the following repositories :\n  - "
-                + normalizedRepos.stream().map(MavenRepository::getUri).collect(Collectors.joining("\n  - ")));
+        StringBuilder message = new StringBuilder("Unable to download dependency [\" + gav + \"] from the following repositories :");
+
+        for (MavenRepository repository : normalizedRepos) {
+            message.append("\n  ").append(repository.getUri());
+        }
+
+        if (webRequestFailures != null) {
+            message.append("\nDownload failures:");
+            for (String failure : webRequestFailures) {
+                message.append("\n  ").append(failure);
+            }
+        }
+        throw new MavenDownloadingException(message.toString());
+
     }
 
     @Nullable
