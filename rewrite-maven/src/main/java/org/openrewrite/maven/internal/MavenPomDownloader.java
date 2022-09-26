@@ -121,7 +121,7 @@ public class MavenPomDownloader {
                 if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
                     downloadFailures.add("[" + repo.getUri() + "] Version is a snapshot but the repository does not support snapshots.");
                     continue;
-                } else if (!repo.isReleases()) {
+                } else if (!version.endsWith("-SNAPSHOT") && !repo.isReleases()) {
                     downloadFailures.add("[" + repo.getUri() + "] Version is a release but the repository does not support releases.");
                     continue;
                 }
