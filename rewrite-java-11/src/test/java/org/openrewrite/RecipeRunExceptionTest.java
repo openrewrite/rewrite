@@ -37,7 +37,7 @@ public class RecipeRunExceptionTest {
             @Override
             public J.Identifier visitIdentifier(J.Identifier ident, Integer p) {
                 J.Identifier i = super.visitIdentifier(ident, p);
-                return i.withException(new IllegalStateException("boom"), null);
+                return i.withExceptionMarker(new IllegalStateException("boom"));
             }
         }.visitNonNull(cu, 0);
 

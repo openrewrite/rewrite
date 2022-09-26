@@ -234,7 +234,7 @@ public class UpgradeDependencyVersion extends Recipe {
                 // There is a problem downloading the metadata for a dependency (this can happen if the repository
                 // does not publish the metadata and the metadata cannot be easily derived by querying the repository's
                 // directory structure).
-                return t.withException(exception, ctx);
+                return t.withExceptionMarker(exception);
             }
             return t;
         }

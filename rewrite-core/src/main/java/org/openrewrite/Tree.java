@@ -132,10 +132,7 @@ public interface Tree {
     }
 
     @SuppressWarnings("unchecked")
-    default <T extends Tree> T withException(Throwable throwable, @Nullable ExecutionContext ctx) {
-        if (ctx != null) {
-            ctx.getOnError().accept(throwable);
-        }
+    default <T extends Tree> T withExceptionMarker(Throwable throwable) {
         RecipeRunException rre;
         if (throwable instanceof RecipeRunException) {
             rre = (RecipeRunException) throwable;
@@ -153,6 +150,4 @@ public interface Tree {
             return (T) this;
         }
     }
-
-
 }
