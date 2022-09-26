@@ -233,9 +233,8 @@ public class UpgradeDependencyVersion extends Recipe {
             } catch (MavenDownloadingException exception) {
                 // There is a problem downloading the metadata for a dependency (this can happen if the repository
                 // does not publish the metadata and the metadata cannot be easily derived by querying the repository's
-                // directory structure). In this case, we add a non-fatal marker to indicate that meta-data could not be
-                // found for the dependency.
-                return t.withMarkers(t.getMarkers().searchResult("Unable to upgrade this dependency. " + exception.getMessage()));
+                // directory structure).
+                return t.withException(exception, ctx);
             }
             return t;
         }
