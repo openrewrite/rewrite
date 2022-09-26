@@ -42,6 +42,7 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         )
     )
 
+    @Suppress("SuspiciousIndentAfterControlStatement")
     @Issue("https://github.com/openrewrite/rewrite/issues/2251")
     @Test
     fun multilineCommentStartPositionIsIndented(jp: JavaParser) = assertChanged(
@@ -53,8 +54,9 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                         foo();
                         foo();
                       /*
-                      comment start tag precedes the end tag
-                    */
+                   * line-one
+                   * line-two
+                   */
                 }
                 static void foo() {}
             }
@@ -66,8 +68,9 @@ interface TabsAndIndentsTest : JavaRecipeTest {
                         foo();
                     foo();
                     /*
-                     comment start tag precedes the end tag
-                    */
+                 * line-one
+                 * line-two
+                   */
                 }
                 static void foo() {}
             }
