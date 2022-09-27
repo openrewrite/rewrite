@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.test.TypeValidation
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Issue("https://github.com/openrewrite/rewrite/issues/466")
@@ -47,6 +48,10 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
             jp.setSourceSet("test")
             return jp
         }
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(MethodNameCasing(true))
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1741")
     @Test
@@ -351,5 +356,25 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2261")
+    @Test
+    fun unknownParameterTypes() = rewriteRun(
+        { spec ->
+            spec.typeValidationOptions(TypeValidation.none())
+        },
+        java("""
+            class Test {
+                private void _foo(Unknown u) {
+                }
+            }
+        """,
+        """
+            class Test {
+                private void foo(Unknown u) {
+                }
+            }
+        """)
     )
 }

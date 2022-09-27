@@ -416,4 +416,18 @@ interface MethodMatcherTest {
         assertEquals("MethodDeclaration{com.yourorg.Foo{name=bar,return=void,parameters=[java.lang.String[]]}}", methodDecl.toString())
         assertTrue(MethodMatcher("com.yourorg.Foo bar(String[])").matches(methodDecl, classDecl))
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2261")
+    @Test
+    fun matcherForUnknownType(jp: JavaParser) {
+        val cu = jp.parse("""
+            class Test {
+                void foo(Unknown u) {}
+            }
+        """).first()
+        val methodDecl = cu.classes[0].body.statements[0] as J.MethodDeclaration
+
+        val matcher = MethodMatcher(MethodMatcher.methodPattern(methodDecl))
+        assertTrue(matcher.matches(methodDecl.methodType))
+    }
 }

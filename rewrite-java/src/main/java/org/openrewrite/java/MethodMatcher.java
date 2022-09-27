@@ -322,6 +322,8 @@ public class MethodMatcher {
                 return ((JavaType.Primitive) type).getClassName();
             }
             return ((JavaType.Primitive) type).getKeyword();
+        } else if(type instanceof JavaType.Unknown) {
+            return "*";
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Array) {
