@@ -21,6 +21,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.intellij.lang.annotations.Language
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -30,8 +31,10 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.ipc.http.HttpUrlConnectionSender
 import org.openrewrite.maven.MavenParser
 import org.openrewrite.maven.tree.GroupArtifactVersion
+import org.openrewrite.maven.tree.MavenMetadata
 import org.openrewrite.maven.tree.MavenRepository
 import java.time.Duration
+import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
 
 
@@ -235,5 +238,72 @@ class MavenPomDownloaderTest {
                 assertThat(metadataPaths.get()).isEqualTo(0)
             }
         }
+    }
+
+    @Test
+    fun mergeMetadata() {
+
+        @Language("xml") val metadata1 = """
+            <metadata>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot</artifactId>
+                <versioning>
+                    <versions>
+                        <version>2.3.3</version>
+                        <version>2.4.1</version>
+                        <version>2.4.2</version>
+                    </versions>
+                    <snapshot>
+                        <timestamp>20220927.033510</timestamp>
+                        <buildNumber>223</buildNumber>
+                    </snapshot>
+                    <snapshotVersions>
+                        <snapshotVersion>
+                            <extension>pom.asc</extension>
+                            <value>0.1.0-20220927.033510-223</value>
+                            <updated>20220927033510</updated>
+                        </snapshotVersion>
+                    </snapshotVersions>                    
+                </versioning>
+            </metadata>
+        """.trimIndent()
+
+        @Language("xml") val metadata2 = """
+            <metadata modelVersion="1.1.0">
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot</artifactId>
+                <versioning>
+                    <versions>
+                        <version>2.3.2</version>
+                        <version>2.3.3</version>
+                    </versions>
+                    <snapshot>
+                        <timestamp>20210115.042754</timestamp>
+                        <buildNumber>180</buildNumber>
+                    </snapshot>
+                    <snapshotVersions>
+                        <snapshotVersion>
+                            <extension>pom.asc</extension>
+                            <value>0.1.0-20210115.042754-180</value>
+                            <updated>20210115042754</updated>
+                        </snapshotVersion>
+                    </snapshotVersions>
+                </versioning>
+            </metadata>
+        """.trimIndent()
+
+        val m1 = MavenMetadata.parse(metadata1.toByteArray())
+        val m2 = MavenMetadata.parse(metadata2.toByteArray())
+
+        @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+        val merged = MavenPomDownloader(null, InMemoryExecutionContext()).mergeMetadata(m1, m2)
+
+        assertThat(merged.versioning.snapshot?.timestamp).isEqualTo("20220927.033510")
+        assertThat(merged.versioning.snapshot?.buildNumber).isEqualTo("223")
+        assertThat(merged.versioning.versions).hasSize(4).containsAll(Arrays.asList("2.3.2", "2.3.3", "2.4.1", "2.4.2"))
+        assertThat(merged.versioning.snapshotVersions).hasSize(2)
+        assertThat(merged.versioning.snapshotVersions!![0].extension).isNotNull()
+        assertThat(merged.versioning.snapshotVersions!![0].value).isNotNull()
+        assertThat(merged.versioning.snapshotVersions!![0].updated).isNotNull()
     }
 }

@@ -327,13 +327,31 @@ public class MavenPomDownloader {
     }
 
     @NonNull
-    private MavenMetadata mergeMetadata(MavenMetadata m1, MavenMetadata m2) {
+    protected MavenMetadata mergeMetadata(MavenMetadata m1, MavenMetadata m2) {
+
         return new MavenMetadata(new MavenMetadata.Versioning(
-                Stream.concat(m1.getVersioning().getVersions().stream(), m2.getVersioning().getVersions().stream()).collect(toList()),
+                mergeVersions(m1.getVersioning().getVersions(), m2.getVersioning().getVersions()),
                 Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
                         m2.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m2.getVersioning().getSnapshotVersions().stream()).collect(toList()),
-                null
+                maxSnapshot(m1.getVersioning().getSnapshot(), m2.getVersioning().getSnapshot())
         ));
+    }
+
+    private List<String> mergeVersions(List<String> versions1, List<String> versions2) {
+        Set<String> merged = new HashSet<>(versions1);
+        merged.addAll(versions2);
+        return new ArrayList<>(merged);
+    }
+
+    @Nullable
+    private MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
+        if (s1 == null) {
+            return s2;
+        } else if (s2 == null) {
+            return s1;
+        } else {
+            return (s1.getTimestamp().compareTo(s2.getTimestamp())) >= 0 ? s1 : s2;
+        }
     }
 
     public Pom download(GroupArtifactVersion gav,

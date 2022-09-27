@@ -31,6 +31,7 @@ class MavenMetadataTest {
                     <latest>2.4.2</latest>
                     <release>2.4.2</release>
                     <versions>
+                        <version>2.4.1</version>
                         <version>2.4.2</version>
                     </versions>
                     <lastUpdated>20210115042754</lastUpdated>
@@ -40,6 +41,46 @@ class MavenMetadataTest {
 
         val parsed = MavenMetadata.parse(metadata.toByteArray())
 
-        assertThat(parsed.versioning.versions).isNotEmpty
+        assertThat(parsed.versioning.versions).hasSize(2)
     }
+
+    @Test
+    fun deserializeSnapshotMetadata() {
+        @Language("xml") val metadata = """
+            <metadata modelVersion="1.1.0">
+                <groupId>org.openrewrite.recipe</groupId>
+                <artifactId>rewrite-recommendations</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+                <versioning>
+                    <snapshot>
+                        <timestamp>20220927.033510</timestamp>
+                        <buildNumber>223</buildNumber>
+                    </snapshot>
+                    <snapshotVersions>
+                        <snapshotVersion>
+                            <extension>pom.asc</extension>
+                            <value>0.1.0-20220927.033510-223</value>
+                            <updated>20220927033510</updated>
+                        </snapshotVersion>
+                        <snapshotVersion>
+                            <extension>pom</extension>
+                            <value>0.1.0-20220927.033510-223</value>
+                            <updated>20220927033510</updated>
+                        </snapshotVersion>
+                    </snapshotVersions>
+                </versioning>
+            </metadata>
+        """.trimIndent()
+
+        val parsed = MavenMetadata.parse(metadata.toByteArray())
+
+        assertThat(parsed.versioning.snapshot?.timestamp).isEqualTo("20220927.033510")
+        assertThat(parsed.versioning.snapshot?.buildNumber).isEqualTo("223")
+        assertThat(parsed.versioning.versions).isNotNull
+        assertThat(parsed.versioning.snapshotVersions).hasSize(2)
+        assertThat(parsed.versioning.snapshotVersions!![0].extension).isNotNull()
+        assertThat(parsed.versioning.snapshotVersions!![0].value).isNotNull()
+        assertThat(parsed.versioning.snapshotVersions!![0].updated).isNotNull()
+    }
+
 }

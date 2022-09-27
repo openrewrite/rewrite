@@ -64,7 +64,7 @@ public class MavenMetadata {
 
         public Versioning(
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
-                @Nullable List<SnapshotVersion> snapshotVersions,
+                @JacksonXmlElementWrapper(localName = "snapshotVersions") @Nullable List<SnapshotVersion> snapshotVersions,
                 @Nullable Snapshot snapshot) {
             this.versions = versions;
             this.snapshotVersions = snapshotVersions;
