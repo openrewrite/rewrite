@@ -19,6 +19,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class CaretRangeTest {
+
+    @Test
+    fun isValidWhenCurrentIsNull() {
+        val caretRange: CaretRange = CaretRange.build("^1", null).getValue()!!
+        assertThat(caretRange.isValid(null, "1.0.0")).isTrue
+    }
+
     @Test
     fun pattern() {
         assertThat(CaretRange.build("^1", null).isValid).isTrue

@@ -19,6 +19,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class TildeRangeTest {
+
+    @Test
+    fun isValidWhenCurrentIsNull() {
+        val tildeRange: TildeRange = TildeRange.build("~1", null).getValue()!!
+        assertThat(tildeRange.isValid(null, "1.0.0")).isTrue
+    }
+
     @Test
     fun pattern() {
         assertThat(TildeRange.build("~1", null).isValid).isTrue

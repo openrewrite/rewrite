@@ -26,7 +26,9 @@ public class LatestPatch implements VersionComparator {
 
     @Override
     public boolean isValid(@Nullable String currentVersion, String version) {
-        //noinspection ConstantConditions
+        if (currentVersion == null) {
+            return true;
+        }
         Validated validated = TildeRange.build("~" + Semver.majorVersion(currentVersion) + "." + Semver.minorVersion(currentVersion), metadataPattern);
         if (validated.isValid()) {
             VersionComparator comparator = validated.getValue();

@@ -24,6 +24,11 @@ class LatestPatchTest {
     private val latestMetadataPatch = LatestPatch("-fred")
 
     @Test
+    fun isValidWhenCurrentIsNull() {
+        assertThat(latestPatch.isValid(null, "1.0.0")).isTrue
+    }
+
+    @Test
     fun isValid() {
         assertThat(latestPatch.isValid("1.0.0", "1.0.0")).isTrue
         assertThat(latestPatch.isValid("1.0.0", "1.0.0.1")).isTrue

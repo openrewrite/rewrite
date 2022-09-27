@@ -19,6 +19,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class XRangeTest {
+
+    @Test
+    fun isValidWhenCurrentIsNull() {
+        val xRange: XRange = XRange.build("*", null).getValue()!!
+        assertThat(xRange.isValid(null, "1.0.0")).isTrue
+    }
+
     @Test
     fun pattern() {
         assertThat(XRange.build("*", null).isValid).isTrue
