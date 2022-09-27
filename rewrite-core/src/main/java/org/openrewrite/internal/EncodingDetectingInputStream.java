@@ -44,6 +44,11 @@ public class EncodingDetectingInputStream extends InputStream {
     boolean maybeThreeByteSequence = false;
     boolean maybeFourByteSequence = false;
 
+    public EncodingDetectingInputStream(InputStream inputStream) {
+        this.inputStream = inputStream;
+        this.charset = null;
+    }
+
     public EncodingDetectingInputStream(InputStream inputStream, @Nullable Charset charset) {
         this.inputStream = inputStream;
         this.charset = charset;
