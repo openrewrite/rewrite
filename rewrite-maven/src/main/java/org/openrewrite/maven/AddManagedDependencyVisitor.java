@@ -17,12 +17,10 @@ package org.openrewrite.maven;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.semver.LatestRelease;
-import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -41,7 +39,10 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
 
     private final String groupId;
     private final String artifactId;
-    private final String version;
+    private final VersionComparator version;
+
+    @Nullable
+    private final String fallbackVersion;
 
     @Nullable
     private final String versionPattern;
@@ -59,9 +60,6 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
     private final String classifier;
 
     @Nullable
-    private VersionComparator versionComparator;
-
-    @Nullable
     private String resolvedVersion;
 
     @Override
@@ -69,17 +67,13 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
 
         Xml.Document doc = super.visitDocument(document, ctx);
 
-        Validated versionValidation = Semver.validate(version, versionPattern);
-        if (versionValidation.isValid()) {
-            versionComparator = versionValidation.getValue();
-        }
 
         if (documentHasManagedDependency(doc, ctx)) {
             return document;
         }
 
         String versionToUse = findVersionToUse(ctx);
-        if (versionToUse.equals(existingManagedDependencyVersion())) {
+        if (Objects.equals(versionToUse, existingManagedDependencyVersion())) {
             return document;
         }
 
@@ -174,22 +168,17 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                 .findFirst().orElse(null);
     }
 
+    @Nullable
     private String findVersionToUse(ExecutionContext ctx) {
         if (resolvedVersion == null) {
-
-            if (versionComparator == null) {
-                resolvedVersion = version;
-            } else {
-                MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                LatestRelease latest = new LatestRelease(versionPattern);
-                resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(v -> versionComparator.isValid(null, v))
-                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                        .orElse(version);
-            }
+            MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+            LatestRelease latest = new LatestRelease(versionPattern);
+            resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(v -> version.isValid(null, v))
+                    .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                    .max((v1, v2) -> version.compare(null, v1, v2))
+                    .orElse(fallbackVersion);
         }
-
         return resolvedVersion;
     }
 }

@@ -17,14 +17,15 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.semver.ExactVersion
 
 class AddManagedDependencyVisitorTest : MavenRecipeTest {
     override val parser: MavenParser = MavenParser.builder()
         .build()
 
     override val recipe: Recipe
-        get() = toRecipe { AddManagedDependencyVisitor("org.apache.logging.log4j", "log4j-bom", "2.17.2",
-            null,"import",true,"pom", null) }
+        get() = toRecipe { AddManagedDependencyVisitor("org.apache.logging.log4j", "log4j-bom", ExactVersion("2.17.2"),
+            null, null,"import",true,"pom", null) }
 
     @Test
     fun `ManagedDependency Exists`() = assertUnchanged(

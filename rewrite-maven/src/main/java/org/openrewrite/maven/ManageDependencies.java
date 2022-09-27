@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -115,8 +116,9 @@ public class ManageDependencies extends Recipe {
 
                             for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
                                 doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
-                                        rmd.getArtifactId(), rmd.getVersion(), null,
-                                        null, false, null, rmd.getRequested().getClassifier()));
+                                        rmd.getArtifactId(), new ExactVersion(rmd.getVersion()),
+                                        rmd.getVersion(), null, null, false,
+                                        null, rmd.getRequested().getClassifier()));
                             }
                         }
 
