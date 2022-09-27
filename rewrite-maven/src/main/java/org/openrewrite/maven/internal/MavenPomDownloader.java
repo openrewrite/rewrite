@@ -488,7 +488,13 @@ public class MavenPomDownloader {
                 }
             }
 
-            MavenMetadata mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            MavenMetadata mavenMetadata;
+            try {
+                mavenMetadata = downloadMetadata(gav, containingPom, repositories);
+            } catch (MavenDownloadingException e) {
+                //This can happen if the artifact only exists in the local maven cache. In this case, just return the original
+                return gav.getVersion();
+            }
             MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
             if (snapshot != null) {
                 return gav.getVersion().replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
