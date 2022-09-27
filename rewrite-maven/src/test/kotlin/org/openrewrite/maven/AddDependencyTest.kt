@@ -585,10 +585,65 @@ class AddDependencyTest : RewriteTest {
         )
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2255")
+    @ParameterizedTest
+    @ValueSource(strings = ["provided", "runtime", "test"])
+    fun addScopedDependency(scope: String) = rewriteRun(
+        { spec ->
+            spec.recipe(
+                addDependency(
+                    "com.fasterxml.jackson.core:jackson-core:2.12.0",
+                    "com.fasterxml.jackson.core.*",
+                    scope
+                )
+            )
+        },
+        mavenProject(
+            "project",
+            srcMainJava(
+                java(
+                    """
+                        public class A {
+                            com.fasterxml.jackson.core.Versioned v;
+                        }
+                    """
+                )
+            ),
+            pomXml(
+                """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+                """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.fasterxml.jackson.core</groupId>
+                                <artifactId>jackson-core</artifactId>
+                                <version>2.12.0</version>
+                                <scope>$scope</scope>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+        )
+    )
+
     private fun addDependency(gav: String, onlyIfUsing: String): AddDependency {
+        return addDependency(gav, onlyIfUsing, null)
+    }
+
+    private fun addDependency(gav: String, onlyIfUsing: String, scope: String?): AddDependency {
         val (group, artifact, version) = gav.split(":")
         return AddDependency(
-            group, artifact, version, null, null, true,
+            group, artifact, version, null, scope, true,
             onlyIfUsing, null, null, false, null
         )
     }
