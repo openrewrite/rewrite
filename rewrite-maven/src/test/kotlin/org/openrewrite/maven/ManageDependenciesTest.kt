@@ -31,7 +31,6 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "org.junit.jupiter",
             "*",
-            null,
             false),
         before = """
             <project>
@@ -78,7 +77,6 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "junit",
             "junit",
-            null,
             false),
         dependsOn = arrayOf(
             """
@@ -142,7 +140,6 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "junit",
             "junit",
-            "4.13",
             false),
         before = """
             <project>
@@ -168,7 +165,7 @@ class ManageDependenciesTest : MavenRecipeTest {
                         <dependency>
                             <groupId>junit</groupId>
                             <artifactId>junit</artifactId>
-                            <version>4.13</version>
+                            <version>4.13.2</version>
                         </dependency>
                     </dependencies>
                 </dependencyManagement>
@@ -176,89 +173,6 @@ class ManageDependenciesTest : MavenRecipeTest {
                     <dependency>
                         <groupId>junit</groupId>
                         <artifactId>junit</artifactId>
-                    </dependency>
-                </dependencies>
-            </project>
-        """
-    )
-
-    @Test
-    fun useMaxVersion() = assertChanged(
-        recipe = ManageDependencies(
-            "org.apache.logging.log4j",
-            "log4j-*",
-            null,
-            false),
-        before = """
-            <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-core</artifactId>
-                        <version>2.17.0</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-api</artifactId>
-                        <version>2.17.1</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-slf4j-impl</artifactId>
-                        <version>2.17.2</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                        <version>4.13.2</version>
-                    </dependency>
-                </dependencies>
-            </project>
-        """,
-        after = """
-            <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>org.apache.logging.log4j</groupId>
-                            <artifactId>log4j-api</artifactId>
-                            <version>2.17.2</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.apache.logging.log4j</groupId>
-                            <artifactId>log4j-core</artifactId>
-                            <version>2.17.2</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.apache.logging.log4j</groupId>
-                            <artifactId>log4j-slf4j-impl</artifactId>
-                            <version>2.17.2</version>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
-                <dependencies>
-                    <dependency>
-                        <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-core</artifactId>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-api</artifactId>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.apache.logging.log4j</groupId>
-                        <artifactId>log4j-slf4j-impl</artifactId>
-                    </dependency>
-                    <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                        <version>4.13.2</version>
                     </dependency>
                 </dependencies>
             </project>
@@ -342,7 +256,7 @@ class ManageDependenciesTest : MavenRecipeTest {
                 </project>
             """.trimIndent()
         )
-        val results = ManageDependencies("junit", "junit", null, true)
+        val results = ManageDependencies("junit", "junit", true)
             .run(parser.parse(listOf(project, serviceApi, service, core), tempDir, InMemoryExecutionContext())
                 .map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
                 .mapIndexed { n, maven ->
@@ -403,7 +317,6 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "org.apache.logging.log4j",
             "log4j-*",
-            null,
             true),
         before = """
             <project>
@@ -474,7 +387,6 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "junit",
             "junit",
-            null,
             true),
         before = """
             <project>

@@ -176,7 +176,8 @@ public class AddManagedDependency extends Recipe {
                         Xml maven = super.visitDocument(document, executionContext);
 
                         if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
-                            doAfterVisit(new AddManagedDependencyVisitor(groupId,artifactId,version,versionPattern,scope,releasesOnly,type,classifier));
+                            doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId, version,
+                                    versionPattern, scope, releasesOnly, type, classifier));
                         }
 
                         return maven;
