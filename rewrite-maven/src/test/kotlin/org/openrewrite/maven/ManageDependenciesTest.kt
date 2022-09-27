@@ -180,12 +180,11 @@ class ManageDependenciesTest : MavenRecipeTest {
     )
 
     @Test
-    fun `Added to the root pom`(@TempDir tempDir: Path) {
+    fun addedToTheRootPom(@TempDir tempDir: Path) {
         val project = tempDir.resolve("pom.xml")
         val serviceApi = tempDir.resolve("api/pom.xml")
         val service = tempDir.resolve("service/pom.xml")
         val core = tempDir.resolve("core/pom.xml")
-
 
         serviceApi.toFile().parentFile.mkdirs()
         service.toFile().parentFile.mkdirs()
@@ -437,5 +436,4 @@ class ManageDependenciesTest : MavenRecipeTest {
             </project>
         """
     )
-
 }

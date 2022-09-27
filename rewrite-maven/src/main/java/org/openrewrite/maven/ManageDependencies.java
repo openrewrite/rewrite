@@ -108,10 +108,13 @@ public class ManageDependencies extends Recipe {
 
                         if (manageableDependencies != null) {
                             Map<GroupArtifact, ResolvedDependency> maxVersionByGroupArtifact = new HashMap<>(manageableDependencies.size());
+
                             for (ResolvedDependency rmd : manageableDependencies) {
-                                maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
-                                        (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
-                                                rmd : existing);
+                                if(rmd.getDepth() <= 1) {
+                                    maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
+                                            (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
+                                                    rmd : existing);
+                                }
                             }
 
                             for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
