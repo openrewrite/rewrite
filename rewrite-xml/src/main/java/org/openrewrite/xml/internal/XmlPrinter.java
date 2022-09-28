@@ -26,7 +26,6 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitDocument(Xml.Document document, PrintOutputCapture<P> p) {
         p.out.append(document.getPrefix());
-        visitMarkers(document.getMarkers(), p);
         document = (Xml.Document) super.visitDocument(document, p);
         p.out.append(document.getEof());
         return document;
@@ -35,7 +34,6 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitProlog(Xml.Prolog prolog, PrintOutputCapture<P> p) {
         p.out.append(prolog.getPrefix());
-        visitMarkers(prolog.getMarkers(), p);
         return super.visitProlog(prolog, p);
     }
 
