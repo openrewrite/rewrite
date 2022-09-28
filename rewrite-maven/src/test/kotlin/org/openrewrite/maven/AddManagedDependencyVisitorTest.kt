@@ -73,7 +73,9 @@ class AddManagedDependencyVisitorTest : MavenRecipeTest {
                     </dependencies>
                 </dependencyManagement>
             </project>
-        """
+        """,
+            cycles = 1,
+            expectedCyclesThatMakeChanges = 1
     )
 
     @Test
@@ -103,6 +105,8 @@ class AddManagedDependencyVisitorTest : MavenRecipeTest {
                     </dependencies>
                 </dependencyManagement>
             </project>
-        """
+        """,
+            cycles = 1,
+            expectedCyclesThatMakeChanges = 1
     )
 }
