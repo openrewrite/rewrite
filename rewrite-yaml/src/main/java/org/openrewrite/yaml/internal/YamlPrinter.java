@@ -113,12 +113,28 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
                 p.out.append('"')
-                        .append(scalar.getValue().replaceAll("\\n", "\\\\n"))
+                        .append(scalar.getValue()
+                                .replace("\\", "\\\\")
+                                .replace("\0", "\\0")
+                                .replace("\u0007", "\\a")
+                                .replace("\b", "\\b")
+                                .replace("\t", "\\t")
+                                .replace("\n", "\\n")
+                                .replace("\u000B", "\\v")
+                                .replace("\f", "\\f")
+                                .replace("\r", "\\r")
+                                .replace("\u001B", "\\e")
+                                .replace("\"", "\\\"")
+                                .replace("\u0085", "\\N")
+                                .replace("\u00A0", "\\_")
+                                .replace("\u2028", "\\L")
+                                .replace("\u2029", "\\P")
+                        )
                         .append('"');
                 break;
             case SINGLE_QUOTED:
                 p.out.append('\'')
-                        .append(scalar.getValue().replaceAll("\\n", "\\\\n"))
+                        .append(scalar.getValue())
                         .append('\'');
                 break;
             case LITERAL:

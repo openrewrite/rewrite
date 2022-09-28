@@ -18,6 +18,8 @@ package org.openrewrite.yaml.tree
 import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.Issue
 import org.openrewrite.yaml.YamlParser
 import org.openrewrite.yaml.tree.Yaml.Scalar
@@ -302,4 +304,44 @@ class MappingTest: YamlParserTest {
       : 
         - value
     """)
+
+    @ParameterizedTest
+    @ValueSource(strings = [
+        """ '\\n' """,
+        """ '\n' """,
+        """ \n """,
+        """ "\\." """,
+        """ "\\0" """,
+        """ "\0" """,
+        """ "\\a" """,
+        """ "\a" """,
+        """ "\\b" """,
+        """ "\b" """,
+        """ "\\t" """,
+        """ "\t" """,
+        """ "\\n" """,
+        """ "\n" """,
+        """ "\\v" """,
+        """ "\v" """,
+        """ "\\f" """,
+        """ "\f" """,
+        """ "\\r" """,
+        """ "\r" """,
+        """ "\\e" """,
+        """ "\e" """,
+        """ "\\\\" """,
+        """ "\\" """,
+        """ "\\\"" """,
+        """ "\"" """,
+        """ "\\N" """,
+        """ "\N" """,
+        """ "\\_" """,
+        """ "\_" """,
+        """ "\\L" """,
+        """ "\L" """,
+        """ "\\P" """,
+        """ "\P" """,
+    ])
+    // https://github.com/yaml/yaml-grammar/blob/master/yaml-spec-1.2.txt#L1914
+    fun escapeSequences(string: String) = assertRoundTrip("escaped-value: $string")
 }
