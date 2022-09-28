@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -111,14 +112,12 @@ public class RecipeExceptionDemonstration extends Recipe {
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         if (Boolean.TRUE.equals(throwOnVisitAllVisitor)) {
-            for (SourceFile sourceFile : before) {
-                new TreeVisitor<Tree, ExecutionContext>() {
-                    @Override
-                    public Tree preVisit(Tree tree, ExecutionContext executionContext) {
-                        throw new DemonstrationException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
-                    }
-                }.visit(sourceFile, ctx);
-            }
+            return ListUtils.map(before, s -> (SourceFile) new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public Tree preVisit(Tree tree, ExecutionContext executionContext) {
+                    throw new DemonstrationException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
+                }
+            }.visit(s, ctx));
         } else if (Boolean.TRUE.equals(throwOnVisitAll)) {
             throw new DemonstrationException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
         }

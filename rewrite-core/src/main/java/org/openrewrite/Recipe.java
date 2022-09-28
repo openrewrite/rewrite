@@ -52,6 +52,8 @@ import static java.util.Collections.emptyList;
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
 
+    public static final String RECIPE_EXECUTION_FAILURE = "__RECIPE_EXECUTION_FAILURE__";
+
     private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
 
     @SuppressWarnings("unused")

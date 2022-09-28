@@ -38,6 +38,7 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Recipe.PANIC;
+import static org.openrewrite.Recipe.RECIPE_EXECUTION_FAILURE;
 import static org.openrewrite.RecipeSchedulerUtils.addRecipesThatMadeChanges;
 import static org.openrewrite.RecipeSchedulerUtils.handleUncaughtException;
 import static org.openrewrite.Tree.randomId;
@@ -169,25 +170,50 @@ public interface RecipeScheduler {
         if (ctx instanceof WatchableExecutionContext) {
             ((WatchableExecutionContext) ctx).resetHasNewMessages();
         }
+        List<S> after;
         try {
             if (recipe.getApplicableTest() != null) {
-                boolean applicable = false;
-                for (S s : before) {
-                    if (recipe.getApplicableTest().visit(s, ctx) != s) {
-                        applicable = true;
-                        break;
+                AtomicBoolean applicable = new AtomicBoolean(false);
+                after = ListUtils.map(before, s -> {
+                    if (applicable.get()) {
+                        return s;
                     }
-
+                    //noinspection unchecked
+                    S applicableSource = (S) recipe.getApplicableTest().visit(s, ctx);
+                    if (applicableSource != s) {
+                        assert applicableSource != null;
+                        if (ctx.getMessage(RECIPE_EXECUTION_FAILURE) == null) {
+                            applicable.set(true);
+                        } else if (!FindRecipeRunException.hasRecipeRunException(applicableSource)) {
+                            applicable.set(true);
+                        } else {
+                            applicableSource = addRecipesThatMadeChanges(recipeStack, applicableSource);
+                        }
+                    }
+                    if (applicable.get()) {
+                        return s;
+                    }
                     for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
-                        if (applicableTest.visit(s, ctx) != s) {
-                            applicable = true;
+                        //noinspection unchecked
+                        applicableSource = (S) applicableTest.visit(applicableSource, ctx);
+                        if (applicableSource != s) {
+                            assert applicableSource != null;
+                            if (ctx.getMessage(RECIPE_EXECUTION_FAILURE) == null) {
+                                applicable.set(true);
+                            } else if (!FindRecipeRunException.hasRecipeRunException(applicableSource)) {
+                                applicable.set(true);
+                            } else {
+                                applicableSource = addRecipesThatMadeChanges(recipeStack, applicableSource);
+                            }
                             break;
                         }
                     }
-                }
+                    return applicableSource;
+                });
 
-                if (!applicable) {
-                    return before;
+                if (!applicable.get() && after != before) {
+                    //A recipe execution exception occurred.
+                    return after;
                 }
             }
         } catch (Throwable t) {
@@ -195,7 +221,6 @@ public interface RecipeScheduler {
         }
 
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
-        List<S> after;
         if (!recipe.validate(ctx).isValid()) {
             after = before;
         } else {
@@ -208,16 +233,28 @@ public interface RecipeScheduler {
 
                 try {
                     if (recipe.getSingleSourceApplicableTest() != null) {
-                        if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
+                        //noinspection unchecked
+                        S afterTest = (S) recipe.getSingleSourceApplicableTest().visit(s, ctx);
+                        assert afterTest != null;
+                        if (afterTest == s) {
                             sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
                             return s;
+                        } else if (ctx.getMessage(RECIPE_EXECUTION_FAILURE) != null && FindRecipeRunException.hasRecipeRunException(afterTest)) {
+                            afterTest = addRecipesThatMadeChanges(recipeStack, afterTest);
+                            return afterTest;
                         }
                     }
 
                     for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
-                        if (singleSourceApplicableTest.visit(s, ctx) == s) {
+                        //noinspection unchecked
+                        S afterTest = (S) singleSourceApplicableTest.visit(s, ctx);
+                        assert afterTest != null;
+                        if (afterTest == s) {
                             sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
                             return s;
+                        } else if (ctx.getMessage(RECIPE_EXECUTION_FAILURE) != null && FindRecipeRunException.hasRecipeRunException(afterTest)) {
+                            afterTest = addRecipesThatMadeChanges(recipeStack, afterTest);
+                            return afterTest;
                         }
                     }
 
@@ -250,12 +287,7 @@ public interface RecipeScheduler {
                     sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                     ctx.getOnError().accept(t);
 
-                    if (t instanceof RecipeRunException) {
-                        RecipeRunException vt = (RecipeRunException) t;
-
-                        //noinspection unchecked
-                        afterFile = (S) new FindRecipeRunException(vt).visitNonNull(requireNonNull(afterFile), 0);
-                    } else if (afterFile != null) {
+                    if (afterFile != null) {
                         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
                         // and instead we add a marker to the top of the source file to record the exception message.
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(new RecipeRunExceptionResult(new RecipeRunException(t)),
@@ -322,7 +354,8 @@ public interface RecipeScheduler {
         }
 
         for (Recipe r : recipe.getRecipeList()) {
-            if (ctx.getMessage(PANIC) != null) {
+            if (ctx.getMessage(PANIC) != null || ctx.getMessage(RECIPE_EXECUTION_FAILURE) != null) {
+                //Do not run another cycle if a failure/panic has occurred.
                 //noinspection unchecked
                 return (List<S>) afterWidened;
             }
@@ -381,22 +414,6 @@ class RecipeSchedulerUtils {
                                                                          Throwable t) {
         ctx.getOnError().accept(t);
         ctx.putMessage(PANIC, true);
-
-        if (t instanceof RecipeRunException) {
-            RecipeRunException vt = (RecipeRunException) t;
-
-            List<S> exceptionMapped = ListUtils.map(before, sourceFile -> {
-                //noinspection unchecked
-                S afterFile = (S) new FindRecipeRunException(vt).visitNonNull(requireNonNull((SourceFile) sourceFile), 0);
-                if (afterFile != sourceFile) {
-                    afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
-                }
-                return afterFile;
-            });
-            if (exceptionMapped != before) {
-                return exceptionMapped;
-            }
-        }
 
         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
         // and instead we add a new file to record the exception message.

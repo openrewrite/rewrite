@@ -61,8 +61,8 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 class Test {
                     void test(List<Integer> list) {
                         /*~~(org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: Demonstrating an exception thrown on a matching method.
-                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}4.visitMethodInvocation(RecipeExceptionDemonstration.java:137)
-                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}4.visitMethodInvocation(RecipeExceptionDemonstration.java:131))~~>*/list.add(42);
+                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}4.visitMethodInvocation(RecipeExceptionDemonstration.java:139)
+                  org.openrewrite.java.RecipeExceptionDemonstration${'$'}4.visitMethodInvocation(RecipeExceptionDemonstration.java:133))~~>*/list.add(42);
                     }
                 }
             """
@@ -150,8 +150,8 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 """,
                     """
                     /*~~(org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: Throwing on the project-level applicable test.
-                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.preVisit(RecipeExceptionDemonstration.java:76)
-                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.preVisit(RecipeExceptionDemonstration.java:73))~~>*/import java.util.*;
+                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.preVisit(RecipeExceptionDemonstration.java:77)
+                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}1.preVisit(RecipeExceptionDemonstration.java:74))~~>*/import java.util.*;
                     class Test {
                         void test(List<Integer> list) {
                             list.add(42);
@@ -183,8 +183,8 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                 """,
                     """
                     /*~~(org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.
-                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}3.preVisit(RecipeExceptionDemonstration.java:118)
-                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}3.preVisit(RecipeExceptionDemonstration.java:115))~~>*/import java.util.*;
+                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}3.preVisit(RecipeExceptionDemonstration.java:119)
+                      org.openrewrite.java.RecipeExceptionDemonstration${'$'}3.preVisit(RecipeExceptionDemonstration.java:116))~~>*/import java.util.*;
                     class Test {
                         void test(List<Integer> list) {
                             list.add(42);

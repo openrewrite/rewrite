@@ -246,11 +246,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 afterVisit = null;
             }
         } catch (Throwable e) {
-            if (e instanceof RecipeRunException) {
-                // bubbling up from lower in the tree
-                throw e;
+            if (p instanceof ExecutionContext) {
+                ExecutionContext context = (ExecutionContext) p;
+                context.putMessage(Recipe.RECIPE_EXECUTION_FAILURE, true);
             }
-            throw new RecipeRunException(e, getCursor());
+            return t == null ? tree.withExceptionMarker(e) : t.withExceptionMarker(e);
         }
 
         //noinspection unchecked
