@@ -13,45 +13,49 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.internal
+package org.openrewrite.maven.internal;
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Test
-import java.util.function.Supplier
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class VersionRequirementTest {
-    private val available = Supplier<Iterable<String>> { (1..10).map { it.toString() } }
-
-    @Test
-    fun rangeSet() {
-        assertThat(VersionRequirement.fromVersion("[1,11)", 0).resolve(available))
-            .isEqualTo("10")
+    private Iterable<String> available() {
+        return List.of("1", "2", "3", "4", "5", "6", "7", "8", "9", "10");
     }
 
     @Test
-    fun multipleSoftRequirements() {
-        assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("2").resolve(available))
-            .isEqualTo("1")
+    void rangeSet() {
+        assertThat(VersionRequirement.fromVersion("[1,11)", 0).resolve(this::available))
+          .isEqualTo("10");
     }
 
     @Test
-    fun softRequirementThenHardRequirement() {
+    void multipleSoftRequirements() {
+        assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("2").resolve(this::available))
+          .isEqualTo("1");
+    }
+
+    @Test
+    void softRequirementThenHardRequirement() {
         assertThat(VersionRequirement.fromVersion("1", 1).addRequirement("[1,11]")
-            .resolve(available))
-            .isEqualTo("10")
+          .resolve(this::available))
+          .isEqualTo("10");
     }
 
     @Test
-    fun hardRequirementThenSoftRequirement() {
+    void hardRequirementThenSoftRequirement() {
         assertThat(VersionRequirement.fromVersion("[1,11]", 1).addRequirement("1")
-            .resolve(available))
-            .isEqualTo("10")
+          .resolve(this::available))
+          .isEqualTo("10");
     }
 
     @Test
-    fun nearestRangeWins() {
+    void nearestRangeWins() {
         assertThat(VersionRequirement.fromVersion("[1,2]", 1).addRequirement("[9,10]")
-            .resolve(available))
-            .isEqualTo("2")
+          .resolve(this::available))
+          .isEqualTo("2");
     }
 }

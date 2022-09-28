@@ -13,17 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.internal
+package org.openrewrite.maven.internal;
 
-import org.assertj.core.api.Assertions.assertThat
-import org.intellij.lang.annotations.Language
-import org.junit.jupiter.api.Test
-import org.openrewrite.maven.tree.MavenMetadata
+import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.maven.tree.MavenMetadata;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class MavenMetadataTest {
+
     @Test
-    fun deserializeMetadata() {
-        @Language("xml") val metadata = """
+    void deserializeMetadata() {
+        @Language("xml") String metadata = """
             <metadata>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot</artifactId>
@@ -37,16 +39,16 @@ class MavenMetadataTest {
                     <lastUpdated>20210115042754</lastUpdated>
                 </versioning>
             </metadata>
-        """.trimIndent()
+        """;
 
-        val parsed = MavenMetadata.parse(metadata.toByteArray())
-
-        assertThat(parsed.versioning.versions).hasSize(2)
+        MavenMetadata parsed = MavenMetadata.parse(metadata.getBytes());
+        assertThat(parsed.getVersioning().getVersions()).hasSize(2);
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Test
-    fun deserializeSnapshotMetadata() {
-        @Language("xml") val metadata = """
+    void deserializeSnapshotMetadata() {
+        @Language("xml") String metadata = """
             <metadata modelVersion="1.1.0">
                 <groupId>org.openrewrite.recipe</groupId>
                 <artifactId>rewrite-recommendations</artifactId>
@@ -70,17 +72,16 @@ class MavenMetadataTest {
                     </snapshotVersions>
                 </versioning>
             </metadata>
-        """.trimIndent()
+        """;
 
-        val parsed = MavenMetadata.parse(metadata.toByteArray())
+        MavenMetadata parsed = MavenMetadata.parse(metadata.getBytes());
 
-        assertThat(parsed.versioning.snapshot?.timestamp).isEqualTo("20220927.033510")
-        assertThat(parsed.versioning.snapshot?.buildNumber).isEqualTo("223")
-        assertThat(parsed.versioning.versions).isNotNull
-        assertThat(parsed.versioning.snapshotVersions).hasSize(2)
-        assertThat(parsed.versioning.snapshotVersions!![0].extension).isNotNull()
-        assertThat(parsed.versioning.snapshotVersions!![0].value).isNotNull()
-        assertThat(parsed.versioning.snapshotVersions!![0].updated).isNotNull()
+        assertThat(parsed.getVersioning().getSnapshot().getTimestamp()).isEqualTo("20220927.033510");
+        assertThat(parsed.getVersioning().getSnapshot().getBuildNumber()).isEqualTo("223");
+        assertThat(parsed.getVersioning().getVersions()).isNotNull();
+        assertThat(parsed.getVersioning().getSnapshotVersions()).hasSize(2);
+        assertThat(parsed.getVersioning().getSnapshotVersions().get(0).getExtension()).isNotNull();
+        assertThat(parsed.getVersioning().getSnapshotVersions().get(0).getValue()).isNotNull();
+        assertThat(parsed.getVersioning().getSnapshotVersions().get(0).getUpdated()).isNotNull();
     }
-
 }

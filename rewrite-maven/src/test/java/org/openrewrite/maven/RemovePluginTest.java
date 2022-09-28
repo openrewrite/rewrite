@@ -49,7 +49,7 @@ class RemovePluginTest implements RewriteTest {
                         <plugin>
                           <groupId>org.apache.avro</groupId>
                           <artifactId>avro-maven-plugin</artifactId>
-                          <version>${"$"}{avro-maven-plugin.version}</version>
+                          <version>${avro-maven-plugin.version}</version>
                           <executions>
                             <execution>
                               <id>schemas</id>
@@ -60,8 +60,8 @@ class RemovePluginTest implements RewriteTest {
                                 <goal>idl-protocol</goal>
                               </goals>
                               <configuration>
-                                <sourceDirectory>${"$"}{project.basedir}/src/main/resources/</sourceDirectory>
-                                <outputDirectory>${"$"}{project.basedir}/src/main/java/</outputDirectory>
+                                <sourceDirectory>${project.basedir}/src/main/resources/</sourceDirectory>
+                                <outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
                               </configuration>
                             </execution>
                           </executions>
@@ -191,7 +191,7 @@ class RemovePluginTest implements RewriteTest {
                         <plugin>
                           <groupId>org.openrewrite.maven</groupId>
                           <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>${"$"}{rewrite-maven-plugin.version}</version>
+                          <version>${rewrite-maven-plugin.version}</version>
                         </plugin>
                         <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
@@ -206,12 +206,12 @@ class RemovePluginTest implements RewriteTest {
                         <plugin>
                           <groupId>org.openrewrite.maven</groupId>
                           <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>${"$"}{rewrite-maven-plugin.version}</version>
+                          <version>${rewrite-maven-plugin.version}</version>
                         </plugin>
                         <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-checkstyle-plugin</artifactId>
-                          <version>${"$"}{maven-checkstyle-plugin.version}</version>
+                          <version>${maven-checkstyle-plugin.version}</version>
                           <configuration>
                             <configLocation>src/main/resources/checkstyle.xml</configLocation>
                           </configuration>
@@ -248,7 +248,7 @@ class RemovePluginTest implements RewriteTest {
                         <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-checkstyle-plugin</artifactId>
-                          <version>${"$"}{maven-checkstyle-plugin.version}</version>
+                          <version>${maven-checkstyle-plugin.version}</version>
                           <configuration>
                             <configLocation>src/main/resources/checkstyle.xml</configLocation>
                           </configuration>
@@ -288,7 +288,7 @@ class RemovePluginTest implements RewriteTest {
                         <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-checkstyle-plugin</artifactId>
-                          <version>${"$"}{maven-checkstyle-plugin}</version>
+                          <version>${maven-checkstyle-plugin}</version>
                           <configuration>
                             <configLocation>src/main/resources/checkstyle.xml</configLocation>
                           </configuration>
