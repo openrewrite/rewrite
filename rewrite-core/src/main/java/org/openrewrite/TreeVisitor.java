@@ -249,6 +249,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             if (p instanceof ExecutionContext) {
                 ExecutionContext context = (ExecutionContext) p;
                 context.putMessage(Recipe.RECIPE_EXECUTION_FAILURE, true);
+                context.getOnError().accept(e);
             }
             return t == null ? tree.withExceptionMarker(e) : t.withExceptionMarker(e);
         }
