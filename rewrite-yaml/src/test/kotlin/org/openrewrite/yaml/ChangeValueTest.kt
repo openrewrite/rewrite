@@ -42,6 +42,27 @@ class ChangeValueTest : YamlRecipeTest {
     )
 
     @Test
+    fun changeAliasedKeyValue() = assertChanged(
+        recipe = ChangeValue(
+            "$.*.yo",
+            "howdy",
+            null
+        ),
+        before = """
+            bar:
+              &abc yo: friend
+            baz:
+              *abc: friendly
+        """,
+        after = """
+            bar:
+              &abc yo: howdy
+            baz:
+              *abc: howdy
+        """
+    )
+
+    @Test
     fun changeSequenceValue() = assertChanged(
         recipe = ChangeValue(
             "$.metadata.name",

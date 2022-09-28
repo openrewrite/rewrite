@@ -224,5 +224,17 @@ class CoalescePropertiesTest : YamlRecipeTest {
               g: g-value
         """
     )
-
+    @Test
+    fun doNotCoalesceDocumentsHavingAnchorsAndAliases() = assertUnchanged(
+        before = """
+            management:
+                metrics:
+                    &id enable.process.files: true
+                endpoint:
+                    health:
+                        show-components: always
+                        show-details: always
+                        *id: false
+        """
+    )
 }

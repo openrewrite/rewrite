@@ -84,6 +84,18 @@ class DeletePropertyKeyTest : YamlRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2273")
+    @Test
+    fun aliasAnchorPairs() = assertUnchanged(
+        recipe = DeleteProperty("bar.yo", null, null, null),
+        before = """
+          bar:
+            &abc yo: friend
+          baz:
+            *abc: friendly
+          """
+    )
+
     @ParameterizedTest
     @ValueSource(
         strings = [
