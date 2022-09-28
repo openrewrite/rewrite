@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -44,7 +43,7 @@ public class ManageDependencies extends Recipe {
 
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                    "Group is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.*")
     String groupPattern;
 
@@ -110,7 +109,9 @@ public class ManageDependencies extends Recipe {
                             Map<GroupArtifact, ResolvedDependency> maxVersionByGroupArtifact = new HashMap<>(manageableDependencies.size());
 
                             for (ResolvedDependency rmd : manageableDependencies) {
-                                if(rmd.getDepth() <= 1) {
+                                String alreadyManagedVersion = getResolutionResult().getPom().getManagedVersion(rmd.getGroupId(), rmd.getArtifactId(), rmd.getType(),
+                                        rmd.getClassifier());
+                                if(rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
                                     maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
                                             (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
                                                     rmd : existing);
@@ -119,8 +120,7 @@ public class ManageDependencies extends Recipe {
 
                             for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
                                 doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
-                                        rmd.getArtifactId(), new ExactVersion(rmd.getVersion()),
-                                        rmd.getVersion(), null, null, false,
+                                        rmd.getArtifactId(), rmd.getVersion(), null,
                                         null, rmd.getRequested().getClassifier()));
                             }
                         }
@@ -156,9 +156,7 @@ public class ManageDependencies extends Recipe {
                 tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new RemoveContentVisitor<>(versionTag, false)));
                 return tag;
             }
-
             return super.visitTag(tag, ctx);
         }
     }
-
 }

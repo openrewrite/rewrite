@@ -418,15 +418,6 @@ class ManageDependenciesTest : MavenRecipeTest {
                     <artifactId>jackson-parent</artifactId>
                     <version>2.9.1</version>
                 </parent>
-                <dependencyManagement>
-                    <dependencies>
-                        <dependency>
-                            <groupId>junit</groupId>
-                            <artifactId>junit</artifactId>
-                            <version>4.11</version>
-                        </dependency>
-                    </dependencies>
-                </dependencyManagement>
                 <dependencies>
                     <dependency>
                         <groupId>junit</groupId>

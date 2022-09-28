@@ -22,12 +22,17 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+
+import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.20.0")
 @Getter
@@ -176,12 +181,46 @@ public class AddManagedDependency extends Recipe {
                         Xml maven = super.visitDocument(document, executionContext);
 
                         if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
-                            doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
-                                    Semver.validate(version, versionPattern).getValue(), null,
-                                    versionPattern, scope, releasesOnly, type, classifier));
+                            Validated versionValidation = Semver.validate(version, versionPattern);
+                            if (versionValidation.isValid()) {
+                                VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
+                                String versionToUse = findVersionToUse(versionComparator, ctx);
+                                if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
+                                    doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
+                                            versionToUse, scope, type, classifier));
+                                }
+                            }
                         }
 
                         return maven;
+                    }
+
+                    @Nullable
+                    private String existingManagedDependencyVersion() {
+                        return getResolutionResult().getPom().getDependencyManagement().stream()
+                                .map(resolvedManagedDep -> {
+                                    if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
+                                        return resolvedManagedDep.getGav().getVersion();
+                                    } else if (resolvedManagedDep.getRequestedBom() != null
+                                            && resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId)
+                                            && resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
+                                        return resolvedManagedDep.getRequestedBom().getVersion();
+                                    }
+                                    return null;
+                                })
+                                .filter(Objects::nonNull)
+                                .findFirst().orElse(null);
+                    }
+
+                    @Nullable
+                    private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) {
+                        MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                        LatestRelease latest = new LatestRelease(versionPattern);
+                        return mavenMetadata.getVersioning().getVersions().stream()
+                                .filter(v -> versionComparator.isValid(null, v))
+                                .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                                .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                                .orElse(null);
                     }
                 }.visit(s, ctx))
                 .map(SourceFile.class::cast)

@@ -19,16 +19,12 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
-import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.semver.LatestRelease;
-import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
@@ -39,19 +35,10 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
 
     private final String groupId;
     private final String artifactId;
-    private final VersionComparator version;
-
-    @Nullable
-    private final String fallbackVersion;
-
-    @Nullable
-    private final String versionPattern;
+    private final String version;
 
     @Nullable
     private final String scope;
-
-    @Nullable
-    private final Boolean releasesOnly;
 
     @Nullable
     private final String type;
@@ -59,21 +46,11 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
     @Nullable
     private final String classifier;
 
-    @Nullable
-    private String resolvedVersion;
-
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-
         Xml.Document doc = super.visitDocument(document, ctx);
 
-
         if (documentHasManagedDependency(doc, ctx)) {
-            return document;
-        }
-
-        String versionToUse = findVersionToUse(ctx);
-        if (Objects.equals(versionToUse, existingManagedDependencyVersion())) {
             return document;
         }
 
@@ -89,7 +66,7 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                     new MavenTagInsertionComparator(rootContent)).visitNonNull(doc, ctx);
         }
 
-        doc = (Xml.Document) new InsertDependencyInOrder(groupId, artifactId, versionToUse,
+        doc = (Xml.Document) new InsertDependencyInOrder(groupId, artifactId, version,
                 type, scope, classifier).visitNonNull(doc, ctx);
         return doc;
     }
@@ -122,12 +99,6 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
         private final String classifier;
 
         @Override
-        public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-
-            return super.visitDocument(document, ctx);
-        }
-
-        @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
                 Xml.Tag dependencyTag = Xml.Tag.build(
@@ -149,36 +120,5 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
             }
             return super.visitTag(tag, ctx);
         }
-    }
-
-    @Nullable
-    private String existingManagedDependencyVersion() {
-        return getResolutionResult().getPom().getDependencyManagement().stream()
-                .map(resolvedManagedDep -> {
-                    if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
-                        return resolvedManagedDep.getGav().getVersion();
-                    } else if (resolvedManagedDep.getRequestedBom() != null
-                            && resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId)
-                            && resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
-                        return resolvedManagedDep.getRequestedBom().getVersion();
-                    }
-                    return null;
-                })
-                .filter(Objects::nonNull)
-                .findFirst().orElse(null);
-    }
-
-    @Nullable
-    private String findVersionToUse(ExecutionContext ctx) {
-        if (resolvedVersion == null) {
-            MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-            LatestRelease latest = new LatestRelease(versionPattern);
-            resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
-                    .filter(v -> version.isValid(null, v))
-                    .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                    .max((v1, v2) -> version.compare(null, v1, v2))
-                    .orElse(fallbackVersion);
-        }
-        return resolvedVersion;
     }
 }
