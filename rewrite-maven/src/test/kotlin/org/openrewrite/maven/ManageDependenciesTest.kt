@@ -31,7 +31,7 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "org.junit.jupiter",
             "*",
-            false),
+            false, false),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>
@@ -77,7 +77,7 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "junit",
             "junit",
-            false),
+            false, false),
         dependsOn = arrayOf(
             """
                 <project>
@@ -140,7 +140,7 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "junit",
             "junit",
-            false),
+            false, false),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>
@@ -255,7 +255,7 @@ class ManageDependenciesTest : MavenRecipeTest {
                 </project>
             """.trimIndent()
         )
-        val results = ManageDependencies("junit", "junit", true)
+        val results = ManageDependencies("junit", "junit", true, false)
             .run(parser.parse(listOf(project, serviceApi, service, core), tempDir, InMemoryExecutionContext())
                 .map { j -> j.withMarkers(j.markers.addIfAbsent(javaProject)) }
                 .mapIndexed { n, maven ->
@@ -316,7 +316,7 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "org.apache.logging.log4j",
             "log4j-*",
-            true),
+            true, false),
         before = """
             <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -386,7 +386,7 @@ class ManageDependenciesTest : MavenRecipeTest {
         recipe = ManageDependencies(
             "junit",
             "junit",
-            true),
+            true, false),
         before = """
             <project>
                 <modelVersion>4.0.0</modelVersion>

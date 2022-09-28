@@ -116,7 +116,6 @@ public class AddManagedDependencyVisitor extends MavenIsoVisitor<ExecutionContex
                 );
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
                         new InsertDependencyComparator(tag.getContent() == null ? emptyList() : tag.getContent(), dependencyTag)));
-                maybeUpdateModel();
             }
             return super.visitTag(tag, ctx);
         }
