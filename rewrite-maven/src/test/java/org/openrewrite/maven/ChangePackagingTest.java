@@ -11,7 +11,8 @@ public class ChangePackagingTest implements RewriteTest {
     void addPackaging() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
-          pomXml("""
+          pomXml(
+"""
                   <project>
                       <groupId>org.example</groupId>
                       <artifactId>foo</artifactId>
@@ -34,7 +35,8 @@ public class ChangePackagingTest implements RewriteTest {
     void removePackaging() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackaging("*", "*", null)),
-          pomXml("""
+          pomXml(
+"""
                   <project>
                       <groupId>org.example</groupId>
                       <artifactId>foo</artifactId>
@@ -57,7 +59,8 @@ public class ChangePackagingTest implements RewriteTest {
     void changePackaging() {
         rewriteRun(
           spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
-          pomXml("""
+          pomXml(
+"""
                   <project>
                       <groupId>org.example</groupId>
                       <artifactId>foo</artifactId>

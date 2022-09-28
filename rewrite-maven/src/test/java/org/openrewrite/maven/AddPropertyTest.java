@@ -44,7 +44,8 @@ class AddPropertyTest implements RewriteTest {
               """
           ),
           mavenProject("my-app",
-            pomXml("""
+            pomXml(
+"""
                   <project>
                     <parent>
                       <groupId>com.mycompany.app</groupId>
@@ -78,7 +79,8 @@ class AddPropertyTest implements RewriteTest {
             spec -> spec.skip(true)
           ),
           mavenProject("my-app",
-            pomXml("""
+            pomXml(
+"""
                   <project>
                     <parent>
                       <groupId>com.mycompany.app</groupId>
@@ -188,7 +190,8 @@ class AddPropertyTest implements RewriteTest {
     void preserveExistingPropertyWithDifferentValue() {
         rewriteRun(
           spec -> spec.recipe(new AddProperty("key", "value", true, false)),
-          pomXml("""
+          pomXml(
+"""
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
