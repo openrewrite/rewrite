@@ -16,7 +16,6 @@
 package org.openrewrite.maven.utilities;
 
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 
@@ -214,7 +213,7 @@ public final class PrintMavenAsCycloneDxBom {
                 bom.append(indent).append("            <name>").append(license.getName()).append("</name>\n");
                 bom.append(indent).append("        </license>\n");
             }
-            bom.append(indent).append("      </licenses>\n");
+            bom.append(indent).append("    </licenses>\n");
         }
     }
 

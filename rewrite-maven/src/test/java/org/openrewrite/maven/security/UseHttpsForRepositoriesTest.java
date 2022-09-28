@@ -157,18 +157,16 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
             """
                   <project>
                     <modelVersion>4.0.0</modelVersion>
-
                     <groupId>org.openrewrite.example</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
                     <properties>
                       <my-repo-url>http://repo.example.com/repo</my-repo-url>
                     </properties>
-
                     <repositories>
                       <repository>
                         <id>my-repo</id>
-                        <url>${'$'}{my-repo-url}</url>
+                        <url>${my-repo-url}</url>
                       </repository>
                     </repositories>
                   </project>
@@ -176,18 +174,16 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
             """
                   <project>
                     <modelVersion>4.0.0</modelVersion>
-
                     <groupId>org.openrewrite.example</groupId>
                     <artifactId>my-app</artifactId>
                     <version>1</version>
                     <properties>
                       <my-repo-url>https://repo.example.com/repo</my-repo-url>
                     </properties>
-
                     <repositories>
                       <repository>
                         <id>my-repo</id>
-                        <url>${'$'}{my-repo-url}</url>
+                        <url>${my-repo-url}</url>
                       </repository>
                     </repositories>
                   </project>

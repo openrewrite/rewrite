@@ -28,14 +28,15 @@ class PrintMavenAsCycloneDxBomTest implements RewriteTest {
     void cycloneDxBom() {
         Xml.Document pom = MavenParser.builder()
           .build()
-          .parse("""
+          .parse(
+                """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
-                   
+                  \s
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-                  
+                 \s
                   <dependencies>
                     <dependency>
                         <groupId>org.yaml</groupId>
@@ -50,52 +51,55 @@ class PrintMavenAsCycloneDxBomTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </project>
-            """).get(0);
+                """
+          ).get(0);
 
         String bom = PrintMavenAsCycloneDxBom.print(pom)
           .replaceAll("<timestamp>.*</timestamp>", "<timestamp>TODAY</timestamp>");
 
-        assertThat(bom).isEqualTo("""
-              <?xml version="1.0" encoding="UTF-8"?>
-              <bom xmlns="http://cyclonedx.org/schema/bom/1.2" serialNumber="urn:uuid:${pom[0].id}" version="1">
-                  <metadata>
-                      <timestamp>TODAY</timestamp>
-                      <tools>
-                          <tool>
-                              <vendor>OpenRewrite</vendor>
-                              <name>OpenRewrite CycloneDX</name>
-                              <version>7.18.0</version>
-                          </tool>
-                      </tools>
-                      <component bom-ref="pkg:maven/com.mycompany.app/my-app@1?type=jar" type="library">
-                          <group>com.mycompany.app</group>
-                          <name>my-app</name>
-                          <version>1</version>
-                          <scope>required</scope>
-                          <purl>pkg:maven/com.mycompany.app/my-app@1?type=jar</purl>
-                      </component>
-                  </metadata>
-                  <components>
-                      <component bom-ref="pkg:maven/org.yaml/snakeyaml@1.27?type=jar" type="library">
-                          <group>org.yaml</group>
-                          <name>snakeyaml</name>
-                          <version>1.27</version>
-                          <scope>required</scope>
-                          <licenses>
-                              <license>
-                                  <id>Apache-2.0</id>
-                                  <name>Apache License, Version 2.0</name>
-                              </license>
-                            </licenses>
-                          <purl>pkg:maven/org.yaml/snakeyaml@1.27?type=jar</purl>
-                      </component>
-                  </components>
-                  <dependencies>
-                      <dependency ref="pkg:maven/org.yaml/snakeyaml@1.27?type=jar">
-                      </dependency>
-                  </dependencies>
-              </bom>
-          """
+        assertThat(bom).isEqualTo(String.format(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <bom xmlns="http://cyclonedx.org/schema/bom/1.2" serialNumber="urn:uuid:%s" version="1">
+                <metadata>
+                    <timestamp>TODAY</timestamp>
+                    <tools>
+                        <tool>
+                            <vendor>OpenRewrite</vendor>
+                            <name>OpenRewrite CycloneDX</name>
+                            <version>7.18.0</version>
+                        </tool>
+                    </tools>
+                    <component bom-ref="pkg:maven/com.mycompany.app/my-app@1?type=jar" type="library">
+                        <group>com.mycompany.app</group>
+                        <name>my-app</name>
+                        <version>1</version>
+                        <scope>required</scope>
+                        <purl>pkg:maven/com.mycompany.app/my-app@1?type=jar</purl>
+                    </component>
+                </metadata>
+                <components>
+                    <component bom-ref="pkg:maven/org.yaml/snakeyaml@1.27?type=jar" type="library">
+                        <group>org.yaml</group>
+                        <name>snakeyaml</name>
+                        <version>1.27</version>
+                        <scope>required</scope>
+                        <licenses>
+                            <license>
+                                <id>Apache-2.0</id>
+                                <name>Apache License, Version 2.0</name>
+                            </license>
+                        </licenses>
+                        <purl>pkg:maven/org.yaml/snakeyaml@1.27?type=jar</purl>
+                    </component>
+                </components>
+                <dependencies>
+                    <dependency ref="pkg:maven/org.yaml/snakeyaml@1.27?type=jar">
+                    </dependency>
+                </dependencies>
+            </bom>
+            """, pom.getId().toString())
         );
+
     }
 }
