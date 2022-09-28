@@ -21,11 +21,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
-    Map<String, Yaml> scopedAnchors = new HashMap<>();
+    Map<String, Yaml> anchorValues = new HashMap<>();
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {
         if (mapping.getAnchor() != null) {
-            scopedAnchors.put(mapping.getAnchor().getKey(), mapping.withAnchor(null));
+            anchorValues.put(mapping.getAnchor().getKey(), mapping.withAnchor(null));
         }
         return super.visitMapping(mapping, p);
     }
@@ -33,7 +33,7 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
     @Override
     public Yaml visitScalar(Yaml.Scalar scalar, P p) {
         if (scalar.getAnchor() != null) {
-            scopedAnchors.put(scalar.getAnchor().getKey(), scalar.withAnchor(null));
+            anchorValues.put(scalar.getAnchor().getKey(), scalar.withAnchor(null));
         }
         return super.visitScalar(scalar, p);
     }
@@ -41,7 +41,7 @@ public class ReplaceAliasWithAnchorValueVisitor<P> extends YamlVisitor<P> {
     @Override
     public Yaml visitAlias(Yaml.Alias alias, P p) {
         Yaml.Alias al = (Yaml.Alias) super.visitAlias(alias, p);
-        Yaml anchorVal = scopedAnchors.get(al.getAnchor().getKey());
+        Yaml anchorVal = anchorValues.get(al.getAnchor().getKey());
         if (anchorVal != null) {
             return anchorVal;
         }
