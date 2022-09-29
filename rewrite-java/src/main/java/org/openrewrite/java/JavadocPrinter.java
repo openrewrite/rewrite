@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 
@@ -404,6 +406,18 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
                 p.append(space.getWhitespace());
             }
             return space;
+        }
+
+        @Override
+        public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+            if (marker instanceof SearchResult) {
+                String description = ((SearchResult) marker).getDescription();
+                p.append("~~")
+                        .append(description == null ? "" : "(" + description + ")~~")
+                        .append(">");
+            }
+            //noinspection unchecked
+            return (M) marker;
         }
 
         private void visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
