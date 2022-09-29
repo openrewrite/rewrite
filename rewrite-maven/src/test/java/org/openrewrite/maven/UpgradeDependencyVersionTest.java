@@ -27,6 +27,102 @@ import static org.openrewrite.maven.Assertions.pomXml;
 class UpgradeDependencyVersionTest implements RewriteTest {
 
     @Test
+    void doNotOverrideImplicitProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion(
+            "io.dropwizard.metrics",
+            "metrics-annotation",
+            "4.2.9", null, true)),
+          pomXml(
+            """
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>explicit-deps-app</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <name>explicit-deps-app</name>
+                    <description>explicit-deps-app</description>
+                    <properties>
+                        <java.version>17</java.version>
+                        <maven.compiler.source>17</maven.compiler.source>
+                        <maven.compiler.target>17</maven.compiler.target>
+                    </properties>
+                    <repositories>
+                        <repository>
+                            <id>spring-milestone</id>
+                            <url>https://repo.spring.io/milestone</url>
+                            <snapshots>
+                                <enabled>false</enabled>
+                            </snapshots>
+                        </repository>
+                    </repositories>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-dependencies</artifactId>
+                                <version>2.4.0</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.dropwizard.metrics</groupId>
+                            <artifactId>metrics-annotation</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """,
+            """
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>explicit-deps-app</artifactId>
+                    <version>0.0.1-SNAPSHOT</version>
+                    <name>explicit-deps-app</name>
+                    <description>explicit-deps-app</description>
+                    <properties>
+                        <java.version>17</java.version>
+                        <maven.compiler.source>17</maven.compiler.source>
+                        <maven.compiler.target>17</maven.compiler.target>
+                    </properties>
+                    <repositories>
+                        <repository>
+                            <id>spring-milestone</id>
+                            <url>https://repo.spring.io/milestone</url>
+                            <snapshots>
+                                <enabled>false</enabled>
+                            </snapshots>
+                        </repository>
+                    </repositories>
+                    <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.boot</groupId>
+                                <artifactId>spring-boot-dependencies</artifactId>
+                                <version>2.4.0</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>io.dropwizard.metrics</groupId>
+                            <artifactId>metrics-annotation</artifactId>
+                            <version>4.2.9</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+            """
+          )
+        );
+    }
+    @Test
     void updateManagedDependencyVersion() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion(

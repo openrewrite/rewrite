@@ -47,6 +47,11 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
 
+    //There are several implicitly defined version properties that we should never attempt to update.
+    private static final Set<String> implicitlyDefinedVersionProperties = new HashSet<>(Arrays.asList(
+            "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
+    ));
+
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "com.fasterxml.jackson*")
@@ -118,6 +123,7 @@ public class UpgradeDependencyVersion extends Recipe {
     }
 
     private class UpgradeDependencyVersionVisitor extends MavenIsoVisitor<ExecutionContext> {
+
         private final VersionComparator versionComparator;
 
         private final Set<GroupArtifact> projectArtifacts;
@@ -146,30 +152,36 @@ public class UpgradeDependencyVersion extends Recipe {
             try {
                 if (isDependencyTag(groupId, artifactId)) {
 
-                    ResolvedDependency d = findDependency(tag);
+                    ResolvedDependency d = findDependency(t);
                     if (d != null && d.getRepository() != null) {
-                        //If the resolved dependency exists AND it does not represent an artifact that was parsed
-                        //as a source file, attempt to find a new version.
+                        // If the resolved dependency exists AND it does not represent an artifact that was parsed
+                        // as a source file, attempt to find a new version.
                         String newerVersion = findNewerVersion(d.getGroupId(), d.getArtifactId(), d.getVersion(), ctx);
                         if (newerVersion != null) {
-                            ResolvedManagedDependency dm = findManagedDependency(t);
-                            if (dm != null) {
-                                String requestedVersion = dm.getRequested().getVersion();
-                                if (requestedVersion != null && requestedVersion.startsWith("${")) {
-                                    doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
-                                    return t;
-                                }
-                            }
-
                             Optional<Xml.Tag> version = t.getChild("version");
+
                             if (version.isPresent()) {
                                 String requestedVersion = d.getRequested().getVersion();
-                                if (requestedVersion != null && requestedVersion.startsWith("${")) {
+                                if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
                                     doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                                     return t;
                                 }
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(version.get(), newerVersion).visitNonNull(t, 0, getCursor());
                             } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
+
+                                ResolvedManagedDependency dm = findManagedDependency(t);
+                                if (dm != null) {
+                                    // If this dependency is managed and the managed dependency is expressed as a property,
+                                    // change/add the property value.
+                                    String requestedVersion = dm.getRequested().getVersion();
+                                    if (requestedVersion != null && requestedVersion.startsWith("${")
+                                        && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
+
+                                        doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
+                                        return t;
+                                    }
+                                }
+
                                 //If the version is not present and the override managed version is set, add a new, explicit version tag.
                                 Xml.Tag versionTag = Xml.Tag.build("<version>" + newerVersion + "</version>");
                                 //noinspection ConstantConditions
