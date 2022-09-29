@@ -15,10 +15,13 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavadocVisitor
 import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.CompilationUnit
 
 @Suppress("JavadocDeclaration")
@@ -1448,4 +1451,37 @@ interface JavadocTest : JavaTreeTest {
                 " */\n" +
                 "class A {}"
     )
+
+    @Test
+    fun renderMarkers(jp: JavaParser) {
+        var cu = jp.parse("""
+            /**
+             *   {@link #n }
+             */
+            class Test {
+                int n;
+            }
+        """.trimIndent())[0]
+
+        cu = object : JavaIsoVisitor<Int>() {
+            override fun getJavadocVisitor(): JavadocVisitor<Int> {
+                return object : JavadocVisitor<Int>(this) {
+                    override fun visitLink(link: Javadoc.Link, p: Int): Javadoc {
+                        return link.withMarkers(link.markers.searchResult("hello"))
+                    }
+                }
+            }
+        }.visit(cu, 0) as J.CompilationUnit
+
+        Assertions.assertThat(cu.printAll()).isEqualTo(
+            """
+            /**
+             *   ~~(hello)~~>{@link #n }
+             */
+            class Test {
+                int n;
+            }
+            """.trimIndent()
+        )
+    }
 }
