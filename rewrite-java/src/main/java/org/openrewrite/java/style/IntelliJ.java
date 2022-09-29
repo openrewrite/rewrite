@@ -28,7 +28,9 @@ import static org.openrewrite.Tree.randomId;
 public class IntelliJ extends NamedStyles {
     private static final IntelliJ INSTANCE = new IntelliJ();
 
-    private IntelliJ() {
+    // Public so that Environment can find and activate this style
+    // From code, should use IntelliJ.default() instead
+    public IntelliJ() {
         super(randomId(),
                 "org.openrewrite.java.IntelliJ",
                 "IntelliJ IDEA",
