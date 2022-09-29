@@ -17,19 +17,20 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress("Convert2Diamond")
-interface UseDiamondOperatorTest: JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = UseDiamondOperator()
+interface UseDiamondOperatorTest: RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(UseDiamondOperator())
+    }
 
     @Test
-    fun useDiamondOperator(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun useDiamondOperator() = rewriteRun(
+        java("""
             import java.util.*;
 
             class Test<X, Y> {
@@ -41,7 +42,7 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.*;
 
             class Test<X, Y> {
@@ -52,14 +53,13 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                     };
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1297")
     @Test
-    fun `do not use diamond operators for variables having null or unknown types`(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotUseDiamondOperatorsForVariablesHavingNullOrUnknownTypes() = rewriteRun(
+        java("""
             import lombok.val;
             import java.util.ArrayList;
 
@@ -69,26 +69,24 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                     UnknownThing o = new UnknownThing<String>();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun noLeftSide(jp: JavaParser) = assertUnchanged(
-        parser = jp,
-        before = """
+    fun noLeftSide() = rewriteRun(
+        java("""
             import java.util.HashMap;
             class Test {
                 static {
                     new HashMap<String, String>();
                 }
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun notAsAChainedMethodInvocation(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun notAsAChainedMethodInvocation() = rewriteRun(
+        java("""
             class Test {
                 public static ResponseBuilder<String> bResponse(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
@@ -104,7 +102,7 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 public static ResponseBuilder<String> bResponse(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
@@ -119,13 +117,12 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun removeUnusedImports(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun removeUnusedImports() = rewriteRun(
+        java("""
             import java.util.Map;
             import java.util.HashMap;
             import java.math.BigDecimal;
@@ -137,7 +134,7 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.Map;
             import java.util.HashMap;
 
@@ -146,7 +143,7 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                     Map<Object,Object> map = new HashMap<>();
                 }
             }
-        """
+        """)
     )
 
 }
