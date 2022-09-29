@@ -43,13 +43,13 @@ public class ManageDependencies extends Recipe {
 
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                          "Group is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.*")
     String groupPattern;
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                          "Artifact is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "guava*",
             required = false)
     @Nullable
@@ -61,6 +61,15 @@ public class ManageDependencies extends Recipe {
             required = false)
     @Nullable
     Boolean addToRootPom;
+
+    @Option(displayName = "Skip model updates",
+            description = "Optionally skip updating the dependency model after managing dependencies. " +
+                          "Updating the model does not affect the source code of the POM," +
+                          "but will cause the resolved dependency model to reflect the changes made to the POM. " +
+                          "If this recipe is ran standalone, it is not necessary to update the model.",
+            required = false)
+    @Nullable
+    Boolean skipModelUpdate;
 
     @Override
     public String getDisplayName() {
@@ -111,7 +120,7 @@ public class ManageDependencies extends Recipe {
                             for (ResolvedDependency rmd : manageableDependencies) {
                                 String alreadyManagedVersion = getResolutionResult().getPom().getManagedVersion(rmd.getGroupId(), rmd.getArtifactId(), rmd.getType(),
                                         rmd.getClassifier());
-                                if(rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
+                                if (rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
                                     maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
                                             (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
                                                     rmd : existing);
@@ -122,6 +131,9 @@ public class ManageDependencies extends Recipe {
                                 doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
                                         rmd.getArtifactId(), rmd.getVersion(), null,
                                         null, rmd.getRequested().getClassifier()));
+                                if (!Boolean.TRUE.equals(skipModelUpdate)) {
+                                    maybeUpdateModel();
+                                }
                             }
                         }
 

@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -50,6 +51,7 @@ public class AddPlugin extends Recipe {
             example = "1.0.0")
     String version;
 
+    @Language("xml")
     @Option(displayName = "Configuration",
             description = "Optional plugin configuration provided as raw XML",
             example = "<configuration><foo>foo</foo></configuration>",

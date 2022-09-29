@@ -90,6 +90,18 @@ class JsonPathMatcherTest {
       """.trimIndent())
 
     @Test
+    fun findsAlias() = assertMatched(
+        jsonPath = "$.*.yo",
+        before = arrayOf("""
+            bar:
+              &abc yo: friend
+            baz:
+              *abc: friendly
+        """),
+        after = arrayOf("&abc yo: friend", "*abc: friendly")
+    )
+
+    @Test
     fun doesNotMatchMissingProperty() = assertNotMatched(
         jsonPath = "$.none",
         before = simple

@@ -86,6 +86,16 @@ public class DeleteProperty extends Recipe {
     @Override
     public YamlVisitor<ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
+
+            @Override
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+                // TODO: Update DeleteProperty to support documents having Anchor / Alias Pairs
+                if (documents != new ReplaceAliasWithAnchorValueVisitor<ExecutionContext>().visit(documents, executionContext)) {
+                    return documents;
+                }
+                return super.visitDocuments(documents, executionContext);
+            }
+
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);

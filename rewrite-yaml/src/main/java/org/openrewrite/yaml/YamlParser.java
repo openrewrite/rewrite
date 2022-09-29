@@ -30,6 +30,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.yaml.tree.Yaml;
+import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.events.*;
 import org.yaml.snakeyaml.parser.Parser;
 import org.yaml.snakeyaml.parser.ParserImpl;
@@ -418,7 +419,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
-        private Yaml.Scalar key;
+        private YamlKey key;
 
         private MappingBuilder(String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
             this.prefix = prefix;
@@ -430,6 +431,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         public void push(Yaml.Block block) {
             if (key == null && block instanceof Yaml.Scalar) {
                 key = (Yaml.Scalar) block;
+            } else if (key == null && block instanceof Yaml.Alias) {
+                key = (Yaml.Alias) block;
             } else {
                 String keySuffix = block.getPrefix();
                 block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));
