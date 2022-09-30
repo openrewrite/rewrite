@@ -67,12 +67,7 @@ public interface JavaType {
     }
 
     default boolean isAssignableFrom(Pattern pattern) {
-        //noinspection ConstantConditions
-        if(this instanceof JavaType.Parameterized && ((Parameterized) this).getType() == null) {
-            // Guard against NPE from malformed JavaType.Parameterized
-            return false;
-        }
-        if (this instanceof FullyQualified) {
+         if (this instanceof FullyQualified) {
             FullyQualified fq = (FullyQualified) this;
             if (pattern.matcher(fq.getFullyQualifiedName()).matches()) {
                 return true;
