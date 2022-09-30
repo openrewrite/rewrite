@@ -123,9 +123,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public final Cursor getCursor() {
-        if (cursor == null) {
-            throw new IllegalStateException("Cursoring is not enabled for this visitor. " + "Call setCursoringOn() in the visitor's constructor to enable.");
-        }
         return cursor;
     }
 

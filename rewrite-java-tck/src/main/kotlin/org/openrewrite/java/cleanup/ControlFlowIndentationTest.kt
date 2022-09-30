@@ -13,24 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("SuspiciousIndentAfterControlStatement", "ClassInitializerMayBeStatic", "ConstantConditions",
+    "IfStatementWithIdenticalBranches", "DuplicateCondition"
+)
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
+import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface ControlFlowIndentationTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = ControlFlowIndentation()
+interface ControlFlowIndentationTest : RewriteTest {
 
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(ControlFlowIndentation())
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2277")
     @Test
-    fun removesIndentationFromStatementAfterIf(jp: JavaParser) = assertChanged(
-        before = """
+    fun removesIndentationFromStatementAroundIf() = rewriteRun(
+        java("""
             class A {
                 {
+                        foo(); // This should be left alone because it does not come after control flow
                     if(true)
-                        foo();
+                    foo();
                         foo();
                 }
                 
@@ -40,9 +50,10 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                         }
             }
         """,
-        after = """
+        """
             class A {
                 {
+                        foo(); // This should be left alone because it does not come after control flow
                     if(true)
                         foo();
                     foo();
@@ -53,58 +64,32 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                             int a = 0;
                         }
             }
-        """
+        """)
     )
 
     @Test
-    fun addsIndentationToStatementInIf(jp: JavaParser) = assertChanged(
-        before = """
-            class A {
-                {
-                    if(true)
-                    foo();
-                    foo();
-                }
-                
-                static void foo(){}
-            }
-        """,
-        after = """
-            class A {
-                {
-                    if(true)
-                        foo();
-                    foo();
-                }
-                
-                static void foo(){}
-            }
-        """
-    )
-
-    @Test
-    fun leavesIndentationAloneWhenBlocksAreExplicit(jp: JavaParser) = assertUnchanged(
-        before = """
+    fun leavesIndentationAloneWhenBlocksAreExplicit() = rewriteRun(
+        java("""
             class A {
                 {
                     if(true) {
-                        foo();
+                            foo();
                     } else if(true) {
-                        foo();
+                            foo();
                     } else {
-                        foo();
+                            foo();
                     }
-                        foo();
+                            foo();
                 }
                 
                 static void foo(){}
             }
-        """
+        """)
     )
 
     @Test
-    fun removesIndentationFromStatementAfterIfElse(jp: JavaParser) = assertChanged(
-        before = """
+    fun removesIndentationFromStatementAfterIfElse() = rewriteRun(
+        java("""
             class A {
                 {
                     if(true) {
@@ -117,7 +102,7 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                 static void foo(){}
             }
         """,
-        after = """
+        """
             class A {
                 {
                     if(true) {
@@ -129,12 +114,12 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                 
                 static void foo(){}
             }
-        """
+        """)
     )
 
     @Test
-    fun elseIf(jp: JavaParser) = assertChanged(
-        before = """
+    fun elseIf(jp: JavaParser) = rewriteRun(
+        java("""
             class A {
                 {
                     if(true){
@@ -148,7 +133,7 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                 static void foo(){}
             }
         """,
-        after = """
+        """
             class A {
                 {
                     if(true){
@@ -161,12 +146,12 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                 }
                 static void foo(){}
             }
-        """
+        """)
     )
 
     @Test
-    fun removesIndentationFromStatementAfterLoop(jp: JavaParser) = assertChanged(
-        before = """
+    fun removesIndentationFromStatementAfterLoop() = rewriteRun(
+        java("""
             class A {
                 {
                     while(false)
@@ -177,7 +162,7 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                 static void foo(){}
             }
         """,
-        after = """
+        """
             class A {
                 {
                     while(false)
@@ -187,6 +172,6 @@ interface ControlFlowIndentationTest : JavaRecipeTest {
                 
                 static void foo(){}
             }
-        """
+        """)
     )
 }
