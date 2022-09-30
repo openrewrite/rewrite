@@ -18,19 +18,19 @@ package org.openrewrite.java.search;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class FindMissingTypes extends Recipe {
     @Override
@@ -90,7 +90,7 @@ public class FindMissingTypes extends Recipe {
             J.Identifier ident = super.visitIdentifier(identifier, ctx);
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
-            if (isNullType(ident.getType()) && !isAllowedToHaveNullType(ident)) {
+            if (!isWellFormedType(ident.getType()) && !isAllowedToHaveNullType(ident)) {
                 ident = ident.withMarkers(ident.getMarkers().searchResult("Identifier type is null"));
             }
             return ident;
@@ -100,7 +100,7 @@ public class FindMissingTypes extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
             JavaType.Method type = mi.getMethodType();
-            if (isNullType(type)) {
+            if (!isWellFormedType(type)) {
                 mi = mi.withMarkers(mi.getMarkers().searchResult("MethodInvocation type is null"));
             } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
                 mi = mi.withMarkers(mi.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
@@ -112,7 +112,7 @@ public class FindMissingTypes extends Recipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
-            if (isNullType(type)) {
+            if (!isWellFormedType(type)) {
                 md = md.withMarkers(md.getMarkers().searchResult("MethodDeclaration type is null"));
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = md.withMarkers(md.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
@@ -124,7 +124,7 @@ public class FindMissingTypes extends Recipe {
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
-            if (isNullType(t)) {
+            if (!isWellFormedType(t)) {
                 return cd.withMarkers(cd.getMarkers().searchResult("ClassDeclaration type is null"));
             }
             if (!cd.getKind().name().equals(t.getKind().name())) {
@@ -140,10 +140,6 @@ public class FindMissingTypes extends Recipe {
                 }
             }
             return cd;
-        }
-
-        private boolean isNullType(@Nullable JavaType type) {
-            return type == null || type instanceof JavaType.Unknown;
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {

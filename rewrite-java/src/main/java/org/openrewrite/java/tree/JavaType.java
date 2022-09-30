@@ -67,6 +67,11 @@ public interface JavaType {
     }
 
     default boolean isAssignableFrom(Pattern pattern) {
+        //noinspection ConstantConditions
+        if(this instanceof JavaType.Parameterized && ((Parameterized) this).getType() == null) {
+            // Guard against NPE from malformed JavaType.Parameterized
+            return false;
+        }
         if (this instanceof FullyQualified) {
             FullyQualified fq = (FullyQualified) this;
             if (pattern.matcher(fq.getFullyQualifiedName()).matches()) {
@@ -521,7 +526,6 @@ public interface JavaType {
 
         @With
         @NonFinal
-        @Nullable
         FullyQualified type;
 
         @NonFinal
@@ -531,12 +535,11 @@ public interface JavaType {
         public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
                              @Nullable List<JavaType> typeParameters) {
             this.managedReference = managedReference;
-            this.type = type;
+            this.type = type == null ? Unknown.getInstance() : type;
             this.typeParameters = nullIfEmpty(typeParameters);
         }
 
         public FullyQualified getType() {
-            assert type != null;
             return type;
         }
 
@@ -574,61 +577,51 @@ public interface JavaType {
         }
 
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
-            assert type != null;
             return type.withFullyQualifiedName(fullyQualifiedName);
         }
 
         @Override
         public List<FullyQualified> getAnnotations() {
-            assert type != null;
             return type.getAnnotations();
         }
 
         @Override
         public boolean hasFlags(Flag... test) {
-            assert type != null;
             return type.hasFlags(test);
         }
 
         @Override
         public Set<Flag> getFlags() {
-            assert type != null;
             return type.getFlags();
         }
 
         @Override
         public List<FullyQualified> getInterfaces() {
-            assert type != null;
             return type.getInterfaces();
         }
 
         @Override
         public Kind getKind() {
-            assert type != null;
             return type.getKind();
         }
 
         @Override
         public List<Variable> getMembers() {
-            assert type != null;
             return type.getMembers();
         }
 
         @Override
         public List<Method> getMethods() {
-            assert type != null;
             return type.getMethods();
         }
 
         @Nullable
         public FullyQualified getOwningClass() {
-            assert type != null;
             return type.getOwningClass();
         }
 
         @Override
         public FullyQualified getSupertype() {
-            assert type != null;
             return type.getSupertype();
         }
 
@@ -637,8 +630,7 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Parameterized that = (Parameterized) o;
-            assert type != null && typeParameters != null;
-            return type.equals(that.type) && typeParameters.equals(that.typeParameters);
+            return Objects.equals(type, that.type) && Objects.equals(typeParameters, that.typeParameters);
         }
 
         @Override
@@ -730,17 +722,15 @@ public interface JavaType {
         @NonFinal
         Integer managedReference;
 
-        @Nullable
         @NonFinal
         JavaType elemType;
 
         public Array(@Nullable Integer managedReference, @Nullable JavaType elemType) {
             this.managedReference = managedReference;
-            this.elemType = elemType;
+            this.elemType = elemType == null ? JavaType.Unknown.getInstance() : elemType;
         }
 
         public JavaType getElemType() {
-            assert elemType != null;
             return elemType;
         }
 
@@ -760,8 +750,7 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Array array = (Array) o;
-            assert elemType != null;
-            return elemType.equals(array.elemType);
+            return Objects.equals(elemType, array.elemType);
         }
 
         @Override
@@ -1181,8 +1170,7 @@ public interface JavaType {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Variable variable = (Variable) o;
-            assert owner != null;
-            return name.equals(variable.name) && owner.equals(variable.owner);
+            return Objects.equals(name, variable.name) && Objects.equals(owner, variable.owner);
         }
 
         @Override
@@ -1267,6 +1255,21 @@ public interface JavaType {
         @Override
         public String toString() {
             return "Unknown";
+        }
+
+        @Override
+        public boolean isAssignableFrom(Pattern pattern) {
+            return false;
+        }
+
+        @Override
+        public boolean isAssignableFrom(@Nullable JavaType type) {
+            return false;
+        }
+
+        @Override
+        public boolean isAssignableTo(String fullyQualifiedName) {
+            return false;
         }
     }
 }

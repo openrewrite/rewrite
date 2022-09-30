@@ -351,7 +351,9 @@ interface ChangeTypeTest : JavaRecipeTest {
             import a.A1;
             
             public class B {
-               public <T extends A1> T generic(T n, List<? super A1> in);
+               public <T extends A1> T generic(T n, List<? super A1> in) {
+               
+               }
                public void test() {
                    A1.stat();
                    this.<A1>generic(null, true);
@@ -362,7 +364,9 @@ interface ChangeTypeTest : JavaRecipeTest {
             import a.A2;
             
             public class B {
-               public <T extends A2> T generic(T n, List<? super A2> in);
+               public <T extends A2> T generic(T n, List<? super A2> in) {
+               
+               }
                public void test() {
                    A2.stat();
                    this.<A2>generic(null, true);
