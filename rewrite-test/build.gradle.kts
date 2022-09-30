@@ -36,6 +36,4 @@ dependencies {
     implementation("org.mapstruct:mapstruct:latest.release")
 
     testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
-    testCompileOnly("org.projectlombok:lombok:1.18.24")
-    annotationProcessor("org.projectlombok:lombok:1.18.24")
 }
