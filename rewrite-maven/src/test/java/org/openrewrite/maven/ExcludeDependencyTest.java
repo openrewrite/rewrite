@@ -206,4 +206,30 @@ class ExcludeDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1886")
+    @Test
+    void respectTransitiveDependencyOriginalScopeWhenDeterminingIfExclusionIsNecessary() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
+          pomXml(
+             """
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.5.14</version>
+                </parent>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-actuator</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+          """)
+        );
+    }
 }

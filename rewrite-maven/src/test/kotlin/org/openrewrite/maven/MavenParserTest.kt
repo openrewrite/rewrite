@@ -23,6 +23,7 @@ import okio.ByteString.Companion.encode
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatExceptionOfType
 import org.junit.jupiter.api.Disabled
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
@@ -1459,4 +1460,101 @@ class MavenParserTest : RewriteTest {
             }
         }
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1886")
+    @Nested
+    inner class TransitiveDependencyScopeOverrides {
+        @Test
+        fun `depMgmt cannot upgrade scope of transitive dep (with explicit scope), adding it to classpath`() = rewriteRun(
+            pomXml("""
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.hamcrest</groupId>
+                        <artifactId>hamcrest</artifactId>
+                        <version>2.1</version>
+                        <scope>compile</scope>
+                      </dependency> 
+                    </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-to-slf4j</artifactId>
+                      <version>2.17.2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            ) { spec -> spec.afterRecipe { pomXml ->
+              val foundDependencies = pomXml.mavenResolutionResult().findDependencies("org.hamcrest", "hamcrest", null)
+              assertThat(foundDependencies).hasSize(0)
+            } }
+        )
+
+        @Test
+        fun `depMgmt cannot upgrade scope of transitive dep (with implicit scope), adding it to classpath`() = rewriteRun(
+            pomXml("""
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.junit.vintage</groupId>
+                        <artifactId>junit-vintage-engine</artifactId>
+                        <version>5.7.2</version>
+                        <scope>compile</scope>
+                      </dependency> 
+                    </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-to-slf4j</artifactId>
+                      <version>2.17.2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            ) { spec -> spec.afterRecipe { pomXml ->
+                val foundDependencies = pomXml.mavenResolutionResult().findDependencies("org.junit.vintage", "junit-vintage-engine", null)
+                assertThat(foundDependencies).hasSize(0)
+            } }
+        )
+
+        @Test
+        fun `depMgmt can downgrade scope of transitive dependency, removing from classpath`() = rewriteRun(
+            pomXml("""
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.apache.logging.log4j</groupId>
+                        <artifactId>log4j-api</artifactId>
+                        <version>2.17.2</version>
+                        <scope>test</scope>
+                      </dependency> 
+                    </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-to-slf4j</artifactId>
+                      <version>2.17.2</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """
+            ) { spec -> spec.afterRecipe { pomXml ->
+                val foundDependencies = pomXml.mavenResolutionResult().findDependencies("org.apache.logging.log4j", "log4j-api", null)
+                assertThat(foundDependencies).hasSize(0)
+            } }
+        )
+    }
 }
