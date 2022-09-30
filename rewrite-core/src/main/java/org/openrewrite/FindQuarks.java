@@ -27,7 +27,7 @@ public class FindQuarks extends Recipe {
             description = "Flag to include all instances of type `Quark`, instead of only those with parser failures. Defaults to false.",
             required = false)
     @Nullable
-    Boolean includeAllQuarks;
+    Boolean includeAll;
 
     @Override
     public String getDisplayName() {
@@ -45,7 +45,7 @@ public class FindQuarks extends Recipe {
             @Override
             public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
                 if (sourceFile instanceof Quark &&
-                        ((includeAllQuarks != null && includeAllQuarks) || sourceFile.getMarkers().findFirst(ParseExceptionResult.class).isPresent())) {
+                        ((includeAll != null && includeAll) || sourceFile.getMarkers().findFirst(ParseExceptionResult.class).isPresent())) {
                     return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());
                 }
                 return sourceFile;
