@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
+import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
 
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -92,16 +93,30 @@ public interface JavaType {
         return false;
     }
 
-    @Getter
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @AllArgsConstructor
-    @With
     class MultiCatch implements JavaType {
-        @NonFinal
-        List<JavaType> throwableTypes;
+        public MultiCatch(@Nullable List<JavaType> throwableTypes) {
+            this.throwableTypes = nullIfEmpty(throwableTypes);
+        }
+
+        private List<JavaType> throwableTypes;
+
+        public List<JavaType> getThrowableTypes() {
+            if(throwableTypes == null) {
+                return Collections.emptyList();
+            }
+            return throwableTypes;
+        }
+
+        public MultiCatch withThrowableTypes(@Nullable List<JavaType> throwableTypes) {
+            throwableTypes = nullIfEmpty(throwableTypes);
+            if(this.throwableTypes == throwableTypes) {
+                return this;
+            }
+            return new MultiCatch(throwableTypes);
+        }
 
         public MultiCatch unsafeSet(List<JavaType> throwableTypes) {
-            this.throwableTypes = throwableTypes;
+            this.throwableTypes = nullIfEmpty(throwableTypes);
             return this;
         }
     }
@@ -167,7 +182,7 @@ public interface JavaType {
             private Iterator<E> current;
 
             @Nullable
-            private Iterator<E> supertypeE;
+            private Iterator<E> supertype;
 
             @Nullable
             private Iterator<FullyQualified> interfaces;
@@ -203,9 +218,9 @@ public interface JavaType {
 
                     return true;
                 } else {
-                    if (supertypeE == null) {
-                        supertypeE = fq.getSupertype() == null ? emptyIterator() : recursive.apply(fq.getSupertype());
-                        current = supertypeE;
+                    if (supertype == null) {
+                        supertype = fq.getSupertype() == null ? emptyIterator() : recursive.apply(fq.getSupertype());
+                        current = supertype;
                         rec = fq.getSupertype();
                         return hasNext();
                     } else if (interfaces == null) {
@@ -321,6 +336,7 @@ public interface JavaType {
             this.flagsBitMap = flagsBitMap & Flag.VALID_CLASS_FLAGS;
             this.fullyQualifiedName = fullyQualifiedName;
             this.kind = kind;
+            //noinspection DuplicatedCode
             this.typeParameters = nullIfEmpty(typeParameters);
             this.supertype = supertype;
             this.owningClass = owningClass;
@@ -340,9 +356,7 @@ public interface JavaType {
         }
 
         public Class withAnnotations(@Nullable List<FullyQualified> annotations) {
-            if (annotations != null && annotations.isEmpty()) {
-                annotations = null;
-            }
+            annotations = nullIfEmpty(annotations);
             if (annotations == this.annotations) {
                 return this;
             }
@@ -359,9 +373,7 @@ public interface JavaType {
         }
 
         public Class withInterfaces(@Nullable List<FullyQualified> interfaces) {
-            if (interfaces != null && interfaces.isEmpty()) {
-                interfaces = null;
-            }
+            interfaces = nullIfEmpty(interfaces);
             if (interfaces == this.interfaces) {
                 return this;
             }
@@ -378,9 +390,7 @@ public interface JavaType {
         }
 
         public Class withMembers(@Nullable List<Variable> members) {
-            if (members != null && members.isEmpty()) {
-                members = null;
-            }
+            members = nullIfEmpty(members);
             if (members == this.members) {
                 return this;
             }
@@ -397,9 +407,7 @@ public interface JavaType {
         }
 
         public Class withMethods(@Nullable List<Method> methods) {
-            if (methods != null && methods.isEmpty()) {
-                methods = null;
-            }
+            methods = nullIfEmpty(methods);
             if (methods == this.methods) {
                 return this;
             }
@@ -423,9 +431,7 @@ public interface JavaType {
         }
 
         public Class withTypeParameters(@Nullable List<JavaType> typeParameters) {
-            if (typeParameters != null && typeParameters.isEmpty()) {
-                typeParameters = null;
-            }
+            typeParameters = nullIfEmpty(typeParameters);
             if (typeParameters == this.typeParameters) {
                 return this;
             }
@@ -446,6 +452,7 @@ public interface JavaType {
         public Class unsafeSet(@Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                                @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces,
                                @Nullable List<Variable> members, @Nullable List<Method> methods) {
+            //noinspection DuplicatedCode
             this.typeParameters = nullIfEmpty(typeParameters);
             this.supertype = supertype;
             this.owningClass = owningClass;
@@ -530,7 +537,7 @@ public interface JavaType {
         public Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
                              @Nullable List<JavaType> typeParameters) {
             this.managedReference = managedReference;
-            this.type = type == null ? Unknown.getInstance() : type;
+            this.type = unknownIfNull(type);
             this.typeParameters = nullIfEmpty(typeParameters);
         }
 
@@ -544,9 +551,7 @@ public interface JavaType {
         }
 
         public Parameterized withTypeParameters(@Nullable List<JavaType> typeParameters) {
-            if (typeParameters != null && typeParameters.isEmpty()) {
-                typeParameters = null;
-            }
+            typeParameters = nullIfEmpty(typeParameters);
             if (typeParameters == this.typeParameters) {
                 return this;
             }
@@ -559,16 +564,16 @@ public interface JavaType {
             return this;
         }
 
-        public Parameterized unsafeSet(FullyQualified type, List<JavaType> typeParameters) {
+        public Parameterized unsafeSet(@Nullable FullyQualified type, @Nullable List<JavaType> typeParameters) {
             assert type != this;
-            this.type = type;
+            this.type = unknownIfNull(type);
             this.typeParameters = nullIfEmpty(typeParameters);
             return this;
         }
 
         @Override
         public String getFullyQualifiedName() {
-            return type == null ? "" : type.getFullyQualifiedName();
+            return type.getFullyQualifiedName();
         }
 
         public FullyQualified withFullyQualifiedName(String fullyQualifiedName) {
@@ -667,9 +672,7 @@ public interface JavaType {
         }
 
         public GenericTypeVariable withBounds(@Nullable List<JavaType> bounds) {
-            if (bounds != null && bounds.isEmpty()) {
-                bounds = null;
-            }
+            bounds = nullIfEmpty(bounds);
             if (bounds == this.bounds) {
                 return this;
             }
@@ -677,7 +680,7 @@ public interface JavaType {
         }
 
         @Override
-        public GenericTypeVariable unsafeSetManagedReference(Integer id) {
+        public GenericTypeVariable unsafeSetManagedReference(@Nullable Integer id) {
             this.managedReference = id;
             return this;
         }
@@ -722,7 +725,7 @@ public interface JavaType {
 
         public Array(@Nullable Integer managedReference, @Nullable JavaType elemType) {
             this.managedReference = managedReference;
-            this.elemType = elemType == null ? JavaType.Unknown.getInstance() : elemType;
+            this.elemType = unknownIfNull(elemType);
         }
 
         public JavaType getElemType() {
@@ -736,7 +739,7 @@ public interface JavaType {
         }
 
         public Array unsafeSet(JavaType elemType) {
-            this.elemType = elemType;
+            this.elemType = unknownIfNull(elemType);
             return this;
         }
 
@@ -882,7 +885,6 @@ public interface JavaType {
 
         @With
         @NonFinal
-        @Nullable
         FullyQualified declaringType;
 
         @With
@@ -890,7 +892,6 @@ public interface JavaType {
 
         @With
         @NonFinal
-        @Nullable
         JavaType returnType;
 
         @Nullable
@@ -914,9 +915,9 @@ public interface JavaType {
                       @Nullable List<FullyQualified> annotations) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
-            this.declaringType = declaringType;
+            this.declaringType = unknownIfNull(declaringType);
             this.name = name;
-            this.returnType = returnType;
+            this.returnType = unknownIfNull(returnType);
             this.parameterNames = nullIfEmpty(parameterNames);
             this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
@@ -929,13 +930,13 @@ public interface JavaType {
             return this;
         }
 
-        public Method unsafeSet(FullyQualified declaringType,
-                                JavaType returnType,
+        public Method unsafeSet(@Nullable FullyQualified declaringType,
+                                @Nullable JavaType returnType,
                                 @Nullable List<JavaType> parameterTypes,
                                 @Nullable List<FullyQualified> thrownExceptions,
                                 @Nullable List<FullyQualified> annotations) {
-            this.declaringType = declaringType;
-            this.returnType = returnType;
+            this.declaringType = unknownIfNull(declaringType);
+            this.returnType = unknownIfNull(returnType);
             this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
@@ -946,18 +947,12 @@ public interface JavaType {
             return "<constructor>".equals(name);
         }
 
-        @SuppressWarnings("NullableProblems")
         public FullyQualified getDeclaringType() {
-            // After construction the declaring type will never be null in a well-formed AST
-            // But the AST might be missing type information if an annotation processor like lombok is in use
-            // see: https://github.com/openrewrite/rewrite/issues/1362
-
-            //noinspection ConstantConditions
             return declaringType;
         }
 
         public boolean isInheritedFrom(String fullyQualifiedTypeName) {
-            if (declaringType == null) {
+            if (declaringType instanceof JavaType.Unknown) {
                 return false;
             }
 
@@ -996,9 +991,7 @@ public interface JavaType {
         }
 
         public Method withParameterNames(@Nullable List<String> parameterNames) {
-            if (parameterNames != null && parameterNames.isEmpty()) {
-                parameterNames = null;
-            }
+            parameterNames = nullIfEmpty(parameterNames);
             if (parameterNames == this.parameterNames) {
                 return this;
             }
@@ -1011,9 +1004,7 @@ public interface JavaType {
         }
 
         public Method withParameterTypes(@Nullable List<JavaType> parameterTypes) {
-            if (parameterTypes != null && parameterTypes.isEmpty()) {
-                parameterTypes = null;
-            }
+            parameterTypes = nullIfEmpty(parameterTypes);
             if (parameterTypes == this.parameterTypes) {
                 return this;
             }
@@ -1026,9 +1017,7 @@ public interface JavaType {
         }
 
         public Method withThrownExceptions(@Nullable List<FullyQualified> thrownExceptions) {
-            if (thrownExceptions != null && thrownExceptions.isEmpty()) {
-                thrownExceptions = null;
-            }
+            thrownExceptions = nullIfEmpty(thrownExceptions);
             if (thrownExceptions == this.thrownExceptions) {
                 return this;
             }
@@ -1041,9 +1030,7 @@ public interface JavaType {
         }
 
         public Method withAnnotations(@Nullable List<FullyQualified> annotations) {
-            if (annotations != null && annotations.isEmpty()) {
-                annotations = null;
-            }
+            annotations = nullIfEmpty(annotations);
             if (annotations == this.annotations) {
                 return this;
             }
@@ -1102,7 +1089,6 @@ public interface JavaType {
 
         @With
         @NonFinal
-        @Nullable
         JavaType type;
 
         @NonFinal
@@ -1115,7 +1101,7 @@ public interface JavaType {
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.name = name;
             this.owner = owner;
-            this.type = type;
+            this.type = unknownIfNull(type);
             this.annotations = nullIfEmpty(annotations);
         }
 
@@ -1129,9 +1115,7 @@ public interface JavaType {
         }
 
         public Variable withAnnotations(@Nullable List<FullyQualified> annotations) {
-            if (annotations != null && annotations.isEmpty()) {
-                annotations = null;
-            }
+            annotations = nullIfEmpty(annotations);
             if (this.annotations == annotations) {
                 return this;
             }
@@ -1155,7 +1139,7 @@ public interface JavaType {
         public Variable unsafeSet(JavaType owner, @Nullable JavaType type,
                                   @Nullable List<FullyQualified> annotations) {
             this.owner = owner;
-            this.type = type;
+            this.type = unknownIfNull(type);
             this.annotations = nullIfEmpty(annotations);
             return this;
         }

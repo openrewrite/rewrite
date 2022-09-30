@@ -275,7 +275,7 @@ public class MethodMatcher {
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        if (type == null) {
+        if (type == null || type instanceof JavaType.Unknown) {
             return false;
         }
 

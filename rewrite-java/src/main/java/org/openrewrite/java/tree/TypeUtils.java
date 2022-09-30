@@ -16,7 +16,6 @@
 package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.search.FindMissingTypes;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -408,6 +407,20 @@ public class TypeUtils {
         }
 
         return true;
+    }
+
+    public static JavaType.FullyQualified unknownIfNull(@Nullable JavaType.FullyQualified t) {
+        if(t == null) {
+            return JavaType.Unknown.getInstance();
+        }
+        return t;
+    }
+
+    public static JavaType unknownIfNull(@Nullable JavaType t) {
+        if(t == null) {
+            return JavaType.Unknown.getInstance();
+        }
+        return t;
     }
 
     static boolean deepEquals(@Nullable List<? extends JavaType> ts1, @Nullable List<? extends JavaType> ts2) {
