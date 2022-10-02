@@ -63,16 +63,33 @@ public class UseDiamondOperator extends Recipe {
     private static class UseDiamondOperatorVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
-            J.VariableDeclarations.NamedVariable nv = super.visitVariable(variable, executionContext);
-            J.VariableDeclarations variableDeclarations = getCursor().firstEnclosing(J.VariableDeclarations.class);
-            if (variableDeclarations != null && variableDeclarations.getTypeExpression() instanceof J.ParameterizedType) {
-                if (nv.getInitializer() instanceof J.NewClass) {
-                    nv = nv.withInitializer(maybeRemoveParams(
-                            parameterizedTypes((J.ParameterizedType)variableDeclarations.getTypeExpression()), (J.NewClass) nv.getInitializer()));
+        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+            J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
+            final TypedTree typeExpression = varDecls.getTypeExpression();
+            if (varDecls.getVariables().size() == 1 && varDecls.getVariables().get(0).getInitializer() != null
+                    && varDecls.getTypeExpression() instanceof J.ParameterizedType) {
+                varDecls = varDecls.withVariables(ListUtils.map(varDecls.getVariables(), nv -> {
+                    if (nv.getInitializer() instanceof J.NewClass) {
+                        nv = nv.withInitializer(maybeRemoveParams(
+                                parameterizedTypes((J.ParameterizedType) typeExpression), (J.NewClass) nv.getInitializer()));
+                    }
+                    return nv;
+                }));
+            }
+            return varDecls;
+        }
+
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
+            J.Assignment asgn = super.visitAssignment(assignment, executionContext);
+            if (asgn.getAssignment() instanceof J.NewClass) {
+                JavaType.Parameterized paramType = TypeUtils.asParameterized(asgn.getType());
+                J.NewClass nc = (J.NewClass) asgn.getAssignment();
+                if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
+                    asgn = asgn.withAssignment(maybeRemoveParams(parameterizedTypes((J.ParameterizedType) nc.getClazz()), nc));
                 }
             }
-            return nv;
+            return asgn;
         }
 
         @Override

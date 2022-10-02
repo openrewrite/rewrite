@@ -60,17 +60,23 @@ interface UseDiamondOperatorTest: RewriteTest {
     @Test
     fun useDiamondOperatorTest2() = rewriteRun(
         {spec -> spec.expectedCyclesThatMakeChanges(2)},
-        java("""
+        java(
+            """
+            import java.util.Map;
+            import java.util.HashMap;
             import java.util.function.Predicate;
             import java.util.List;
             
             class Foo<T> {
+                Map<String, Integer> map;
                 public Foo(Predicate<T> p) {}
                 public void something(Foo<List<String>> foos){}
                 
                 Foo getFoo() {
                     // variable type initializer
                     Foo<List<String>> f = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                    // assignment
+                    map = new HashMap<String, Integer>();
                     // method argument type assignment
                     something(new Foo<List<String>>(it -> it.stream().anyMatch(b -> true)));
                     // return type and assignment type unknown
@@ -86,16 +92,21 @@ interface UseDiamondOperatorTest: RewriteTest {
             }
         """,
             """
+            import java.util.Map;
+            import java.util.HashMap;
             import java.util.function.Predicate;
             import java.util.List;
             
             class Foo<T> {
+                Map<String, Integer> map;
                 public Foo(Predicate<T> p) {}
                 public void something(Foo<List<String>> foos){}
                 
                 Foo getFoo() {
                     // variable type initializer
                     Foo<List<String>> f = new Foo<>(it -> it.stream().anyMatch(baz -> true));
+                    // assignment
+                    map = new HashMap<>();
                     // method argument type assignment
                     something(new Foo<>(it -> it.stream().anyMatch(b -> true)));
                     // return type and assignment type unknown
