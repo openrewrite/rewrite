@@ -148,7 +148,7 @@ public class UseDiamondOperator extends Recipe {
                         return newClass;
                     } else {
                         for (int i = 0; i < paramTypes.size(); i++) {
-                            if (!TypeUtils.isOfType(paramTypes.get(i), newClassType.getTypeParameters().get(i).getType())) {
+                            if (!TypeUtils.isAssignableTo(paramTypes.get(i), newClassType.getTypeParameters().get(i).getType())) {
                                 return newClass;
                             }
                         }

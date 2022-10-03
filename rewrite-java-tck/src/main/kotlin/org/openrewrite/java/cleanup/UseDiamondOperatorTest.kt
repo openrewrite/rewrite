@@ -59,7 +59,6 @@ interface UseDiamondOperatorTest: RewriteTest {
     @Suppress("rawtypes")
     @Test
     fun useDiamondOperatorTest2() = rewriteRun(
-        {spec -> spec.expectedCyclesThatMakeChanges(2)},
         java(
             """
             import java.util.ArrayList;
