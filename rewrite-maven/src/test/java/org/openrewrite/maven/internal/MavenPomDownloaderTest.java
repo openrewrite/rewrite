@@ -22,6 +22,7 @@ import okhttp3.mockwebserver.RecordedRequest;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
@@ -29,12 +30,16 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenParser;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -236,6 +241,19 @@ class MavenPomDownloaderTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    void deriveMetaDataFromFileRepository(@TempDir Path repoPath) throws IOException {
+        Path fred = repoPath.resolve("fred/fred");
+        Files.createDirectories(fred.resolve("1.0.0"));
+        Files.createDirectories(fred.resolve("1.1.0"));
+        Files.createDirectories(fred.resolve("2.0.0"));
+
+        MavenRepository repository = new MavenRepository("file-based", repoPath.toUri().toString(), true, true, true, null, null, true);
+        MavenMetadata metaData  = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+          .downloadMetadata(new GroupArtifact("fred", "fred"), null, Arrays.asList(repository));
+        assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
     }
 
     @SuppressWarnings("ConstantConditions")
