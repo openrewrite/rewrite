@@ -15,16 +15,19 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.singletonList;
@@ -54,58 +57,109 @@ public class UseDiamondOperator extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new UseDiamondOperatorVisitor();
+    }
 
-        return new JavaIsoVisitor<ExecutionContext>() {
+    private static class UseDiamondOperatorVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-            @Override
-            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
-                if (multiVariable.getType() == null || multiVariable.getType() instanceof JavaType.Unknown) {
-                    return multiVariable;
-                }
-                return super.visitVariableDeclarations(multiVariable, executionContext);
+        @Override
+        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+            J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
+            final TypedTree varDeclsTypeExpression = varDecls.getTypeExpression();
+            if (varDecls.getVariables().size() == 1 && varDecls.getVariables().get(0).getInitializer() != null
+                    && varDecls.getTypeExpression() instanceof J.ParameterizedType) {
+                varDecls = varDecls.withVariables(ListUtils.map(varDecls.getVariables(), nv -> {
+                    if (nv.getInitializer() instanceof J.NewClass) {
+                        nv = nv.withInitializer(maybeRemoveParams(parameterizedTypes((J.ParameterizedType) varDeclsTypeExpression), (J.NewClass) nv.getInitializer()));
+                    }
+                    return nv;
+                }));
             }
+            return varDecls;
+        }
 
-            @Override
-            public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
-                J.NewClass n = super.visitNewClass(newClass, executionContext);
-                if (n.getClazz() instanceof J.ParameterizedType && n.getBody() == null) {
-                    J.ParameterizedType parameterizedType = (J.ParameterizedType) n.getClazz();
-                    if (useDiamondOperator(newClass, parameterizedType)) {
-                        n = n.withClazz(parameterizedType.withTypeParameters(singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))));
-                        if (parameterizedType.getTypeParameters() != null) {
-                            parameterizedType.getTypeParameters().stream()
-                                    .map(e -> TypeUtils.asFullyQualified(e.getType()))
-                                    .forEach(this::maybeRemoveImport);
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
+            J.Assignment asgn = super.visitAssignment(assignment, executionContext);
+            if (asgn.getAssignment() instanceof J.NewClass) {
+                JavaType.Parameterized assignmentType = TypeUtils.asParameterized(asgn.getType());
+                J.NewClass nc = (J.NewClass) asgn.getAssignment();
+                if (assignmentType != null && nc.getClazz() instanceof J.ParameterizedType) {
+                    asgn = asgn.withAssignment(maybeRemoveParams(assignmentType.getTypeParameters(), nc));
+                }
+            }
+            return asgn;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+            J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
+            JavaType.Method methodType = mi.getMethodType();
+            if (methodType != null) {
+                mi = mi.withArguments(ListUtils.map(mi.getArguments(), (i, arg) -> {
+                    if (arg instanceof J.NewClass) {
+                        J.NewClass nc = (J.NewClass) arg;
+                        JavaType.Parameterized paramType = TypeUtils.asParameterized(methodType.getParameterTypes().get(i));
+                        if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
+                            return maybeRemoveParams(paramType.getTypeParameters(), nc);
                         }
                     }
-                }
-                return n;
+                    return arg;
+                }));
             }
+            return mi;
+        }
 
-            private boolean useDiamondOperator(J.NewClass newClass, J.ParameterizedType parameterizedType) {
-                if (parameterizedType.getTypeParameters() == null || parameterizedType.getTypeParameters().isEmpty()
-                        || parameterizedType.getTypeParameters().get(0) instanceof J.Empty) {
-                    return false;
-                }
-
-                Cursor c = getCursor().dropParentUntil(J.class::isInstance);
-
-                if (c.getValue() instanceof J.VariableDeclarations.NamedVariable) {
-                    //If the immediate parent is named variable, check the variable declaration to make sure it's
-                    //not using local variable type inference.
-                    J.VariableDeclarations variableDeclaration = c.firstEnclosing(J.VariableDeclarations.class);
-                    return variableDeclaration != null && (variableDeclaration.getTypeExpression() == null ||
-                            !variableDeclaration.getTypeExpression().getMarkers().findFirst(JavaVarKeyword.class).isPresent());
-                } else if (c.getValue() instanceof J.MethodInvocation) {
-                    //Do not remove the type parameters if the newClass is the receiver of a method invocation.
-                    J.MethodInvocation invocation = c.getValue();
-                    return invocation.getSelect() != newClass;
-                } else {
-                    //If the immediate parent is a block, this new operation is a statement and there is no left side to
-                    //infer the type parameters.
-                    return !(c.getValue() instanceof J.Block);
+        @Override
+        public J.Return visitReturn(J.Return _return, ExecutionContext executionContext) {
+            J.Return rtn = super.visitReturn(_return, executionContext);
+            J.NewClass returnExpNewClass = rtn.getExpression() instanceof J.NewClass ? (J.NewClass)rtn.getExpression() : null;
+            if (returnExpNewClass != null && returnExpNewClass.getClazz() instanceof J.ParameterizedType) {
+                J parentBlock = getCursor().dropParentUntil(v -> v instanceof J.MethodDeclaration || v instanceof J.Lambda).getValue();
+                if (parentBlock instanceof J.MethodDeclaration) {
+                    J.MethodDeclaration md = (J.MethodDeclaration) parentBlock;
+                    if (md.getReturnTypeExpression() instanceof J.ParameterizedType) {
+                        rtn = rtn.withExpression(
+                                maybeRemoveParams(parameterizedTypes((J.ParameterizedType) md.getReturnTypeExpression()), returnExpNewClass));
+                    }
                 }
             }
-        };
+            return rtn;
+        }
+
+        @Nullable
+        private List<JavaType> parameterizedTypes(J.ParameterizedType parameterizedType) {
+            if (parameterizedType.getTypeParameters() == null) {
+                return null;
+            }
+            List<JavaType> types = new ArrayList<>(parameterizedType.getTypeParameters().size());
+            for (Expression typeParameter : parameterizedType.getTypeParameters()) {
+                types.add(typeParameter.getType());
+            }
+            return types;
+        }
+
+
+        private J.NewClass maybeRemoveParams(@Nullable List<JavaType> paramTypes, J.NewClass newClass) {
+            if (paramTypes != null && newClass.getBody() == null && newClass.getClazz() instanceof J.ParameterizedType) {
+                J.ParameterizedType newClassType = (J.ParameterizedType) newClass.getClazz();
+                if (newClassType.getTypeParameters() != null){
+                    if (paramTypes.size() != newClassType.getTypeParameters().size()) {
+                        return newClass;
+                    } else {
+                        for (int i = 0; i < paramTypes.size(); i++) {
+                            if (!TypeUtils.isAssignableTo(paramTypes.get(i), newClassType.getTypeParameters().get(i).getType())) {
+                                return newClass;
+                            }
+                        }
+                    }
+                    newClassType.getTypeParameters().stream()
+                            .map(e -> TypeUtils.asFullyQualified(e.getType()))
+                            .forEach(this::maybeRemoveImport);
+                    newClass = newClass.withClazz(newClassType.withTypeParameters(singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))));
+                }
+            }
+            return newClass;
+        }
     }
 }

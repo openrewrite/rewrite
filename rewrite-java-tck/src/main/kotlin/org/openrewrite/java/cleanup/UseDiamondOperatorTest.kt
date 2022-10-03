@@ -56,6 +56,122 @@ interface UseDiamondOperatorTest: RewriteTest {
         """)
     )
 
+    @Suppress("rawtypes")
+    @Test
+    fun useDiamondOperatorTest2() = rewriteRun(
+        java(
+            """
+            import java.util.ArrayList;
+            import java.util.HashMap;
+            import java.util.function.Predicate;
+            import java.util.List;
+            import java.util.Map;
+            
+            class Foo<T> {
+                Map<String, Integer> map;
+                Map unknownMap;
+                public Foo(Predicate<T> p) {}
+                public void something(Foo<List<String>> foos){}
+                public void somethingEasy(List<List<String>> l){}
+                
+                Foo getFoo() {
+                    // variable type initializer
+                    Foo<List<String>> f = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                    // assignment
+                    map = new HashMap<String, Integer>();
+                    unknownMap = new HashMap<String, Integer>();
+                    // method argument type assignment
+                    something(new Foo<List<String>>(it -> it.stream().anyMatch(b -> true)));
+                    somethingEasy(new ArrayList<List<String>>());
+                    // return type and assignment type unknown
+                    Object o = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                    // return type unknown
+                    return new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                }
+                
+                Foo<List<String>> getFoo2() {
+                    // return type expression
+                    return new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                }
+            }
+        """,
+            """
+            import java.util.ArrayList;
+            import java.util.HashMap;
+            import java.util.function.Predicate;
+            import java.util.List;
+            import java.util.Map;
+            
+            class Foo<T> {
+                Map<String, Integer> map;
+                Map unknownMap;
+                public Foo(Predicate<T> p) {}
+                public void something(Foo<List<String>> foos){}
+                public void somethingEasy(List<List<String>> l){}
+                
+                Foo getFoo() {
+                    // variable type initializer
+                    Foo<List<String>> f = new Foo<>(it -> it.stream().anyMatch(baz -> true));
+                    // assignment
+                    map = new HashMap<>();
+                    unknownMap = new HashMap<String, Integer>();
+                    // method argument type assignment
+                    something(new Foo<>(it -> it.stream().anyMatch(b -> true)));
+                    somethingEasy(new ArrayList<>());
+                    // return type and assignment type unknown
+                    Object o = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                    // return type unknown
+                    return new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                }
+                
+                Foo<List<String>> getFoo2() {
+                    // return type expression
+                    return new Foo<>(it -> it.stream().anyMatch(baz -> true));
+                }
+            }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2274")
+    @Test
+    fun returnTypeParamsDoNotMatchNewClassParams() = rewriteRun(
+        java("""
+            import java.util.List;
+            import java.util.function.Predicate;
+            
+            class Test {
+                interface MyInterface<T> { }
+                class MyClass<S, T> implements MyInterface<T>{
+                    public MyClass(Predicate<S> p, T check) {}
+                }
+            
+                public MyInterface<Integer> a() {
+                    return new MyClass<List<String>, Integer>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+                public MyClass<List<String>, Integer> b() {
+                    return new MyClass<List<String>, Integer>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+            }
+        ""","""
+            import java.util.List;
+            import java.util.function.Predicate;
+            
+            class Test {
+                interface MyInterface<T> { }
+                class MyClass<S, T> implements MyInterface<T>{
+                    public MyClass(Predicate<S> p, T check) {}
+                }
+            
+                public MyInterface<Integer> a() {
+                    return new MyClass<List<String>, Integer>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+                public MyClass<List<String>, Integer> b() {
+                    return new MyClass<>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+            }
+        """)
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1297")
     @Test
     fun doNotUseDiamondOperatorsForVariablesHavingNullOrUnknownTypes() = rewriteRun(
@@ -66,7 +182,6 @@ interface UseDiamondOperatorTest: RewriteTest {
             class Test<X, Y> {
                 void test() {
                     val ls = new ArrayList<String>();
-                    UnknownThing o = new UnknownThing<String>();
                 }
             }
         """)
@@ -88,7 +203,7 @@ interface UseDiamondOperatorTest: RewriteTest {
     fun notAsAChainedMethodInvocation() = rewriteRun(
         java("""
             class Test {
-                public static ResponseBuilder<String> bResponse(String entity) {
+                public static ResponseBuilder<String> bResponseEntity(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
                 }
                 public static ResponseBuilder<String> bResponse(String entity) {
@@ -104,7 +219,7 @@ interface UseDiamondOperatorTest: RewriteTest {
         """,
         """
             class Test {
-                public static ResponseBuilder<String> bResponse(String entity) {
+                public static ResponseBuilder<String> bResponseEntity(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
                 }
                 public static ResponseBuilder<String> bResponse(String entity) {
@@ -119,31 +234,4 @@ interface UseDiamondOperatorTest: RewriteTest {
             }
         """)
     )
-
-    @Test
-    fun removeUnusedImports() = rewriteRun(
-        java("""
-            import java.util.Map;
-            import java.util.HashMap;
-            import java.math.BigDecimal;
-            import java.util.Date;
-
-            class Test {
-                void test() {
-                    Map<Object,Object> map = new HashMap<BigDecimal,Date>();
-                }
-            }
-        """,
-        """
-            import java.util.Map;
-            import java.util.HashMap;
-
-            class Test {
-                void test() {
-                    Map<Object,Object> map = new HashMap<>();
-                }
-            }
-        """)
-    )
-
 }
