@@ -27,7 +27,6 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenRepositoryMirror;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -292,7 +291,7 @@ class MavenSettingsTest {
 
     @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/1688")
-    static class LocalRepositoryTest {
+    class LocalRepositoryTest {
         @Test
         void parsesLocalRepositoryPathFromSettingsXml() {
             var localRepoPath = System.getProperty("java.io.tmpdir");
@@ -303,14 +302,13 @@ class MavenSettingsTest {
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                          <localRepository>$localRepoPath</localRepository>
+                          <localRepository>%s</localRepository>
                     </settings>
-                """.getBytes()
+                """.formatted(localRepoPath).getBytes()
             )), ctx));
-
             assertThat(ctx.getLocalRepository().getUri())
               .startsWith("file://")
-              .containsSubsequence(localRepoPath.split(File.separator));
+              .containsSubsequence(Paths.get(localRepoPath).toUri().toString().split("/"));
         }
 
         @Test
@@ -323,9 +321,9 @@ class MavenSettingsTest {
                     <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                         xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
-                          <localRepository>$localRepoPath</localRepository>
+                          <localRepository>%s</localRepository>
                     </settings>
-                """.getBytes()
+                """.formatted(localRepoPath).getBytes()
             )), ctx));
 
             assertThat(ctx.getLocalRepository().getUri())
@@ -352,7 +350,7 @@ class MavenSettingsTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1801")
     @Nested
-    static class InterpolationTest {
+    class InterpolationTest {
         @Test
         void properties() {
             System.setProperty("rewrite.test.custom.location", "/tmp");
@@ -502,7 +500,7 @@ class MavenSettingsTest {
 
     @SuppressWarnings("ConstantConditions")
     @Nested
-    static class MergingTest {
+    class MergingTest {
         @Language("xml")
         private final String installationSettings = """
               <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
