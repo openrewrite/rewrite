@@ -15,30 +15,33 @@
  */
 package org.openrewrite;
 
-import lombok.AllArgsConstructor;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
-@AllArgsConstructor
 @With
 public class ParseExceptionResult implements Marker {
     UUID id;
 
     Throwable throwable;
 
-    @Nullable
-    String description;
-
     public ParseExceptionResult(Throwable t) {
         this(Tree.randomId(), t);
     }
 
     public ParseExceptionResult(UUID id, Throwable t) {
-        this(id, t, t.getMessage());
+        this.id = id;
+        this.throwable = t;
+    }
+
+    public String getDescription() {
+        if(throwable == null) {
+            return "Unknown parsing exception. Perhaps there was an issue deserializing the associated throwable.";
+        } else {
+            return throwable.toString();
+        }
     }
 }
