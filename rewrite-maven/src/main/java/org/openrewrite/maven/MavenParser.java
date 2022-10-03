@@ -86,13 +86,13 @@ public class MavenParser implements Parser<Xml.Document> {
             try {
                 Pom pom = RawPom.parse(source.getSource(ctx), null)
                         .toPom(pomPath, null);
-                if (relativeTo != null) {
-                    if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
-                        pom = pom.withProperties(new LinkedHashMap<>());
-                    }
-                    pom.getProperties().put("project.basedir", relativeTo.toString());
-                    pom.getProperties().put("basedir", relativeTo.toString());
+
+                if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
+                    pom = pom.withProperties(new LinkedHashMap<>());
                 }
+                String baseDir = pomPath.toAbsolutePath().getParent().toString();
+                pom.getProperties().put("project.basedir", baseDir);
+                pom.getProperties().put("basedir", baseDir);
 
                 Xml.Document xml = new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
