@@ -99,9 +99,11 @@ public class UseDiamondOperator extends Recipe {
                 mi = mi.withArguments(ListUtils.map(mi.getArguments(), (i, arg) -> {
                     if (arg instanceof J.NewClass) {
                         J.NewClass nc = (J.NewClass) arg;
-                        JavaType.Parameterized paramType = TypeUtils.asParameterized(getMethodParamType(methodType, i));
-                        if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
-                            return maybeRemoveParams(paramType.getTypeParameters(), nc);
+                        if (nc.getBody() == null && !methodType.getParameterTypes().isEmpty()) {
+                            JavaType.Parameterized paramType = TypeUtils.asParameterized(getMethodParamType(methodType, i));
+                            if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
+                                return maybeRemoveParams(paramType.getTypeParameters(), nc);
+                            }
                         }
                     }
                     return arg;
@@ -122,7 +124,7 @@ public class UseDiamondOperator extends Recipe {
         public J.Return visitReturn(J.Return _return, ExecutionContext executionContext) {
             J.Return rtn = super.visitReturn(_return, executionContext);
             J.NewClass returnExpNewClass = rtn.getExpression() instanceof J.NewClass ? (J.NewClass)rtn.getExpression() : null;
-            if (returnExpNewClass != null && returnExpNewClass.getClazz() instanceof J.ParameterizedType) {
+            if (returnExpNewClass != null && returnExpNewClass.getBody() == null && returnExpNewClass.getClazz() instanceof J.ParameterizedType) {
                 J parentBlock = getCursor().dropParentUntil(v -> v instanceof J.MethodDeclaration || v instanceof J.Lambda).getValue();
                 if (parentBlock instanceof J.MethodDeclaration) {
                     J.MethodDeclaration md = (J.MethodDeclaration) parentBlock;
