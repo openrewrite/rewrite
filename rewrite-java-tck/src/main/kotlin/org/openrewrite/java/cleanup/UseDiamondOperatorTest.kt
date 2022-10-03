@@ -62,23 +62,28 @@ interface UseDiamondOperatorTest: RewriteTest {
         {spec -> spec.expectedCyclesThatMakeChanges(2)},
         java(
             """
-            import java.util.Map;
+            import java.util.ArrayList;
             import java.util.HashMap;
             import java.util.function.Predicate;
             import java.util.List;
+            import java.util.Map;
             
             class Foo<T> {
                 Map<String, Integer> map;
+                Map unknownMap;
                 public Foo(Predicate<T> p) {}
                 public void something(Foo<List<String>> foos){}
+                public void somethingEasy(List<List<String>> l){}
                 
                 Foo getFoo() {
                     // variable type initializer
                     Foo<List<String>> f = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
                     // assignment
                     map = new HashMap<String, Integer>();
+                    unknownMap = new HashMap<String, Integer>();
                     // method argument type assignment
                     something(new Foo<List<String>>(it -> it.stream().anyMatch(b -> true)));
+                    somethingEasy(new ArrayList<List<String>>());
                     // return type and assignment type unknown
                     Object o = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
                     // return type unknown
@@ -92,23 +97,28 @@ interface UseDiamondOperatorTest: RewriteTest {
             }
         """,
             """
-            import java.util.Map;
+            import java.util.ArrayList;
             import java.util.HashMap;
             import java.util.function.Predicate;
             import java.util.List;
+            import java.util.Map;
             
             class Foo<T> {
                 Map<String, Integer> map;
+                Map unknownMap;
                 public Foo(Predicate<T> p) {}
                 public void something(Foo<List<String>> foos){}
+                public void somethingEasy(List<List<String>> l){}
                 
                 Foo getFoo() {
                     // variable type initializer
                     Foo<List<String>> f = new Foo<>(it -> it.stream().anyMatch(baz -> true));
                     // assignment
                     map = new HashMap<>();
+                    unknownMap = new HashMap<String, Integer>();
                     // method argument type assignment
                     something(new Foo<>(it -> it.stream().anyMatch(b -> true)));
+                    somethingEasy(new ArrayList<>());
                     // return type and assignment type unknown
                     Object o = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
                     // return type unknown
@@ -194,7 +204,7 @@ interface UseDiamondOperatorTest: RewriteTest {
     fun notAsAChainedMethodInvocation() = rewriteRun(
         java("""
             class Test {
-                public static ResponseBuilder<String> bResponse(String entity) {
+                public static ResponseBuilder<String> bResponseEntity(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
                 }
                 public static ResponseBuilder<String> bResponse(String entity) {
@@ -210,7 +220,7 @@ interface UseDiamondOperatorTest: RewriteTest {
         """,
         """
             class Test {
-                public static ResponseBuilder<String> bResponse(String entity) {
+                public static ResponseBuilder<String> bResponseEntity(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
                 }
                 public static ResponseBuilder<String> bResponse(String entity) {

@@ -65,13 +65,12 @@ public class UseDiamondOperator extends Recipe {
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
             J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
-            final TypedTree typeExpression = varDecls.getTypeExpression();
+            final TypedTree varDeclsTypeExpression = varDecls.getTypeExpression();
             if (varDecls.getVariables().size() == 1 && varDecls.getVariables().get(0).getInitializer() != null
                     && varDecls.getTypeExpression() instanceof J.ParameterizedType) {
                 varDecls = varDecls.withVariables(ListUtils.map(varDecls.getVariables(), nv -> {
                     if (nv.getInitializer() instanceof J.NewClass) {
-                        nv = nv.withInitializer(maybeRemoveParams(
-                                parameterizedTypes((J.ParameterizedType) typeExpression), (J.NewClass) nv.getInitializer()));
+                        nv = nv.withInitializer(maybeRemoveParams(parameterizedTypes((J.ParameterizedType) varDeclsTypeExpression), (J.NewClass) nv.getInitializer()));
                     }
                     return nv;
                 }));
@@ -83,10 +82,10 @@ public class UseDiamondOperator extends Recipe {
         public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
             J.Assignment asgn = super.visitAssignment(assignment, executionContext);
             if (asgn.getAssignment() instanceof J.NewClass) {
-                JavaType.Parameterized paramType = TypeUtils.asParameterized(asgn.getType());
+                JavaType.Parameterized assignmentType = TypeUtils.asParameterized(asgn.getType());
                 J.NewClass nc = (J.NewClass) asgn.getAssignment();
-                if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
-                    asgn = asgn.withAssignment(maybeRemoveParams(parameterizedTypes((J.ParameterizedType) nc.getClazz()), nc));
+                if (assignmentType != null && nc.getClazz() instanceof J.ParameterizedType) {
+                    asgn = asgn.withAssignment(maybeRemoveParams(assignmentType.getTypeParameters(), nc));
                 }
             }
             return asgn;
@@ -99,10 +98,10 @@ public class UseDiamondOperator extends Recipe {
             if (methodType != null) {
                 mi = mi.withArguments(ListUtils.map(mi.getArguments(), (i, arg) -> {
                     if (arg instanceof J.NewClass) {
-                        JavaType.Parameterized paramType = TypeUtils.asParameterized(methodType.getParameterTypes().get(i));
                         J.NewClass nc = (J.NewClass) arg;
+                        JavaType.Parameterized paramType = TypeUtils.asParameterized(methodType.getParameterTypes().get(i));
                         if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
-                            return maybeRemoveParams(parameterizedTypes((J.ParameterizedType) nc.getClazz()), nc);
+                            return maybeRemoveParams(paramType.getTypeParameters(), nc);
                         }
                     }
                     return arg;
@@ -114,14 +113,14 @@ public class UseDiamondOperator extends Recipe {
         @Override
         public J.Return visitReturn(J.Return _return, ExecutionContext executionContext) {
             J.Return rtn = super.visitReturn(_return, executionContext);
-            J.NewClass nc = rtn.getExpression() instanceof J.NewClass ? (J.NewClass)rtn.getExpression() : null;
-            if (nc != null && nc.getClazz() instanceof J.ParameterizedType) {
+            J.NewClass returnExpNewClass = rtn.getExpression() instanceof J.NewClass ? (J.NewClass)rtn.getExpression() : null;
+            if (returnExpNewClass != null && returnExpNewClass.getClazz() instanceof J.ParameterizedType) {
                 J parentBlock = getCursor().dropParentUntil(v -> v instanceof J.MethodDeclaration || v instanceof J.Lambda).getValue();
                 if (parentBlock instanceof J.MethodDeclaration) {
                     J.MethodDeclaration md = (J.MethodDeclaration) parentBlock;
                     if (md.getReturnTypeExpression() instanceof J.ParameterizedType) {
                         rtn = rtn.withExpression(
-                                maybeRemoveParams(parameterizedTypes((J.ParameterizedType) md.getReturnTypeExpression()), nc));
+                                maybeRemoveParams(parameterizedTypes((J.ParameterizedType) md.getReturnTypeExpression()), returnExpNewClass));
                     }
                 }
             }
