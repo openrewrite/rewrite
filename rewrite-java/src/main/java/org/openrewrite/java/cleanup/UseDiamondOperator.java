@@ -99,7 +99,7 @@ public class UseDiamondOperator extends Recipe {
                 mi = mi.withArguments(ListUtils.map(mi.getArguments(), (i, arg) -> {
                     if (arg instanceof J.NewClass) {
                         J.NewClass nc = (J.NewClass) arg;
-                        JavaType.Parameterized paramType = TypeUtils.asParameterized(methodType.getParameterTypes().get(i));
+                        JavaType.Parameterized paramType = TypeUtils.asParameterized(getMethodParamType(methodType, i));
                         if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
                             return maybeRemoveParams(paramType.getTypeParameters(), nc);
                         }
@@ -108,6 +108,14 @@ public class UseDiamondOperator extends Recipe {
                 }));
             }
             return mi;
+        }
+
+        private JavaType getMethodParamType(JavaType.Method methodType, int paramIndex) {
+            if (methodType.hasFlags(Flag.Varargs) && paramIndex >= methodType.getParameterTypes().size()-1){
+                return ((JavaType.Array)methodType.getParameterTypes().get(methodType.getParameterTypes().size()-1)).getElemType();
+            } else {
+                return methodType.getParameterTypes().get(paramIndex);
+            }
         }
 
         @Override

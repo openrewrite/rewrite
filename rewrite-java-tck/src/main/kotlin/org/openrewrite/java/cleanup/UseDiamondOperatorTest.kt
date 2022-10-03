@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("unchecked")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
@@ -54,6 +56,39 @@ interface UseDiamondOperatorTest: RewriteTest {
                 }
             }
         """)
+    )
+
+
+    @Test
+    fun varArgIsParameterizedNewClass() = rewriteRun(
+        java(
+            """
+            import java.util.*;
+
+            class Foo {
+                void something(List<Integer>... lists) {}
+                void somethingElse(Object[] o, List<Integer> s){}
+                void doSomething() {
+                    something(new ArrayList<Integer>(), new ArrayList<Integer>());
+                    something(new ArrayList<Integer>());
+                    somethingElse(new String[0], new ArrayList<Integer>());
+                }
+            }
+            """,
+            """
+            import java.util.*;
+
+            class Foo {
+                void something(List<Integer>... lists) {}
+                void somethingElse(Object[] o, List<Integer> s){}
+                void doSomething() {
+                    something(new ArrayList<>(), new ArrayList<>());
+                    something(new ArrayList<>());
+                    somethingElse(new String[0], new ArrayList<>());
+                }
+            }
+            """
+        )
     )
 
     @Suppress("rawtypes")
