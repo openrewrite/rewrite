@@ -2,12 +2,12 @@ package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
 
-class IdentifyDeadReposTest : XmlRecipeTest {
+class IdentifyUnreachableReposTest : XmlRecipeTest {
 
     // HTTPS yields "ambiguous"
     @Test
     fun `https maven glassfish dead repo` () = assertChanged(
-        recipe = IdentifyDeadRepos(),
+        recipe = IdentifyUnreachableRepos(),
         before = """
                 <project>
                     <repositories>
@@ -31,7 +31,7 @@ class IdentifyDeadReposTest : XmlRecipeTest {
                     <repositories>
                         <repository>
                             <id>central</id>
-                            <!--~~(ambiguous)~~>--><url>https://maven.glassfish.org/content/groups/public</url>
+                            <!--~~(replacement)~~>--><url>https://maven.glassfish.org/content/groups/public</url>
                         </repository>
                         <repository>
                             <id>spring-snapshots</id>
@@ -49,7 +49,7 @@ class IdentifyDeadReposTest : XmlRecipeTest {
     // HTTP yields "dead"
     @Test
     fun `http maven glassfish dead repo` () = assertChanged(
-        recipe = IdentifyDeadRepos(),
+        recipe = IdentifyUnreachableRepos(),
         before = """
                 <project>
                     <repositories>
@@ -73,7 +73,7 @@ class IdentifyDeadReposTest : XmlRecipeTest {
                     <repositories>
                         <repository>
                             <id>central</id>
-                            <!--~~(dead)~~>--><url>http://maven.glassfish.org/content/groups/public</url>
+                            <!--~~(replacement)~~>--><url>http://maven.glassfish.org/content/groups/public</url>
                         </repository>
                         <repository>
                             <id>spring-snapshots</id>
@@ -90,7 +90,7 @@ class IdentifyDeadReposTest : XmlRecipeTest {
 
     @Test
     fun removeNoDead() = assertUnchanged(
-        recipe = IdentifyDeadRepos(),
+        recipe = IdentifyUnreachableRepos(),
         before = """
                 <project>
                     <repositories>

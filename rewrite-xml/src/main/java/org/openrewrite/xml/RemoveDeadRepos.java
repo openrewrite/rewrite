@@ -1,13 +1,11 @@
 package org.openrewrite.xml;
 
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.xml.tree.Xml;
 
-public class IdentifyDeadRepos extends Recipe {
+public class RemoveDeadRepos extends Recipe {
 
     @Override
     public String getDisplayName() {
@@ -16,7 +14,7 @@ public class IdentifyDeadRepos extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove remote repositories that are not responding.";
+        return "Remove repos marked as dead in Maven POM files.";
     }
 
     @Override
@@ -28,23 +26,21 @@ public class IdentifyDeadRepos extends Recipe {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
-            HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-            if (t.getName().equals("url")) {
-                String url = t.getValue().orElse(null);
-                if (url != null) {
-                    try (HttpSender.Response response = httpSender.send(httpSender.get(url).build())) {
-                        if (!response.isSuccessful()) {
-                            // mark the repo url as "dead"
-                            t = t.withMarkers(t.getMarkers().searchResult("dead"));
+            Xml.Tag newTag = t;
+            if (t.getName().equals("repository")) {
+                newTag = t.getChild("url").flatMap(Xml.Tag::getValue).map(url -> {
+                    String urlKey = IdentifyUnreachableRepos.httpOrHttps(url);
+                    if (IdentifyUnreachableRepos.KNOWN_DEFUNCT.containsKey(urlKey)) {
+                        if (IdentifyUnreachableRepos.KNOWN_DEFUNCT.get(urlKey) == null) {
+                            return null;
                         }
-                    } catch (Exception e) {
-                        // mark the repo url as "ambiguous"
-                        t = t.withMarkers(t.getMarkers().searchResult("ambiguous"));
+                        return t.withChildValue("url", IdentifyUnreachableRepos.KNOWN_DEFUNCT.get(urlKey));
                     }
-
-                }
+                    return t;
+                }).orElse(t);
             }
-            return t;
+            return newTag;
         }
+
     }
 }

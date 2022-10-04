@@ -1,6 +1,5 @@
 package org.openrewrite.xml;
 
-import com.ibm.icu.impl.Trie;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.Recipe;
@@ -12,13 +11,23 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-public class IdentifyDeadRepos extends Recipe {
+public class IdentifyUnreachableRepos extends Recipe {
 
     public static final Map<String, String> KNOWN_DEFUNCT;
     static {
         Map<String, String> knownDefunct = new HashMap<>();
-        knownDefunct.put("maven.glassfish.org", "maven.java.net");
+        knownDefunct.put("maven.glassfish.org/content/groups/public", "https://maven.java.net");
         KNOWN_DEFUNCT = Collections.unmodifiableMap(knownDefunct);
+    }
+
+    protected static String httpOrHttps(String url) {
+        if (url.startsWith("http://")) {
+            return url.substring(7);
+        }
+        if (url.startsWith("https://")) {
+            return url.substring(8);
+        }
+        return url;
     }
 
     @Override
@@ -44,12 +53,13 @@ public class IdentifyDeadRepos extends Recipe {
             if (t.getName().equals("url")) {
                 String url = t.getValue().orElse(null);
                 if (url != null) {
-                    if (KNOWN_DEFUNCT.containsKey(url) && KNOWN_DEFUNCT.get(url) != null) {
+                    String urlKey = httpOrHttps(url);
+                    if (KNOWN_DEFUNCT.containsKey(urlKey)) {
                         // if we know of a replacement, mark it as "replacement"
-                        return t.withMarkers(t.getMarkers().searchResult("replacement"));
-                    }
-                    if (KNOWN_DEFUNCT.containsKey(url) && KNOWN_DEFUNCT.get(url) == null) {
-                        // if we know of a replacement, mark it as "replacement"
+                        if (KNOWN_DEFUNCT.get(urlKey) != null) {
+                            return t.withMarkers(t.getMarkers().searchResult("replacement"));
+                        }
+                        // otherwise, mark it as (potentially) "dead"
                         return t.withMarkers(t.getMarkers().searchResult("dead"));
                     }
                     try (HttpSender.Response response = httpSender.send(httpSender.get(url).build())) {
