@@ -17,21 +17,15 @@ package org.openrewrite.xml.security;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.List;
+import java.util.Objects;
 
 public class IsOwaspSuppressionsFile extends XmlIsoVisitor<ExecutionContext> {
 
     private static final String MATCHER = "https://jeremylong.github.io/DependencyCheck/dependency-suppression(.*?).xsd";
-
-    @Override
-    public void visit(@Nullable List<? extends Xml> nodes, ExecutionContext executionContext) {
-        super.visit(nodes, executionContext);
-    }
 
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
@@ -54,24 +48,13 @@ public class IsOwaspSuppressionsFile extends XmlIsoVisitor<ExecutionContext> {
             }
         }
         if (isOwaspSuppressionFile) {
-            return doc.withRoot(doc.getRoot().withMarkers(doc.getRoot().getMarkers().addIfAbsent(new FoundSuppressionMarker("Found it"))));
+            return doc.withRoot(doc.getRoot().withMarkers(doc.getRoot().getMarkers().addIfAbsent(new SearchResult(Tree.randomId(), "Found it") {
+                @Override
+                public boolean equals(Object obj) {
+                    return obj instanceof SearchResult && Objects.equals(((SearchResult) obj).getDescription(), getDescription());
+                }
+            })));
         }
         return doc;
-    }
-
-    @SuppressWarnings("ConstantConditions")
-    private static class FoundSuppressionMarker extends SearchResult {
-
-        public FoundSuppressionMarker(String description) {
-            super(Tree.randomId(), description);
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (!(obj instanceof FoundSuppressionMarker)) {
-                return false;
-            }
-            return getDescription().equals(((FoundSuppressionMarker) obj).getDescription());
-        }
     }
 }

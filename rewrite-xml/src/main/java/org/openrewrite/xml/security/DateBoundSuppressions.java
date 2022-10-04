@@ -80,12 +80,12 @@ public class DateBoundSuppressions extends Recipe {
                 }
                 if (!hasUntil) {
                     String date = untilDate != null ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
-                    newAttributes.add(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
-                            new Xml.Ident(Tree.randomId(), " ", Markers.EMPTY, "until"),
+                    newAttributes.add(autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
+                            new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
                             "",
-                            new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
+                            autoFormat(new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
                                     Xml.Attribute.Value.Quote.Double,
-                                    date + "Z")));
+                                    date + "Z"), ctx)), ctx));
                     return t.withAttributes(newAttributes);
                 }
             }
