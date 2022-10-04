@@ -22,7 +22,6 @@ import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
-import java.util.Objects;
 
 public class IsOwaspSuppressionsFile extends XmlIsoVisitor<ExecutionContext> {
 
@@ -49,12 +48,7 @@ public class IsOwaspSuppressionsFile extends XmlIsoVisitor<ExecutionContext> {
             }
         }
         if (isOwaspSuppressionFile) {
-            return doc.withRoot(doc.getRoot().withMarkers(doc.getRoot().getMarkers().addIfAbsent(new SearchResult(Tree.randomId(), "Found it") {
-                @Override
-                public boolean equals(Object obj) {
-                    return obj instanceof SearchResult && Objects.equals(((SearchResult) obj).getDescription(), getDescription());
-                }
-            })));
+            return doc.withRoot(doc.getRoot().withMarkers(doc.getRoot().getMarkers().addIfAbsent(new SearchResult(Tree.randomId(), "Found it"))));
         }
         return doc;
     }
