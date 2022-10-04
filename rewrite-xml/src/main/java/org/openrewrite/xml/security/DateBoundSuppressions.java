@@ -41,6 +41,7 @@ public class DateBoundSuppressions extends Recipe {
     @Override
     public String getDescription() {
         return "Adds an expiration date to all OWASP suppressions in order to ensure that they are periodically reviewed. " +
+                "For use with the OWASP `dependency-check` tool. " +
                 "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html";
     }
 
