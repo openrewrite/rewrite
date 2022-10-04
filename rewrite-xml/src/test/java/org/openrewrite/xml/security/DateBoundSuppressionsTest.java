@@ -29,20 +29,21 @@ public class DateBoundSuppressionsTest implements RewriteTest {
         rewriteRun(
                 spec -> spec.recipe(new DateBoundSuppressions("2020-01-01")),
                 xml("""
-                        <?xml version="1.0" encoding="UTF-8" ?>
-                        <suppressions>
-                            <suppress>
-                                <notes>
-                                </notes>
-                            </suppress>
-                        </suppressions>""", """
-                        <?xml version="1.0" encoding="UTF-8" ?>
-                        <suppressions>
-                            <suppress until="2020-01-01Z">
-                                <notes>
-                                </notes>
-                            </suppress>
-                        </suppressions>""")
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress>
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""", """
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="2020-01-01Z">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""",
+                        spec -> spec.path("suppressions.xml"))
         );
     }
 
@@ -54,20 +55,23 @@ public class DateBoundSuppressionsTest implements RewriteTest {
         rewriteRun(
                 spec -> spec.recipe(new DateBoundSuppressions(null)),
                 xml("""
-                        <?xml version="1.0" encoding="UTF-8" ?>
-                        <suppressions>
-                            <suppress>
-                                <notes>
-                                </notes>
-                            </suppress>
-                        </suppressions>""", "" +
-                        "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n" +
-                        "<suppressions>\n" +
-                        "    <suppress until=\"" + thirtyDaysFromNowString + "\">\n" +
-                        "        <notes>\n" +
-                        "        </notes>\n" +
-                        "    </suppress>\n" +
-                        "</suppressions>")
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress>
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""",
+                        """
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>"""
+                                .formatted(thirtyDaysFromNowString),
+                        spec -> spec.path("suppressions.xml"))
         );
     }
 }

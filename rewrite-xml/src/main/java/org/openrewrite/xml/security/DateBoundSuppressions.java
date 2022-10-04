@@ -17,10 +17,7 @@ package org.openrewrite.xml.security;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -30,7 +27,6 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -58,6 +54,16 @@ public class DateBoundSuppressions extends Recipe {
         return new DateBoundSuppressionsVisitor();
     }
 
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return new HasOwaspSuppressionsFile();
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new IsOwaspSuppressionsFile();
+    }
+
     private class DateBoundSuppressionsVisitor extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -74,10 +80,10 @@ public class DateBoundSuppressions extends Recipe {
                 }
                 if (!hasUntil) {
                     String date = untilDate != null ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
-                    newAttributes.add(new Xml.Attribute(UUID.randomUUID(), "", Markers.EMPTY,
-                            new Xml.Ident(UUID.randomUUID(), " ", Markers.EMPTY, "until"),
+                    newAttributes.add(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
+                            new Xml.Ident(Tree.randomId(), " ", Markers.EMPTY, "until"),
                             "",
-                            new Xml.Attribute.Value(UUID.randomUUID(), "", Markers.EMPTY,
+                            new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
                                     Xml.Attribute.Value.Quote.Double,
                                     date + "Z")));
                     return t.withAttributes(newAttributes);

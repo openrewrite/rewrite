@@ -16,6 +16,7 @@
 package org.openrewrite.xml.security;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.time.LocalDate;
@@ -23,6 +24,11 @@ import java.time.LocalDate;
 import static org.openrewrite.xml.Assertions.xml;
 
 class RemoveSuppressionsTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RemoveSuppressions());
+    }
 
     @Test
     void removesSuppressionsAtLeastOneDayAgo() {
@@ -33,18 +39,20 @@ class RemoveSuppressionsTest implements RewriteTest {
         String dayBeforeYesterdayString = dayBeforeYesterday + "Z";
 
         rewriteRun(
-                spec -> spec.recipe(new RemoveSuppressions()),
-                xml("" +
-                        "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n" +
-                        "<suppressions>\n" +
-                        "    <suppress until=\"" + dayBeforeYesterdayString + "\">\n" +
-                        "        <notes>\n" +
-                        "        </notes>\n" +
-                        "    </suppress>\n" +
-                        "</suppressions>", """
-                        <?xml version="1.0" encoding="UTF-8" ?>
-                        <suppressions>
-                        </suppressions>""")
+                xml("""
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>"""
+                                .formatted(dayBeforeYesterdayString),
+                        """
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                </suppressions>""",
+                        spec -> spec.path("suppressions.xml"))
         );
     }
 
@@ -57,29 +65,32 @@ class RemoveSuppressionsTest implements RewriteTest {
         String dayBeforeYesterdayString = dayBeforeYesterday.toString().substring(0, 10);
 
         rewriteRun(
-                spec -> spec.recipe(new RemoveSuppressions()),
-                xml("" +
-                        "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n" +
-                        "<suppressions>\n" +
-                        "    <suppress until=\"" + tomorrowString + "\">\n" +
-                        "        <notes>\n" +
-                        "        </notes>\n" +
-                        "    </suppress>\n" +
-                        "    <suppress until=\"" + dayBeforeYesterdayString + "\">\n" +
-                        "        <notes>\n" +
-                        "        </notes>\n" +
-                        "    </suppress>\n" +
-                        "</suppressions>", "" +
-                        "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n" +
-                        "<suppressions>\n" +
-                        "    <suppress until=\"" + tomorrowString + "\">\n" +
-                        "        <notes>\n" +
-                        "        </notes>\n" +
-                        "    </suppress>\n" +
-                        "</suppressions>")
+                xml(("""
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""")
+                                .formatted(tomorrowString, dayBeforeYesterdayString),
+                        """
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>"""
+                                .formatted(tomorrowString),
+                        spec -> spec.path("suppressions.xml"))
         );
     }
-    
+
     @Test
     void removesSuppressionsWithAndWithoutZ() {
         LocalDate today = LocalDate.now();
@@ -88,21 +99,24 @@ class RemoveSuppressionsTest implements RewriteTest {
         String dayBeforeYesterdayStringNoZ = dayBeforeYesterday.toString();
 
         rewriteRun(
-                spec -> spec.recipe(new RemoveSuppressions()),
-                xml("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n" +
-                        "<suppressions>\n" +
-                        "    <suppress until=\"" + dayBeforeYesterdayString + "\">\n" +
-                        "        <notes>\n" +
-                        "        </notes>\n" +
-                        "    </suppress>\n" +
-                        "    <suppress until=\"" + dayBeforeYesterdayStringNoZ + "\">\n" +
-                        "        <notes>\n" +
-                        "        </notes>\n" +
-                        "    </suppress>\n" +
-                        "</suppressions>", """
-                        <?xml version="1.0" encoding="UTF-8" ?>
-                        <suppressions>
-                        </suppressions>""")
+                xml(("""
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""")
+                                .formatted(dayBeforeYesterdayString, dayBeforeYesterdayStringNoZ),
+                        """
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                </suppressions>""",
+                        spec -> spec.path("suppressions.xml"))
         );
     }
 }

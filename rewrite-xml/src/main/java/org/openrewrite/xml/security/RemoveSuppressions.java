@@ -50,6 +50,16 @@ public class RemoveSuppressions extends Recipe {
         return new RemoveSuppressionsVisitor();
     }
 
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return new HasOwaspSuppressionsFile();
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new IsOwaspSuppressionsFile();
+    }
+
     private static class RemoveSuppressionsVisitor extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
