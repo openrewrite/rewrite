@@ -20,14 +20,14 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -59,37 +59,31 @@ public class RemoveSuppressions extends Recipe {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
-            if (t.getName().equals("suppressions") && t.getContent() != null) {
-                List<Content> newContent = new ArrayList<>();
-                List<? extends Content> contents = t.getContent();
-                for (Content content : contents) {
-                    boolean isPastDueSuppression = false;
-                    if (content instanceof Xml.Tag) {
-                        Xml.Tag child = (Xml.Tag) content;
-                        if (child.getName().equals("suppress")) {
-                            for (Xml.Attribute attribute : child.getAttributes()) {
-                                if (attribute.getKeyAsString().equals("until")) {
-                                    String maybeDate = attribute.getValueAsString();
-                                    if (maybeDate.endsWith("Z")) {
-                                        maybeDate = maybeDate.substring(0, maybeDate.length() - 1);
-                                    }
-                                    LocalDate date = LocalDate.parse(maybeDate);
-                                    if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
-                                        isPastDueSuppression = true;
-                                    }
-                                }
+            if (!new XPathMatcher("/suppressions").matches(getCursor()) || t.getContent() == null) {
+                return t;
+            }
+            return t.withContent(ListUtils.flatMap(t.getContent(), (i, c) -> isPastDueSuppression(c) ? null : c));
+        }
+
+        private boolean isPastDueSuppression(Content content) {
+            if (content instanceof Xml.Tag) {
+                Xml.Tag child = (Xml.Tag) content;
+                if (child.getName().equals("suppress")) {
+                    for (Xml.Attribute attribute : child.getAttributes()) {
+                        if (attribute.getKeyAsString().equals("until")) {
+                            String maybeDate = attribute.getValueAsString();
+                            if (maybeDate.endsWith("Z")) {
+                                maybeDate = maybeDate.substring(0, maybeDate.length() - 1);
+                            }
+                            LocalDate date = LocalDate.parse(maybeDate);
+                            if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
+                                return true;
                             }
                         }
                     }
-                    if (!isPastDueSuppression) {
-                        newContent.add(content);
-                    }
-                }
-                if (newContent.size() != contents.size()) {
-                    t = t.withContent(newContent);
                 }
             }
-            return t;
+            return false;
         }
     }
 

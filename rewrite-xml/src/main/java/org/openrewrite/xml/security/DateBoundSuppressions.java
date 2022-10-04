@@ -18,14 +18,15 @@ package org.openrewrite.xml.security;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
 
 @Value
@@ -63,25 +64,22 @@ public class DateBoundSuppressions extends Recipe {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
-            if (t.getName().equals("suppress")) {
+            if (new XPathMatcher("/suppressions/suppress").matches(getCursor())) {
                 boolean hasUntil = false;
                 List<Xml.Attribute> attributes = t.getAttributes();
-                List<Xml.Attribute> newAttributes = new ArrayList<>();
                 for (Xml.Attribute attribute : attributes) {
                     if (attribute.getKeyAsString().equals("until")) {
                         hasUntil = true;
                     }
-                    newAttributes.add(attribute);
                 }
                 if (!hasUntil) {
                     String date = untilDate != null ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
-                    newAttributes.add(autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
+                    return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
                             new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
                             "",
                             autoFormat(new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
                                     Xml.Attribute.Value.Quote.Double,
-                                    date + "Z"), ctx)), ctx));
-                    return t.withAttributes(newAttributes);
+                                    date + "Z"), ctx)), ctx)));
                 }
             }
             return t;
