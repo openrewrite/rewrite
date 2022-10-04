@@ -16,7 +16,7 @@ public class IdentifyUnreachableRepos extends Recipe {
     public static final Map<String, String> KNOWN_DEFUNCT;
     static {
         Map<String, String> knownDefunct = new HashMap<>();
-        knownDefunct.put("maven.glassfish.org/content/groups/public", "https://maven.java.net");
+        knownDefunct.put("maven.glassfish.org/content/groups/public", "maven.java.net");
         KNOWN_DEFUNCT = Collections.unmodifiableMap(knownDefunct);
     }
 

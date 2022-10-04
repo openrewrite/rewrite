@@ -34,7 +34,7 @@ public class RemoveDeadRepos extends Recipe {
                         if (IdentifyUnreachableRepos.KNOWN_DEFUNCT.get(urlKey) == null) {
                             return null;
                         }
-                        return t.withChildValue("url", IdentifyUnreachableRepos.KNOWN_DEFUNCT.get(urlKey));
+                        return t.withChildValue("url", "https://" + IdentifyUnreachableRepos.KNOWN_DEFUNCT.get(urlKey));
                     }
                     return t;
                 }).orElse(t);
