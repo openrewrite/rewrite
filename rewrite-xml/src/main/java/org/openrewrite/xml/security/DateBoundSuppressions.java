@@ -46,6 +46,7 @@ public class DateBoundSuppressions extends Recipe {
     }
 
     @Option(displayName = "Until date",
+            required = false,
             description = "Optional. The date to add to the suppression. Default will be 30 days from today.",
             example = "2023-01-01")
     @Nullable
