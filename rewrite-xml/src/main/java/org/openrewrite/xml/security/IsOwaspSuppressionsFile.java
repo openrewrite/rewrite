@@ -21,6 +21,7 @@ import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Paths;
 import java.util.Objects;
 
 public class IsOwaspSuppressionsFile extends XmlIsoVisitor<ExecutionContext> {
@@ -30,7 +31,7 @@ public class IsOwaspSuppressionsFile extends XmlIsoVisitor<ExecutionContext> {
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
         Xml.Document doc = super.visitDocument(document, executionContext);
-        if (doc.getRoot() == null) {
+        if (!doc.getSourcePath().equals(Paths.get("suppressions.xml")) || doc.getRoot() == null) {
             return doc;
         }
         Xml.Tag root = doc.getRoot();

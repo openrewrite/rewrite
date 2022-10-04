@@ -51,11 +51,6 @@ public class RemoveSuppressions extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new HasOwaspSuppressionsFile();
-    }
-
-    @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new IsOwaspSuppressionsFile();
     }

@@ -111,4 +111,94 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void noChangesIfNoSuppressionsFile() {
+        rewriteRun(
+                xml("""
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        spec -> spec.path("soppressata.xml")
+                )
+        );
+    }
+
+    @Test
+    void changesIfSuppressionsFile() {
+        rewriteRun(
+                xml("""
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        """
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <!--~~(Found it)~~>--><suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        spec -> spec.path("suppressions.xml")
+                )
+        );
+    }
+
+    @Test
+    void doesntChangeIfNotAtRoot() {
+        rewriteRun(
+                xml("""
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        spec -> spec.path("not/root/suppressions.xml")
+                )
+        );
+    }
+
+    @Test
+    void onlyChangesRoot() {
+        rewriteRun(
+                xml("""
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        spec -> spec.path("not/root/suppressions.xml")
+                ),
+                xml("""
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        """
+                        <?xml version="1.0" encoding="UTF-8" ?>
+                        <!--~~(Found it)~~>--><suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.2.4.xsd">
+                            <suppress>
+                                <notes>
+                                </notes>
+                            </suppress>
+                        </suppressions>""",
+                        spec -> spec.path("suppressions.xml")
+                )
+        );
+    }
 }
