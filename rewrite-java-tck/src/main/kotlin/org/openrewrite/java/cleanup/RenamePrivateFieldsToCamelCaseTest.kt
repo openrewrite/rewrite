@@ -16,55 +16,53 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = RenamePrivateFieldsToCamelCase()
-
+interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(RenamePrivateFieldsToCamelCase())
+    }
+    
     @Test
-    fun doNotChangeStaticImports(jp: JavaParser) = assertUnchanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun doNotChangeStaticImports() = rewriteRun(
+        java("""
             class B {
                 public static int _staticImport_ = 0;
             }
         """),
-        before = """
+        java("""
             import static B._staticImport_;
 
             class Test {
                 private int member = _staticImport_;
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotChangeInheritedFields(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun doNotChangeInheritedFields() = rewriteRun(
+        java("""
             class A {
                 public int _inheritedField_ = 0;
             }
         """),
-        before = """
+        java("""
             class Test extends A {
                 private int _inheritedField_ = super._inheritedField_;
             }
         """,
-        after = """
+        """
             class Test extends A {
                 private int inheritedField = super._inheritedField_;
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotChangeIfToNameExists(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotChangeIfToNameExists() = rewriteRun(
+        java("""
             class Test {
                 int test_value;
 
@@ -72,13 +70,12 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     return test_value + testValue;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotChangeExistsInOnlyOneMethod(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotChangeExistsInOnlyOneMethod() = rewriteRun(
+       java("""
             class Test {
                 private int DoNoTChange;
                 
@@ -89,13 +86,12 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     return DoNoTChange + 10;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun renamePrivateMembers(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renamePrivateMembers() = rewriteRun(
+       java("""
             class Test {
                 private int DoChange = 10;
                 public int DoNotChangePublicMember;
@@ -114,7 +110,7 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 private int doChange = 10;
                 public int DoNotChangePublicMember;
@@ -132,18 +128,17 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     return doChange * 3;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun renameWithFieldAccess(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun renameWithFieldAccess() = rewriteRun(
+       java("""
             class ClassWithPublicField {
                 public int publicField = 10;
             }
         """),
-        before = """
+        java("""
             class Test {
                 private ClassWithPublicField DoChange = new ClassWithPublicField();
 
@@ -152,7 +147,7 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 private ClassWithPublicField doChange = new ClassWithPublicField();
 
@@ -160,13 +155,12 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     return doChange.publicField;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotRenameInnerClassesMembers(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotRenameInnerClassesMembers() = rewriteRun(
+       java("""
             class Test {
                 private int test = new InnerClass().DoNotChange + new InnerClass().DoNotChange2;
                 
@@ -175,13 +169,12 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     private int DoNotChange2 = 10;
                 }
             }
-        """
+       """)
     )
 
     @Test
-    fun renameUsageInInnerClasses(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renameUsageInInnerClasses() = rewriteRun(
+        java("""
             class Test {
                 private int DoChange = 10;
                 
@@ -190,7 +183,7 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 private int doChange = 10;
                 
@@ -198,16 +191,15 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     private int test = doChange + 1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotRenameAnonymousInnerClasses(jp: JavaParser) = assertUnchanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun doNotRenameAnonymousInnerClasses() = rewriteRun(
+        java("""
                 interface Book{}
             """),
-        before = """
+        java("""
                 class B (){
                     B(){
                         new Book() {
@@ -220,13 +212,12 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                         };
                     }
                 }
-        """
+        """)
     )
 
     @Test
-    fun handleStaticMethods(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun handleStaticMethods() = rewriteRun(
+       java("""
                 class A (){
                     private int _variable;
                     public static A getInstance(){
@@ -236,7 +227,7 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     }
                 }
         """,
-        after = """
+        """
                 class A (){
                     private int variable;
                     public static A getInstance(){
@@ -245,32 +236,30 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                         return a;
                     }
                 }
-        """
+        """)
     )
 
     @Test
-    fun renameFinalMembers(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renameFinalMembers() = rewriteRun(
+        java("""
                 class A (){
                     private final int _final_variable;
                     private static int _static_variable;
                     private static final int DO_NOT_CHANGE;
                 }
         """,
-        after = """
+        """
                 class A (){
                     private final int finalVariable;
                     private static int staticVariable;
                     private static final int DO_NOT_CHANGE;
                 }
-        """
+        """)
     )
 
     @Test
-    fun doNotChangeWhenSameMethodParam(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotChangeWhenSameMethodParam() = rewriteRun(
+        java("""
                 class A (){
                     private int _variable;
                     public void getInstance(int _variable){
@@ -278,11 +267,11 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     }
                 }
         """)
+    )
 
     @Test
-    fun renameWhenSameMethodExists(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renameWhenSameMethodExists() = rewriteRun(
+        java("""
                 class A (){
                     private boolean _hasMethod;
                     public boolean hasMethod(){
@@ -290,13 +279,13 @@ interface RenamePrivateFieldsToCamelCaseTest : JavaRecipeTest {
                     }
                 }
         """,
-        after = """
+        """
                 class A (){
                     private boolean hasMethod;
                     public boolean hasMethod(){
                         return hasMethod;
                     }
                 }
-        """
+        """)
     )
 }
