@@ -348,7 +348,7 @@ public interface Xml extends Tree {
         }
 
         /**
-         * Locate an child tag with the given name and set its text value.
+         * Locate a child tag with the given name and set its text value.
          *
          * @param childName The child tag to locate. This assumes there is one and only one.
          * @param text      The text value to set.
