@@ -48,7 +48,11 @@ public class CategoryTreeTest {
 
     @Test
     void print() {
-        System.out.println(categoryTree.print(false, false));
+        System.out.println(categoryTree.print(CategoryTree.PrintOptions.builder()
+                .omitCategoryRoots(false)
+                .omitEmptyCategories(false)
+                .nameStyle(CategoryTree.PrintNameStyle.DISPLAY_NAME)
+                .build()));
     }
 
     @Test

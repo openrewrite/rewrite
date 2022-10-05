@@ -15,14 +15,17 @@
  */
 package org.openrewrite.config;
 
+import lombok.Value;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.config.CategoryTree.PrintNameStyle.ID;
 
 /**
  * A hierarchical listing of recipe categories and the recipes that are contained inside them.
@@ -62,7 +65,7 @@ public class CategoryTree<G> {
 
     public static class Root<G> extends CategoryTree<G> {
         private static final CategoryDescriptor ROOT_DESCRIPTOR = new CategoryDescriptor(
-                "Root", "", "", emptySet(), true, true);
+                "ε", "", "", emptySet(), true, true);
 
         private Root() {
             super();
@@ -109,9 +112,9 @@ public class CategoryTree<G> {
             return "CategoryTree{ROOT}";
         }
 
-        public String print(boolean omitCategoryRoots, boolean omitEmptyCategories) {
+        public String print(PrintOptions printOptions) {
             StringJoiner out = new StringJoiner("\n");
-            toString(out, 0, omitCategoryRoots, omitEmptyCategories, new BitSet());
+            toString(out, 0, printOptions, new BitSet());
             return out.toString();
         }
     }
@@ -330,6 +333,9 @@ public class CategoryTree<G> {
 
     public Collection<RecipeDescriptor> getRecipes() {
         synchronized (lock) {
+            if (!subtrees.isEmpty()) {
+                return emptyList();
+            }
             return getRecipesByGroup().values().stream()
                     .flatMap(Collection::stream)
                     .distinct()
@@ -417,27 +423,46 @@ public class CategoryTree<G> {
         return "CategoryTree{packageName=" + getDescriptor().getPackageName() + "}";
     }
 
-    void toString(StringJoiner out, int level, boolean omitCategoryRoots,
-                  boolean omitEmptyCategories, BitSet lastCategoryMask) {
+    void toString(StringJoiner out,
+                  int level,
+                  PrintOptions printOptions,
+                  BitSet lastCategoryMask) {
         CategoryDescriptor descriptor = getDescriptor();
-        if (!omitCategoryRoots || !descriptor.isRoot()) {
+        if (!printOptions.isOmitCategoryRoots() || !descriptor.isRoot()) {
             StringBuilder line = new StringBuilder();
             printTreeLines(line, level, lastCategoryMask);
             if (level > 0) {
                 line.append("|-");
             }
-            line.append(descriptor.isRoot() ? "√" : "\uD83D\uDCC1")
-                    .append(descriptor.getPackageName().isEmpty() ? "ε" : descriptor.getPackageName());
+            line.append(descriptor.isRoot() ? "√" : "\uD83D\uDCC1");
+            String packageName = descriptor.getPackageName().isEmpty() ? "ε" : descriptor.getPackageName();
+            switch(printOptions.getNameStyle()) {
+                case DISPLAY_NAME:
+                    line.append(descriptor.getDisplayName());
+                    break;
+                case ID:
+                    line.append(packageName);
+                    break;
+                case BOTH:
+                    if(descriptor.getPackageName().isEmpty()) {
+                        line.append(packageName);
+                    } else {
+                        line.append(descriptor.getDisplayName()).append(" (").append(packageName).append(')');
+                    }
+                    break;
+            }
             out.add(line);
         }
-        Collection<CategoryTree<G>> categories = getCategories(omitCategoryRoots, omitEmptyCategories);
+        Collection<CategoryTree<G>> categories = getCategories(printOptions.isOmitCategoryRoots(),
+                printOptions.isOmitEmptyCategories());
         int i = 0;
         for (CategoryTree<G> subtree : categories) {
             if (++i == categories.size()) {
                 lastCategoryMask.set(level, true);
             }
-            subtree.toString(out, descriptor.isRoot() && omitCategoryRoots ? level : level + 1,
-                    omitCategoryRoots, omitEmptyCategories, (BitSet) lastCategoryMask.clone());
+            subtree.toString(out,
+                    descriptor.isRoot() && printOptions.isOmitCategoryRoots() ? level : level + 1,
+                    printOptions, (BitSet) lastCategoryMask.clone());
         }
 
         lastCategoryMask.set(level, true);
@@ -446,7 +471,17 @@ public class CategoryTree<G> {
             StringBuilder line = new StringBuilder();
             printTreeLines(line, level, lastCategoryMask);
             line.append("|-\uD83E\uDD16");
-            line.append(recipe.getName());
+            switch(printOptions.getNameStyle()) {
+                case DISPLAY_NAME:
+                    line.append(recipe.getDisplayName());
+                    break;
+                case ID:
+                    line.append(recipe.getName());
+                    break;
+                case BOTH:
+                    line.append(recipe.getDisplayName()).append(" (").append(recipe.getName()).append(')');
+                    break;
+            }
             out.add(line);
         }
     }
@@ -457,6 +492,55 @@ public class CategoryTree<G> {
                 line.append("   ");
             } else {
                 line.append("│  ");
+            }
+        }
+    }
+
+    public enum PrintNameStyle {
+        DISPLAY_NAME,
+        ID,
+        BOTH;
+    }
+
+    @Value
+    public static class PrintOptions {
+        int maxDepth;
+        boolean omitCategoryRoots;
+        boolean omitEmptyCategories;
+        PrintNameStyle nameStyle;
+
+        public static Builder builder() {
+            return new Builder();
+        }
+
+        public static class Builder {
+            private int maxDepth = Integer.MAX_VALUE;
+            private boolean omitCategoryRoots = true;
+            private boolean omitEmptyCategories = true;
+            private PrintNameStyle nameStyle = ID;
+
+            public Builder maxDepth(int maxDepth) {
+                this.maxDepth = maxDepth;
+                return this;
+            }
+
+            public Builder omitCategoryRoots(boolean omitCategoryRoots) {
+                this.omitCategoryRoots = omitCategoryRoots;
+                return this;
+            }
+
+            public Builder omitEmptyCategories(boolean omitEmptyCategories) {
+                this.omitEmptyCategories = omitEmptyCategories;
+                return this;
+            }
+
+            public Builder nameStyle(PrintNameStyle nameStyle) {
+                this.nameStyle = nameStyle;
+                return this;
+            }
+
+            public PrintOptions build() {
+                return new PrintOptions(maxDepth, omitCategoryRoots, omitEmptyCategories, nameStyle);
             }
         }
     }
