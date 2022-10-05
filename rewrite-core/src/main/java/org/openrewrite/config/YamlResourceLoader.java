@@ -15,12 +15,15 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
@@ -29,8 +32,8 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -139,7 +142,7 @@ public class YamlResourceLoader implements ResourceLoader {
     private Collection<Map<String, Object>> loadResources(ResourceType resourceType) {
         Collection<Map<String, Object>> resources = new ArrayList<>();
 
-        Yaml yaml = new Yaml(new SafeConstructor());
+        Yaml yaml = new Yaml(new LoaderOptions());
         for (Object resource : yaml.loadAll(yamlSource)) {
             if (resource instanceof Map) {
                 @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
@@ -158,12 +161,17 @@ public class YamlResourceLoader implements ResourceLoader {
         return loadResources(ResourceType.Recipe).stream()
                 .filter(r -> r.containsKey("name"))
                 .map(r -> {
-                    String name = (String) r.get("name");
+                    @Language("markdown") String name = (String) r.get("name");
+
+                    @Language("markdown")
                     String displayName = (String) r.get("displayName");
                     if (displayName == null) {
                         displayName = name;
                     }
+
+                    @Language("markdown")
                     String description = (String) r.get("description");
+
                     Set<String> tags = Collections.emptySet();
                     List<String> rawTags = (List<String>) r.get("tags");
                     if (rawTags != null) {
@@ -172,7 +180,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
                     Duration estimatedEffortPerOccurrence = null;
-                    if(estimatedEffortPerOccurrenceStr != null) {
+                    if (estimatedEffortPerOccurrenceStr != null) {
                         estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
                     }
                     DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
@@ -310,18 +318,34 @@ public class YamlResourceLoader implements ResourceLoader {
     @Override
     public Collection<CategoryDescriptor> listCategoryDescriptors() {
         return loadResources(ResourceType.Category).stream()
-                .filter(r -> r.containsKey("name") && r.containsKey("packageName"))
+                .filter(r -> r.containsKey("packageName"))
                 .map(c -> {
+                    @Language("markdown")
                     String name = (String) c.get("name");
+
+                    @Language("markdown")
                     String packageName = (String) c.get("packageName");
+                    if (packageName.endsWith("." + CategoryTree.CORE) ||
+                            packageName.contains("." + CategoryTree.CORE + ".")) {
+                        throw new IllegalArgumentException("The package name 'core' is reserved.");
+                    }
+
+                    if (name == null) {
+                        name = packageName;
+                    }
+
+                    @Language("markdown")
                     String description = (String) c.get("description");
+
                     Set<String> tags = Collections.emptySet();
                     @SuppressWarnings("unchecked")
                     List<String> rawTags = (List<String>) c.get("tags");
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
                     }
-                    return new CategoryDescriptor(name, packageName, description, tags);
+
+                    boolean root = c.containsKey("root") && (Boolean) c.get("root");
+                    return new CategoryDescriptor(name, packageName, description, tags, root, false);
                 })
                 .collect(toList());
     }

@@ -61,7 +61,7 @@ public class FindDeprecatedClasses extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find uses of deprecated classes, optionally ignoring those classes that are inside of deprecated scopes.";
+        return "Find uses of deprecated classes, optionally ignoring those classes that are inside deprecated scopes.";
     }
 
     @Override

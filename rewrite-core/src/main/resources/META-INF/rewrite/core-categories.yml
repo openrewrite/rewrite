@@ -17,3 +17,15 @@
 type: specs.openrewrite.org/v1beta/category
 name: OpenRewrite
 packageName: org.openrewrite
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: io
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: com
+root: true
+---
+type: specs.openrewrite.org/v1beta/category
+packageName: org
+root: true

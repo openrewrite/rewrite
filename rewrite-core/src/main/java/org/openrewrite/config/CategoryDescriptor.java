@@ -16,15 +16,23 @@
 package org.openrewrite.config;
 
 import lombok.Value;
-import org.openrewrite.Incubating;
+import lombok.With;
+import org.intellij.lang.annotations.Language;
 
 import java.util.Set;
 
-@Incubating(since = "7.7.0")
 @Value
+@With
 public class CategoryDescriptor {
+    @Language("markdown")
     String displayName;
+
     String packageName;
+
+    @Language("markdown")
     String description;
+
     Set<String> tags;
+    boolean root;
+    boolean synthetic;
 }

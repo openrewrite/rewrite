@@ -76,7 +76,7 @@ class SemanticallyEqualTest {
     }
 
     @Test
-    fun `Comments inside of or around tags don't matter for semantic equality`() {
+    fun `Comments inside or around tags don't matter for semantic equality`() {
         assertSemanticEquality(
             """
                 <foo>

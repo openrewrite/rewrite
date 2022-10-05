@@ -15,60 +15,157 @@
  */
 package org.openrewrite.config;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
-import java.util.stream.Stream;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
 
 /**
- * A hierarchical listing of recipe categories and the recipes that are contained inside of them.
+ * A hierarchical listing of recipe categories and the recipes that are contained inside them.
+ *
+ * @param <G> A grouping key that can cross category boundaries. Must implement {@link Object#equals} and {@link Object#hashCode},
+ *            but there is otherwise no restriction on the type. For example, a grouping key could be a {@link String} that represents
+ *            a GAV coordinate of a recipe artifact that contributes recipes to multiple categories.
  */
 public class CategoryTree<G> {
-    private final Object lock = new Object();
+    /**
+     * This is a synthetic category used so that a category's children are either all subcategories or all recipes,
+     * and never a mixture of both.
+     */
+    static final String CORE = "core";
 
-    private final CategoryDescriptor descriptor;
+    final Object lock = new Object();
+
+    /**
+     * Groups contributing information about a category. This information is not merged together,
+     * so the last group explicitly contributing information about a category controls its details.
+     * Should that group ever be removed, it will be popped from this stack, revealing category details
+     * from the next group in line.
+     */
+    private final List<G> groups = new ArrayList<>(3);
+
     private final Collection<CategoryTree<G>> subtrees = new ArrayList<>();
-    private Map<G, Collection<RecipeDescriptor>> recipesByGroup = new HashMap<>();
+    private final Map<G, CategoryDescriptor> descriptorsByGroup = new HashMap<>();
+    private final Map<G, Collection<RecipeDescriptor>> recipesByGroup = new HashMap<>();
 
-    private CategoryTree(CategoryDescriptor descriptor) {
-        this.descriptor = descriptor;
+    CategoryTree() {
     }
 
-    public static <G> CategoryTree<G> build() {
-        return new CategoryTree<>(new CategoryDescriptor("Root", "", "", emptySet()));
+    private CategoryTree(G group, CategoryDescriptor descriptor) {
+        descriptorsByGroup.put(group, descriptor);
+        groups.add(group);
+    }
+
+    public static class Root<G> extends CategoryTree<G> {
+        private static final CategoryDescriptor ROOT_DESCRIPTOR = new CategoryDescriptor(
+                "Root", "", "", emptySet(), true, true);
+
+        private Root() {
+            super();
+        }
+
+        public CategoryTree.Root<G> removeAll(G group) {
+            // increase visibility and cast
+            return (Root<G>) super.removeAll(group);
+        }
+
+        public CategoryTree.Root<G> putAll(G group, Environment environment) {
+            synchronized (lock) {
+                return removeAll(group)
+                        .putRecipes(group, environment.listRecipeDescriptors().toArray(new RecipeDescriptor[0]))
+                        .putCategories(group, environment.listCategoryDescriptors().toArray(new CategoryDescriptor[0]));
+            }
+        }
+
+        public CategoryTree.Root<G> putRecipes(G group, RecipeDescriptor... recipes) {
+            synchronized (lock) {
+                for (RecipeDescriptor recipe : recipes) {
+                    addRecipe(group, recipe);
+                }
+            }
+            return this;
+        }
+
+        public synchronized CategoryTree.Root<G> putCategories(G group, CategoryDescriptor... categories) {
+            synchronized (lock) {
+                for (CategoryDescriptor category : categories) {
+                    findOrAddCategory(group, category);
+                }
+            }
+            return this;
+        }
+
+        @Override
+        public CategoryDescriptor getDescriptor() {
+            return ROOT_DESCRIPTOR;
+        }
+
+        @Override
+        public String toString() {
+            return "CategoryTree{ROOT}";
+        }
+
+        public String print(boolean omitCategoryRoots, boolean omitEmptyCategories) {
+            StringJoiner out = new StringJoiner("\n");
+            toString(out, 0, omitCategoryRoots, omitEmptyCategories, new BitSet());
+            return out.toString();
+        }
+    }
+
+    public static <G> CategoryTree.Root<G> build() {
+        return new CategoryTree.Root<>();
     }
 
     public CategoryDescriptor getDescriptor() {
-        return descriptor;
+        CategoryDescriptor categoryDescriptor = null;
+        for (G group : groups) {
+            categoryDescriptor = descriptorsByGroup.get(group);
+            if (!categoryDescriptor.isSynthetic()) {
+                return categoryDescriptor;
+            }
+        }
+
+        if (categoryDescriptor == null) {
+            throw new IllegalStateException("Unable to find a descriptor for category. This represents " +
+                                            "a bug in CategoryTree, since it should never occur.");
+        }
+
+        return categoryDescriptor;
     }
 
     public Integer getRecipeCount() {
-        return recipesByGroup.values().stream().mapToInt(Collection::size).sum() +
-                subtrees.stream().mapToInt(CategoryTree::getRecipeCount).sum();
+        int sum = 0;
+        for (Collection<RecipeDescriptor> recipeDescriptors : getRecipesByGroup().values()) {
+            sum += recipeDescriptors.size();
+        }
+        for (CategoryTree<G> subtree : subtrees) {
+            sum += subtree.getRecipeCount();
+        }
+        return sum;
     }
 
     @Nullable
     public CategoryTree<G> getCategory(String subcategory) {
-        String packageName = descriptor.getPackageName();
+        String packageName = getDescriptor().getPackageName();
         synchronized (lock) {
-            if ("core".equals(subcategory) && !recipesByGroup.isEmpty()) {
-                return syntheticCore();
-            }
-
-            for (CategoryTree<G> t : subtrees) {
+            String[] split = subcategory.split("\\.", 2);
+            for (CategoryTree<G> t : getCategories(false, true)) {
                 String tPackage = t.getDescriptor().getPackageName();
                 int endIndex = tPackage.indexOf('.', packageName.length() + 1);
                 String test = tPackage.substring(
                         packageName.isEmpty() ? 0 : packageName.length() + 1,
                         endIndex < 0 ? tPackage.length() : endIndex
                 );
-                if (subcategory.equals(test)) {
-                    return t;
+                if (split[0].equals(test)) {
+                    if (split.length == 1) {
+                        return t;
+                    } else {
+                        return t.getCategory(split[1]);
+                    }
                 }
             }
         }
@@ -91,7 +188,7 @@ public class CategoryTree<G> {
         CategoryTree<G> subtree = getCategory(subcategory);
         if (subtree == null) {
             throw new IllegalArgumentException("No subcategory of " +
-                    descriptor.getPackageName() + " named '" + subcategory + "'");
+                                               getDescriptor().getPackageName() + " named '" + subcategory + "'");
         }
         return subtree;
     }
@@ -99,7 +196,9 @@ public class CategoryTree<G> {
     public CategoryTree<G> getCategoryOrThrow(String... subcategories) {
         CategoryTree<G> acc = this;
         for (String subcategory : subcategories) {
-            acc = acc.getCategoryOrThrow(subcategory);
+            for (String subsubcategory : subcategory.split("\\.")) {
+                acc = acc.getCategoryOrThrow(subsubcategory);
+            }
         }
         return acc;
     }
@@ -111,12 +210,14 @@ public class CategoryTree<G> {
             CategoryTree<G> subcategory = getCategory(split[0]);
             return subcategory == null ? null : subcategory.getRecipe(split[1]);
         }
-
-        return recipesByGroup.values().stream()
-                .flatMap(Collection::stream)
-                .filter(r -> r.getName().substring(r.getName().lastIndexOf('.') + 1).equals(id))
-                .findAny()
-                .orElse(null);
+        for (Collection<RecipeDescriptor> recipeDescriptors : recipesByGroup.values()) {
+            for (RecipeDescriptor r : recipeDescriptors) {
+                if (r.getName().substring(r.getName().lastIndexOf('.') + 1).equals(id)) {
+                    return r;
+                }
+            }
+        }
+        return null;
     }
 
     @Nullable
@@ -126,76 +227,98 @@ public class CategoryTree<G> {
             CategoryTree<G> subcategory = getCategory(split[0]);
             return subcategory == null ? null : subcategory.getRecipeGroup(split[1]);
         }
-
-        return recipesByGroup.entrySet().stream()
-                .filter(g -> g.getValue().stream().anyMatch(r -> r.getName().substring(r.getName().lastIndexOf('.') + 1).equals(id)))
-                .map(Map.Entry::getKey)
-                .findAny()
-                .orElse(null);
-    }
-
-    public CategoryTree<G> putAll(G group, Environment environment) {
-        return putAll(group, environment.listRecipeDescriptors(), environment.listCategoryDescriptors());
-    }
-
-    public CategoryTree<G> putAll(G group, Iterable<RecipeDescriptor> recipes, Iterable<CategoryDescriptor> categories) {
-        synchronized (lock) {
-            removeAll(group);
-            for (RecipeDescriptor recipe : recipes) {
-                add(group, recipe, categories);
+        for (Map.Entry<G, Collection<RecipeDescriptor>> g : recipesByGroup.entrySet()) {
+            for (RecipeDescriptor r : g.getValue()) {
+                if (r.getName().substring(r.getName().lastIndexOf('.') + 1).equals(id)) {
+                    return g.getKey();
+                }
             }
         }
-        return this;
+        return null;
     }
 
-    private void add(G group, RecipeDescriptor recipe, Iterable<CategoryDescriptor> categories) {
+    CategoryTree<G> findOrAddCategory(G group, CategoryDescriptor category) {
+        String packageName = getDescriptor().getPackageName();
+        String categoryPackage = category.getPackageName();
+
+        // same category with a potentially different descriptor coming from this group
+        if (categoryPackage.equals(packageName)) {
+            if (!groups.contains(group)) {
+                groups.add(0, group);
+
+                // might be synthetic, but it's the first so add it
+                descriptorsByGroup.put(group, category);
+            }
+            if (!category.isSynthetic()) {
+                // replace a potentially synthetic descriptor with a real one
+                descriptorsByGroup.put(group, category);
+            }
+            return this;
+        }
+
+        // subcategory of this category
+        if (packageName.isEmpty() || (categoryPackage.startsWith(packageName + ".") &&
+                                      categoryPackage.charAt(packageName.length()) == '.')) {
+            for (CategoryTree<G> subtree : subtrees) {
+                String subtreePackage = subtree.getDescriptor().getPackageName();
+                if (subtreePackage.equals(categoryPackage) || categoryPackage.startsWith(subtreePackage + ".")) {
+                    return subtree.findOrAddCategory(group, category);
+                }
+            }
+
+            String subpackage = packageName.isEmpty() ?
+                    category.getPackageName() :
+                    category.getPackageName().substring(packageName.length() + 1);
+            if (subpackage.contains(".")) {
+                String displayName = subpackage.substring(0, subpackage.indexOf('.'));
+
+                StringJoiner intermediatePackage = new StringJoiner(".");
+                if (!packageName.isEmpty()) {
+                    intermediatePackage.add(packageName);
+                }
+                intermediatePackage.add(displayName);
+
+                return findOrAddCategory(group, new CategoryDescriptor(
+                        StringUtils.capitalize(displayName),
+                        intermediatePackage.toString(),
+                        "",
+                        emptySet(),
+                        false,
+                        true
+                )).findOrAddCategory(group, category);
+            }
+
+            // a direct subcategory of this category
+            CategoryTree<G> subtree = new CategoryTree<>(group, category);
+            subtrees.add(subtree);
+            return subtree;
+        } else {
+            throw new IllegalStateException("Attempted to add a category with package '" +
+                                            category.getPackageName() + "' as a subcategory of '" +
+                                            packageName + "'. This represents a bug in CategoryTree, as " +
+                                            "it should not be possible to add a category to a CategoryTree root " +
+                                            "that cannot be placed somewhere in the tree.");
+        }
+    }
+
+    void addRecipe(G group, RecipeDescriptor recipe) {
         String category = recipe.getName().substring(0, recipe.getName().lastIndexOf('.'));
-        String packageName = descriptor.getPackageName();
-        if (category.equals(packageName)) {
-            recipesByGroup.computeIfAbsent(group, g -> new ArrayList<>()).add(recipe);
-        } else if (category.startsWith(packageName)) {
-            CategoryTree<G> subtree = null;
-            for (CategoryTree<G> s : subtrees) {
-                if (category.startsWith(s.descriptor.getPackageName())) {
-                    subtree = s;
-                    break;
-                }
-            }
-
-            if (subtree == null) {
-                int endIndex = category.indexOf('.', packageName.length() + 1);
-                String subcategoryPackage = endIndex < 0 ?
-                        category :
-                        packageName + category.substring(packageName.length(), endIndex);
-
-                CategoryDescriptor subcategoryDescriptor = null;
-                for (CategoryDescriptor categoryDescriptor : categories) {
-                    if (categoryDescriptor.getPackageName().equals(subcategoryPackage)) {
-                        subcategoryDescriptor = categoryDescriptor;
-                        break;
-                    }
-                }
-
-                if (subcategoryDescriptor == null) {
-                    subcategoryDescriptor = new CategoryDescriptor(
-                            StringUtils.capitalize(subcategoryPackage.substring(subcategoryPackage.lastIndexOf('.') + 1)),
-                            subcategoryPackage,
-                            "",
-                            emptySet()
-                    );
-                }
-
-                subtree = new CategoryTree<>(subcategoryDescriptor);
-                subtrees.add(subtree);
-            }
-
-            subtree.add(group, recipe, categories);
-        }
+        CategoryTree<G> categoryTree = findOrAddCategory(group, new CategoryDescriptor(
+                StringUtils.capitalize(category.substring(category.lastIndexOf('.') + 1)),
+                category,
+                "",
+                emptySet(),
+                false,
+                true
+        ));
+        categoryTree.recipesByGroup.computeIfAbsent(group, g -> new CopyOnWriteArrayList<>()).add(recipe);
     }
 
     @SuppressWarnings("UnusedReturnValue")
-    public CategoryTree<G> removeAll(G group) {
+    CategoryTree<G> removeAll(G group) {
         synchronized (lock) {
+            groups.remove(group);
+            descriptorsByGroup.remove(group);
             recipesByGroup.remove(group);
             for (CategoryTree<G> subtree : subtrees) {
                 subtree.removeAll(group);
@@ -206,10 +329,8 @@ public class CategoryTree<G> {
 
     public Collection<RecipeDescriptor> getRecipes() {
         synchronized (lock) {
-            return Stream.concat(
-                            recipesByGroup.values().stream().flatMap(Collection::stream),
-                            subtrees.stream().flatMap(it -> it.getRecipes().stream())
-                    )
+            return getRecipesByGroup().values().stream()
+                    .flatMap(Collection::stream)
                     .distinct()
                     .collect(toList());
         }
@@ -222,28 +343,120 @@ public class CategoryTree<G> {
         }
     }
 
+    /**
+     * @return The subcategories if this category.
+     * @deprecated Use {@link #getCategories()} instead.
+     */
+    @Deprecated
     public Collection<CategoryTree<G>> getSubtrees() {
+        return getCategories(true, true);
+    }
+
+    public Collection<CategoryTree<G>> getCategories() {
+        return getCategories(true, true);
+    }
+
+    /**
+     * Used to recursively navigate the whole category tree without
+     * any advance knowledge of what categories exist.
+     *
+     * @return The subcategories of this category.
+     */
+    public Collection<CategoryTree<G>> getCategories(boolean omitCategoryRoots,
+                                                     boolean omitEmptyCategories) {
         synchronized (lock) {
-            if (!subtrees.isEmpty() && !recipesByGroup.isEmpty()) {
-                List<CategoryTree<G>> subtreesAndCore = new ArrayList<>(subtrees);
-                subtreesAndCore.add(syntheticCore());
-                return subtreesAndCore;
+            List<CategoryTree<G>> cats = new ArrayList<>(subtrees.size());
+            for (CategoryTree<G> subtree : subtrees) {
+                if (omitCategoryRoots && subtree.getDescriptor().isRoot()) {
+                    cats.addAll(subtree.getCategories());
+                } else if (!omitEmptyCategories || !subtree.getRecipes().isEmpty() ||
+                           !subtree.getCategories().isEmpty()) {
+                    cats.add(subtree);
+                }
             }
-            return subtrees;
+
+            if (!subtrees.isEmpty()) {
+                CategoryTree<G> core = maybeAddCore(getDescriptor());
+                if (core != null) {
+                    cats.add(core);
+                }
+            }
+            return cats;
         }
     }
 
-    @NotNull
-    private CategoryTree<G> syntheticCore() {
-        CategoryTree<G> core = new CategoryTree<>(
-                new CategoryDescriptor(
+    @Nullable
+    private CategoryTree<G> maybeAddCore(CategoryDescriptor parent) {
+        if (recipesByGroup.isEmpty()) {
+            return null;
+        }
+
+        return new CategoryTree<G>() {
+            @Override
+            public CategoryDescriptor getDescriptor() {
+                return new CategoryDescriptor(
                         "Core",
-                        descriptor.getPackageName() + ".core",
+                        parent.getPackageName() + "." + CORE,
                         "",
-                        emptySet()
-                )
-        );
-        core.recipesByGroup = recipesByGroup;
-        return core;
+                        emptySet(),
+                        false,
+                        true
+                );
+            }
+
+            @Override
+            public Map<G, Collection<RecipeDescriptor>> getRecipesByGroup() {
+                return recipesByGroup;
+            }
+        };
+    }
+
+    @Override
+    public String toString() {
+        return "CategoryTree{packageName=" + getDescriptor().getPackageName() + "}";
+    }
+
+    void toString(StringJoiner out, int level, boolean omitCategoryRoots,
+                  boolean omitEmptyCategories, BitSet lastCategoryMask) {
+        CategoryDescriptor descriptor = getDescriptor();
+        if (!omitCategoryRoots || !descriptor.isRoot()) {
+            StringBuilder line = new StringBuilder();
+            printTreeLines(line, level, lastCategoryMask);
+            if (level > 0) {
+                line.append("|-");
+            }
+            line.append(descriptor.isRoot() ? "√" : "\uD83D\uDCC1")
+                    .append(descriptor.getPackageName().isEmpty() ? "ε" : descriptor.getPackageName());
+            out.add(line);
+        }
+        Collection<CategoryTree<G>> categories = getCategories(omitCategoryRoots, omitEmptyCategories);
+        int i = 0;
+        for (CategoryTree<G> subtree : categories) {
+            if (++i == categories.size()) {
+                lastCategoryMask.set(level, true);
+            }
+            subtree.toString(out, descriptor.isRoot() && omitCategoryRoots ? level : level + 1,
+                    omitCategoryRoots, omitEmptyCategories, (BitSet) lastCategoryMask.clone());
+        }
+
+        lastCategoryMask.set(level, true);
+        level++;
+        for (RecipeDescriptor recipe : getRecipes()) {
+            StringBuilder line = new StringBuilder();
+            printTreeLines(line, level, lastCategoryMask);
+            line.append("|-\uD83E\uDD16");
+            line.append(recipe.getName());
+            out.add(line);
+        }
+    }
+
+    private void printTreeLines(StringBuilder line, int level, BitSet lastCategoryMask) {
+        for (int i = 0; i < level - 1; i++) {
+            if (lastCategoryMask.get(i)) {
+                line.append("   ");
+            } else {
+                line.append("│  ");
+            }
+        }
     }
 }
