@@ -128,7 +128,7 @@ public class CategoryTreeTest {
 
     @Test
     void getRecipes() {
-        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite").getRecipes().size())
+        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite.text").getRecipes().size())
                 .isGreaterThan(1);
     }
 
