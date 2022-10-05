@@ -53,7 +53,7 @@ public class CategoryTreeTest {
 
     @Test
     void categoryDescriptorPrecedence() {
-        CategoryDescriptor descriptor = categoryDescriptor("org.openrewrite.test");
+        CategoryDescriptor descriptor = categoryDescriptor();
         CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
                 .putRecipes(0, recipeDescriptor("org.openrewrite.test"))
                 .putCategories(1, descriptor)
@@ -72,7 +72,7 @@ public class CategoryTreeTest {
     @Test
     void getCategoryThatIsTransitivelyEmpty() {
         CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
-                .putCategories(1, categoryDescriptor("org.openrewrite.test"));
+                .putCategories(1, categoryDescriptor());
 
         assertThat(categoryTree.getCategory("org", "openrewrite")).isNull();
         assertThat(categoryTree.getCategory("org", "openrewrite", "test")).isNull();
@@ -145,8 +145,8 @@ public class CategoryTreeTest {
                 .isEqualTo(Group1);
     }
 
-    private static CategoryDescriptor categoryDescriptor(String packageName) {
-        return new CategoryDescriptor(StringUtils.capitalize(packageName.substring(packageName.lastIndexOf('.') + 1)),
+    private static CategoryDescriptor categoryDescriptor() {
+        return new CategoryDescriptor(StringUtils.capitalize("org.openrewrite.test".substring("org.openrewrite.test".lastIndexOf('.') + 1)),
                 "org.openrewrite.test", "", emptySet(),
                 false, false);
     }
