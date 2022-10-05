@@ -323,6 +323,7 @@ public class CategoryTree<G> {
             for (CategoryTree<G> subtree : subtrees) {
                 subtree.removeAll(group);
             }
+            subtrees.removeIf(subtree -> subtree.groups.isEmpty());
         }
         return this;
     }
