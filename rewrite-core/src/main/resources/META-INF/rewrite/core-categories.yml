@@ -17,6 +17,7 @@
 type: specs.openrewrite.org/v1beta/category
 name: OpenRewrite
 packageName: org.openrewrite
+root: true
 ---
 type: specs.openrewrite.org/v1beta/category
 packageName: io
