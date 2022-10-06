@@ -65,7 +65,7 @@ public class CategoryTree<G> {
 
     public static class Root<G> extends CategoryTree<G> {
         private static final CategoryDescriptor ROOT_DESCRIPTOR = new CategoryDescriptor(
-                "ε", "", "", emptySet(), true, true);
+                "ε", "", "", emptySet(), true, 0, true);
 
         private Root() {
             super();
@@ -125,16 +125,26 @@ public class CategoryTree<G> {
 
     public CategoryDescriptor getDescriptor() {
         CategoryDescriptor categoryDescriptor = null;
+        int currentPriority = CategoryDescriptor.LOWEST_PRECEDENCE;
+
+        // find the highest priority non-synthetic descriptor, if any
         for (G group : groups) {
-            categoryDescriptor = descriptorsByGroup.get(group);
-            if (!categoryDescriptor.isSynthetic()) {
-                return categoryDescriptor;
+            CategoryDescriptor test = descriptorsByGroup.get(group);
+            if (!test.isSynthetic() && test.getPriority() > currentPriority) {
+                categoryDescriptor = test;
             }
         }
 
         if (categoryDescriptor == null) {
-            throw new IllegalStateException("Unable to find a descriptor for category. This represents " +
-                                            "a bug in CategoryTree, since it should never occur.");
+            // select a synthetic descriptor as a fallback
+            for (G group : groups) {
+                categoryDescriptor = descriptorsByGroup.get(group);
+                break;
+            }
+            if (categoryDescriptor == null) {
+                throw new IllegalStateException("Unable to find a descriptor for category. This represents " +
+                                                "a bug in CategoryTree, since it should never occur.");
+            }
         }
 
         return categoryDescriptor;
@@ -287,6 +297,7 @@ public class CategoryTree<G> {
                         "",
                         emptySet(),
                         false,
+                        0,
                         true
                 )).findOrAddCategory(group, category);
             }
@@ -312,6 +323,7 @@ public class CategoryTree<G> {
                 "",
                 emptySet(),
                 false,
+                0,
                 true
         ));
         categoryTree.recipesByGroup.computeIfAbsent(group, g -> new CopyOnWriteArrayList<>()).add(recipe);
@@ -407,6 +419,7 @@ public class CategoryTree<G> {
                         "",
                         emptySet(),
                         false,
+                        0,
                         true
                 );
             }
@@ -427,6 +440,10 @@ public class CategoryTree<G> {
                   int level,
                   PrintOptions printOptions,
                   BitSet lastCategoryMask) {
+        if (level > printOptions.getMaxDepth()) {
+            return;
+        }
+
         CategoryDescriptor descriptor = getDescriptor();
         if (!printOptions.isOmitCategoryRoots() || !descriptor.isRoot()) {
             StringBuilder line = new StringBuilder();
@@ -436,7 +453,7 @@ public class CategoryTree<G> {
             }
             line.append(descriptor.isRoot() ? "√" : "\uD83D\uDCC1");
             String packageName = descriptor.getPackageName().isEmpty() ? "ε" : descriptor.getPackageName();
-            switch(printOptions.getNameStyle()) {
+            switch (printOptions.getNameStyle()) {
                 case DISPLAY_NAME:
                     line.append(descriptor.getDisplayName());
                     break;
@@ -444,7 +461,7 @@ public class CategoryTree<G> {
                     line.append(packageName);
                     break;
                 case BOTH:
-                    if(descriptor.getPackageName().isEmpty()) {
+                    if (descriptor.getPackageName().isEmpty()) {
                         line.append(packageName);
                     } else {
                         line.append(descriptor.getDisplayName()).append(" (").append(packageName).append(')');
@@ -471,7 +488,7 @@ public class CategoryTree<G> {
             StringBuilder line = new StringBuilder();
             printTreeLines(line, level, lastCategoryMask);
             line.append("|-\uD83E\uDD16");
-            switch(printOptions.getNameStyle()) {
+            switch (printOptions.getNameStyle()) {
                 case DISPLAY_NAME:
                     line.append(recipe.getDisplayName());
                     break;
@@ -499,7 +516,7 @@ public class CategoryTree<G> {
     public enum PrintNameStyle {
         DISPLAY_NAME,
         ID,
-        BOTH;
+        BOTH
     }
 
     @Value

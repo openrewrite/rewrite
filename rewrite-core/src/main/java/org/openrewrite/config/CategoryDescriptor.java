@@ -24,6 +24,9 @@ import java.util.Set;
 @Value
 @With
 public class CategoryDescriptor {
+    public static final int LOWEST_PRECEDENCE = 0;
+    public static final int HIGHEST_PRECEDENCE = Integer.MAX_VALUE;
+
     @Language("markdown")
     String displayName;
 
@@ -34,5 +37,15 @@ public class CategoryDescriptor {
 
     Set<String> tags;
     boolean root;
+
+    /**
+     * Defines the sort order for category descriptors of the same {@link #packageName}. The description, tags, and root values of the highest
+     * priority category descriptor for a given package name will be used.
+     * <p/>
+     * Lower values have higher priority. The default value is {@link #LOWEST_PRECEDENCE}, indicating the lowest priority
+     * (effectively deferring to any other specified prioritiy value).
+     **/
+    int priority;
+
     boolean synthetic;
 }

@@ -152,7 +152,7 @@ public class CategoryTreeTest {
     private static CategoryDescriptor categoryDescriptor() {
         return new CategoryDescriptor(StringUtils.capitalize("org.openrewrite.test".substring("org.openrewrite.test".lastIndexOf('.') + 1)),
                 "org.openrewrite.test", "", emptySet(),
-                false, false);
+                false, 0, false);
     }
 
     enum Group {

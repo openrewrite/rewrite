@@ -205,7 +205,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                         if (e.getCause() instanceof InvalidTypeIdException) {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
                                                     nameAndConfig.getValue(), "Recipe class " +
-                                                            nameAndConfig.getKey() + " cannot be found"));
+                                                                              nameAndConfig.getKey() + " cannot be found"));
                                         } else {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
                                                     "Unable to load Recipe: " + e));
@@ -220,7 +220,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                 e.printStackTrace();
                                 recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
                                         "Unexpected declarative recipe parsing exception " +
-                                                e.getClass().getName()));
+                                        e.getClass().getName()));
                             }
                         } else {
                             recipe.addValidation(invalid(
@@ -326,7 +326,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     @Language("markdown")
                     String packageName = (String) c.get("packageName");
                     if (packageName.endsWith("." + CategoryTree.CORE) ||
-                            packageName.contains("." + CategoryTree.CORE + ".")) {
+                        packageName.contains("." + CategoryTree.CORE + ".")) {
                         throw new IllegalArgumentException("The package name 'core' is reserved.");
                     }
 
@@ -345,7 +345,9 @@ public class YamlResourceLoader implements ResourceLoader {
                     }
 
                     boolean root = c.containsKey("root") && (Boolean) c.get("root");
-                    return new CategoryDescriptor(name, packageName, description, tags, root, false);
+                    int priority = c.containsKey("priority") ? (Integer) c.get("priority") : CategoryDescriptor.LOWEST_PRECEDENCE;
+
+                    return new CategoryDescriptor(name, packageName, description, tags, root, priority, false);
                 })
                 .collect(toList());
     }

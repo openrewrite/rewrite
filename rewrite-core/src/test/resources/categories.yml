@@ -17,6 +17,13 @@
 # These category and recipes definitions are used in CategoryTreeTest
 ---
 type: specs.openrewrite.org/v1beta/category
+name: OpenRewrite
+packageName: org.openrewrite
+description: All OSS repositories.
+root: false
+priority: 1
+---
+type: specs.openrewrite.org/v1beta/category
 name: Moderne
 packageName: io.moderne
 description: Moderne best practices.
