@@ -26,12 +26,13 @@ import java.util.Set;
 public class MultipleVariableDeclarations extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Multiple variable declarations";
+        return "No multiple variable declarations";
     }
 
     @Override
     public String getDescription() {
-        return "Places each variable declaration in its own statement and on its own line. Using one variable declaration per line encourages commenting and can increase readability.";
+        return "Places each variable declaration in its own statement and on its own line. " +
+                "Using one variable declaration per line encourages commenting and can increase readability.";
     }
 
     @Override
