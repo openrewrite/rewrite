@@ -21,8 +21,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.style.TabsAndIndentsStyle.MethodDeclarationParameters
 import org.openrewrite.style.GeneralFormatStyle
 import org.openrewrite.style.NamedStyles
+import java.util.*
 
 interface AutodetectTest {
 

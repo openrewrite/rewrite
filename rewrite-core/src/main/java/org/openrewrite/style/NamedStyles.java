@@ -16,13 +16,15 @@
 package org.openrewrite.style;
 
 import lombok.*;
+import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
-import java.util.Collection;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 
 /**
  * A collection of styles by name, e.g. IntelliJ or Google Java Format.
@@ -63,6 +65,38 @@ public class NamedStyles implements Marker {
             }
         }
         return merged;
+    }
+
+    /**
+     * Merge many NamedStyles into one NamedStyle.
+     *
+     * @param styles The styles to be merged. Styles earlier in the list take precedence over styles later in the list.
+     * @return A single merged style with the aggregate configuration of all inputs. null if the list is empty.
+     */
+    @Nullable
+    private NamedStyles merge(List<NamedStyles> styles) {
+        if(styles.isEmpty()) {
+            return null;
+        } else if(styles.size() == 1) {
+            return styles.get(0);
+        }
+        Set<Class<? extends Style>> styleClasses = new HashSet<>();
+        for(NamedStyles namedStyles : styles) {
+            for(Style style : namedStyles.getStyles()) {
+                styleClasses.add(style.getClass());
+            }
+        }
+
+        List<Style> mergedStyles = new ArrayList<>(styleClasses.size());
+        for(Class<? extends Style> styleClass : styleClasses) {
+            mergedStyles.add(NamedStyles.merge(styleClass, styles));
+        }
+
+        return new NamedStyles(Tree.randomId(), "MergedStyles",
+                "Merged styles",
+                "Merged Styles from " + styles.stream().map(NamedStyles::getName).collect(joining(", ")),
+                styles.stream().map(NamedStyles::getTags).flatMap(Set::stream).collect(toSet()),
+                mergedStyles);
     }
 
     public Validated validate() {
