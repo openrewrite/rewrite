@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
@@ -26,22 +27,20 @@ import java.util.UUID;
 public class ParseExceptionResult implements Marker {
     UUID id;
 
-    Throwable throwable;
+    String message;
 
     public ParseExceptionResult(Throwable t) {
         this(Tree.randomId(), t);
     }
 
     public ParseExceptionResult(UUID id, Throwable t) {
-        this.id = id;
-        this.throwable = t;
+        //noinspection ConstantConditions
+        this(id, (t == null) ? "" : new RecipeRunException(t).getSanitizedStackTrace());
     }
 
-    public String getDescription() {
-        if(throwable == null) {
-            return "Unknown parsing exception. Perhaps there was an issue deserializing the associated throwable.";
-        } else {
-            return throwable.toString();
-        }
+    @JsonCreator
+    public ParseExceptionResult(UUID id, String message) {
+        this.id = id;
+        this.message = message;
     }
 }
