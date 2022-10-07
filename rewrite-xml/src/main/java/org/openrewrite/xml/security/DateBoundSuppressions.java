@@ -62,6 +62,20 @@ public class DateBoundSuppressions extends Recipe {
         return new IsOwaspSuppressionsFile();
     }
 
+    @Override
+    public Validated validate() {
+        return super.validate().and(Validated.test("untilDate", "Must be empty or a valid date of format yyyy-MM-dd", untilDate, date -> {
+            if (date != null && !date.isEmpty()) {
+                try {
+                    LocalDate.parse(date);
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            return true;
+        }));
+    }
+
     private class DateBoundSuppressionsVisitor extends XmlIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -75,7 +89,7 @@ public class DateBoundSuppressions extends Recipe {
                     }
                 }
                 if (!hasUntil) {
-                    String date = untilDate != null ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
+                    String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
                     return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
                             new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
                             "",

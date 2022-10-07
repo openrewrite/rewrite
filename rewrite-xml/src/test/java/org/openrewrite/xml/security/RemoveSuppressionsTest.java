@@ -119,4 +119,44 @@ class RemoveSuppressionsTest implements RewriteTest {
                         spec -> spec.path("suppressions.xml"))
         );
     }
+
+    @Test
+    void ignoresMalformedDates() {
+        LocalDate today = LocalDate.now();
+        LocalDate dayBeforeYesterday = today.minusDays(2);
+        String dayBeforeYesterdayString = dayBeforeYesterday.toString().substring(0, 10);
+
+        rewriteRun(
+                xml(("""
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="blah">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                    <suppress until="blahZ">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""")
+                                .formatted(dayBeforeYesterdayString),
+                        """
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="blah">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                    <suppress until="blahZ">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""",
+                        spec -> spec.path("suppressions.xml"))
+        );
+    }
 }

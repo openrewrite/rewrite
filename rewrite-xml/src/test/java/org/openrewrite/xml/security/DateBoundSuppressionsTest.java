@@ -16,10 +16,13 @@
 package org.openrewrite.xml.security;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.test.RewriteTest;
 
 import java.time.LocalDate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
 public class DateBoundSuppressionsTest implements RewriteTest {
@@ -73,5 +76,41 @@ public class DateBoundSuppressionsTest implements RewriteTest {
                                 .formatted(thirtyDaysFromNowString),
                         spec -> spec.path("suppressions.xml"))
         );
+    }
+
+    @Test
+    void defaultIs30DaysInFutureWithEmptyString() {
+        LocalDate today = LocalDate.now();
+        LocalDate thirtyDaysFromNow = today.plusDays(30);
+        String thirtyDaysFromNowString = thirtyDaysFromNow + "Z";
+        rewriteRun(
+                spec -> spec.recipe(new DateBoundSuppressions("")),
+                xml("""
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress>
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>""",
+                        """
+                                <?xml version="1.0" encoding="UTF-8" ?>
+                                <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                                    <suppress until="%s">
+                                        <notes>
+                                        </notes>
+                                    </suppress>
+                                </suppressions>"""
+                                .formatted(thirtyDaysFromNowString),
+                        spec -> spec.path("suppressions.xml"))
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({"abcd,false",
+            "2022,false",
+            "2022-01-01,true"})
+    void valid(String untilDate, boolean valid) {
+        assertThat(new DateBoundSuppressions(untilDate).validate().isValid()).isEqualTo(valid);
     }
 }
