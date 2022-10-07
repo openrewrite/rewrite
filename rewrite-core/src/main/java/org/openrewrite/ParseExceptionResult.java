@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.RecipeRunException;
 
 import java.util.UUID;
 

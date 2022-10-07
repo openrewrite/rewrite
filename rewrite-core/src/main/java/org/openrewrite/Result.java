@@ -24,7 +24,6 @@ import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.RecipeRunException;
 import org.openrewrite.marker.Markup;
 
 import java.io.ByteArrayOutputStream;

@@ -18,7 +18,7 @@ package org.openrewrite.internal;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.marker.RecipeRunException;
+import org.openrewrite.RecipeRunException;
 
 import static java.util.Objects.requireNonNull;
 

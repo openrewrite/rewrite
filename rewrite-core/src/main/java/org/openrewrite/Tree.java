@@ -22,11 +22,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.RecipeRunException;
-import org.openrewrite.marker.Markup;
 
-import java.lang.reflect.Method;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")

@@ -2,6 +2,7 @@ package org.openrewrite.marker;
 
 import lombok.Getter;
 import org.openrewrite.Incubating;
+import org.openrewrite.RecipeRunException;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 
