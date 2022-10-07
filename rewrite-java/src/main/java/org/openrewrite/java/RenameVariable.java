@@ -15,14 +15,13 @@
  */
 package org.openrewrite.java;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -32,7 +31,6 @@ import java.util.Stack;
 /**
  * Renames a NamedVariable to the target name.
  * Prevents variables from being renamed to reserved java keywords.
- *
  * Notes:
  *  - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
  */
@@ -49,19 +47,17 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         if (!JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
-            doAfterVisit(new RenameVariableByCursor(getCursor()));
+            doAfterVisit(new RenameVariableVisitor(variable, toName));
             return variable;
         }
         return super.visitVariable(variable, p);
     }
 
-    private class RenameVariableByCursor extends JavaIsoVisitor<P> {
-        private final Cursor scope;
+    @RequiredArgsConstructor
+    private class RenameVariableVisitor extends JavaIsoVisitor<P> {
         private final Stack<Tree> currentNameScope = new Stack<>();
-
-        public RenameVariableByCursor(Cursor scope) {
-            this.scope = scope;
-        }
+        private final J.VariableDeclarations.NamedVariable renameVariable;
+        private final String newName;
 
         @Override
         public J.Block visitBlock(J.Block block, P p) {
@@ -71,7 +67,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 boolean isClassScope = false;
                 for (Statement statement : block.getStatements()) {
                     if (statement instanceof J.VariableDeclarations) {
-                        if (((J.VariableDeclarations) statement).getVariables().contains(variable)) {
+                        if (((J.VariableDeclarations) statement).getVariables().contains(renameVariable)) {
                             isClassScope = true;
                             break;
                         }
@@ -87,30 +83,44 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
-            // The size of the stack will be 1 if the identifier is in the right scope.
-            if (ident.getSimpleName().equals(variable.getSimpleName()) && isInSameNameScope(scope, getCursor()) && currentNameScope.size() == 1) {
-                J parent  = getCursor().dropParentUntil(J.class::isInstance).getValue();
-                if (!(parent instanceof J.FieldAccess)) {
-                    return ident.withSimpleName(toName);
-                } else if (((J.FieldAccess) parent).getTarget() instanceof J.Identifier) {
-                    J.FieldAccess fieldAccess =  ((J.FieldAccess) parent);
-                    J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
-                    if (fieldAccessTarget.getFieldType() != null && (fieldAccessTarget.getFieldType().equals(variable.getName().getFieldType())
-                            || fieldAccessTarget.getFieldType().getType() != null && variable.getName().getFieldType() != null && fieldAccessTarget.getFieldType().getType().equals(variable.getName().getFieldType().getOwner()))) {
-                        return ident.withSimpleName(toName);
+            J parent  = getCursor().dropParentUntil(J.class::isInstance).getValue();
+            if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
+                if (parent instanceof J.FieldAccess) {
+                    if (fieldAccessTargetsVariable((J.FieldAccess)parent)) {
+                        return ident.withSimpleName(newName);
                     }
+                } else if (currentNameScope.size() == 1) {
+                    // The size of the stack will be 1 if the identifier is in the right scope.
+                    return ident.withSimpleName(newName);
                 }
             }
             return super.visitIdentifier(ident, p);
         }
 
+        /**
+         * FieldAccess targets the variable if its target is an Identifier and either
+         *  its target FieldType equals variable.Name.FieldType
+         *  or its target Type equals variable.Name.FieldType.Owner
+         */
+        private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
+            if (renameVariable.getName().getFieldType() != null && fieldAccess.getTarget() instanceof J.Identifier) {
+                J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
+                JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
+                // TODO:  Handle case where FieldAccessTarget is ParameterizedType and variable ower is JavaType.Class
+                return variableNameFieldType.equals(fieldAccessTarget.getFieldType()) ||
+                        (fieldAccessTarget.getType() != null && fieldAccessTarget.getType().equals(variableNameFieldType.getOwner()));
+
+            }
+            return false;
+        }
+
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable namedVariable, P p) {
-            if (namedVariable.getSimpleName().equals(variable.getSimpleName())) {
+            if (namedVariable.getSimpleName().equals(renameVariable.getSimpleName())) {
                 Cursor parentScope = getCursorToParentScope(getCursor());
                 // The target variable was found and was not declared in a class declaration block.
                 if (currentNameScope.isEmpty()) {
-                    if (namedVariable.equals(variable)) {
+                    if (namedVariable.equals(renameVariable)) {
                         currentNameScope.add(parentScope.getValue());
                     }
                 } else {
