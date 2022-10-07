@@ -25,6 +25,7 @@ import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.RecipeRunException;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;

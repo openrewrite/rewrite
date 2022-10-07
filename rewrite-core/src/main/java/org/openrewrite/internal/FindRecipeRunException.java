@@ -17,24 +17,12 @@ package org.openrewrite.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.RecipeRunException;
-import org.openrewrite.RecipeRunExceptionResult;
-import org.openrewrite.marker.Marker;
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.RecipeRunException;
 
 import static java.util.Objects.requireNonNull;
 
 public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
-
-    private static final TreeVisitor<Tree, AtomicBoolean> hasRecipeRunExceptionVisitor = new TreeVisitor<Tree, AtomicBoolean>() {
-        @Override
-        public <M extends Marker> M visitMarker(Marker marker, AtomicBoolean atomicBoolean) {
-            if (marker instanceof RecipeRunExceptionResult) {
-                atomicBoolean.set(true);
-            }
-            return super.visitMarker(marker,atomicBoolean);
-        }
-    };
 
     private final RecipeRunException vt;
     private final Tree nearestTree;
@@ -47,14 +35,8 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
     @Override
     public Tree preVisit(Tree tree, Integer integer) {
         if (tree == nearestTree) {
-            return tree.withExceptionMarker(vt);
+            return Markup.error(tree, "Recipe failed with an exception", vt);
         }
         return tree;
-    }
-
-    public static boolean hasRecipeRunException(Tree tree) {
-        AtomicBoolean hasException = new AtomicBoolean(false);
-        hasRecipeRunExceptionVisitor.visit(tree, hasException);
-        return hasException.get();
     }
 }

@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.marker;
 
 import lombok.Getter;
+import org.openrewrite.Cursor;
+import org.openrewrite.RecipeScheduler;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.StringJoiner;

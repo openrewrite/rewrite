@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.LatestPatch;
@@ -246,7 +247,7 @@ public class UpgradeDependencyVersion extends Recipe {
                 // There is a problem downloading the metadata for a dependency (this can happen if the repository
                 // does not publish the metadata and the metadata cannot be easily derived by querying the repository's
                 // directory structure).
-                return t.withExceptionMarker(exception);
+                return Markup.warn(t, "Unable to download Maven metadata", exception);
             }
             return t;
         }

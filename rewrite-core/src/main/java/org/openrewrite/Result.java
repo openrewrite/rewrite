@@ -24,6 +24,8 @@ import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.RecipeRunException;
+import org.openrewrite.marker.Markup;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -76,7 +78,7 @@ public class Result {
                     try {
                         Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
                         Markers markers = (Markers) getMarkers.invoke(tree);
-                        markers.findFirst(RecipeRunExceptionResult.class)
+                        markers.findFirst(Markup.Error.class)
                                 .ifPresent(e -> exceptions.add(e.getException()));
                     } catch (Throwable ignored) {
                     }

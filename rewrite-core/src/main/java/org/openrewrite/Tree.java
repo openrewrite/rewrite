@@ -23,6 +23,8 @@ import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.RecipeRunException;
+import org.openrewrite.marker.Markup;
 
 import java.lang.reflect.Method;
 import java.util.UUID;
@@ -128,26 +130,6 @@ public interface Tree {
             return cast();
         } catch (ClassCastException ignored) {
             return null;
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    default <T extends Tree> T withExceptionMarker(Throwable throwable) {
-        RecipeRunException rre;
-        if (throwable instanceof RecipeRunException) {
-            rre = (RecipeRunException) throwable;
-        } else {
-            rre = new RecipeRunException(throwable);
-        }
-
-        try {
-            Method getMarkers = this.getClass().getDeclaredMethod("getMarkers");
-            Method withMarkers = this.getClass().getDeclaredMethod("withMarkers", Markers.class);
-            Markers markers = (Markers) getMarkers.invoke(this);
-            return (T) withMarkers.invoke(this, markers
-                    .computeByType(new RecipeRunExceptionResult(rre), (s1, s2) -> s1 == null ? s2 : s1));
-        } catch (Throwable ignored) {
-            return (T) this;
         }
     }
 }
