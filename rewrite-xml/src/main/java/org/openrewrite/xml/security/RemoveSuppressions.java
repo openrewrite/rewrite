@@ -27,6 +27,7 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 
 @Value
@@ -75,9 +76,13 @@ public class RemoveSuppressions extends Recipe {
                             if (maybeDate.endsWith("Z")) {
                                 maybeDate = maybeDate.substring(0, maybeDate.length() - 1);
                             }
-                            LocalDate date = LocalDate.parse(maybeDate);
-                            if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
-                                return true;
+                            try {
+                                LocalDate date = LocalDate.parse(maybeDate);
+                                if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
+                                    return true;
+                                }
+                            } catch (DateTimeParseException e) {
+                                return false;
                             }
                         }
                     }
