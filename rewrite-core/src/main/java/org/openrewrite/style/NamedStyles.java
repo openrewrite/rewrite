@@ -74,7 +74,7 @@ public class NamedStyles implements Marker {
      * @return A single merged style with the aggregate configuration of all inputs. null if the list is empty.
      */
     @Nullable
-    private NamedStyles merge(List<NamedStyles> styles) {
+    public static NamedStyles merge(List<NamedStyles> styles) {
         if(styles.isEmpty()) {
             return null;
         } else if(styles.size() == 1) {
