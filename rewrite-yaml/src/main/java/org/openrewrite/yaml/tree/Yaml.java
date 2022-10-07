@@ -435,6 +435,11 @@ public interface Yaml extends Tree {
         }
 
         @Override
+        public Alias withValue(String s) {
+            return withAnchor(anchor.withKey(s));
+        }
+
+        @Override
         public Alias copyPaste() {
             return new Alias(randomId(), prefix, Markers.EMPTY, anchor);
         }
