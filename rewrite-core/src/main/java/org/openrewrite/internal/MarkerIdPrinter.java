@@ -47,4 +47,3 @@ public class MarkerIdPrinter extends TreeVisitor<Tree, PrintOutputCapture<Execut
         return super.visit(tree, p);
     }
 }
-

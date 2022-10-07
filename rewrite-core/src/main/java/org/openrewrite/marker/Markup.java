@@ -34,7 +34,7 @@ public abstract class Markup extends SearchResult {
     private final String detail;
 
     public Markup(UUID id, String message, @Nullable String detail) {
-        super(id, message);
+        super(id, message + (detail != null ? "\n" + detail : ""));
         this.detail = detail;
     }
 
@@ -50,7 +50,7 @@ public abstract class Markup extends SearchResult {
         private final RecipeRunException exception;
 
         public Error(UUID id, String message, RecipeRunException exception) {
-            super(id, message, exception.getSanitizedStackTrace());
+            super(id, "ERROR: " + message, exception.getSanitizedStackTrace());
             this.exception = exception;
         }
     }
@@ -102,7 +102,7 @@ public abstract class Markup extends SearchResult {
         RecipeRunException rre = null;
         if (throwable instanceof RecipeRunException) {
             rre = (RecipeRunException) throwable;
-        } else if(throwable != null) {
+        } else if (throwable != null) {
             rre = new RecipeRunException(throwable);
         }
 
@@ -112,7 +112,7 @@ public abstract class Markup extends SearchResult {
             Markers markers = (Markers) getMarkers.invoke(t);
 
             Markup markup;
-            switch(level) {
+            switch (level) {
                 case DEBUG:
                     markup = new Markup.Debug(randomId(), message);
                     break;

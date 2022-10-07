@@ -257,7 +257,7 @@ public interface RecipeScheduler {
                     } else if (afterFile != null) {
                         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
                         // and instead we add a marker to the top of the source file to record the exception message.
-                        afterFile = Markup.error(afterFile,"Error running applicable test", new RecipeRunException(t));
+                        afterFile = Markup.error(afterFile,"Recipe applicable test failed with an exception.", new RecipeRunException(t));
                     }
                 }
 
@@ -402,7 +402,7 @@ class RecipeSchedulerUtils {
                 .parse("Rewrite encountered an uncaught recipe error in " + recipe.getName() + ".")
                 .get(0)
                 .withSourcePath(Paths.get("recipe-exception-" + ctx.incrementAndGetUncaughtExceptionCount() + ".txt"));
-        exception = Markup.error(exception, "Error running applicable test", new RecipeRunException(t));
+        exception = Markup.error(exception, "Recipe applicable test failed with an exception.", new RecipeRunException(t));
         recipeThatAddedOrDeletedSourceFile.put(exception.getId(), recipeStack);
         return ListUtils.concat(before, exception);
     }
