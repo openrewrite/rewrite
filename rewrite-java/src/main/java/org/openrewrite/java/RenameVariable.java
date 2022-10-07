@@ -106,10 +106,9 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             if (renameVariable.getName().getFieldType() != null && fieldAccess.getTarget() instanceof J.Identifier) {
                 J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                // TODO:  Handle case where FieldAccessTarget is ParameterizedType and variable ower is JavaType.Class
+                JavaType fieldAccessTargetType = fieldAccessTarget.getType() instanceof JavaType.Parameterized ? ((JavaType.Parameterized)fieldAccessTarget.getType()).getType() : fieldAccessTarget.getType();
                 return variableNameFieldType.equals(fieldAccessTarget.getFieldType()) ||
-                        (fieldAccessTarget.getType() != null && fieldAccessTarget.getType().equals(variableNameFieldType.getOwner()));
-
+                        (fieldAccessTargetType != null && fieldAccessTargetType.equals(variableNameFieldType.getOwner()));
             }
             return false;
         }

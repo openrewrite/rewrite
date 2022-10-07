@@ -111,35 +111,27 @@ interface RenameVariableTest : JavaRecipeTest {
         recipe = renameVariableTest("A", "_val", "val"),
         before = """
             package org.openrewrite;
-
-            import java.util.concurrent.atomic.AtomicReference;
             
             public class A<T> {
                 private String _val;
                 private String name;
-                private AtomicReference<T> reference;
                  
-                A(String name, String _val, T something) {
+                A(String name, String _val) {
                     this._val = _val;
                     this.name = name;
-                    this.reference = new AtomicReference<>().compareAndSet(something);
                 }
             }
         """,
         after = """
             package org.openrewrite;
-
-            import java.util.concurrent.atomic.AtomicReference;
             
             public class A<T> {
                 private String val;
                 private String name;
-                private AtomicReference<T> reference;
                  
-                A(String name, String _val, T something) {
+                A(String name, String _val) {
                     this.val = _val;
                     this.name = name;
-                    this.reference = new AtomicReference<>().compareAndSet(something);
                 }
             }
         """
