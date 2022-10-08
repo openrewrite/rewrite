@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
@@ -42,7 +43,7 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
     @Override
     public Tree preVisit(Tree tree, P p) {
         if (filePattern == null) {
-            return tree.withMarkers(tree.getMarkers().searchResult("has file"));
+            return SearchResult.found(tree, "has file");
         }
 
         if (tree instanceof SourceFile) {
@@ -56,7 +57,7 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
 
             PathMatcher pathMatcher = sourcePath.getFileSystem().getPathMatcher(syntax + ":" + filePattern);
             if (pathMatcher.matches(sourcePath)) {
-                return sourceFile.withMarkers(sourceFile.getMarkers().searchResult("has file"));
+                return SearchResult.found(sourceFile,"has file");
             }
         }
 

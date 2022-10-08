@@ -28,6 +28,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Iterator;
 import java.util.List;
@@ -69,7 +70,7 @@ public class FindDeprecatedMethods extends Recipe {
                     if (methodMatcher == null || methodMatcher.matches(method)) {
                         for (JavaType.FullyQualified annotation : method.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
-                                return cu.withMarkers(cu.getMarkers().searchResult());
+                                return SearchResult.found(cu);
                             }
                         }
                     }
@@ -104,7 +105,7 @@ public class FindDeprecatedMethods extends Recipe {
                                 }
                             }
 
-                            m = m.withMarkers(m.getMarkers().searchResult());
+                            m = SearchResult.found(m);
                         }
                     }
                 }

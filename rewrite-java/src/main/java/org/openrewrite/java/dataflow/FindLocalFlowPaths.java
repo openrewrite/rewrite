@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.dataflow.analysis.SinkFlow;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.*;
 
@@ -54,7 +55,7 @@ public class FindLocalFlowPaths<P> extends JavaIsoVisitor<P> {
                 @Override
                 public Expression visitExpression(Expression expression, P p) {
                     return flowSteps.contains(expression) ?
-                            expression.withMarkers(expression.getMarkers().searchResult()) :
+                            SearchResult.found(expression) :
                             expression;
                 }
             });

@@ -24,6 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
@@ -65,7 +66,7 @@ public class RemoveImplements extends Recipe {
                 }
                 JavaType.Class cdt = (JavaType.Class) cd.getType();
                 if((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
-                    return cd.withMarkers(cd.getMarkers().searchResult(""));
+                    return SearchResult.found(cd, "");
                 }
                 return cd;
             }

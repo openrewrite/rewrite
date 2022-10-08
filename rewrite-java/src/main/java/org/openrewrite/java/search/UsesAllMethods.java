@@ -20,6 +20,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,7 +42,7 @@ public class UsesAllMethods<P> extends JavaIsoVisitor<P> {
         List<MethodMatcher> unmatched = new ArrayList<>(methodMatchers);
         for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
             if (unmatched.removeIf(matcher -> matcher.matches(type)) && unmatched.isEmpty()) {
-                return cu.withMarkers(cu.getMarkers().searchResult());
+                return SearchResult.found(cu);
             }
         }
         return cu;

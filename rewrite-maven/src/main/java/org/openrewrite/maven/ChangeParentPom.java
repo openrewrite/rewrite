@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -108,7 +109,7 @@ public class ChangeParentPom extends Recipe {
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 Parent parent = getResolutionResult().getPom().getRequested().getParent();
                 if (parent != null && oldArtifactId.equals(parent.getArtifactId()) && oldGroupId.equals(parent.getGroupId())) {
-                    return document.withMarkers(document.getMarkers().searchResult());
+                    return SearchResult.found(document);
                 }
                 return document;
             }

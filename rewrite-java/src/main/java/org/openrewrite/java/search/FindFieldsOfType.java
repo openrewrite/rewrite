@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Iterator;
@@ -61,7 +62,7 @@ public class FindFieldsOfType extends Recipe {
                 if (multiVariable.getTypeExpression() != null &&
                         hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName) &&
                         isField(getCursor())) {
-                    return multiVariable.withMarkers(multiVariable.getMarkers().searchResult());
+                    return SearchResult.found(multiVariable);
                 }
                 return multiVariable;
             }

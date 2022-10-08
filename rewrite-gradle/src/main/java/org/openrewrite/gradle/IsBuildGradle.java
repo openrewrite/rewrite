@@ -15,16 +15,15 @@
  */
 package org.openrewrite.gradle;
 
-import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.SearchResult;
 
 public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        SourceFile sourceFile = (SourceFile) cu;
-        if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
-            return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());
+        if (cu.getSourcePath().toString().endsWith(".gradle")) {
+            return SearchResult.found(cu);
         }
         return super.visitJavaSourceFile(cu, p);
     }

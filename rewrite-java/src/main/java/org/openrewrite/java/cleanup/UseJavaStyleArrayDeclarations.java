@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -57,13 +58,13 @@ public class UseJavaStyleArrayDeclarations extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext executionContext) {
-                return arrayType.withMarkers(arrayType.getMarkers().searchResult());
+                return SearchResult.found(arrayType);
             }
 
             @Override
             public VariableDeclarations.NamedVariable visitVariable(VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
                 if (!variable.getDimensionsAfterName().isEmpty()) {
-                    variable = variable.withMarkers(variable.getMarkers().searchResult());
+                    variable = SearchResult.found(variable);
                 }
                 return variable;
             }

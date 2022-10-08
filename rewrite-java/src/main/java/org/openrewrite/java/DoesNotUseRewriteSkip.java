@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Set;
 
@@ -47,7 +48,7 @@ public class DoesNotUseRewriteSkip extends Recipe {
                 JavaSourceFile c = cu;
                 if (c == usesRewriteSkip.visit(c, ctx)) {
                     // if this source file is NOT skipped, then the recipe is applicable
-                    c = c.withMarkers(c.getMarkers().searchResult());
+                    c = SearchResult.found(c);
                 }
                 return c;
             }
@@ -69,7 +70,7 @@ public class DoesNotUseRewriteSkip extends Recipe {
                     c = c.withPackageDeclaration((J.Package) visit(c.getPackageDeclaration(), ctx, getCursor()));
                     if (skip.getArguments() == null || skip.getArguments().isEmpty()) {
                         // this annotation skips all recipes
-                        c = c.withMarkers(c.getMarkers().searchResult());
+                        c = SearchResult.found(c);
                     }
                 }
             }
@@ -83,7 +84,7 @@ public class DoesNotUseRewriteSkip extends Recipe {
                 assert literal.getValue() != null;
                 Recipe currentRecipe = ctx.getCurrentRecipe();
                 if (literal.getValue().toString().equals(currentRecipe.getClass().getName())) {
-                    l = l.withMarkers(l.getMarkers().searchResult());
+                    l = SearchResult.found(l);
                 }
             }
             return l;
@@ -95,7 +96,7 @@ public class DoesNotUseRewriteSkip extends Recipe {
             if (f.getSimpleName().equals("class")) {
                 Recipe currentRecipe = ctx.getCurrentRecipe();
                 if (TypeUtils.isOfClassType(f.getTarget().getType(), currentRecipe.getClass().getName())) {
-                    f = f.withMarkers(f.getMarkers().searchResult());
+                    f = SearchResult.found(f);
                 }
             }
             return f;

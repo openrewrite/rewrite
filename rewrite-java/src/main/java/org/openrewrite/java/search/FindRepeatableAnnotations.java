@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 public class FindRepeatableAnnotations extends Recipe {
 
@@ -43,7 +44,7 @@ public class FindRepeatableAnnotations extends Recipe {
             public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
                     if (isRepeatable(javaType)) {
-                        return cu.withMarkers(cu.getMarkers().searchResult());
+                        return SearchResult.found(cu);
                     }
                 }
                 return cu;
@@ -57,7 +58,7 @@ public class FindRepeatableAnnotations extends Recipe {
             @Override
             public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 if (isRepeatable(annotation.getType())) {
-                    return annotation.withMarkers(annotation.getMarkers().searchResult());
+                    return SearchResult.found(annotation);
                 }
                 return super.visitAnnotation(annotation, ctx);
             }

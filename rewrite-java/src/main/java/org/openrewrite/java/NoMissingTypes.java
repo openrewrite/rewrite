@@ -19,13 +19,12 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.SearchResult;
 
 /**
  * Puts a search result marker on a JavaSourceFile if there is no missing type information according to FindMissingTypes.
- * So when there _are_ missing types, no changes are made.
- *
- * The intended purpose is as a singleSourceApplicabilityTest() for recipes in danger of removing things they should not
- * when type information is missing.
+ * So when there _are_ missing types, no changes are made. The intended purpose is as a singleSourceApplicabilityTest()
+ * for recipes in danger of removing things they should not when type information is missing.
  */
 public class NoMissingTypes extends JavaVisitor<ExecutionContext> {
 
@@ -33,7 +32,7 @@ public class NoMissingTypes extends JavaVisitor<ExecutionContext> {
     public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext context) {
         JavaSourceFile cu2 = (JavaSourceFile) new FindMissingTypes().getVisitor().visit(cu, context);
         if(cu2 == cu) {
-            return cu.withMarkers(cu.getMarkers().searchResult("All AST elements have type information"));
+            return SearchResult.found(cu, "All AST elements have type information");
         }
         return cu;
     }

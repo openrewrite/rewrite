@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -71,11 +72,11 @@ public class FindLiterals extends Recipe {
                 if (literal.getValueSource() != null) {
                     if (literal.getType() == JavaType.Primitive.String) {
                         if (compiledPattern.matcher(literal.getValueSource().substring(1, literal.getValueSource().length() - 1)).matches()) {
-                            return literal.withMarkers(literal.getMarkers().searchResult());
+                            return SearchResult.found(literal);
                         }
                     }
                     if (compiledPattern.matcher(literal.getValueSource()).matches()) {
-                        return literal.withMarkers(literal.getMarkers().searchResult());
+                        return SearchResult.found(literal);
                     }
                 }
                 return literal;

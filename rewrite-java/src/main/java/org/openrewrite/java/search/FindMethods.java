@@ -27,6 +27,7 @@ import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.dataflow.LocalTaintFlowSpec;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -87,7 +88,7 @@ public class FindMethods extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (!flowEnabled) {
-                        m = m.withMarkers(m.getMarkers().searchResult());
+                        m = SearchResult.found(m);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(method)));
                     }
@@ -113,7 +114,7 @@ public class FindMethods extends Recipe {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
                     if (!flowEnabled) {
-                        n = n.withMarkers(n.getMarkers().searchResult());
+                        n = SearchResult.found(n);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(newClass)));
                     }

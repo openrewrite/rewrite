@@ -91,7 +91,7 @@ public class FindMissingTypes extends Recipe {
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
             if (!isWellFormedType(ident.getType()) && !isAllowedToHaveNullType(ident)) {
-                ident = ident.withMarkers(ident.getMarkers().searchResult("Identifier type is null"));
+                ident = SearchResult.found(ident, "Identifier type is null");
             }
             return ident;
         }
@@ -101,9 +101,9 @@ public class FindMissingTypes extends Recipe {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
             JavaType.Method type = mi.getMethodType();
             if (!isWellFormedType(type)) {
-                mi = mi.withMarkers(mi.getMarkers().searchResult("MethodInvocation type is null"));
+                mi = SearchResult.found(mi, "MethodInvocation type is null");
             } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
-                mi = mi.withMarkers(mi.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
+                mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
             }
             return mi;
         }
@@ -113,9 +113,9 @@ public class FindMissingTypes extends Recipe {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type)) {
-                md = md.withMarkers(md.getMarkers().searchResult("MethodDeclaration type is null"));
+                md = SearchResult.found(md, "MethodDeclaration type is null");
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
-                md = md.withMarkers(md.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
+                md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
             return md;
         }
@@ -125,18 +125,18 @@ public class FindMissingTypes extends Recipe {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
             if (!isWellFormedType(t)) {
-                return cd.withMarkers(cd.getMarkers().searchResult("ClassDeclaration type is null"));
+                return SearchResult.found(cd, "ClassDeclaration type is null");
             }
             if (!cd.getKind().name().equals(t.getKind().name())) {
-                cd = cd.withMarkers(cd.getMarkers().searchResult(
-                        " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind()));
+                cd = SearchResult.found(cd, 
+                        " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind());
             }
             J.CompilationUnit jc = getCursor().firstEnclosing(J.CompilationUnit.class);
             if (jc != null) {
                 J.Package pkg = jc.getPackageDeclaration();
                 if (pkg != null && t.getPackageName().equals(pkg.printTrimmed(getCursor()))) {
-                    cd = cd.withMarkers(cd.getMarkers().searchResult(
-                            " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor())));
+                    cd = SearchResult.found(cd,
+                            " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor()));
                 }
             }
             return cd;

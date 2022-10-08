@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -151,7 +152,7 @@ public class AddManagedDependency extends Recipe {
                         if (dependency != null) {
                             ResolvedDependency match = dependency.findDependency(ga[0], ga[1]);
                             if (match != null) {
-                                t = t.withMarkers(t.getMarkers().searchResult());
+                                t = SearchResult.found(t);
                             }
                         }
                     }

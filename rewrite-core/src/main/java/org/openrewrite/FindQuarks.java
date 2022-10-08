@@ -18,6 +18,7 @@ package org.openrewrite;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 
 @Value
@@ -46,7 +47,7 @@ public class FindQuarks extends Recipe {
             public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
                 if (sourceFile instanceof Quark &&
                         ((includeAll != null && includeAll) || sourceFile.getMarkers().findFirst(ParseExceptionResult.class).isPresent())) {
-                    return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());
+                    return SearchResult.found(sourceFile);
                 }
                 return sourceFile;
             }

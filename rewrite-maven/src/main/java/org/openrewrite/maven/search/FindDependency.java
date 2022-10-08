@@ -18,6 +18,7 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -68,7 +69,7 @@ public class FindDependency extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId)) {
-                    return tag.withMarkers(tag.getMarkers().searchResult());
+                    return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
             }
