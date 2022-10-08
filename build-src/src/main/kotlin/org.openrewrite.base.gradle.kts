@@ -19,7 +19,11 @@ repositories {
             url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
         }
     }
-    mavenCentral()
+    mavenCentral {
+        content {
+            excludeVersionByRegex(".+", ".+", ".+-rc[0-9]*")
+        }
+    }
 }
 
 configure<ContactsExtension> {
