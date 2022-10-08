@@ -86,7 +86,6 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
 
     @Test
     fun changeMethodDeclaration() = assertChanged(
-
         before = """
             class Test {
                 void MyMethod_with_über() {
@@ -96,6 +95,22 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
         after = """
             class Test {
                 void myMethodWithBer() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun changeCamelCaseMethodWithFirstLetterUpperCase() = assertChanged(
+        before = """
+            class Test {
+                void MyMethod() {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void myMethod() {
                 }
             }
         """
