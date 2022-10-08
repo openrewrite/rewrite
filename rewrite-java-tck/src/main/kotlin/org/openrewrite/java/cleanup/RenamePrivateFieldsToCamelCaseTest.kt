@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -24,7 +25,45 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RenamePrivateFieldsToCamelCase())
     }
-    
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2285")
+    @Test
+    fun doesNotRenameAssociatedIdentifiers() = rewriteRun(
+        {spec -> spec.expectedCyclesThatMakeChanges(2)},
+        java("""
+            class A {
+                private static String MY_STRING = "VAR";
+                void doSomething() {
+                    MY_STRING.toLowerCase();
+                    AB.INNER_STRING.toLowerCase();
+                }
+            
+                private static class AB {
+                    private static String INNER_STRING = "var";
+                    void doSomething() {
+                        MY_STRING.toLowerCase();
+                    }
+                }
+            }
+        """,
+        """
+            class A {
+                private static String myString = "VAR";
+                void doSomething() {
+                    myString.toLowerCase();
+                    AB.INNER_STRING.toLowerCase();
+                }
+            
+                private static class AB {
+                    private static String INNER_STRING = "var";
+                    void doSomething() {
+                        myString.toLowerCase();
+                    }
+                }
+            }
+        """)
+    )
+
     @Test
     fun doNotChangeStaticImports() = rewriteRun(
         java("""

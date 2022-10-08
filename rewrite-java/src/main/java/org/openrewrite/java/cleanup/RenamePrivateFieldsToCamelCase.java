@@ -119,18 +119,6 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
             return variable;
         }
 
-        @SuppressWarnings("all")
-        @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-            Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = (Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY");
-            for (J.VariableDeclarations.NamedVariable variableToRename : renameVariablesMap.keySet()) {
-                if (variableToRename.getSimpleName().equals(identifier.getSimpleName())) {
-                    return identifier;
-                }
-            }
-            return identifier;
-        }
-
         /**
          * Returns either the current block or a J.Type that may create a reference to a variable.
          * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
