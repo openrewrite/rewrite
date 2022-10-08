@@ -159,10 +159,8 @@ public interface Javadoc extends Tree {
         }
 
         @Override
-        public String printComment() {
-            PrintOutputCapture<Integer> print = new PrintOutputCapture<>(0);
-            new JavadocPrinter<Integer>().visit(this, print);
-            return print.getOut();
+        public <P> void printComment(Cursor cursor, PrintOutputCapture<P> print) {
+            new JavadocPrinter<P>().visit(this, print, new Cursor(cursor, this));
         }
     }
 
@@ -311,6 +309,7 @@ public interface Javadoc extends Tree {
             return new LineBreak(this.id, margin, this.markers);
         }
 
+        @SuppressWarnings("unchecked")
         public LineBreak withMarkers(Markers markers) {
             if (markers == this.markers) {
                 return this;
@@ -336,7 +335,7 @@ public interface Javadoc extends Tree {
         @Nullable
         public Reference getTreeReference() {
             if (tree != null && treeReference == null) {
-                treeReference = new Reference(Tree.randomId(), tree, null);
+                treeReference = new Reference(Tree.randomId(), Markers.EMPTY, tree, null);
             }
             return treeReference;
         }
@@ -390,7 +389,7 @@ public interface Javadoc extends Tree {
         @Nullable
         public Reference getNameReference() {
             if (name != null && nameReference == null) {
-                nameReference = new Reference(Tree.randomId(), name, null);
+                nameReference = new Reference(Tree.randomId(), Markers.EMPTY, name, null);
             }
             return nameReference;
         }
@@ -458,7 +457,7 @@ public interface Javadoc extends Tree {
         @Nullable
         public Reference getTreeReference() {
             if (tree != null && treeReference == null) {
-                treeReference = new Reference(Tree.randomId(), tree, null);
+                treeReference = new Reference(Tree.randomId(), Markers.EMPTY, tree, null);
             }
             return treeReference;
         }
@@ -693,6 +692,17 @@ public interface Javadoc extends Tree {
     class Reference implements Javadoc {
         @EqualsAndHashCode.Include
         UUID id;
+
+        /**
+         * Not truly nullable, but done for deserialization backwards compatibility since this
+         * field was accidentally omitted prior to 7.31.0.
+         */
+        @Nullable
+        Markers markers;
+
+        public Markers getMarkers() {
+            return markers == null ? Markers.EMPTY : markers;
+        }
 
         @Nullable
         J tree;

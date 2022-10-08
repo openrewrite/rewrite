@@ -87,10 +87,6 @@ public interface J extends Tree {
         return template.withTemplate(this, coordinates, parameters);
     }
 
-    <J2 extends J> J2 withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     /**
      * @return This tree, printed.
      * @deprecated This method doesn't print in a way that is

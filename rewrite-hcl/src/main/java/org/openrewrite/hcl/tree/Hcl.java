@@ -64,10 +64,6 @@ public interface Hcl extends Tree {
         return template.withTemplate(this, coordinates, parameters);
     }
 
-    <T extends Hcl> T withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor

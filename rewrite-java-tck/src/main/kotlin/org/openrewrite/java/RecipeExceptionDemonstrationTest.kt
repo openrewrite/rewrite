@@ -94,8 +94,8 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
             text(
                     null,
                     "~~(ERROR: Recipe applicable test failed with an exception.\n" +
-                        "org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: " +
-                        "Throwing on the project-level applicable test.)~~>Rewrite encountered an uncaught recipe error in org.openrewrite.java.RecipeExceptionDemonstration."
+                            "org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: Throwing on the project-level applicable test.)~~>" +
+                            "Rewrite encountered an uncaught recipe error in org.openrewrite.java.RecipeExceptionDemonstration."
             ) { spec -> spec.path("recipe-exception-1.txt") }
     )
 
@@ -224,6 +224,7 @@ interface RecipeExceptionDemonstrationTest : RewriteTest {
                     null,
                     "~~(ERROR: Recipe applicable test failed with an exception.\n" +
                         "org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.)~~>" +
+                            "org.openrewrite.java.RecipeExceptionDemonstration${'$'}DemonstrationException: Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.)~~>" +
                             "Rewrite encountered an uncaught recipe error in org.openrewrite.java.RecipeExceptionDemonstration."
             ) { spec -> spec.path("recipe-exception-1.txt") }
     )

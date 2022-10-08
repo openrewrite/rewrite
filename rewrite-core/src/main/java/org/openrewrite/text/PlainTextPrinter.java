@@ -15,27 +15,29 @@
  */
 package org.openrewrite.text;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.SearchResult;
+
+import java.util.function.UnaryOperator;
 
 public class PlainTextPrinter<P> extends PlainTextVisitor<PrintOutputCapture<P>> {
-    @Override
-    public PlainText visitText(PlainText text, PrintOutputCapture<P> p) {
-        visitMarkers(text.getMarkers(), p);
-        p.out.append(text.getText());
-        return text;
-    }
+    private static final UnaryOperator<String> TEXT_MARKER_WRAPPER =
+            out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-        if(marker instanceof SearchResult) {
-            String description = ((SearchResult) marker).getDescription();
-            p.out.append("~~")
-                    .append(description == null ? "" : "(" + description + ")~~")
-                    .append(">");
+    public PlainText visitText(PlainText text, PrintOutputCapture<P> p) {
+        for (Marker marker : text.getMarkers().getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
         }
-        //noinspection unchecked
-        return (M) marker;
+        visitMarkers(text.getMarkers(), p);
+        for (Marker marker : text.getMarkers().getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+        }
+        p.out.append(text.getText());
+        for (Marker marker : text.getMarkers().getMarkers()) {
+            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+        }
+        return text;
     }
 }

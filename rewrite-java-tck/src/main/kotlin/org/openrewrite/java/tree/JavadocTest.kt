@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
@@ -1473,7 +1474,7 @@ interface JavadocTest : JavaTreeTest {
             }
         }.visit(cu, 0) as J.CompilationUnit
 
-        Assertions.assertThat(cu.printAll()).isEqualTo(
+        assertThat(cu.printAll()).isEqualTo(
             """
             /**
              *   ~~(hello)~~>{@link #n }

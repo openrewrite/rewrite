@@ -297,7 +297,7 @@ public interface G extends J {
         }
 
         @Override
-        public <J2 extends J> J2 withMarkers(Markers markers) {
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
             return (J2) withExpression(expression.withMarkers(markers));
         }
 

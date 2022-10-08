@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 
 import java.util.UUID;
 
@@ -45,6 +46,10 @@ public interface Tree {
      * @return A unique identifier
      */
     UUID getId();
+
+    Markers getMarkers();
+
+    <T extends Tree> T withMarkers(Markers markers);
 
     <T extends Tree> T withId(UUID id);
 
@@ -79,28 +84,23 @@ public interface Tree {
         return cursor.firstEnclosingOrThrow(SourceFile.class).printer(cursor);
     }
 
-    default <P> String print(P p, Cursor cursor) {
-        PrintOutputCapture<P> outputCapture = new PrintOutputCapture<>(p);
-        this.<P>printer(cursor).visit(this, outputCapture, cursor);
-        return outputCapture.out.toString();
+    default String print(Cursor cursor) {
+        return print(cursor, new PrintOutputCapture<>(0));
     }
 
-    default <P> String print(P p, TreeVisitor<?, PrintOutputCapture<P>> printer) {
-        PrintOutputCapture<P> outputCapture = new PrintOutputCapture<>(p);
+    default <P> String print(Cursor cursor, PrintOutputCapture<P> out) {
+        this.<P>printer(cursor).visit(this, out, cursor);
+        return out.out.toString();
+    }
+
+    default <P> String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
+        PrintOutputCapture<Integer> outputCapture = new PrintOutputCapture<>(0);
         printer.visit(this, outputCapture);
         return outputCapture.out.toString();
     }
 
-    default String print(Cursor cursor) {
-        return print(0, cursor);
-    }
-
-    default String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
-        return print(0, printer);
-    }
-
     default <P> String printTrimmed(P p, Cursor cursor) {
-        return StringUtils.trimIndent(print(p, cursor));
+        return StringUtils.trimIndent(print(cursor, new PrintOutputCapture<>(p)));
     }
 
     default String printTrimmed(Cursor cursor) {

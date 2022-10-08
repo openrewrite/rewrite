@@ -19,7 +19,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.RecipesThatMadeChanges;
@@ -27,23 +26,22 @@ import org.openrewrite.marker.RecipesThatMadeChanges;
 import java.util.StringJoiner;
 
 public class MarkerIdPrinter extends TreeVisitor<Tree, PrintOutputCapture<ExecutionContext>> {
+
     @Override
-    public Tree visit(@Nullable Tree tree, PrintOutputCapture<ExecutionContext> p) {
-        if (tree instanceof Markers && !((Markers) tree).getMarkers().isEmpty()) {
-            StringJoiner markerIdJoiner = new StringJoiner(",");
-            for (Marker marker : ((Markers) tree).entries()) {
-                if (!(marker instanceof RecipesThatMadeChanges)) {
-                    markerIdJoiner.add(Integer.toString(marker.hashCode()));
-                }
-            }
-            String markerIds = markerIdJoiner.toString();
-            if (!markerIds.isEmpty()) {
-                p.out
-                        .append("m[")
-                        .append(markerIds)
-                        .append("]->");
+    public Markers visitMarkers(Markers markers, PrintOutputCapture<ExecutionContext> p) {
+        StringJoiner markerIdJoiner = new StringJoiner(",");
+        for (Marker marker : markers.entries()) {
+            if (!(marker instanceof RecipesThatMadeChanges)) {
+                markerIdJoiner.add(Integer.toString(marker.hashCode()));
             }
         }
-        return super.visit(tree, p);
+        String markerIds = markerIdJoiner.toString();
+        if (!markerIds.isEmpty()) {
+            p.out
+                    .append("m[")
+                    .append(markerIds)
+                    .append("]->");
+        }
+        return markers;
     }
 }

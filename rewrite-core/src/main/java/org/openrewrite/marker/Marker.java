@@ -18,14 +18,29 @@ package org.openrewrite.marker;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.Cursor;
+
+import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public interface Marker extends Tree {
-    @Override
-    default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return false;
+public interface Marker {
+    /**
+     * An id that can be used to identify a particular marker, even after transformations have taken place on it
+     *
+     * @return A unique identifier
+     */
+    UUID getId();
+
+    <M extends Marker> M withId(UUID id);
+
+    /**
+     * @param cursor The cursor at the point where the marker is being visited.
+     * @param commentWrapper A function that wraps arbitrary text in a multi-line comment that is language-specific.
+     * @return The printed representation of the marker.
+     */
+    default String print(Cursor cursor, UnaryOperator<String> commentWrapper) {
+        return "";
     }
 }

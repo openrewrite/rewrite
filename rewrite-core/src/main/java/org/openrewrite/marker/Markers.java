@@ -32,7 +32,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
-public class Markers implements Tree {
+public class Markers {
     public static final Markers EMPTY = new Markers(randomId(), emptyList());
 
     UUID id;
@@ -161,16 +161,21 @@ public class Markers implements Tree {
                 .findFirst();
     }
 
+    /**
+     * @deprecated Use {@link SearchResult#found(Tree)} instead.
+     * @return A markers instance with a search result added.
+     */
+    @Deprecated
     public Markers searchResult() {
         return searchResult(null);
     }
 
+    /**
+     * @deprecated Use {@link SearchResult#found(Tree, String)} instead.
+     * @return A markers instance with a search result added.
+     */
+    @Deprecated
     public Markers searchResult(@Nullable String description) {
         return computeByType(new SearchResult(randomId(), description), (s1, s2) -> s1 == null ? s2 : s1);
-    }
-
-    @Override
-    public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return false;
     }
 }

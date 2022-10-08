@@ -21,7 +21,6 @@ import org.openrewrite.RecipeRunException;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.lang.reflect.Method;
 import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
@@ -90,12 +89,12 @@ public abstract class Markup extends SearchResult {
         return markup(t, Level.WARNING, message, throwable);
     }
 
-    public static <T extends Tree> T info(T t, String message, Throwable throwable) {
-        return markup(t, Level.INFO, message, throwable);
+    public static <T extends Tree> T info(T t, String message) {
+        return markup(t, Level.INFO, message, null);
     }
 
-    public static <T extends Tree> T debug(T t, String message, Throwable throwable) {
-        return markup(t, Level.DEBUG, message, throwable);
+    public static <T extends Tree> T debug(T t, String message) {
+        return markup(t, Level.DEBUG, message, null);
     }
 
     private static <T extends Tree> T markup(T t, Level level, String message, @Nullable Throwable throwable) {
@@ -106,33 +105,23 @@ public abstract class Markup extends SearchResult {
             rre = new RecipeRunException(throwable);
         }
 
-        try {
-            Method getMarkers = t.getClass().getDeclaredMethod("getMarkers");
-            Method withMarkers = t.getClass().getDeclaredMethod("withMarkers", Markers.class);
-            Markers markers = (Markers) getMarkers.invoke(t);
-
-            Markup markup;
-            switch (level) {
-                case DEBUG:
-                    markup = new Markup.Debug(randomId(), message);
-                    break;
-                case INFO:
-                    markup = new Markup.Info(randomId(), message);
-                    break;
-                case WARNING:
-                    markup = new Markup.Warn(randomId(), message, rre);
-                    break;
-                case ERROR:
-                default:
-                    markup = new Markup.Error(randomId(), message, requireNonNull(rre));
-                    break;
-            }
-
-            //noinspection unchecked
-            return (T) withMarkers.invoke(t, markers
-                    .computeByType(markup, (s1, s2) -> s1 == null ? s2 : s1));
-        } catch (Throwable ignored) {
-            return t;
+        Markup markup;
+        switch (level) {
+            case DEBUG:
+                markup = new Markup.Debug(randomId(), message);
+                break;
+            case INFO:
+                markup = new Markup.Info(randomId(), message);
+                break;
+            case WARNING:
+                markup = new Markup.Warn(randomId(), message, rre);
+                break;
+            case ERROR:
+            default:
+                markup = new Markup.Error(randomId(), message, requireNonNull(rre));
+                break;
         }
+
+        return t.withMarkers(t.getMarkers().computeByType(markup, (s1, s2) -> s1 == null ? s2 : s1));
     }
 }

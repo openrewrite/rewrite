@@ -59,10 +59,6 @@ public interface Yaml extends Tree {
 
     Yaml withPrefix(String prefix);
 
-    <Y extends Yaml> Y withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

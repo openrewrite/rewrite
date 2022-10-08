@@ -50,10 +50,6 @@ public interface Properties extends Tree {
 
     Properties withPrefix(String prefix);
 
-    <T extends Properties> T withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -126,13 +122,18 @@ public interface Properties extends Tree {
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Value {
+    class Value implements Properties {
         @EqualsAndHashCode.Include
         UUID id;
 
         String prefix;
         Markers markers;
         String text;
+
+        @Override
+        public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
+            return v.visitValue(this, p);
+        }
     }
 
     @lombok.Value

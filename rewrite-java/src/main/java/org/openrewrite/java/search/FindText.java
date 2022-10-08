@@ -78,8 +78,10 @@ public class FindText extends Recipe {
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext context) {
                 return space.withComments(ListUtils.map(space.getComments(), comment -> {
                     if(comment instanceof TextComment) {
-                        if (compiledPatterns.stream().anyMatch(p -> p.matcher(((TextComment) comment).getText()).find())) {
-                            return comment.withMarkers(comment.getMarkers().searchResult());
+                        for (Pattern p : compiledPatterns) {
+                            if (p.matcher(((TextComment) comment).getText()).find()) {
+                                return comment.withMarkers(comment.getMarkers().searchResult());
+                            }
                         }
                     }
                     return comment;

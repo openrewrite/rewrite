@@ -25,6 +25,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -1978,7 +1979,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     ).scan(commentTree, new ArrayList<>(1)));
                     break;
                 } else {
-                    commentCursor += comment.printComment().length() + comment.getSuffix().length();
+                    commentCursor += comment.printComment(new Cursor(null, "root")).length() + comment.getSuffix().length();
                 }
             }
 
