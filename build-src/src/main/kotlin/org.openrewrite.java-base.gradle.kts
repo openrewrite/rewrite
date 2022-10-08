@@ -18,7 +18,15 @@ java {
 
 configurations.all {
     exclude("com.google.errorprone", "*")
-    resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
+    resolutionStrategy {
+        cacheDynamicVersionsFor(0, "seconds")
+        eachDependency {
+            if(requested.group.startsWith("com.fasterxml.jackson") && requested.version!!.startsWith("2.14.0-rc")) {
+                useVersion("2.13.4")
+                because("No release candidates, only real releases")
+            }
+        }
+    }
 }
 
 tasks.withType<KotlinCompile>().configureEach {

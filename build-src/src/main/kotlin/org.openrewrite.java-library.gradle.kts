@@ -9,6 +9,7 @@ dependencies {
     compileOnly("org.projectlombok:lombok:latest.release")
     testCompileOnly("org.projectlombok:lombok:latest.release")
     annotationProcessor("org.projectlombok:lombok:latest.release")
+    api(platform("com.fasterxml.jackson:jackson-bom:latest.release"))
 
     implementation("org.jetbrains:annotations:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")

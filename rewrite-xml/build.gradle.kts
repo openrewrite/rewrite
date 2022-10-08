@@ -19,7 +19,7 @@ tasks.register<JavaExec>("generateAntlrSources") {
 dependencies {
     api(project(":rewrite-core"))
     api("org.jetbrains:annotations:latest.release")
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations")
 
     compileOnly(project(":rewrite-test"))
     compileOnly(platform(kotlin("bom")))

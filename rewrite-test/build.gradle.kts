@@ -35,5 +35,5 @@ dependencies {
     // FindRepeatableAnnotationsTest
     implementation("org.mapstruct:mapstruct:latest.release")
 
-    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
+    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
 }
