@@ -122,7 +122,7 @@ interface AutodetectTest {
         val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
 
         assertThat(tabsAndIndents.useTabCharacter).isFalse
-        assertThat(tabsAndIndents.tabSize).isEqualTo(1)
+        assertThat(tabsAndIndents.tabSize).isEqualTo(2)
         assertThat(tabsAndIndents.indentSize).isEqualTo(2)
         assertThat(tabsAndIndents.continuationIndent).isEqualTo(4)
     }
@@ -153,7 +153,7 @@ interface AutodetectTest {
         val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
 
         assertThat(tabsAndIndents.useTabCharacter).isFalse
-        assertThat(tabsAndIndents.tabSize).isEqualTo(1)
+        assertThat(tabsAndIndents.tabSize).isEqualTo(4)
         assertThat(tabsAndIndents.indentSize).isEqualTo(4)
         assertThat(tabsAndIndents.continuationIndent).isEqualTo(8)
     }

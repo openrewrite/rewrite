@@ -250,6 +250,9 @@ public class Autodetect extends NamedStyles {
         @Override
         public Space visitSpace(Space space, Space.Location loc, IndentStatistics stats) {
             String prefix = space.getWhitespace();
+            if(!prefix.contains("\n")) {
+                return space;
+            }
             char[] chars = prefix.toCharArray();
 
             int spaceIndent = 0;
