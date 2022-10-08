@@ -16,38 +16,55 @@
 package org.openrewrite.gradle
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.gradle.Assertions.buildGradle
+import org.openrewrite.test.RewriteTest
 
-class UpgradePluginVersionTest : GradleRecipeTest {
+class UpgradePluginVersionTest : RewriteTest {
 
     @Test
-    fun upgradePlugin() = assertChanged(
-        recipe = UpgradePluginVersion("com.jfrog.bintray", "latest.patch", null),
-        before = """
+    fun upgradePlugin() = rewriteRun(
+        { spec -> spec.recipe(UpgradePluginVersion("com.jfrog.bintray", "latest.patch", null)) },
+        buildGradle("""
             plugins {
                 id 'com.jfrog.bintray' version '1.7.0'
                 id 'com.github.johnrengelman.shadow' version '6.1.0'
             }
         """,
-        after = """
+        """
             plugins {
                 id 'com.jfrog.bintray' version '1.7.3'
                 id 'com.github.johnrengelman.shadow' version '6.1.0'
             }
-        """
+        """)
     )
 
     @Test
-    fun upgradePluginGlob() = assertChanged(
-        recipe = UpgradePluginVersion("com.jfrog.*", "1.8.X", null),
-        before = """
+    fun upgradePluginGlob() = rewriteRun(
+        { spec -> spec.recipe(UpgradePluginVersion("com.jfrog.*", "1.8.X", null)) },
+        buildGradle("""
             plugins {
                 id 'com.jfrog.bintray' version '1.8.2'
             }
         """,
-        after = """
+        """
             plugins {
                 id 'com.jfrog.bintray' version '1.8.5'
             }
-        """
+        """)
+    )
+
+    @Test
+    fun exactVersionDoesNotHaveToBeResolvable() = rewriteRun(
+        { spec -> spec.recipe(UpgradePluginVersion("com.madeup.doesnotexist", "2.0", null)) },
+        buildGradle("""
+            plugins {
+                id 'com.madeup.doesnotexist' version '1.0'
+            }
+        """,
+            """
+            plugins {
+                id 'com.madeup.doesnotexist' version '2.0'
+            }
+        """)
     )
 }
