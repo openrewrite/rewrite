@@ -37,7 +37,7 @@ public class SearchResult implements Marker {
     String description;
 
     public static <T extends Tree> T found(@Nullable T t) {
-        return found(null, null);
+        return found(t, null);
     }
 
     public static <T extends Tree> T found(@Nullable T t, @Nullable String description) {
