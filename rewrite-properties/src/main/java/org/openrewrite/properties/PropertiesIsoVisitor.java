@@ -32,9 +32,4 @@ public class PropertiesIsoVisitor<P> extends PropertiesVisitor<P> {
     public Properties.Entry visitEntry(Properties.Entry entry, P p) {
         return (Properties.Entry) super.visitEntry(entry, p);
     }
-
-    @Override
-    public Properties.Value visitValue(Properties.Value value, P p) {
-        return (Properties.Value) super.visitValue(value, p);
-    }
 }

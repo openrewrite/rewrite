@@ -18,6 +18,7 @@ package org.openrewrite.properties.internal;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
@@ -40,17 +41,11 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
         p.out.append(entry.getKey())
                 .append(entry.getBeforeEquals())
                 .append('=');
-        visit(entry.getValue(), p);
+        beforeSyntax(entry.getValue().getPrefix(), entry.getValue().getMarkers(), p);
+        p.out.append(entry.getValue().getText());
+        afterSyntax(entry.getValue().getMarkers(), p);
         afterSyntax(entry, p);
         return entry;
-    }
-
-    @Override
-    public Properties visitValue(Properties.Value value, PrintOutputCapture<P> p) {
-        beforeSyntax(value, p);
-        p.out.append(value.getText());
-        afterSyntax(value, p);
-        return value;
     }
 
     @Override
@@ -65,18 +60,26 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
             out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
 
     private void beforeSyntax(Properties props, PrintOutputCapture<P> p) {
-        for (Marker marker : props.getMarkers().getMarkers()) {
+        beforeSyntax(props.getPrefix(), props.getMarkers(), p);
+    }
+
+    private void beforeSyntax(String prefix, Markers markers, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
             p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
         }
-        p.out.append(props.getPrefix());
-        visitMarkers(props.getMarkers(), p);
-        for (Marker marker : props.getMarkers().getMarkers()) {
+        p.out.append(prefix);
+        visitMarkers(markers, p);
+        for (Marker marker : markers.getMarkers()) {
             p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
         }
     }
 
     private void afterSyntax(Properties props, PrintOutputCapture<P> p) {
-        for (Marker marker : props.getMarkers().getMarkers()) {
+        afterSyntax(props.getMarkers(), p);
+    }
+
+    private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
             p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
         }
     }

@@ -42,14 +42,7 @@ public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
     public Properties visitEntry(Properties.Entry entry, P p) {
         Properties.Entry e = entry;
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        e = e.withValue((Properties.Value) visit(e.getValue(), p));
         return e;
-    }
-
-    public Properties visitValue(Properties.Value value, P p) {
-        Properties.Value v = value;
-        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
-        return v;
     }
 
     public Properties visitComment(Properties.Comment comment, P p) {
