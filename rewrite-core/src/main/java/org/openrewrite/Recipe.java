@@ -256,12 +256,16 @@ public abstract class Recipe implements Cloneable {
 
     /**
      * Override this to generate new source files or delete source files.
+     * Note that here, as throughout OpenRewrite, we use referential equality to detect that a change has occured.
+     * To indicate to rewrite that the recipe has made changes a different instance must be returned than the instance
+     * passed in as "before".
+     *
+     * Currently, the list passed in as "before" is not immutable, but you should treat it as such anyway.
      *
      * @param before The set of source files to operate on.
      * @param ctx    The current execution context.
      * @return A set of source files, with some files potentially added/deleted/modified.
      */
-    @SuppressWarnings("unused")
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         return before;
     }
