@@ -116,7 +116,7 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
                 ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(variable.getSimpleName());
             }
 
-            return variable;
+            return super.visitVariable(variable, ctx);
         }
 
         /**

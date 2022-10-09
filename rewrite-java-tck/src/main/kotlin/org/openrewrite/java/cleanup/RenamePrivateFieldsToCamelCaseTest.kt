@@ -26,6 +26,25 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
         spec.recipe(RenamePrivateFieldsToCamelCase())
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2294")
+    @Test
+    fun nameConflict() = rewriteRun(
+        java("""
+            class A {
+                private final String _val = "";
+                private void a() {
+                    if (true) {
+                        Thread t = new Thread(){
+                            public void run() {
+                                String val = _val;
+                            }
+                        };
+                    }
+                }
+            }
+        """)
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2285")
     @Test
     fun doesNotRenameAssociatedIdentifiers() = rewriteRun(
