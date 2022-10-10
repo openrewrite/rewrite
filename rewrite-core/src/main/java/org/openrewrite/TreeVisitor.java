@@ -195,6 +195,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @Incubating(since = "7.31.0")
+    public P reduce(Iterable<? extends Tree> trees, P p) {
+        for (Tree tree : trees) {
+            visit(tree, p);
+        }
+        return p;
+    }
+
+    @Incubating(since = "7.31.0")
     public P reduce(Tree tree, P p) {
         visit(tree, p);
         return p;
