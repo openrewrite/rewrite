@@ -395,6 +395,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RecipeExceptionDemonstrationTck : RecipeExceptionDemonstrationTest
 
     @Nested
+    inner class RecipeMarkupDemonstrationTck : RecipeMarkupDemonstrationTest
+
+    @Nested
     inner class RedundantFileCreationTck : RedundantFileCreationTest
 
     @Nested

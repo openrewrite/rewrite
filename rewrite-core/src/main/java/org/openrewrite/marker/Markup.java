@@ -46,10 +46,15 @@ public abstract class Markup extends SearchResult {
 
     public static class Error extends Markup {
         @Getter
+        @Nullable
         private final RecipeRunException exception;
 
-        public Error(UUID id, String message, RecipeRunException exception) {
-            super(id, "ERROR: " + message, exception.getSanitizedStackTrace());
+        public Error(UUID id, String message, @Nullable RecipeRunException exception) {
+            super(
+                    id,
+                    message,
+                    exception == null ? null : exception.getSanitizedStackTrace()
+            );
             this.exception = exception;
         }
     }
@@ -97,7 +102,11 @@ public abstract class Markup extends SearchResult {
         return markup(t, Level.DEBUG, message, null);
     }
 
-    private static <T extends Tree> T markup(T t, Level level, String message, @Nullable Throwable throwable) {
+    public static <T extends Tree> T markup(T t, Level level, String message) {
+        return markup(t, level, message, null);
+    }
+
+    public static <T extends Tree> T markup(T t, Level level, String message, @Nullable Throwable throwable) {
         RecipeRunException rre = null;
         if (throwable instanceof RecipeRunException) {
             rre = (RecipeRunException) throwable;
@@ -118,7 +127,7 @@ public abstract class Markup extends SearchResult {
                 break;
             case ERROR:
             default:
-                markup = new Markup.Error(randomId(), message, requireNonNull(rre));
+                markup = new Markup.Error(randomId(), message, rre);
                 break;
         }
 
