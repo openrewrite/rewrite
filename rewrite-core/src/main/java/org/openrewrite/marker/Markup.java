@@ -23,17 +23,19 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.UUID;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
+@Getter
 @Incubating(since = "7.31.0")
 public abstract class Markup extends SearchResult {
-    @Getter
     @Nullable
     private final String detail;
 
-    public Markup(UUID id, String message, @Nullable String detail) {
+    private final Level level;
+
+    public Markup(UUID id, Level level, String message, @Nullable String detail) {
         super(id, message + (detail != null ? "\n" + detail : ""));
+        this.level = level;
         this.detail = detail;
     }
 
@@ -52,6 +54,7 @@ public abstract class Markup extends SearchResult {
         public Error(UUID id, String message, @Nullable RecipeRunException exception) {
             super(
                     id,
+                    Level.ERROR,
                     message,
                     exception == null ? null : exception.getSanitizedStackTrace()
             );
@@ -67,6 +70,7 @@ public abstract class Markup extends SearchResult {
         public Warn(UUID id, String message, @Nullable RecipeRunException exception) {
             super(
                     id,
+                    Level.WARNING,
                     message,
                     exception == null ? null : exception.getSanitizedStackTrace()
             );
@@ -76,13 +80,13 @@ public abstract class Markup extends SearchResult {
 
     public static class Info extends Markup {
         public Info(UUID id, String message) {
-            super(id, message, null);
+            super(id, Level.INFO, message, null);
         }
     }
 
     public static class Debug extends Markup {
         public Debug(UUID id, String message) {
-            super(id, message, null);
+            super(id, Level.DEBUG, message, null);
         }
     }
 
