@@ -204,7 +204,7 @@ public class Result {
                 afterPath,
                 relativeTo,
                 before == null ? "" : before.printAll(out),
-                after == null ? "" : after.printAll(out),
+                after == null ? "" : after.printAll(out.clone()),
                 recipes.stream().map(Stack::peek).collect(Collectors.toSet())
         )) {
             this.relativeTo = relativeTo;

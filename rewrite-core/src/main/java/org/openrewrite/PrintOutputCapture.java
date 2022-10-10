@@ -20,7 +20,7 @@ import org.openrewrite.marker.Marker;
 
 import java.util.function.UnaryOperator;
 
-public class PrintOutputCapture<P> {
+public class PrintOutputCapture<P> implements Cloneable{
     private final P p;
     private final MarkerPrinter markerPrinter;
     public final StringBuilder out = new StringBuilder();
@@ -58,6 +58,12 @@ public class PrintOutputCapture<P> {
     public PrintOutputCapture<P> append(char c) {
         out.append(c);
         return this;
+    }
+
+    @SuppressWarnings("MethodDoesntCallSuperMethod")
+    @Override
+    public PrintOutputCapture<P> clone() {
+        return new PrintOutputCapture<>(p, markerPrinter);
     }
 
     @Incubating(since = "7.31.0")
