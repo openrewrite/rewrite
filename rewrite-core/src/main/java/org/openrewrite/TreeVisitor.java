@@ -29,10 +29,12 @@ import org.openrewrite.marker.Markers;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -167,6 +169,41 @@ public abstract class TreeVisitor<T extends Tree, P> {
         T t = visit(tree, p, parent);
         assert t != null;
         return t;
+    }
+
+    @Incubating(since = "7.31.0")
+    public static <R extends Tree, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
+                                                                      Tree tree, C initial) {
+        return collect(visitor, tree, initial, Tree.class, t -> (R) t);
+    }
+
+    @Incubating(since = "7.31.0")
+    public static <U extends Tree, R, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
+                                                                         Tree tree, C initial, Class<U> matchOn,
+                                                                         Function<U, R> map) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.addObserver(new TreeObserver.Subscription(new TreeObserver() {
+            @Override
+            public Tree treeChanged(Cursor cursor, Tree newTree) {
+                initial.add(map.apply(matchOn.cast(newTree)));
+                return newTree;
+            }
+        }).subscribeToType(matchOn));
+
+        visitor.visit(tree, ctx);
+        return initial;
+    }
+
+    @Incubating(since = "7.31.0")
+    public P reduce(Tree tree, P p) {
+        visit(tree, p);
+        return p;
+    }
+
+    @Incubating(since = "7.31.0")
+    public P reduce(Tree tree, P p, Cursor parent) {
+        visit(tree, p, parent);
+        return p;
     }
 
     @Nullable
@@ -325,7 +362,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                "type hierarhcy of visitor " + getClass().getName());
+                                           "type hierarhcy of visitor " + getClass().getName());
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {

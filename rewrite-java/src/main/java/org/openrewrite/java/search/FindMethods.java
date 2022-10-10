@@ -15,7 +15,8 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -31,6 +32,8 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
+
+import static org.openrewrite.TreeVisitor.collect;
 
 /**
  * Finds matching method invocations.
@@ -162,27 +165,9 @@ public class FindMethods extends Recipe {
      * @return A set of {@link J.MethodInvocation} and {@link J.MemberReference} representing calls to this method.
      */
     public static Set<J> find(J j, String methodPattern) {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
-        JavaIsoVisitor<Set<J>> findVisitor = new JavaIsoVisitor<Set<J>>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<J> ms) {
-                if (methodMatcher.matches(method)) {
-                    ms.add(method);
-                }
-                return super.visitMethodInvocation(method, ms);
-            }
-
-            @Override
-            public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<J> ms) {
-                if (methodMatcher.matches(memberRef.getMethodType())) {
-                    ms.add(memberRef);
-                }
-                return super.visitMemberReference(memberRef, ms);
-            }
-        };
-
-        Set<J> ms = new HashSet<>();
-        findVisitor.visit(j, ms);
-        return ms;
+        return TreeVisitor.collect(
+                new FindMethods(methodPattern, null, null).getVisitor(),
+                j, new HashSet<>()
+        );
     }
 }
