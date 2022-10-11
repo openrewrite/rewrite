@@ -16,19 +16,20 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface LambdaBlockToExpressionTest: JavaRecipeTest {
-    override val recipe: Recipe
-        get() = LambdaBlockToExpression()
+interface LambdaBlockToExpressionTest: RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(LambdaBlockToExpression());
+    }
 
     @Suppress("CodeBlock2Expr")
     @Test
-    fun simplifyLambdaBlockToExpression(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun simplifyLambdaBlockToExpression() = rewriteRun(
+        java("""
             import java.util.function.Function;
             class Test {
                 Function<Integer, Integer> f = n -> {
@@ -36,11 +37,11 @@ interface LambdaBlockToExpressionTest: JavaRecipeTest {
                 };
             }
         """,
-        after = """
+        """
             import java.util.function.Function;
             class Test {
                 Function<Integer, Integer> f = n -> n+1;
             }
-        """
+        """)
     )
 }
