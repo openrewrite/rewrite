@@ -24,6 +24,29 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 class MergeYamlTest implements RewriteTest {
 
+    @Issue("https://github.com/moderneinc/support-public/issues/5")
+    @Test
+    void scalarList() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$.on",
+            """
+                    schedule:
+                        - cron: "0 18 * * *"
+              """,
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+                  name: Github Actions workflow
+                  on: [workflow_dispatch]
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1469")
     @Test
     void emptyDocument() {
