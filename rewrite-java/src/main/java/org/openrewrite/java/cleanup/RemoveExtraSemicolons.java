@@ -58,15 +58,12 @@ public class RemoveExtraSemicolons extends Recipe {
                 if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) {
                     return null;
                 }
-                return super.visitEmpty(empty, ctx);
+                return empty;
             }
 
             @Override
-            public J.Try visitTry(J.Try tryable, ExecutionContext ctx) {
-                return tryable.withResources(ListUtils.map(tryable.getResources(), r -> r.withTerminatedWithSemicolon(false)))
-                        .withBody((J.Block) super.visit(tryable.getBody(), ctx))
-                        .withCatches(ListUtils.map(tryable.getCatches(), c -> (J.Try.Catch) super.visit(c, ctx)))
-                        .withFinally((J.Block) super.visit(tryable.getFinally(), ctx));
+            public J.Try.Resource visitTryResource(J.Try.Resource tr, ExecutionContext executionContext) {
+                return tr.withTerminatedWithSemicolon(false);
             }
 
             @Override
