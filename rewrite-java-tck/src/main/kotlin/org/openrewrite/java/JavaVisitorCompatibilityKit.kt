@@ -248,6 +248,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindTextTck : FindTextTest
 
     @Nested
+    inner class FindImportsTck : FindImportsTest
+
+    @Nested
     inner class FindTypesTck : FindTypesTest
 
     @Nested
