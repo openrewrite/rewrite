@@ -67,7 +67,7 @@ recipeList:
   - org.openrewrite.java.cleanup.RenameLocalVariablesToCamelCase
   - org.openrewrite.java.cleanup.RenameMethodsNamedHashcodeEqualOrTostring
   - org.openrewrite.java.cleanup.RenamePrivateFieldsToCamelCase
-#  - org.openrewrite.java.cleanup.ReplaceLambdaWithMethodReference
+  - org.openrewrite.java.cleanup.ReplaceLambdaWithMethodReference
   - org.openrewrite.java.cleanup.SimplifyBooleanExpression
   - org.openrewrite.java.cleanup.SimplifyBooleanReturn
   - org.openrewrite.java.cleanup.StaticMethodNotFinal
