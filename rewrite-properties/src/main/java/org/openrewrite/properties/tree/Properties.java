@@ -127,13 +127,19 @@ public interface Properties extends Tree {
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Value {
+    class Value implements Content {
         @EqualsAndHashCode.Include
         UUID id;
 
         String prefix;
         Markers markers;
         String text;
+
+        @Override
+        public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
+            return v.visitValue(this, p);
+        }
+
     }
 
     @lombok.Value

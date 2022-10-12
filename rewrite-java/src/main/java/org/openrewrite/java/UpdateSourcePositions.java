@@ -41,7 +41,7 @@ public class UpdateSourcePositions extends Recipe {
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         Map<Tree, Range> positionMap = new IdentityHashMap<>();
-        PositionPrintOutputCapture ppoc = new PositionPrintOutputCapture();
+        PositionPrintOutputCapture ppoc = new PositionPrintOutputCapture(new InMemoryExecutionContext());
 
         JavaPrinter<ExecutionContext> printer = new JavaPrinter<ExecutionContext>() {
             final JavaPrinter<ExecutionContext> spacePrinter = new JavaPrinter<>();
@@ -54,12 +54,12 @@ public class UpdateSourcePositions extends Recipe {
 
                 J t = (J) tree;
 
-                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
+                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(new InMemoryExecutionContext(), ppoc.getPosition());
                 spacePrinter.visitSpace(t.getPrefix(), Space.Location.ANY, prefix);
 
-                Range.Position startPosition = new Range.Position(prefix.pos, prefix.line, prefix.column);
+                Range.Position startPosition = prefix.getPosition();
                 t = super.visit(tree, outputCapture);
-                Range.Position endPosition = new Range.Position(ppoc.pos, ppoc.line, ppoc.column);
+                Range.Position endPosition = ppoc.getPosition();
                 positionMap.put(t, new Range(randomId(), startPosition, endPosition));
 
                 return t;
@@ -71,12 +71,12 @@ public class UpdateSourcePositions extends Recipe {
                     return;
                 }
 
-                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
+                PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(new InMemoryExecutionContext(), ppoc.getPosition());
                 spacePrinter.visitSpace(modifier.getPrefix(), Space.Location.ANY, prefix);
 
-                Range.Position startPosition = new Range.Position(prefix.pos, prefix.line, prefix.column);
+                Range.Position startPosition = prefix.getPosition();
                 super.visitModifier(modifier, p);
-                Range.Position endPosition = new Range.Position(ppoc.pos, ppoc.line, ppoc.column);
+                Range.Position endPosition = ppoc.getPosition();
                 positionMap.put(modifier, new Range(randomId(), startPosition, endPosition));
             }
 
@@ -105,57 +105,4 @@ public class UpdateSourcePositions extends Recipe {
         };
     }
 
-    private static class PositionPrintOutputCapture extends PrintOutputCapture<ExecutionContext> {
-        int pos = 0;
-        int line = 1;
-        int column = 0;
-        private boolean lineBoundary;
-
-        public PositionPrintOutputCapture() {
-            super(new InMemoryExecutionContext());
-        }
-
-        public PositionPrintOutputCapture(int pos, int line, int column) {
-            this();
-            this.pos = pos;
-            this.line = line;
-            this.column = column;
-        }
-
-        @Override
-        public PrintOutputCapture<ExecutionContext> append(char c) {
-            pos++;
-            if (lineBoundary) {
-                line++;
-                column = 0;
-                lineBoundary = false;
-            } else {
-                column++;
-            }
-            if (c == '\n') {
-                lineBoundary = true;
-            }
-            return super.append(c);
-        }
-
-        @Override
-        public PrintOutputCapture<ExecutionContext> append(@Nullable String text) {
-            if (text != null) {
-                if (lineBoundary) {
-                    line++;
-                    column = 0;
-                    lineBoundary = false;
-                }
-                pos += text.length();
-                long numberOfLines = text.chars().filter(c -> c == '\n').count();
-                if (numberOfLines > 0) {
-                    line += numberOfLines;
-                    column = text.length() - text.lastIndexOf('\n');
-                } else {
-                    column += text.length();
-                }
-            }
-            return super.append(text);
-        }
-    }
 }
