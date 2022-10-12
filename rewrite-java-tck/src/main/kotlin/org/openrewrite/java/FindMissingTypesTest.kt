@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("CatchMayIgnoreException", "EmptyTryBlock", "ClassInitializerMayBeStatic")
+
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.search.FindMissingTypes
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
@@ -30,15 +32,62 @@ interface FindMissingTypesTest : RewriteTest {
     }
 
     @Test
-    fun findsMissingAnnotationType(jp: JavaParser) {
-        val cu = jp.parse("""
+    fun missingAnnotationType() = rewriteRun(
+        java("""
             import org.junit.Test;
             
             class A {
                 @Test
                 void foo() {}
             }
-        """)[0]
-        assertThat(FindMissingTypes.findMissingTypes(cu).size).isEqualTo(1)
-    }
+        """,
+        """
+            import org.junit.Test;
+
+            class A {
+                @/*~~(Identifier type is missing or malformed)~~>*/Test
+                void foo() {}
+            }
+        """)
+    )
+
+    @Test
+    fun variableDeclaration(jp: JavaParser) = rewriteRun(
+        java("""
+            class A {
+                {
+                    Foo f;
+                }
+            }
+        """,
+        """
+            class A {
+                {
+                    /*~~(Identifier type is missing or malformed)~~>*/Foo f;
+                }
+            }
+        """)
+    )
+
+    @Test
+    fun newClass() = rewriteRun(
+        java("""
+            import some.org.Unknown;
+            
+            class A {
+                {
+                    Object o = new Unknown();
+                }
+            }
+        """,
+        """
+            import some.org.Unknown;
+            
+            class A {
+                {
+                    Object o = /*~~(NewClass type is missing or malformed)~~>*/new Unknown();
+                }
+            }
+        """)
+    )
 }

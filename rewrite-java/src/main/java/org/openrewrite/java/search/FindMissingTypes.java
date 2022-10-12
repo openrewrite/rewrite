@@ -87,23 +87,26 @@ public class FindMissingTypes extends Recipe {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-            J.Identifier ident = super.visitIdentifier(identifier, ctx);
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
-            if (!isWellFormedType(ident.getType()) && !isAllowedToHaveNullType(ident)) {
-                ident = SearchResult.found(ident, "Identifier type is null");
+            if (!isWellFormedType(identifier.getType()) && !isAllowedToHaveNullType(identifier)) {
+                identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
             }
-            return ident;
+            return identifier;
         }
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
-            JavaType.Method type = mi.getMethodType();
-            if (!isWellFormedType(type)) {
-                mi = SearchResult.found(mi, "MethodInvocation type is null");
-            } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
-                mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
+            // If one of the method's arguments or type parameters is missing type, then the invocation very likely will too
+            // Avoid over-reporting the same problem by checking the invocation only when its elements are well-formed
+            if(mi == method) {
+                JavaType.Method type = mi.getMethodType();
+                if (!isWellFormedType(type)) {
+                    mi = SearchResult.found(mi, "MethodInvocation type is missing or malformed");
+                } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
+                    mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
+                }
             }
             return mi;
         }
@@ -113,7 +116,7 @@ public class FindMissingTypes extends Recipe {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
             if (!isWellFormedType(type)) {
-                md = SearchResult.found(md, "MethodDeclaration type is null");
+                md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
@@ -125,10 +128,10 @@ public class FindMissingTypes extends Recipe {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
             if (!isWellFormedType(t)) {
-                return SearchResult.found(cd, "ClassDeclaration type is null");
+                return SearchResult.found(cd, "ClassDeclaration type is missing or malformed");
             }
             if (!cd.getKind().name().equals(t.getKind().name())) {
-                cd = SearchResult.found(cd, 
+                cd = SearchResult.found(cd,
                         " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind());
             }
             J.CompilationUnit jc = getCursor().firstEnclosing(J.CompilationUnit.class);
@@ -140,6 +143,15 @@ public class FindMissingTypes extends Recipe {
                 }
             }
             return cd;
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
+            J.NewClass n = super.visitNewClass(newClass, executionContext);
+            if(n == newClass && !isWellFormedType(n.getType())) {
+                n = SearchResult.found(n, "NewClass type is missing or malformed");
+            }
+            return n;
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
