@@ -2522,4 +2522,62 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             }
         """)
     )
+
+    @Test
+    fun enumClassWithAnonymousInnerClassConstructor() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaVisitor<ExecutionContext>() {
+                    private var TO_STRING = MethodMatcher("java.lang.String toString()")
+                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}")
+                        .doBeforeParseTemplate(::println).build()
+
+                    override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
+                        val mi = super.visitMethodInvocation(method, ctx) as J
+                        if (mi is J.MethodInvocation && TO_STRING.matches(mi)) {
+                            return mi.withTemplate(t, mi.coordinates.replace(), mi.select)
+                        }
+                        return mi
+                    }
+                }
+            })
+        },
+        java(
+            """
+            enum MyEnum {
+                THING_ONE(new MyEnumThing() {
+                    @Override 
+                    public String getName() {
+                        return "Thing One".toString();
+                    }
+                });
+                private final MyEnumThing enumThing;
+                MyEnum(MyEnumThing myEnumThing) {
+                    this.enumThing = myEnumThing;
+                }
+                interface MyEnumThing {
+                    String getName();
+                }
+            }
+            """,
+            """
+            enum MyEnum {
+                THING_ONE(new MyEnumThing() {
+                    @Override 
+                    public String getName() {
+                        return "Thing One";
+                    }
+                });
+                private final MyEnumThing enumThing;
+                MyEnum(MyEnumThing myEnumThing) {
+                    this.enumThing = myEnumThing;
+                }
+                interface MyEnumThing {
+                    String getName();
+                }
+            }
+            """
+        )
+    )
+
 }
