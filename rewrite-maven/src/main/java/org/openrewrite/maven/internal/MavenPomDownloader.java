@@ -430,13 +430,14 @@ public class MavenPomDownloader {
                             RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
-                            // so that the repository path is the same regardless of user name
+                            // so that the repository path is the same regardless of username
                             pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
 
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                             }
                             mavenCache.putPom(resolvedGav, pom);
+                            ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
                             sample.stop(timer.tags("outcome", "from maven local").register(Metrics.globalRegistry));
                             return pom;
                         }
@@ -459,6 +460,7 @@ public class MavenPomDownloader {
                             pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
                         }
                         mavenCache.putPom(resolvedGav, pom);
+                        ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
                         sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
                         return pom;
                     } catch (Throwable exception) {
