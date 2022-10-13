@@ -380,16 +380,16 @@ public class ResolvedPom {
                 Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
                         pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
 
+                MavenExecutionContextView.view(ctx)
+                        .getResolutionListener()
+                        .parent(parentPom, pom);
+
                 for (Pom ancestor : pomAncestry) {
                     if (ancestor.getGav().equals(parentPom.getGav())) {
                         // parent cycle
                         return;
                     }
                 }
-
-                MavenExecutionContextView.view(ctx)
-                        .getResolutionListener()
-                        .parent(parentPom, pom);
 
                 pomAncestry.add(0, parentPom);
                 resolveParentDependenciesRecursively(pomAncestry);
