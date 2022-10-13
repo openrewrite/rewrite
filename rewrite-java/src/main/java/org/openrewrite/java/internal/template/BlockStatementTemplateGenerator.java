@@ -182,7 +182,12 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
-                classDeclaration(prior, before, (J.ClassDeclaration) parent, templated, cursor);
+                J.ClassDeclaration c = (J.ClassDeclaration)parent;
+                if (c.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
+                    enumClassDeclaration(prior, c, before, after, templated, cursor);
+                } else {
+                    classDeclaration(prior, before, after, (J.ClassDeclaration) parent, templated, cursor, false);
+                }
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
@@ -235,33 +240,36 @@ public class BlockStatementTemplateGenerator {
             after.append('}');
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
-            if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
-                StringBuilder beforeSegments = new StringBuilder();
-                StringBuilder afterSegments = new StringBuilder();
-                beforeSegments.append("new ").append(n.getClazz().printTrimmed(cursor)).append("(");
-                boolean priorFound = false;
-                for(Expression arg : n.getArguments()) {
-                    if(!priorFound) {
-                        if (referToSameElement(prior, arg)) {
-                            priorFound = true;
-                            continue;
+            // enum definitions with anonymous class initializers have a null clazz and will be templated next
+            if (n.getClazz() != null) {
+                if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+                    StringBuilder beforeSegments = new StringBuilder();
+                    StringBuilder afterSegments = new StringBuilder();
+                    beforeSegments.append("new ").append(n.getClazz().printTrimmed(cursor)).append("(");
+                    boolean priorFound = false;
+                    for(Expression arg : n.getArguments()) {
+                        if(!priorFound) {
+                            if (referToSameElement(prior, arg)) {
+                                priorFound = true;
+                                continue;
+                            }
+                            beforeSegments.append(valueOfType(arg.getType())).append(",");
+                        } else {
+                            afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
                         }
-                        beforeSegments.append(valueOfType(arg.getType())).append(",");
-                    } else {
-                        afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
                     }
-                }
-                afterSegments.append(")");
-                before.insert(0, beforeSegments);
-                after.append(afterSegments);
-                if(next(cursor).getValue() instanceof J.Block) {
-                    after.append(";");
-                }
-            } else {
-                n = n.withBody(null).withPrefix(Space.EMPTY);
-                before.insert(0, n.printTrimmed(cursor).trim());
-                if (!(next(cursor).getValue() instanceof J.MethodInvocation)) {
-                    after.append(';');
+                    afterSegments.append(")");
+                    before.insert(0, beforeSegments);
+                    after.append(afterSegments);
+                    if(next(cursor).getValue() instanceof J.Block) {
+                        after.append(";");
+                    }
+                } else {
+                    n = n.withBody(null).withPrefix(Space.EMPTY);
+                    before.insert(0, n.printTrimmed(cursor).trim());
+                    if (!(next(cursor).getValue() instanceof MethodCall)) {
+                        after.append(';');
+                    }
                 }
             }
         } else if (j instanceof J.ForLoop) {
@@ -357,11 +365,46 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, as.getVariable() + " = ");
                 after.append(";");
             }
+        } else if (j instanceof J.EnumValue) {
+            J.EnumValue ev = (J.EnumValue)j;
+            if (ev.getInitializer() != null) {
+                before.insert(0,"(");
+                after.append(")");
+            }
+            before.insert(0, ev.getName());
+        } else if (j instanceof J.EnumValueSet) {
+            after.append(";");
         }
         template(next(cursor), j, before, after, templated);
     }
 
-    private void classDeclaration(@Nullable J prior, StringBuilder before, J.ClassDeclaration parent, Set<J> templated, Cursor cursor) {
+    // Enum class declarations are unique in that their EnumValue set must be the first statement
+    private void enumClassDeclaration(@Nullable J prior, J.ClassDeclaration c, StringBuilder before, StringBuilder after, Set<J> templated, Cursor cursor) {
+        before.insert(0, "\nenum " + c.getSimpleName() + "{\n");
+        List<Statement> statements = c.getBody().getStatements();
+        for (int i = 1; i < statements.size(); i++) {
+            Statement statement = statements.get(i);
+            if (templated.contains(statement)) {
+                continue;
+            }
+
+            if (statement instanceof J.VariableDeclarations) {
+                after.append(variable((J.VariableDeclarations) statement, false, cursor)).append(";\n");
+            } else if (statement instanceof J.MethodDeclaration) {
+                if (!referToSameElement(statement, prior)) {
+                    after.append(method((J.MethodDeclaration) statement, cursor));
+                }
+            } else if (statement instanceof J.ClassDeclaration) {
+                // this is a sibling class. we need declarations for all variables and methods.
+                // setting prior to null will cause them all to be written.
+                classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, true);
+            }
+        }
+        after.append("\n");
+
+    }
+
+    private void classDeclaration(@Nullable J prior, StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, boolean appendToAfter) {
         J.ClassDeclaration c = parent;
 
         List<Statement> statements = c.getBody().getStatements();
@@ -372,28 +415,54 @@ public class BlockStatementTemplateGenerator {
             }
 
             if (statement instanceof J.VariableDeclarations) {
-                before.insert(0, variable((J.VariableDeclarations) statement, false, cursor) + ";\n");
+                String stmt = variable((J.VariableDeclarations) statement, false, cursor) + ";\n";
+                if (appendToAfter) {
+                    after.append(stmt);
+                } else {
+                    before.insert(0, stmt);
+                }
             } else if (statement instanceof J.MethodDeclaration) {
                 if (!referToSameElement(statement, prior)) {
-                    before.insert(0, method((J.MethodDeclaration) statement, cursor));
+                    String m = method((J.MethodDeclaration) statement, cursor);
+                    if (appendToAfter) {
+                        after.append(m);
+                    } else {
+                        before.insert(0, m);
+                    }
                 }
             } else if (statement instanceof J.ClassDeclaration) {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
-                before.insert(0, '}');
-                classDeclaration(null, before, (J.ClassDeclaration) statement, templated, cursor);
+                if (appendToAfter) {
+                    after.append('}');
+                } else {
+                    before.insert(0, '}');
+                }
+                classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, appendToAfter);
             } else if (statement instanceof J.EnumValueSet) {
                 J.EnumValueSet enumValues = (J.EnumValueSet) statement;
-                before.insert(0, ";");
+                if (appendToAfter) {
+                    after.append(";");
+                } else {
+                    before.insert(0, ";");
+                }
                 StringJoiner enumStr = new StringJoiner(",");
                 for (J.EnumValue anEnum : enumValues.getEnums()) {
                     enumStr.add(anEnum.getName().getSimpleName());
                 }
-                before.insert(0, enumStr);
+                if (appendToAfter) {
+                    after.append(enumStr);
+                } else {
+                    before.insert(0, enumStr);
+                }
             }
         }
         c = c.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY);
-        before.insert(0, c.printTrimmed(cursor).trim() + '{');
+        if (appendToAfter) {
+            after.append(c.printTrimmed(cursor).trim()).append('{');
+        } else {
+            before.insert(0, c.printTrimmed(cursor).trim() + '{');
+        }
     }
 
     private String method(J.MethodDeclaration method, Cursor cursor) {
