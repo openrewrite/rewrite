@@ -405,6 +405,16 @@ public class MavenPomDownloader {
         Map<String, String> repoDownloadFailures = new HashMap<>();
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         for (MavenRepository repo : normalizedRepos) {
+
+            String version = gav.getVersion();
+            if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
+                repoDownloadFailures.put(repo.getUri(), "Version is a snapshot but the repository does not support snapshots.");
+                continue;
+            } else if (!version.endsWith("-SNAPSHOT") && !repo.isReleases()) {
+                repoDownloadFailures.put(repo.getUri(), "Version is a release but the repository does not support releases.");
+                continue;
+            }
+
             ResolvedGroupArtifactVersion resolvedGav = new ResolvedGroupArtifactVersion(
                     repo.getUri(), gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), versionMaybeDatedSnapshot);
             Optional<Pom> result = mavenCache.getPom(resolvedGav);
