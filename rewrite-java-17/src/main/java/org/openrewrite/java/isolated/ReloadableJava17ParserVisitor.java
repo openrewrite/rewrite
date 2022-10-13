@@ -344,16 +344,38 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCase(CaseTree node, Space fmt) {
-        Expression pattern;
-        if (node.getExpression() == null) {
-            pattern = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null);
-        } else {
-            skip("case");
-            pattern = convertOrNull(node.getExpression());
+        J.Case.Type type = node.getCaseKind() == CaseTree.CaseKind.RULE ? J.Case.Type.Rule : J.Case.Type.Statement;
+        return new J.Case(
+                randomId(),
+                fmt,
+                Markers.EMPTY,
+                type,
+                null,
+                JContainer.build(
+                        node.getExpressions().isEmpty() ? EMPTY : sourceBefore("case"),
+                        node.getExpressions().isEmpty() ?
+                                List.of(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null))) :
+                                convertAll(node.getExpressions(), commaDelim, t -> EMPTY),
+                        Markers.EMPTY
+                ),
+                JContainer.build(
+                        sourceBefore(type == J.Case.Type.Rule ? "->" : ":"),
+                        convertStatements(node.getStatements()),
+                        Markers.EMPTY
+                ),
+                type == J.Case.Type.Rule ?
+                        padRight(convert(node.getBody()), statementDelim(node.getBody())) :
+                        null
+        );
+    }
+
+    @Override
+    public J visitYield(YieldTree node, Space fmt) {
+        boolean implicit = !source.startsWith("yield", cursor);
+        if (!implicit) {
+            skip("yield");
         }
-        return new J.Case(randomId(), fmt, Markers.EMPTY,
-                pattern,
-                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY));
+        return new J.Yield(randomId(), fmt, Markers.EMPTY, implicit, convert(node.getValue()));
     }
 
     @Override
@@ -1111,6 +1133,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case DO_WHILE_LOOP:
             case IF:
             case SWITCH:
+            case SWITCH_EXPRESSION:
             case SYNCHRONIZED:
             case TYPE_CAST:
             case WHILE_LOOP:
@@ -1165,13 +1188,23 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitReturn(ReturnTree node, Space fmt) {
         skip("return");
-        return new J.Return(randomId(), fmt, Markers.EMPTY, convertOrNull(node.getExpression()));
+        Expression expression = convertOrNull(node.getExpression());
+        return new J.Return(randomId(), fmt, Markers.EMPTY, expression);
     }
 
     @Override
     public J visitSwitch(SwitchTree node, Space fmt) {
         skip("switch");
         return new J.Switch(randomId(), fmt, Markers.EMPTY,
+                convert(node.getExpression()),
+                new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                        convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")));
+    }
+
+    @Override
+    public J visitSwitchExpression(SwitchExpressionTree node, Space fmt) {
+        skip("switch");
+        return new J.SwitchExpression(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression()),
                 new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                         convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")));
@@ -1614,7 +1647,8 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             t instanceof JCThrow ||
             t instanceof JCUnary ||
             t instanceof JCExpressionStatement ||
-            t instanceof JCVariableDecl) {
+            t instanceof JCVariableDecl ||
+            t instanceof JCYield) {
             return sourceBefore(";");
         }
 

@@ -65,7 +65,7 @@ public class FindMissingTypes extends Recipe {
                         } else {
                             printedTree = String.valueOf(j);
                         }
-                        missingTypeResults.add(new MissingTypeResult(message,path, printedTree, j));
+                        missingTypeResults.add(new MissingTypeResult(message, path, printedTree, j));
                     }
                     return super.visitMarker(marker, missingTypeResults);
                 }
@@ -100,7 +100,7 @@ public class FindMissingTypes extends Recipe {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
             // If one of the method's arguments or type parameters is missing type, then the invocation very likely will too
             // Avoid over-reporting the same problem by checking the invocation only when its elements are well-formed
-            if(mi == method) {
+            if (mi == method) {
                 JavaType.Method type = mi.getMethodType();
                 if (!isWellFormedType(type)) {
                     mi = SearchResult.found(mi, "MethodInvocation type is missing or malformed");
@@ -148,7 +148,7 @@ public class FindMissingTypes extends Recipe {
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
             J.NewClass n = super.visitNewClass(newClass, executionContext);
-            if(n == newClass && !isWellFormedType(n.getType())) {
+            if (n == newClass && !isWellFormedType(n.getType())) {
                 n = SearchResult.found(n, "NewClass type is missing or malformed");
             }
             return n;
@@ -156,8 +156,8 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName()
-                    || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
-                    || isNewClass(ident) || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField(ident);
+                   || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
+                   || isNewClass(ident) || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField(ident);
         }
 
         private boolean inPackageDeclaration() {
@@ -186,7 +186,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isFieldAccess(J.Identifier ident) {
             J.FieldAccess parent = getCursor().firstEnclosing(J.FieldAccess.class);
             return parent != null
-                    && (parent.getName().equals(ident) || parent.getTarget().equals(ident));
+                   && (parent.getName().equals(ident) || parent.getTarget().equals(ident));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
@@ -206,7 +206,7 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isTypeParameter() {
             return getCursor().getParent() != null
-                    && getCursor().getParent().getValue() instanceof J.TypeParameter;
+                   && getCursor().getParent().getValue() instanceof J.TypeParameter;
         }
 
         private boolean isMemberReference() {
@@ -214,7 +214,7 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isCaseLabel() {
-            return getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.Case;
+            return getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Case;
         }
 
         private boolean isLabel() {
@@ -224,7 +224,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
             return parent != null && parent.getValue() instanceof J.Assignment
-                    && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
+                   && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
     }

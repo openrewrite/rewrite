@@ -393,7 +393,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             c = (J.Case) temp;
         }
-        c = c.withPattern(visitAndCast(c.getPattern(), p));
+        if (c.getPatternUnsafe() == null) {
+            c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, p));
+        } else {
+            c = c.withPattern(visitAndCast(c.getPattern(), p));
+        }
+        c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         c = c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
         return c;
     }
@@ -1027,6 +1032,22 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return s;
     }
 
+    public J visitSwitchExpression(J.SwitchExpression switzh, P p) {
+        J.SwitchExpression s = switzh;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_EXPRESSION_PREFIX, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(s, p);
+        if (!(temp instanceof J.SwitchExpression)) {
+            return temp;
+        } else {
+            s = (J.SwitchExpression) temp;
+        }
+        s = s.withSelector(visitAndCast(s.getSelector(), p));
+        s = s.withCases(visitAndCast(s.getCases(), p));
+        visitType(s.getType(), p);
+        return s;
+    }
+
     public J visitSynchronized(J.Synchronized synch, P p) {
         J.Synchronized s = synch;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SYNCHRONIZED_PREFIX, p));
@@ -1213,6 +1234,20 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             w = w.withBoundedType(visitTypeName(w.getBoundedType(), p));
         }
         return w;
+    }
+
+    public J visitYield(J.Yield yield, P p) {
+        J.Yield y = yield;
+        y = y.withPrefix(visitSpace(y.getPrefix(), Space.Location.YIELD_PREFIX, p));
+        y = y.withMarkers(visitMarkers(y.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(y, p);
+        if (!(temp instanceof J.Yield)) {
+            return temp;
+        } else {
+            y = (J.Yield) temp;
+        }
+        y = y.withValue(visitAndCast(y.getValue(), p));
+        return y;
     }
 
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {

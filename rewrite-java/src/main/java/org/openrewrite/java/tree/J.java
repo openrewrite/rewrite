@@ -19,6 +19,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.StringUtils;
@@ -42,10 +43,12 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
@@ -904,9 +907,60 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Getter
+        Type type;
+
+        public Type getType() {
+            return type == null ? Type.Statement : type;
+        }
+
+        @SuppressWarnings("DeprecatedIsStillUsed")
+        @Deprecated
+        @Nullable
         Expression pattern;
 
+        /**
+         * Only for use in {@link JavaVisitor} to not spawn a new instance when
+         * pattern is still in use.
+         * @return The pattern or null if not set.
+         * @deprecated Not intended for use outside of {@link JavaVisitor}.
+         */
+        @Nullable
+        @Deprecated
+        public Expression getPatternUnsafe() {
+            return pattern;
+        }
+
+        /**
+         * @return The pattern of this case statement.
+         * @deprecated Prior to Java 12, there could only be one pattern. Use {@link #getExpressions()} instead.
+         */
+        public Expression getPattern() {
+            return pattern == null ? getExpressions().get(0) : pattern;
+        }
+
+        /**
+         * @return A new case statement with a different pattern.
+         * @deprecated Prior to Java 12, there could only be one pattern. Use {@link #withExpressions(List)} instead.
+         */
+        public Case withPattern(@Nullable Expression pattern) {
+            return withExpressions(ListUtils.mapFirst(getExpressions(), first -> pattern));
+        }
+
+        JContainer<Expression> expressions;
+
+        public List<Expression> getExpressions() {
+            return expressions == null ? singletonList(requireNonNull(pattern)) : expressions.getElements();
+        }
+
+        public Case withExpressions(List<Expression> expressions) {
+            return getPadding().withExpressions(JContainer.withElements(this.expressions, expressions));
+        }
+
+        /**
+         * For case with kind {@link Type#Statement}, returns the statements labeled by the case.
+         * This container will be empty for case with kind {@link Type#Rule}, but possess the prefix
+         * before the arrow.
+         */
         JContainer<Statement> statements;
 
         public List<Statement> getStatements() {
@@ -914,8 +968,23 @@ public interface J extends Tree {
         }
 
         public Case withStatements(List<Statement> statements) {
-            return getPadding().withStatements(this.statements.getPadding().withElements(JRightPadded.withElements(
-                    this.statements.getPadding().getElements(), statements)));
+            return getPadding().withStatements(JContainer.withElements(this.statements, statements));
+        }
+
+        /**
+         * For case with kind {@link Type#Rule}, returns the statement or expression after the arrow.
+         * Returns null for case with kind {@link Type#Statement}.
+         */
+        @Nullable
+        JRightPadded<J> body;
+
+        @Nullable
+        public J getBody() {
+            return body == null ? null : body.getElement();
+        }
+
+        public Case withBody(J body) {
+            return getPadding().withBody(JRightPadded.withElement(this.body, body));
         }
 
         @Override
@@ -949,16 +1018,38 @@ public interface J extends Tree {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
+        public enum Type {
+            Statement,
+            Rule
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final Case t;
+
+            @Nullable
+            public JRightPadded<J> getBody() {
+                return t.body;
+            }
+
+            public Case withBody(@Nullable JRightPadded<J> body) {
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, t.pattern, t.expressions, t.statements, body);
+            }
 
             public JContainer<Statement> getStatements() {
                 return t.statements;
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.pattern, statements);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, t.pattern, t.expressions, statements, t.body);
+            }
+
+            public JContainer<Expression> getExpressions() {
+                return t.expressions == null ? JContainer.build(singletonList(JRightPadded.build(requireNonNull(t.pattern)))) : t.expressions;
+            }
+
+            public Case withExpressions(JContainer<Expression> expressions) {
+                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, t.pattern, expressions, t.statements, t.body);
             }
         }
     }
@@ -1340,7 +1431,7 @@ public interface J extends Tree {
                 final JavaTypeVisitor<AtomicInteger> typeVisitor = new JavaTypeVisitor<AtomicInteger>() {
                     @Override
                     public JavaType visit(@Nullable JavaType javaType, AtomicInteger n) {
-                        if(javaType != null && uniqueIdentity.test(javaType)) {
+                        if (javaType != null && uniqueIdentity.test(javaType)) {
                             n.incrementAndGet();
                             return super.visit(javaType, n);
                         }
@@ -2494,7 +2585,7 @@ public interface J extends Tree {
                 String name = part.getSimpleName();
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                            "." + name);
+                                       "." + name);
                     break;
                 } else {
                     part = (FieldAccess) part.getTarget();
@@ -2517,7 +2608,7 @@ public interface J extends Tree {
          */
         public String getPackageName() {
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
-            if(fq != null) {
+            if (fq != null) {
                 return fq.getPackageName();
             }
             String typeName = getTypeName();
@@ -2527,7 +2618,7 @@ public interface J extends Tree {
 
         public String getClassName() {
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
-            if(fq != null) {
+            if (fq != null) {
                 return fq.getClassName();
             }
             String typeName = getTypeName();
@@ -2848,8 +2939,8 @@ public interface J extends Tree {
                 return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
             }
 
-    @Transient
-        public CoordinateBuilder.Lambda.Parameters getCoordinates() {
+            @Transient
+            public CoordinateBuilder.Lambda.Parameters getCoordinates() {
                 return new CoordinateBuilder.Lambda.Parameters(this);
             }
 
@@ -3314,8 +3405,8 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return "MethodDeclaration{" +
-                    (getMethodType() == null ? "unknown" : getMethodType()) +
-                    "}";
+                   (getMethodType() == null ? "unknown" : getMethodType()) +
+                   "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -4529,6 +4620,60 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    final class SwitchExpression implements J, Expression {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        ControlParentheses<Expression> selector;
+
+        @With
+        Block cases;
+
+        @Override
+        @Transient
+        @Nullable
+        public JavaType getType() {
+            return new JavaVisitor<AtomicReference<JavaType>>() {
+                @Override
+                public J visitCase(Case caze, AtomicReference<JavaType> javaType) {
+                    if (!caze.getExpressions().isEmpty()) {
+                        javaType.set(caze.getExpressions().get(0).getType());
+                    }
+                    return caze;
+                }
+            }.reduce(this, new AtomicReference<>()).get();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            // a switch expression's type is driven by its case statements
+            //noinspection unchecked
+            return (T) this;
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitSwitchExpression(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
     final class Synchronized implements J, Statement {
         @With
         @EqualsAndHashCode.Include
@@ -5587,6 +5732,29 @@ public interface J extends Tree {
             public Wildcard withBound(@Nullable JLeftPadded<Bound> bound) {
                 return t.bound == bound ? t : new Wildcard(t.id, t.prefix, t.markers, bound, t.boundedType);
             }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Yield implements J, Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        boolean implicit;
+        Expression value;
+
+        @Override
+        public CoordinateBuilder.Yield getCoordinates() {
+            return new CoordinateBuilder.Yield(this);
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitYield(this, p);
         }
     }
 }
