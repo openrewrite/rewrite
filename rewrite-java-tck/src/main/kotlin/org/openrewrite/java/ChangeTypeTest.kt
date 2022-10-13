@@ -551,6 +551,7 @@ interface ChangeTypeTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2302")
     @Test
     fun staticImport(jp: JavaParser) = assertChanged(
         jp,

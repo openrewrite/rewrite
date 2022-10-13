@@ -34,12 +34,12 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
+import java.beans.Transient;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
@@ -151,6 +151,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -216,6 +217,7 @@ public interface J extends Tree {
             return v.visitAnnotation(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Annotation getCoordinates() {
             return new CoordinateBuilder.Annotation(this);
         }
@@ -284,6 +286,7 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -336,6 +339,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -368,6 +372,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -415,6 +420,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -430,6 +436,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return singletonList(this);
         }
@@ -519,11 +526,13 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return singletonList(this);
         }
@@ -621,10 +630,12 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
 
+        @Transient
         @Override
         public List<J> getSideEffects() {
             List<J> sideEffects = new ArrayList<>(2);
@@ -741,6 +752,7 @@ public interface J extends Tree {
             return v.visitBlock(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
         }
@@ -858,6 +870,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -911,6 +924,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1076,6 +1090,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.ClassDeclaration getCoordinates() {
             return new CoordinateBuilder.ClassDeclaration(this);
         }
@@ -1295,6 +1310,7 @@ public interface J extends Tree {
         @Getter
         Space eof;
 
+        @Transient
         @Override
         public long getWeight(Predicate<Object> uniqueIdentity) {
             AtomicInteger n = new AtomicInteger();
@@ -1356,6 +1372,7 @@ public interface J extends Tree {
             return new JavaPrinter<>();
         }
 
+        @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
             if (this.typesInUse == null) {
@@ -1437,6 +1454,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1497,6 +1515,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1569,6 +1588,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1652,6 +1672,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1736,6 +1757,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return target.getSideEffects();
         }
@@ -1805,6 +1827,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1859,6 +1882,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2025,6 +2049,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2192,6 +2217,7 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Identifier getCoordinates() {
             return new CoordinateBuilder.Identifier(this);
         }
@@ -2250,6 +2276,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2537,6 +2564,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2604,6 +2632,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -2683,6 +2712,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2754,6 +2784,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2795,7 +2826,8 @@ public interface J extends Tree {
                 return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
             }
 
-            public CoordinateBuilder.Lambda.Parameters getCoordinates() {
+    @Transient
+        public CoordinateBuilder.Lambda.Parameters getCoordinates() {
                 return new CoordinateBuilder.Lambda.Parameters(this);
             }
 
@@ -2877,6 +2909,7 @@ public interface J extends Tree {
             return v.visitLiteral(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -2983,6 +3016,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -3234,6 +3268,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.MethodDeclaration getCoordinates() {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
@@ -3471,6 +3506,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.MethodInvocation getCoordinates() {
             return new CoordinateBuilder.MethodInvocation(this);
         }
@@ -3485,6 +3521,7 @@ public interface J extends Tree {
             return name.getSimpleName();
         }
 
+        @Transient
         @Override
         public List<J> getSideEffects() {
             return singletonList(this);
@@ -3732,6 +3769,7 @@ public interface J extends Tree {
             return v.visitNewArray(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -3951,11 +3989,13 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return singletonList(this);
         }
@@ -4035,6 +4075,7 @@ public interface J extends Tree {
             return v.visitPackage(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Package getCoordinates() {
             return new CoordinateBuilder.Package(this);
         }
@@ -4098,6 +4139,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4175,6 +4217,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getSideEffects() : emptyList();
         }
@@ -4195,6 +4238,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4271,6 +4315,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getSideEffects() : emptyList();
         }
@@ -4299,6 +4344,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4385,6 +4431,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4414,6 +4461,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4450,6 +4498,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4481,6 +4530,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4558,6 +4608,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4612,6 +4663,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4683,6 +4735,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4828,6 +4881,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -5032,11 +5086,13 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return expression.getSideEffects();
         }
@@ -5146,6 +5202,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.VariableDeclarations getCoordinates() {
             return new CoordinateBuilder.VariableDeclarations(this);
         }
@@ -5376,6 +5433,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -5465,6 +5523,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }

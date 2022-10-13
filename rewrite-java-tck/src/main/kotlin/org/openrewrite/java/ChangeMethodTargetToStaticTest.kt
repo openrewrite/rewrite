@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 
 interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
 
@@ -57,6 +58,7 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
         """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2302")
     @Test
     fun staticTargetToStatic(jp: JavaParser) = assertChanged(
         jp,
