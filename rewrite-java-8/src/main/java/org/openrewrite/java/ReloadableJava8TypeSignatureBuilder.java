@@ -29,7 +29,7 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private Set<String> typeVariableNameStack;
 
     @Nullable
-    private HashMap<String, Set<Symbol>> nameScopeSymbols;
+    private HashMap<String, Map<Symbol, Integer>> symbolNameScope;
 
     @Override
     public String signature(@Nullable Object t) {
@@ -268,13 +268,15 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         String signature = owner + "{name=" + symbol.name.toString() + '}';
-        if (nameScopeSymbols == null) {
-            nameScopeSymbols = new HashMap<>();
+        if (symbolNameScope == null) {
+            symbolNameScope = new HashMap<>();
         }
 
-        Set<Symbol> nameScopes = nameScopeSymbols.computeIfAbsent(signature, k -> Collections.newSetFromMap(new IdentityHashMap<>()));
-        nameScopes.add(symbol);
-        signature += nameScopes.size();
+        Map<Symbol, Integer> nameScopes = symbolNameScope.computeIfAbsent(signature, k -> new IdentityHashMap<>());
+        Integer variableId;
+        variableId = nameScopes.computeIfAbsent(symbol, k -> nameScopes.size() + 1);
+        signature += variableId;
+
         return signature;
     }
 }
