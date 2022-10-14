@@ -107,6 +107,7 @@ public class JContainer<T> {
         METHOD_INVOCATION_ARGUMENTS(Space.Location.METHOD_INVOCATION_ARGUMENTS, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT),
         NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER, JRightPadded.Location.NEW_ARRAY_INITIALIZER),
         NEW_CLASS_ARGUMENTS(Space.Location.NEW_CLASS_ARGUMENTS, JRightPadded.Location.NEW_CLASS_ARGUMENTS),
+        RECORD_STATE_VECTOR(Space.Location.RECORD_STATE_VECTOR, JRightPadded.Location.RECORD_STATE_VECTOR),
         THROWS(Space.Location.THROWS, JRightPadded.Location.THROWS),
         TRY_RESOURCES(Space.Location.TRY_RESOURCES, JRightPadded.Location.TRY_RESOURCE),
         TYPE_BOUNDS(Space.Location.TYPE_BOUNDS, JRightPadded.Location.TYPE_BOUND),

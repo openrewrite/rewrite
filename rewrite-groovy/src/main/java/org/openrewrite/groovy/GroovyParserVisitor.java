@@ -246,6 +246,7 @@ public class GroovyParserVisitor {
                     kind,
                     name,
                     typeParameterContainer,
+                    null,
                     extendings,
                     implementings,
                     visitClassBlock(clazz),

@@ -78,6 +78,7 @@ public class JRightPadded<T> {
         NEW_CLASS_ENCLOSING(Space.Location.NEW_CLASS_ENCLOSING_SUFFIX),
         PACKAGE(Space.Location.PACKAGE_SUFFIX),
         PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
+        RECORD_STATE_VECTOR(Space.Location.RECORD_STATE_VECTOR_SUFFIX),
         STATIC_INIT(Space.Location.STATIC_INIT_SUFFIX),
         THROWS(Space.Location.THROWS_SUFFIX),
         TRY_RESOURCE(Space.Location.TRY_RESOURCE_SUFFIX),

@@ -429,6 +429,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             case Annotation:
                 kind = "@interface";
                 break;
+            case Record:
+                kind = "record";
+                break;
         }
 
         beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
@@ -442,6 +445,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         p.append(kind);
         visit(classDecl.getName(), p);
         visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+        visitContainer("(", classDecl.getPadding().getPrimaryConstructor(), JContainer.Location.RECORD_STATE_VECTOR, ",", ")", p);
         visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
         visitContainer(classDecl.getKind().equals(ClassDeclaration.Kind.Type.Interface) ? "extends" : "implements",
                 classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);

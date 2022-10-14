@@ -281,7 +281,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     @Override
     default Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
-        Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
+        Pattern classPattern = Pattern.compile("(class|interface|enum|record)\\s*(<[^>]*>)?\\s+(\\w+)");
 
         Function<String, String> simpleName = sourceStr -> {
             Matcher classMatcher = classPattern.matcher(sourceStr);
