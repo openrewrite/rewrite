@@ -273,8 +273,11 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         Map<Symbol, Integer> nameScopes = symbolNameScope.computeIfAbsent(signature, k -> new IdentityHashMap<>());
-        Integer variableId = nameScopes.computeIfAbsent(symbol, k -> nameScopes.size() + 1);
-        signature += variableId;
+        Integer variableId = nameScopes.computeIfAbsent(symbol, k -> nameScopes.size());
+        if (variableId > 0) {
+            // Sync the type signature builders with the default signature printer.
+            signature += variableId;
+        }
 
         return signature;
     }
