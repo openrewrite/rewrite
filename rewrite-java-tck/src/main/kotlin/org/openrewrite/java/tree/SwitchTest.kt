@@ -13,54 +13,89 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("SwitchStatementWithTooFewBranches")
+
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RewriteTest
 
-interface SwitchTest : JavaTreeTest {
-
-    @Test
-    fun singleCase(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Block, """
-            int n;
-            switch(n) {
-               case 0: break;
-            }
-        """
-    )
+interface SwitchTest : RewriteTest {
 
     @Test
-    fun default(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Block, """
-            int n;
-            switch(n) {
-                default: System.out.println("default!");
-            }
-        """
-    )
+    fun singleCase() {
+        rewriteRun(
+          java(
+            """
+               class Test {
+                  void test() {
+                      int n;
+                      switch(n) {
+                         case 0: break;
+                      }
+                  }
+               }
+            """
+          )
+        )
+    }
 
     @Test
-    fun noCases(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Block, """
-            int n;
-            switch(n) {}
-        """
-    )
+    fun defaultCase() {
+        rewriteRun(
+          java(
+            """
+               class Test {
+                  void test() {
+                      int n;
+                      switch(n) {
+                          default: System.out.println("default!");
+                      }
+                  }
+               }
+            """
+          )
+        )
+    }
 
     @Test
-    fun multipleCases(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Block, """
-            int n;
-            switch(n) {
-                case 0: {
-                   break;
-                }
-                case 1: {
-                   break;
-                }
-            }
-        """
-    )
+    fun noCases() {
+        rewriteRun(
+          java(
+            """
+               class Test {
+                  void test() {
+                      int n;
+                      switch(n) {}
+                  }
+               }
+            """
+          )
+        )
+    }
+
+    @Suppress("DuplicateBranchesInSwitch")
+    @Test
+    fun multipleCases() {
+        rewriteRun(
+          java(
+            """
+               class Test {
+                  void test() {
+                      int n;
+                      switch(n) {
+                          case 0: {
+                             break;
+                          }
+                          case 1: {
+                             break;
+                          }
+                      }
+                  }
+               }
+            """
+          )
+        )
+    }
 }

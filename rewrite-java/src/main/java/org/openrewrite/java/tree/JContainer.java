@@ -101,6 +101,7 @@ public class JContainer<T> {
     public enum Location {
         ANNOTATION_ARGUMENTS(Space.Location.ANNOTATION_ARGUMENTS, JRightPadded.Location.ANNOTATION_ARGUMENT),
         CASE(Space.Location.CASE, JRightPadded.Location.CASE),
+        CASE_EXPRESSION(Space.Location.CASE_EXPRESSION, JRightPadded.Location.CASE_EXPRESSION),
         IMPLEMENTS(Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS),
         LANGUAGE_EXTENSION(Space.Location.LANGUAGE_EXTENSION, JRightPadded.Location.LANGUAGE_EXTENSION),
         METHOD_DECLARATION_PARAMETERS(Space.Location.METHOD_DECLARATION_PARAMETERS, JRightPadded.Location.METHOD_DECLARATION_PARAMETER),

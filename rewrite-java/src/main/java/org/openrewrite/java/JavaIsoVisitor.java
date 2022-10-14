@@ -282,6 +282,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.SwitchExpression visitSwitchExpression(J.SwitchExpression _switch, P p) {
+        return (J.SwitchExpression) super.visitSwitchExpression(_switch, p);
+    }
+
+    @Override
     public J.Synchronized visitSynchronized(J.Synchronized _sync, P p) {
         return (J.Synchronized) super.visitSynchronized(_sync, p);
     }
@@ -334,5 +339,10 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public J.Wildcard visitWildcard(J.Wildcard wildcard, P p) {
         return (J.Wildcard) super.visitWildcard(wildcard, p);
+    }
+
+    @Override
+    public J.Yield visitYield(J.Yield yield, P p) {
+        return (J.Yield) super.visitYield(yield, p);
     }
 }

@@ -299,6 +299,8 @@ public class Space {
         BREAK_PREFIX,
         CASE,
         CASE_PREFIX,
+        CASE_BODY,
+        CASE_EXPRESSION,
         CASE_SUFFIX,
         CATCH_ALTERNATIVE_SUFFIX,
         CATCH_PREFIX,
@@ -385,6 +387,7 @@ public class Space {
         STATIC_IMPORT,
         STATIC_INIT_SUFFIX,
         SWITCH_PREFIX,
+        SWITCH_EXPRESSION_PREFIX,
         SYNCHRONIZED_PREFIX,
         TERNARY_FALSE,
         TERNARY_PREFIX,
@@ -414,5 +417,6 @@ public class Space {
         WHILE_PREFIX,
         WILDCARD_BOUND,
         WILDCARD_PREFIX,
+        YIELD_PREFIX,
     }
 }

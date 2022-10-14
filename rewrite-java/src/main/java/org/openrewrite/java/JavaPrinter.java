@@ -317,7 +317,6 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     public J visitBlock(Block block, PrintOutputCapture<P> p) {
         beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
 
-
         if (block.isStatic()) {
             p.append("static");
             visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
@@ -359,7 +358,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 s instanceof Return ||
                 s instanceof Throw ||
                 s instanceof Unary ||
-                s instanceof VariableDeclarations) {
+                s instanceof VariableDeclarations ||
+                s instanceof Yield) {
                 p.append(';');
                 return;
             }
@@ -389,16 +389,22 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitCase(Case caze, PrintOutputCapture<P> p) {
         beforeSyntax(caze, Space.Location.CASE_PREFIX, p);
-        Expression elem = caze.getPattern();
-        if (elem instanceof Identifier && ((Identifier) elem).getSimpleName().equals("default")) {
-            p.append("default");
-        } else {
+        Expression elem = caze.getExpressions().get(0);
+        if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
             p.append("case");
-            visit(elem, p);
         }
+        visitContainer("", caze.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
         visitSpace(caze.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
-        p.append(':');
-        visitStatements(caze.getPadding().getStatements().getPadding().getElements(), JRightPadded.Location.CASE, p);
+        p.append(caze.getType() == Case.Type.Statement ? ":" : "->");
+        visitStatements(caze.getPadding().getStatements().getPadding()
+                .getElements(), JRightPadded.Location.CASE, p);
+        if (caze.getBody() instanceof Statement) {
+            //noinspection unchecked
+            visitStatement((JRightPadded<Statement>) (JRightPadded<?>) caze.getPadding().getBody(),
+                    JRightPadded.Location.CASE_BODY, p);
+        } else {
+            visitRightPadded(caze.getPadding().getBody(), JRightPadded.Location.CASE_BODY, ";", p);
+        }
         afterSyntax(caze, p);
         return caze;
     }
@@ -891,6 +897,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitSwitchExpression(SwitchExpression switzh, PrintOutputCapture<P> p) {
+        beforeSyntax(switzh, Space.Location.SWITCH_EXPRESSION_PREFIX, p);
+        p.append("switch");
+        visit(switzh.getSelector(), p);
+        visit(switzh.getCases(), p);
+        afterSyntax(switzh, p);
+        return switzh;
+    }
+
+    @Override
     public J visitSynchronized(J.Synchronized synch, PrintOutputCapture<P> p) {
         beforeSyntax(synch, Space.Location.SYNCHRONIZED_PREFIX, p);
         p.append("synchronized");
@@ -1058,6 +1074,17 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visit(wildcard.getBoundedType(), p);
         afterSyntax(wildcard, p);
         return wildcard;
+    }
+
+    @Override
+    public J visitYield(Yield yield, PrintOutputCapture<P> p) {
+        beforeSyntax(yield, Space.Location.YIELD_PREFIX, p);
+        if (!yield.isImplicit()) {
+            p.out.append("yield");
+        }
+        visit(yield.getValue(), p);
+        afterSyntax(yield, p);
+        return yield;
     }
 
     private static final UnaryOperator<String> JAVA_MARKER_WRAPPER =

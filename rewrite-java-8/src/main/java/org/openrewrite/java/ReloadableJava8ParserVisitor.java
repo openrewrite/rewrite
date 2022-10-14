@@ -342,16 +342,20 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCase(CaseTree node, Space fmt) {
-        Expression pattern;
-        if (node.getExpression() == null) {
-            pattern = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null);
-        } else {
-            skip("case");
-            pattern = convertOrNull(node.getExpression());
-        }
         return new J.Case(randomId(), fmt, Markers.EMPTY,
-                pattern,
-                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY));
+                J.Case.Type.Statement,
+                null,
+                JContainer.build(
+                        node.getExpression() == null ? EMPTY : sourceBefore("case"),
+                        singletonList(node.getExpression() == null ?
+                                JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null)) :
+                                JRightPadded.build(convertOrNull(node.getExpression()))
+                        ),
+                        Markers.EMPTY
+                ),
+                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
+                null
+        );
     }
 
     @Override
