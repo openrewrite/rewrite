@@ -1270,8 +1270,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
+    public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                         JContainer.Location loc, P p) {
+        if (container == null) {
+            return container;
+        }
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
