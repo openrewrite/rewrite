@@ -22,13 +22,14 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 
 class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
+
+    @Nullable
+    private HashMap<String, Set<Symbol>> nameScopeSymbols;
 
     @Override
     public String signature(@Nullable Object t) {
@@ -265,6 +266,15 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         }
-        return owner + "{name=" + symbol.name.toString() + '}';
+
+        String signature = owner + "{name=" + symbol.name.toString() + '}';
+        if (nameScopeSymbols == null) {
+            nameScopeSymbols = new HashMap<>();
+        }
+
+        Set<Symbol> nameScopes = nameScopeSymbols.computeIfAbsent(signature, k -> Collections.newSetFromMap(new IdentityHashMap<>()));
+        nameScopes.add(symbol);
+        signature += nameScopes.size();
+        return signature;
     }
 }
