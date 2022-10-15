@@ -30,8 +30,8 @@ java {
 }
 
 // Set as appropriate for your organization
-group = "com.yourorg"
-description = "Rewrite recipes."
+group = "org.openrewrite"
+description = "Rewrite Kotlin"
 
 repositories {
     mavenLocal()
@@ -52,19 +52,22 @@ configurations.all {
 val rewriteBomVersion = "latest.integration"
 
 dependencies {
+    compileOnly("org.openrewrite:rewrite-test:latest.release")
     compileOnly("org.projectlombok:lombok:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")
     annotationProcessor("org.projectlombok:lombok:latest.release")
-    implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:${rewriteBomVersion}"))
 
-    implementation("org.openrewrite:rewrite-java")
-    runtimeOnly("org.openrewrite:rewrite-java-17")
+    implementation(platform(kotlin("bom", "latest.release")))
+    implementation(kotlin("compiler-embeddable"))
+    implementation(kotlin("stdlib"))
+
+    implementation("org.openrewrite:rewrite-java:latest.release")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 
-    testImplementation("org.openrewrite:rewrite-test")
+    testImplementation("org.openrewrite:rewrite-test:latest.release")
     testImplementation("org.assertj:assertj-core:latest.release")
 }
 
@@ -77,6 +80,7 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
 }
+
 tasks.named<JavaCompile>("compileJava") {
     options.release.set(8)
 }
