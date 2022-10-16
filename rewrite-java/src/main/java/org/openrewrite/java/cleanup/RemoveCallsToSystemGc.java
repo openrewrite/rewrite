@@ -60,11 +60,11 @@ public class RemoveCallsToSystemGc extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
                 if (new MethodMatcher("java.lang.System gc()").matches(invocation)) {
+                    doAfterVisit(new EmptyBlock());
                     return null;
                 }
                 return invocation;
             }
         };
     }
-
 }

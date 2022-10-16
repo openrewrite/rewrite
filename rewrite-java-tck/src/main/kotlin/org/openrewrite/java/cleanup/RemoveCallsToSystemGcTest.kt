@@ -34,6 +34,9 @@ interface RemoveCallsToSystemGcTest : JavaRecipeTest {
                 public static void main(String[] args) {
                     gc();
                     System.gc();
+                    if (1 > 0) {
+                        System.gc();
+                    }
                 }
             }
         """,
