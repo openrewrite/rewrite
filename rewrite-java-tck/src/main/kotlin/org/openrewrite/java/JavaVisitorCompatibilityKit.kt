@@ -410,6 +410,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveAnnotationTck : RemoveAnnotationTest
 
     @Nested
+    inner class RemoveCallsToSystemGcTck : RemoveCallsToSystemGcTest
+
+    @Nested
     inner class RemoveExtraSemicolonsTck : RemoveExtraSemicolonsTest
 
     @Nested
