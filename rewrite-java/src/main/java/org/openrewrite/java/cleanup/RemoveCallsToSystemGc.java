@@ -52,7 +52,10 @@ public class RemoveCallsToSystemGc extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new NoGcVisitor();
     }
-
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>("java.lang.System gc()");
+    }
     private static class NoGcVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
