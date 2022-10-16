@@ -19,10 +19,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -50,31 +49,22 @@ public class RemoveCallsToSystemGc extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new NoGcVisitor();
-    }
-    @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new UsesMethod<>("java.lang.System gc()");
     }
-    private static class NoGcVisitor extends JavaIsoVisitor<ExecutionContext> {
 
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-            J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
-            if (invocation.getSelect() != null) {
-                final JavaType.FullyQualified fq = TypeUtils.asFullyQualified(invocation.getSelect().getType());
-                if (fq != null) {
-                    final Boolean isSystem = "java.lang.System".equals(fq.getFullyQualifiedName());
-                    final Boolean isGc = "gc".equals(method.getName().getSimpleName());
-                    final Boolean isEmptyArgs = method.getArguments().get(0) instanceof J.Empty;
-                    if (isSystem && isGc && isEmptyArgs) {
-                        return null;
-                    }
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
+                J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
+                if (new MethodMatcher("java.lang.System gc()").matches(invocation)) {
+                    return null;
                 }
+                return invocation;
             }
-            return invocation;
-        }
+        };
     }
 
 }
