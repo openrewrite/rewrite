@@ -44,7 +44,7 @@ public class FindDeprecatedMethods extends Recipe {
     String methodPattern;
 
     @Option(displayName = "Ignore deprecated scopes",
-            description = "When a deprecated method is used in a deprecated method or class, ignore it.",
+            description = "When set to `true` deprecated methods used within deprecated methods or classes will be ignored.",
             required = false)
     @Nullable
     Boolean ignoreDeprecatedScopes;
@@ -61,7 +61,7 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern, true);
+        MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
 
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
@@ -82,7 +82,7 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern, true);
+        MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
