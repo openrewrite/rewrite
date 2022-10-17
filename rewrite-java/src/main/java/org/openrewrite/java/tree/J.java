@@ -953,7 +953,7 @@ public interface J extends Tree {
         }
 
         public Case withExpressions(List<Expression> expressions) {
-            return getPadding().withExpressions(JContainer.withElements(this.expressions, expressions));
+            return getPadding().withExpressions(requireNonNull(JContainer.withElementsNullable(this.expressions, expressions)));
         }
 
         /**
