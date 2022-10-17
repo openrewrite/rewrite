@@ -23,14 +23,13 @@ import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.StringJoiner;
 
 class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     private Set<String> typeVariableNameStack;
-
-    @Nullable
-    private HashMap<String, Map<Symbol, Integer>> symbolNameScope;
 
     @Override
     public String signature(@Nullable Object t) {
@@ -267,19 +266,6 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         }
-
-        String signature = owner + "{name=" + symbol.name.toString() + '}';
-        if (symbolNameScope == null) {
-            symbolNameScope = new HashMap<>();
-        }
-
-        Map<Symbol, Integer> nameScopes = symbolNameScope.computeIfAbsent(signature, k -> new IdentityHashMap<>());
-        Integer variableId = nameScopes.computeIfAbsent(symbol, k -> nameScopes.size());
-        if (variableId > 0) {
-            // Sync the type signature builders with the default signature printer.
-            signature += variableId;
-        }
-
-        return signature;
+        return owner + "{name=" + symbol.name.toString() + '}';
     }
 }
