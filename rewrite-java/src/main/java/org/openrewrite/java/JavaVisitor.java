@@ -394,7 +394,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             c = (J.Case) temp;
         }
         if (c.getPatternUnsafe() == null) {
-            c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, p));
+            if (c.getPadding().getExpressions() != null) {
+                c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, p));
+            }
         } else {
             c = c.withPattern(visitAndCast(c.getPattern(), p));
         }
