@@ -742,7 +742,7 @@ public class Autodetect extends NamedStyles {
 
                 staticBlock = anImport.isStatic();
                 i++;
-                previousPkg = importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".");
+                previousPkg = importLayoutStatistics.pkgToBlockPattern.getOrDefault(anImport.getPackageName() + ".", "");
             }
 
             if (i - blockStart > 0) {
