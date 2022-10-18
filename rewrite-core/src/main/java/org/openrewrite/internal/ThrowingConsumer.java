@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.internal;
+package org.openrewrite.internal;
 
-public class MavenDownloadingException extends RuntimeException {
-    public MavenDownloadingException(String message) {
-        super(message);
+import java.util.function.Consumer;
+
+@FunctionalInterface
+public interface ThrowingConsumer<T> extends Consumer<T> {
+
+    @Override
+    default void accept(final T e) {
+        try {
+            accept0(e);
+        } catch (Throwable ex) {
+            Throwing.sneakyThrow(ex);
+        }
     }
 
-    public MavenDownloadingException(String message, Throwable cause) {
-        super(message, cause);
-    }
-
-    public MavenDownloadingException(String message, Object... args) {
-        super(String.format(message, args));
-    }
-
-    public MavenDownloadingException(Throwable throwable) {
-        super(throwable);
-    }
+    void accept0(T e) throws Throwable;
 }

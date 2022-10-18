@@ -41,7 +41,7 @@ public interface Marker {
      * @param commentWrapper A function that wraps arbitrary text in a multi-line comment that is language-specific.
      * @return The printed representation of the marker.
      */
-    default String print(Cursor cursor, UnaryOperator<String> commentWrapper) {
+    default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
         return "";
     }
 }

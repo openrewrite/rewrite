@@ -13,20 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.internal;
 
 import lombok.Getter;
 import org.openrewrite.Cursor;
-import org.openrewrite.RecipeScheduler;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.StringJoiner;
-import java.util.UUID;
-
 public class RecipeRunException extends RuntimeException {
-    @Getter
-    private final UUID id = UUID.randomUUID();
-
     /**
      * Null if the exception occurs outside a visitor in an applicable test, etc.
      */
@@ -37,27 +30,5 @@ public class RecipeRunException extends RuntimeException {
     public RecipeRunException(Throwable cause, @Nullable Cursor cursor) {
         super(cause);
         this.cursor = cursor;
-    }
-
-    public RecipeRunException(Throwable cause) {
-        this(cause, null);
-    }
-
-    public String getSanitizedStackTrace() {
-        StringJoiner sanitized = new StringJoiner("\n");
-        sanitized.add(getCause().getClass().getName() + ": " + getCause().getLocalizedMessage());
-
-        int i = 0;
-        for (StackTraceElement stackTraceElement : getCause().getStackTrace()) {
-            if (stackTraceElement.getClassName().equals(RecipeScheduler.class.getName())) {
-                break;
-            }
-            if (i++ >= 8) {
-                sanitized.add("  ...");
-                break;
-            }
-            sanitized.add("  " + stackTraceElement);
-        }
-        return sanitized.toString();
     }
 }

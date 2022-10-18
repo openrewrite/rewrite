@@ -16,6 +16,7 @@
 package org.openrewrite.maven.cache;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.*;
 
@@ -35,7 +36,7 @@ public interface MavenPomCache {
     void putMavenMetadata(URI repo, GroupArtifactVersion gav, @Nullable MavenMetadata metadata);
 
     @Nullable
-    Optional<Pom> getPom(ResolvedGroupArtifactVersion gav);
+    Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException;
 
     void putPom(ResolvedGroupArtifactVersion gav, @Nullable Pom pom);
 

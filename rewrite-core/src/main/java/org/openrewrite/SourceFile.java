@@ -71,7 +71,7 @@ public interface SourceFile extends Tree {
     }
 
     default <P> String printAll(PrintOutputCapture<P> out) {
-        return print(new Cursor(null, this), out);
+        return print(new Cursor(null, "root"), out);
     }
 
     default String printAll() {

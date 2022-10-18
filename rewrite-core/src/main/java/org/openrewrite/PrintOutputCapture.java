@@ -17,10 +17,11 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markup;
 
 import java.util.function.UnaryOperator;
 
-public class PrintOutputCapture<P> implements Cloneable{
+public class PrintOutputCapture<P> implements Cloneable {
     private final P p;
     private final MarkerPrinter markerPrinter;
     public final StringBuilder out = new StringBuilder();
@@ -71,7 +72,14 @@ public class PrintOutputCapture<P> implements Cloneable{
         MarkerPrinter DEFAULT = new MarkerPrinter() {
             @Override
             public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
-                return marker.print(cursor, commentWrapper);
+                return marker.print(cursor, commentWrapper, false);
+            }
+        };
+
+        MarkerPrinter VERBOSE = new MarkerPrinter() {
+            @Override
+            public String beforeSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
+                return marker.print(cursor, commentWrapper, true);
             }
         };
 

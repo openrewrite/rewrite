@@ -55,7 +55,7 @@ public class SearchResult implements Marker {
      * @return The printed representation of the marker.
      */
     @Override
-    public String print(Cursor cursor, UnaryOperator<String> commentWrapper) {
+    public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
         return commentWrapper.apply(description == null ? "" : "(" + description + ")");
     }
 }

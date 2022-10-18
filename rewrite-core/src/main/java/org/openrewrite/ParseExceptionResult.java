@@ -15,32 +15,22 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
+
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
 public class ParseExceptionResult implements Marker {
     UUID id;
-
     String message;
 
-    public ParseExceptionResult(Throwable t) {
-        this(Tree.randomId(), t);
-    }
-
-    public ParseExceptionResult(UUID id, Throwable t) {
-        //noinspection ConstantConditions
-        this(id, (t == null) ? "" : new RecipeRunException(t).getSanitizedStackTrace());
-    }
-
-    @JsonCreator
-    public ParseExceptionResult(UUID id, String message) {
-        this.id = id;
-        this.message = message;
+    public static ParseExceptionResult build(Parser<?> parser, Throwable t) {
+        return new ParseExceptionResult(randomId(), ExceptionUtils.sanitizeStackTrace(t, parser.getClass()));
     }
 }

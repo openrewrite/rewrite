@@ -47,7 +47,18 @@ public class RecipeMarkupDemonstration extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        return ListUtils.mapFirst(before, sourceFile -> Markup.markup(sourceFile,
-                Markup.Level.valueOf(level.toUpperCase()), "This is a " + level + " message."));
+        return ListUtils.mapFirst(before, sourceFile -> {
+            switch(level) {
+                case "info":
+                    return Markup.info(sourceFile, "This is an info message.");
+                case "warning":
+                    return Markup.warn(sourceFile, new IllegalStateException("This is a warning message."));
+                case "error":
+                    return Markup.error(sourceFile, new IllegalStateException("This is an error message."));
+                case "debug":
+                default:
+                    return Markup.debug(sourceFile, "This is a debug message.");
+            }
+        });
     }
 }

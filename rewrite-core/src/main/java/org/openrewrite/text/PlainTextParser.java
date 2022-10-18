@@ -50,7 +50,7 @@ public class PlainTextParser implements Parser<PlainText> {
                 plainTexts.add(plainText);
                 parsingListener.parsed(source, plainText);
             } catch (Throwable t) {
-                ParsingExecutionContextView.view(ctx).parseFailure(path, t);
+                ParsingExecutionContextView.view(ctx).parseFailure(path, this, t);
                 ctx.getOnError().accept(t);
             }
         }

@@ -80,7 +80,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
-                        ParsingExecutionContextView.view(ctx).parseFailure(path, t);
+                        ParsingExecutionContextView.view(ctx).parseFailure(path, this, t);
                         return null;
                     }
                 })

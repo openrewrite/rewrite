@@ -22,13 +22,13 @@ import lombok.Setter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.Consumer;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -61,7 +61,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         SourceFile accept(SourceFile sourceFile, RecipeSpec testMethodSpec, RecipeSpec testClassSpec);
     }
 
-    final Consumer<ExecutionContext> customizeExecutionContext;
+    final ThrowingConsumer<ExecutionContext> customizeExecutionContext;
 
     public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
                       Parser.Builder parser, @Nullable String before, @Nullable String after) {
@@ -90,11 +90,11 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return sourcePath == null ? null : dir.resolve(sourcePath);
     }
 
-    protected Consumer<T> beforeRecipe = t -> {
+    protected ThrowingConsumer<T> beforeRecipe = t -> {
 
     };
 
-    protected Consumer<T> afterRecipe = t -> {
+    protected ThrowingConsumer<T> afterRecipe = t -> {
     };
 
     protected boolean skip = false;
@@ -114,12 +114,12 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return this;
     }
 
-    public SourceSpec<T> beforeRecipe(Consumer<T> beforeRecipe) {
+    public SourceSpec<T> beforeRecipe(ThrowingConsumer<T> beforeRecipe) {
         this.beforeRecipe = beforeRecipe;
         return this;
     }
 
-    public SourceSpec<T> afterRecipe(Consumer<T> afterRecipe) {
+    public SourceSpec<T> afterRecipe(ThrowingConsumer<T> afterRecipe) {
         this.afterRecipe = afterRecipe;
         return this;
     }

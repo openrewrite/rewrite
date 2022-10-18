@@ -46,8 +46,19 @@ public class RecipeSpec {
      */
     List<Parser.Builder> parsers = new ArrayList<>();
 
+    /**
+     * Used for both parsing and recipe execution unless an alternative recipe execution context is set with
+     * {@link #recipeExecutionContext(ExecutionContext)}.
+     */
     @Nullable
     ExecutionContext executionContext;
+
+    /**
+     * If not specified, will share {@link #executionContext} instance with the
+     * parsing phase.
+     */
+    @Nullable
+    ExecutionContext recipeExecutionContext;
 
     @Nullable
     Path relativeTo;
@@ -62,6 +73,9 @@ public class RecipeSpec {
     TypeValidation typeValidation;
 
     boolean serializationValidation = true;
+
+    @Nullable
+    PrintOutputCapture.MarkerPrinter markerPrinter;
 
     Consumer<List<SourceFile>> beforeRecipe = s -> {
     };
@@ -106,6 +120,16 @@ public class RecipeSpec {
 
     public RecipeSpec executionContext(ExecutionContext executionContext) {
         this.executionContext = executionContext;
+        return this;
+    }
+
+    public RecipeSpec recipeExecutionContext(ExecutionContext executionContext) {
+        this.recipeExecutionContext = executionContext;
+        return this;
+    }
+
+    public RecipeSpec markerPrinter(PrintOutputCapture.MarkerPrinter markerPrinter) {
+        this.markerPrinter = markerPrinter;
         return this;
     }
 

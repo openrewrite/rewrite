@@ -73,11 +73,11 @@ public class RecipeExceptionDemonstration extends Recipe {
             return new TreeVisitor<Tree, ExecutionContext>() {
                 @Override
                 public Tree preVisit(Tree tree, ExecutionContext executionContext) {
-                    throw new DemonstrationException("Throwing on the project-level applicable test.");
+                    throw new RuntimeException("Throwing on the project-level applicable test.");
                 }
             };
         } else if (Boolean.TRUE.equals(throwOnApplicableTest)) {
-            throw new DemonstrationException("Throwing on the project-level applicable test.");
+            throw new RuntimeException("Throwing on the project-level applicable test.");
         }
         return null;
     }
@@ -89,11 +89,11 @@ public class RecipeExceptionDemonstration extends Recipe {
             return new TreeVisitor<Tree, ExecutionContext>() {
                 @Override
                 public Tree preVisit(Tree tree, ExecutionContext executionContext) {
-                    throw new DemonstrationException("Demonstrating an exception thrown on the single-source applicable test.");
+                    throw new RuntimeException("Demonstrating an exception thrown on the single-source applicable test.");
                 }
             };
         } else if (Boolean.TRUE.equals(throwOnSingleSourceApplicableTest)) {
-            throw new DemonstrationException("Demonstrating an exception thrown on the single-source applicable test.");
+            throw new RuntimeException("Demonstrating an exception thrown on the single-source applicable test.");
         }
         return null;
     }
@@ -115,12 +115,12 @@ public class RecipeExceptionDemonstration extends Recipe {
                 new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
                     public Tree preVisit(Tree tree, ExecutionContext executionContext) {
-                        throw new DemonstrationException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
+                        throw new RuntimeException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
                     }
                 }.visit(sourceFile, ctx);
             }
         } else if (Boolean.TRUE.equals(throwOnVisitAll)) {
-            throw new DemonstrationException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
+            throw new RuntimeException("Demonstrating an exception thrown in the recipe's `visit(List<SourceFile>, ExecutionContext)` method.");
         }
         return before;
     }
@@ -134,35 +134,12 @@ public class RecipeExceptionDemonstration extends Recipe {
                 @Override
                 public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                     if (methodMatcher.matches(method)) {
-                        throw new DemonstrationException("Demonstrating an exception thrown on a matching method.");
+                        throw new RuntimeException("Demonstrating an exception thrown on a matching method.");
                     }
                     return super.visitMethodInvocation(method, executionContext);
                 }
             };
         }
         return TreeVisitor.noop();
-    }
-
-    public static class DemonstrationException extends RuntimeException {
-        static boolean restrictStackTrace = false;
-
-        public DemonstrationException(String message) {
-            super(message);
-        }
-
-        @Override
-        public StackTraceElement[] getStackTrace() {
-            if (restrictStackTrace) {
-                List<StackTraceElement> restricted = new ArrayList<>();
-                for (StackTraceElement ste : super.getStackTrace()) {
-                    if (ste.getClassName().startsWith(RecipeExceptionDemonstration.class.getName() + "$")) {
-                        restricted.add(ste);
-                    }
-                }
-                return restricted.toArray(new StackTraceElement[0]);
-            } else {
-                return super.getStackTrace();
-            }
-        }
     }
 }

@@ -24,10 +24,12 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.Markup;
 
 import java.beans.Transient;
 import java.lang.reflect.ParameterizedType;
@@ -203,6 +205,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     @Incubating(since = "7.31.0")
     public static <R extends Tree, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
                                                                       Tree tree, C initial) {
+        //noinspection unchecked
         return collect(visitor, tree, initial, Tree.class, t -> (R) t);
     }
 
@@ -321,6 +324,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 // bubbling up from lower in the tree
                 throw e;
             }
+
             throw new RecipeRunException(e, getCursor());
         }
 

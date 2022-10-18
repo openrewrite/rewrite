@@ -26,9 +26,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.cache.MavenPomCache;
-import org.openrewrite.maven.internal.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.VersionRequirement;
@@ -91,6 +92,7 @@ public class ResolvedPom {
 
     /**
      * Deduplicate dependencies and dependency management dependencies
+     *
      * @return This POM after deduplication.
      */
     @SuppressWarnings("UnnecessaryLocalVariable")
@@ -298,7 +300,7 @@ public class ResolvedPom {
             return ResolvedPom.this;
         }
 
-        void resolveParentsRecursively(Pom requested) {
+        void resolveParentsRecursively(Pom requested) throws MavenDownloadingException {
             List<Pom> pomAncestry = new ArrayList<>();
             pomAncestry.add(requested);
 
@@ -328,7 +330,7 @@ public class ResolvedPom {
             resolveParentDependenciesRecursively(pomAncestry);
         }
 
-        private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) {
+        private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
             //Resolve properties
@@ -363,7 +365,7 @@ public class ResolvedPom {
             }
         }
 
-        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) {
+        private void resolveParentDependenciesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
             Pom pom = pomAncestry.get(0);
 
             for (Profile profile : pom.getProfiles()) {
@@ -460,7 +462,7 @@ public class ResolvedPom {
             }
         }
 
-        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, Pom pom) {
+        private void mergeDependencyManagement(List<ManagedDependency> incomingDependencyManagement, Pom pom) throws MavenDownloadingException {
             if (!incomingDependencyManagement.isEmpty()) {
                 if (dependencyManagement == null || dependencyManagement.isEmpty()) {
                     dependencyManagement = new ArrayList<>();
@@ -496,12 +498,12 @@ public class ResolvedPom {
         }
     }
 
-    public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) {
+    public List<ResolvedDependency> resolveDependencies(Scope scope, MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         return resolveDependencies(scope, new HashMap<>(), downloader, ctx);
     }
 
     public List<ResolvedDependency> resolveDependencies(Scope scope, Map<GroupArtifact, VersionRequirement> requirements,
-                                                        MavenPomDownloader downloader, ExecutionContext ctx) {
+                                                        MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         List<ResolvedDependency> dependencies = new ArrayList<>();
 
         List<DependencyAndDependent> dependenciesAtDepth = new ArrayList<>();
@@ -509,10 +511,11 @@ public class ResolvedPom {
             Dependency d = getValues(requestedDependency, 0);
             Scope dScope = Scope.fromName(d.getScope());
             if (dScope == scope || dScope.isInClasspathOf(scope)) {
-                dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, Scope.Compile, null, this));
+                dependenciesAtDepth.add(new DependencyAndDependent(requestedDependency, Scope.Compile, null, requestedDependency, this));
             }
         }
 
+        MavenDownloadingExceptions exceptions = null;
         int depth = 0;
         while (!dependenciesAtDepth.isEmpty()) {
             List<DependencyAndDependent> dependenciesAtNextDepth = new ArrayList<>();
@@ -609,7 +612,7 @@ public class ResolvedPom {
                         if (d.getExclusions() != null) {
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     continue nextDependency;
                                 }
                             }
@@ -617,16 +620,20 @@ public class ResolvedPom {
 
                         Scope d2Scope = getDependencyScope(d2, resolvedPom);
                         if (d2Scope.isInClasspathOf(dd.getScope())) {
-                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, d2Scope, resolved, resolvedPom));
+                            dependenciesAtNextDepth.add(new DependencyAndDependent(d2, d2Scope, resolved, dd.getRootDependent(), resolvedPom));
                         }
                     }
                 } catch (MavenDownloadingException e) {
-                    ctx.getOnError().accept(e);
+                    exceptions = MavenDownloadingExceptions.append(exceptions, e.setRoot(dd.getRootDependent().getGav()));
                 }
             }
 
             dependenciesAtDepth = dependenciesAtNextDepth;
             depth++;
+        }
+
+        if (exceptions != null) {
+            throw exceptions;
         }
 
         return dependencies;
@@ -712,6 +719,7 @@ public class ResolvedPom {
         Dependency dependency;
         Scope scope;
         ResolvedDependency dependent;
+        Dependency rootDependent;
         ResolvedPom definedIn;
     }
 }

@@ -84,6 +84,17 @@ public interface RewriteTest extends SourceSpecs {
         RecipeSpec testMethodSpec = RecipeSpec.defaults();
         spec.accept(testMethodSpec);
 
+        PrintOutputCapture.MarkerPrinter markerPrinter;
+        if (testMethodSpec.getMarkerPrinter() != null) {
+            markerPrinter = testMethodSpec.getMarkerPrinter();
+        } else if (testClassSpec.getMarkerPrinter() != null) {
+            markerPrinter = testClassSpec.getMarkerPrinter();
+        } else {
+            markerPrinter = PrintOutputCapture.MarkerPrinter.DEFAULT;
+        }
+
+        PrintOutputCapture<Integer> out = new PrintOutputCapture<>(0, markerPrinter);
+
         Recipe recipe = testMethodSpec.recipe == null ? testClassSpec.recipe : testMethodSpec.recipe;
         assertThat(recipe)
                 .as("A recipe must be specified")
@@ -94,8 +105,8 @@ public interface RewriteTest extends SourceSpecs {
                 .isTrue();
 
         if (!(recipe instanceof AdHocRecipe) &&
-                testClassSpec.serializationValidation &&
-                testMethodSpec.serializationValidation) {
+            testClassSpec.serializationValidation &&
+            testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
@@ -209,11 +220,11 @@ public interface RewriteTest extends SourceSpecs {
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
                     if (j++ == i && !(sourceFile instanceof Quark)) {
-                        assertThat(sourceFile.printAll())
+                        assertThat(sourceFile.printAll(out.clone()))
                                 .as("When parsing and printing the source code back to text without modifications, " +
-                                        "the printed source didn't match the original source code. This means there is a bug in the " +
-                                        "parser implementation itself. Please open an issue to report this, providing a sample of the " +
-                                        "code that generated this error!")
+                                    "the printed source didn't match the original source code. This means there is a bug in the " +
+                                    "parser implementation itself. Please open an issue to report this, providing a sample of the " +
+                                    "code that generated this error!")
                                 .isEqualTo(StringUtils.readFully(input.getSource(executionContext), parser.getCharset(executionContext)));
                     }
                 }
@@ -237,9 +248,16 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
+        ExecutionContext recipeExecutionContext = executionContext;
+        if (testMethodSpec.getRecipeExecutionContext() != null) {
+            recipeExecutionContext = testMethodSpec.getRecipeExecutionContext();
+        } else if (testClassSpec.getRecipeExecutionContext() != null) {
+            recipeExecutionContext = testClassSpec.getRecipeExecutionContext();
+        }
+
         RecipeRun recipeRun = recipe.run(
                 runnableSourceFiles,
-                executionContext,
+                recipeExecutionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,
                 expectedCyclesThatMakeChanges + 1
@@ -267,9 +285,9 @@ public interface RewriteTest extends SourceSpecs {
                         expectedNewSources.remove(sourceSpec);
                         assertThat(result.getBefore())
                                 .as("Expected a new file for the source path but there was an existing file already present: " +
-                                        sourceSpec.getSourcePath())
+                                    sourceSpec.getSourcePath())
                                 .isNull();
-                        String actual = result.getAfter().printAll().trim();
+                        String actual = result.getAfter().printAll(out.clone()).trim();
                         String expected = trimIndentPreserveCRLF(sourceSpec.after);
                         assertThat(actual).isEqualTo(expected);
                         continue nextSourceSpec;
@@ -283,7 +301,7 @@ public interface RewriteTest extends SourceSpecs {
             for (Result result : recipeRun.getResults()) {
                 if (result.getAfter() != null && !(result.getAfter() instanceof Remote)) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
-                    String actual = result.getAfter().printAll().trim();
+                    String actual = result.getAfter().printAll(out.clone()).trim();
                     String expected = trimIndentPreserveCRLF(sourceSpec.after);
                     if (actual.equals(expected)) {
                         expectedNewSources.remove(sourceSpec);
@@ -302,7 +320,7 @@ public interface RewriteTest extends SourceSpecs {
             for (Result result : recipeRun.getResults()) {
                 if (result.getAfter() instanceof Remote) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
-                    String actual = result.getAfter().printAll();
+                    String actual = result.getAfter().printAll(out.clone());
                     String expected = trimIndentPreserveCRLF(sourceSpec.after);
                     if (actual.equals(expected)) {
                         expectedNewSources.remove(sourceSpec);
@@ -324,7 +342,7 @@ public interface RewriteTest extends SourceSpecs {
             for (Result result : recipeRun.getResults()) {
                 if (result.getBefore() == specForSourceFile.getKey()) {
                     if (expectedAfter != null && result.getAfter() != null) {
-                        String actual = result.getAfter().printAll();
+                        String actual = result.getAfter().printAll(out.clone());
                         String expected = trimIndentPreserveCRLF(expectedAfter);
                         assertThat(actual).isEqualTo(expected);
                         specForSourceFile.getValue().eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
@@ -334,9 +352,9 @@ public interface RewriteTest extends SourceSpecs {
                         }
 
                         assert result.getBefore() != null;
-                        assertThat(result.getAfter().printAll())
+                        assertThat(result.getAfter().printAll(out.clone()))
                                 .as("The recipe must not make changes")
-                                .isEqualTo(result.getBefore().printAll());
+                                .isEqualTo(result.getBefore().printAll(out.clone()));
                     } else if (expectedAfter != null && result.getAfter() == null) {
                         assert result.getBefore() != null;
                         fail("The recipe deleted a source file [" + result.getBefore().getSourcePath() + "] that was not expected to change");
@@ -351,7 +369,7 @@ public interface RewriteTest extends SourceSpecs {
 
             // if we get here, there was no result.
             if (expectedAfter != null) {
-                String before = trimIndentPreserveCRLF(specForSourceFile.getKey().printAll());
+                String before = trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
                 String expected = trimIndentPreserveCRLF(expectedAfter);
 
                 assertThat(before)

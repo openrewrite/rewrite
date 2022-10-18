@@ -102,7 +102,7 @@ public class MavenParser implements Parser<Xml.Document> {
                 projectPoms.put(xml, pom);
                 projectPomsByPath.put(pomPath, pom);
             } catch (Throwable t) {
-                ParsingExecutionContextView.view(ctx).parseFailure(pomPath, t);
+                ParsingExecutionContextView.view(ctx).parseFailure(pomPath, this, t);
                 ctx.getOnError().accept(t);
             }
         }
@@ -123,10 +123,16 @@ public class MavenParser implements Parser<Xml.Document> {
                         ));
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
-            ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-            MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
-                    .resolveDependencies(downloader, ctx);
-            parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
+            try {
+                ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
+                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
+                        .resolveDependencies(downloader, ctx);
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
+            } catch(MavenDownloadingExceptions e) {
+                throw new UncheckedMavenDownloadingException("Failed to download dependencies for " + docToPom.getKey().getSourcePath(), e);
+            } catch (MavenDownloadingException e) {
+                throw new UncheckedMavenDownloadingException("Failed to download dependencies for " + docToPom.getKey().getSourcePath(), e);
+            }
         }
 
         for (int i = 0; i < parsed.size(); i++) {

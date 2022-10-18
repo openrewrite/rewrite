@@ -21,6 +21,8 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
@@ -165,12 +167,28 @@ public class MavenResolutionResult implements Marker {
         return null;
     }
 
-    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) {
+    private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
+
+    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
-        dependencies.put(Scope.Compile, pom.resolveDependencies(Scope.Compile, downloader, ctx));
-        dependencies.put(Scope.Test, pom.resolveDependencies(Scope.Test, downloader, ctx));
-        dependencies.put(Scope.Runtime, pom.resolveDependencies(Scope.Runtime, downloader, ctx));
-        dependencies.put(Scope.Provided, pom.resolveDependencies(Scope.Provided, downloader, ctx));
+        MavenDownloadingExceptions exceptions = null;
+
+        Map<GroupArtifact, Set<GroupArtifactVersion>> exceptionsInLowerScopes = new HashMap<>();
+        for (Scope scope : RESOLVE_SCOPES) {
+            try {
+                dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
+            } catch (MavenDownloadingExceptions e) {
+                for (MavenDownloadingException exception : e.getExceptions()) {
+                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
+                            exception.getRoot().getArtifactId()), ga -> new HashSet<>()).add(exception.getFailedOn())) {
+                        exceptions = MavenDownloadingExceptions.append(exceptions, exception);
+                    }
+                }
+            }
+        }
+        if (exceptions != null) {
+            throw exceptions;
+        }
         return withDependencies(dependencies);
     }
 
