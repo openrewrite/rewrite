@@ -15,23 +15,18 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
-import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import java.util.concurrent.atomic.AtomicReference
 
-class Java17TypeMappingTest : JavaTypeMappingTest {
+class Java17TypeMappingTest : JavaParserTypeMappingTest {
     companion object {
         private val goat = Java17TypeMappingTest::class.java.getResourceAsStream("/JavaTypeGoat.java")!!
             .bufferedReader().readText()
 
-        private val goatCu = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .build()
+        private val goatCu = JavaParserTypeMappingTest.parser
             .parse(InMemoryExecutionContext { t -> fail(t) }, goat)[0]
     }
 
@@ -46,40 +41,5 @@ class Java17TypeMappingTest : JavaTypeMappingTest {
             }
         }.visitNonNull(goatCu, 0)
         return type.get()!!
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1318")
-    @Test
-    fun methodInvocationOnUnknownType() {
-        val source = """
-            import java.util.ArrayList;
-            // do not import List to create an UnknownType
-            
-            class Test {
-                class Base {
-                    private int foo;
-                    public boolean setFoo(int foo) {
-                        this.foo = foo;
-                    }
-                    public int getFoo() {
-                        return foo;
-                    }
-                }
-                List<Base> createUnknownType(List<Integer> values) {
-                    List<Base> bases = new ArrayList<>();
-                    values.forEach((v) -> {
-                        Base b = new Base();
-                        b.setFoo(v);
-                        bases.add(b);
-                    });
-                    return bases;
-                }
-            }
-        """.trimIndent()
-        val cu = JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .build()
-            .parse(InMemoryExecutionContext { t -> fail(t) }, source)
-        assertThat(cu).isNotNull
     }
 }

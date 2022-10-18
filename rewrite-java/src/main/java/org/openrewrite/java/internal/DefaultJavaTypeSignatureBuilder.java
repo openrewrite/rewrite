@@ -135,7 +135,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
     }
 
     public String variableSignature(JavaType.Variable variable) {
-        return signature(variable.getOwner()) + "{name=" + variable.getName() + '}';
+        return signature(variable.getOwner()) + "{name=" + variable.getName() + ",type=" + signature(variable.getType()) + '}';
     }
 
     public String methodSignature(JavaType.Method method) {
