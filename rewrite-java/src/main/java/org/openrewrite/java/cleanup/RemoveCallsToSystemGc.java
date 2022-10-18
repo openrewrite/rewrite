@@ -18,9 +18,10 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.search.UsesAnyOfMethods;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
@@ -28,14 +29,18 @@ import java.util.Collections;
 import java.util.Set;
 
 public class RemoveCallsToSystemGc extends Recipe {
+
+    private static final MethodMatcher SYSTEM_GC = new MethodMatcher("java.lang.System gc()");
+    private static final MethodMatcher RUNTIME_GC = new MethodMatcher("java.lang.Runtime gc()");
+
     @Override
     public String getDisplayName() {
-        return "Remove calls to `System.gc()` method";
+        return "Remove garbage collection invocations";
     }
 
     @Override
     public String getDescription() {
-        return "Removes calls to System.gc()";
+        return "Removes calls to `System.gc()` and `Runtime.gc()`. When to invoke garbage collection is best left to the JVM.";
     }
 
     @Override
@@ -49,8 +54,8 @@ public class RemoveCallsToSystemGc extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>("java.lang.System gc()");
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesAnyOfMethods(SYSTEM_GC, RUNTIME_GC);
     }
 
     @Override
@@ -59,7 +64,7 @@ public class RemoveCallsToSystemGc extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
-                if (new MethodMatcher("java.lang.System gc()").matches(invocation)) {
+                if (SYSTEM_GC.matches(invocation) || RUNTIME_GC.matches(invocation)) {
                     doAfterVisit(new EmptyBlock());
                     return null;
                 }
