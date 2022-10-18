@@ -30,7 +30,7 @@ interface RemoveCallsToSystemGcTest : JavaRecipeTest {
                 public String gc() {
                    return "here gc stands for good call";
                 }
-            
+
                 public static void main(String[] args) {
                     gc();
                     System.gc();
@@ -45,7 +45,7 @@ interface RemoveCallsToSystemGcTest : JavaRecipeTest {
                 public String gc() {
                    return "here gc stands for good call";
                 }
-            
+
                 public static void main(String[] args) {
                     gc();
                 }

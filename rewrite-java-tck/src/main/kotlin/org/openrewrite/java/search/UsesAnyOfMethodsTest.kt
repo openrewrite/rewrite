@@ -37,7 +37,7 @@ interface UsesAnyOfMethodsTest : RewriteTest {
             import java.util.Collections;
             class Test {
                 {
-                    Collections.emptySet();
+                    Collections.emptyList();
                 }
             }
             """,
@@ -45,9 +45,33 @@ interface UsesAnyOfMethodsTest : RewriteTest {
             /*~~>*/import java.util.Collections;
             class Test {
                 {
+                    Collections.emptyList();
                 }
             }
             """
         )
     )
+
+    @Test
+    fun noneIsUsed() = rewriteRun(
+            { spec ->
+                spec.recipe(RewriteTest.toRecipe {
+                    UsesAnyOfMethods(
+                            MethodMatcher("java.util.Collections emptyList()"),
+                            MethodMatcher("java.util.Collections emptySet()")
+                    )
+                })
+            },
+            java(
+                    """
+            import java.util.Collections;
+            class Test {
+                {
+                    System.out.println("Hello world");
+                }
+            }
+            """
+            )
+    )
+
 }
