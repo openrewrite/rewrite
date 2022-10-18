@@ -101,9 +101,9 @@ public class DeclarativeRecipe extends Recipe {
         uninitializedRecipes.add(recipe);
     }
 
-    public void addUninitialized(String recipeName) {
+    public void addUninitialized(String recipeName, @Nullable ClassLoader classLoader) {
         try {
-            uninitializedRecipes.add((Recipe) Class.forName(recipeName).getDeclaredConstructor().newInstance());
+            uninitializedRecipes.add((Recipe) Class.forName(recipeName, true, classLoader).getDeclaredConstructor().newInstance());
         } catch (Exception e) {
             uninitializedRecipes.add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
         }
