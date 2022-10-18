@@ -63,6 +63,9 @@ public class YamlResourceLoader implements ResourceLoader {
 
     private final ObjectMapper mapper;
 
+    @Nullable
+    private final ClassLoader classLoader;
+
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
@@ -119,6 +122,8 @@ public class YamlResourceLoader implements ResourceLoader {
                 .registerModule(new ParameterNamesModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         maybeAddKotlinModule(mapper);
+
+        this.classLoader = classLoader;
 
         if (classLoader != null) {
             TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(classLoader);
@@ -192,7 +197,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     for (int i = 0; i < recipeList.size(); i++) {
                         Object next = recipeList.get(i);
                         if (next instanceof String) {
-                            recipe.addUninitialized((String) next);
+                            recipe.addUninitialized((String) next, classLoader);
                         } else if (next instanceof Map) {
                             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
                             try {
