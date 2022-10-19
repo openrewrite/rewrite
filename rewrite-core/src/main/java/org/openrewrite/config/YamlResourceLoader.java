@@ -65,6 +65,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Nullable
     private final ClassLoader classLoader;
+    private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
@@ -113,7 +114,22 @@ public class YamlResourceLoader implements ResourceLoader {
      * @throws UncheckedIOException On unexpected IOException
      */
     public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, @Nullable ClassLoader classLoader) throws UncheckedIOException {
+        this(yamlInput, source, properties, classLoader, emptyList());
+    }
+
+    /**
+     * Load a declarative recipe, optionally using the specified classloader and optionally including resource loaders
+     * for recipes from dependencies.
+     *
+     * @param yamlInput   Declarative recipe yaml input stream
+     * @param source      Declarative recipe source
+     * @param properties  Placeholder properties
+     * @param classLoader Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
+     * @throws UncheckedIOException On unexpected IOException
+     */
+    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, @Nullable ClassLoader classLoader, Collection<? extends ResourceLoader> dependencyResourceLoaders) throws UncheckedIOException {
         this.source = source;
+        this.dependencyResourceLoaders = dependencyResourceLoaders;
 
         mapper = JsonMapper.builder()
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
@@ -248,8 +264,11 @@ public class YamlResourceLoader implements ResourceLoader {
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
-                externalRecipes.stream(),
-                internalRecipes.stream()
+                Stream.concat(
+                        externalRecipes.stream(),
+                        internalRecipes.stream()
+                ),
+                dependencyResourceLoaders.stream().flatMap(rl -> rl.listRecipes().stream())
         ).collect(toList());
 
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
