@@ -1881,7 +1881,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor;
+                i = cursor -1;
                 lastAnnotationPosition = cursor;
                 continue;
             }
