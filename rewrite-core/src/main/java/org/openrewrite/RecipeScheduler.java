@@ -20,9 +20,10 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MarkerIdPrinter;
 import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.marker.*;
+import org.openrewrite.marker.Generated;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.text.PlainTextParser;
 
