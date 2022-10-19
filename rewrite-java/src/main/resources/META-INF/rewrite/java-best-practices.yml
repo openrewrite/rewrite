@@ -20,6 +20,7 @@ displayName: Java API best practices
 description: Use the Java standard library in a way that is most idiomatic.
 recipeList:
   - org.openrewrite.java.cleanup.UseMapContainsKey
+  - org.openrewrite.java.cleanup.RemoveCallsToSystemGc
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.cleanup.UseMapContainsKey
