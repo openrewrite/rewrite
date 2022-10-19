@@ -121,22 +121,10 @@ public interface RecipeScheduler {
                         continue;
                     }
 
-                    boolean isChanged = !original.getSourcePath().equals(s.getSourcePath());
-                    if (!isChanged) {
-                        MarkerIdPrinter markerIdPrinter = new MarkerIdPrinter();
-                        PrintOutputCapture<ExecutionContext> originalOutput = new PrintOutputCapture<>(ctx);
-                        PrintOutputCapture<ExecutionContext> sOutput = new PrintOutputCapture<>(ctx);
-                        markerIdPrinter.visit(original, originalOutput);
-                        markerIdPrinter.visit(s, sOutput);
-                        isChanged = !originalOutput.getOut().equals(sOutput.getOut());
-                    }
-
-                    if (isChanged) {
-                        results.add(new Result(original, s, s.getMarkers()
-                                .findFirst(RecipesThatMadeChanges.class)
-                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change. Did a recipe apply a marker?"))
-                                .getRecipes()));
-                    }
+                    results.add(new Result(original, s, s.getMarkers()
+                            .findFirst(RecipesThatMadeChanges.class)
+                            .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change"))
+                            .getRecipes()));
                 }
             }
         }
