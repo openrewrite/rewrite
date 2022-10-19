@@ -128,7 +128,7 @@ public interface RecipeScheduler {
                         PrintOutputCapture<ExecutionContext> sOutput = new PrintOutputCapture<>(ctx);
                         markerIdPrinter.visit(original, originalOutput);
                         markerIdPrinter.visit(s, sOutput);
-                        isChanged = !originalOutput.toString().equals(sOutput.toString());
+                        isChanged = !originalOutput.getOut().equals(sOutput.getOut());
                     }
 
                     if (isChanged) {

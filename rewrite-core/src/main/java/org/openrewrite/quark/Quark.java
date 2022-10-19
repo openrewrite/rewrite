@@ -40,7 +40,14 @@ public class Quark implements SourceFile {
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return true;
+        return v.isAdaptableTo(QuarkVisitor.class);
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    @Override
+    public <R extends Tree, P> @Nullable R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection unchecked
+        return (R) v.adapt(QuarkVisitor.class).visitQuark(this, p);
     }
 
     @Override
@@ -48,6 +55,7 @@ public class Quark implements SourceFile {
         throw new UnsupportedOperationException("The contents of a quark are unknown, so the charset is unknown.");
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SourceFile withCharset(Charset charset) {
         throw new UnsupportedOperationException("The contents of a quark are unknown, so the charset is unknown.");
@@ -58,6 +66,7 @@ public class Quark implements SourceFile {
         throw new UnsupportedOperationException("The contents of a quark are unknown, so the charset is unknown.");
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SourceFile withCharsetBomMarked(boolean marked) {
         throw new UnsupportedOperationException("The contents of a quark are unknown, so the charset is unknown.");
@@ -65,6 +74,6 @@ public class Quark implements SourceFile {
 
     @Override
     public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-        return TreeVisitor.noop();
+        return new QuarkPrinter<>();
     }
 }

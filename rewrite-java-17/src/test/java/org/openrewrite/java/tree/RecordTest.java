@@ -27,7 +27,17 @@ public class RecordTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public record JavaRecord(String name, @Deprecated int age) {}
+                  public record JavaRecord(String name, @Deprecated int age) {
+
+                    public JavaRecord(String name, @Deprecated int age) {
+                      this.name = name;
+                      this.age = age;
+                    }
+                    
+                    @Override public String name() {
+                        return name;
+                    }
+                }
               """
           )
         );
