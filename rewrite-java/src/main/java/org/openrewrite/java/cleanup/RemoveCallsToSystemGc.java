@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.search.UsesAnyOfMethods;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
@@ -55,7 +56,7 @@ public class RemoveCallsToSystemGc extends Recipe {
 
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesAnyOfMethods(SYSTEM_GC, RUNTIME_GC);
+        return Applicability.or(new UsesMethod<>(SYSTEM_GC), new UsesMethod<>(RUNTIME_GC));
     }
 
     @Override

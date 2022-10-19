@@ -581,9 +581,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class UsesAllMethodsTck : UsesAllMethodsTest
 
     @Nested
-    inner class UsesAnyOfMethodsTck : UsesAnyOfMethodsTest
-
-    @Nested
     inner class UsesMethodTck : UsesMethodTest
 
     @Nested
