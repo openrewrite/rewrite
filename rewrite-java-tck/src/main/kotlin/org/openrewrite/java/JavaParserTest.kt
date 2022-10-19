@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 
 /**
@@ -27,22 +28,69 @@ import org.openrewrite.java.tree.J
 interface JavaParserTest : JavaRecipeTest {
 
     @Test
-    fun incompleteAssignment(jp: JavaParser) {
+    fun incompleteAssignment() {
 
-       val source =
-       """
+        val source =
+            """
            @Deprecated(since=)
            public class A {}
-       """.trimIndent();
+       """.trimIndent()
 
-        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0);
+        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0)
 
-        assertThat(cu.printAll()).isEqualTo(source);
+        assertThat(cu.printAll()).isEqualTo(source)
 
-        val newCu = JavaVisitor<ExecutionContext>().visit(cu, InMemoryExecutionContext()) as J.CompilationUnit;
+        val newCu = JavaVisitor<ExecutionContext>().visit(cu, InMemoryExecutionContext()) as J.CompilationUnit
 
-        assertThat(newCu.printAll()).isEqualTo(source);
+        assertThat(newCu.printAll()).isEqualTo(source)
 
+    }
+
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2313")
+    fun annotationCommentWithNoSpaceParsesCorrectly() {
+
+        val source =
+            """
+                package com.example;
+                
+                @SuppressWarnings("serial")// fred
+                @Deprecated
+                public class PersistenceManagerImpl {
+                }
+            """.trimIndent()
+
+        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0)
+
+        assertThat(cu.printAll()).isEqualTo(source)
+
+        val clazz = cu.classes[0]
+
+        assertThat(clazz.leadingAnnotations).hasSize(2)
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2313")
+    fun annotationCommentWithSpaceParsesCorrectly() {
+
+        val source =
+            """
+                package com.example;
+                
+                @SuppressWarnings("serial") // fred
+                @Deprecated
+                public class PersistenceManagerImpl {
+                }
+            """.trimIndent()
+
+        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0)
+
+        assertThat(cu.printAll()).isEqualTo(source)
+
+        val clazz = cu.classes[0]
+
+        assertThat(clazz.leadingAnnotations).hasSize(2)
     }
 
 }
