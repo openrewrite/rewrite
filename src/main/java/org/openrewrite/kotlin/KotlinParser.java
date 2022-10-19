@@ -62,7 +62,6 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayInputStream;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -146,14 +145,12 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     }
 
     private Map<Input, FirFile> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
-        Disposable disposable = null;
+        Disposable disposable = Disposer.newDisposable();
         try {
-            disposable = Disposer.newDisposable();
             KotlinCoreEnvironment kenv = KotlinCoreEnvironment.createForProduction(
                     disposable, compilerConfiguration(), EnvironmentConfigFiles.JVM_CONFIG_FILES);
 
             Project project = kenv.getProject();
-
             LanguageVersionSettings languageVersionSettings = new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7,
                     ApiVersion.KOTLIN_1_7);
             FileIndexFacade fileIndexFacade = new MockFileIndexFacade(project);
@@ -161,7 +158,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             GlobalSearchScope globalScope = coreProjectScopeBuilder.buildAllScope();
             JvmPackagePartProvider packagePartProvider = new JvmPackagePartProvider(languageVersionSettings, globalScope);
             Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
-            TargetPlatform targetPlatform = JvmPlatforms.INSTANCE.getJvm11();
+            TargetPlatform targetPlatform = JvmPlatforms.INSTANCE.getJvm17();
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
             VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(project,
                     VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
@@ -182,7 +179,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             );
             SingleModuleDataProvider moduleDataProvider = new SingleModuleDataProvider(firModuleData);
 
-            FirSession firSession = FirSessionFactory.INSTANCE.createLibrarySession(
+            FirSession librarySession = FirSessionFactory.INSTANCE.createLibrarySession(
                     name,
                     firProjectSessionProvider,
                     moduleDataProvider,
@@ -191,9 +188,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     packagePartProvider,
                     languageVersionSettings
             );
-            FirKotlinScopeProvider firScopeProvider = new FirKotlinScopeProvider();
-            RawFirBuilder rawFirBuilder = new RawFirBuilder(firSession, firScopeProvider, PsiHandlingMode.IDE, BodyBuildingMode.NORMAL);
-
+            RawFirBuilder rawFirBuilder = new RawFirBuilder(librarySession,
+                    new FirKotlinScopeProvider(), PsiHandlingMode.IDE, BodyBuildingMode.NORMAL);
             PsiFileFactory psiFileFactory = PsiFileFactory.getInstance(project);
             Map<Input, FirFile> cus = new LinkedHashMap<>();
             for (Input sourceFile : sources) {
@@ -203,25 +199,16 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             }
             return cus;
         } finally {
-            if (disposable != null) {
-                disposable.dispose();
-            }
+            disposable.dispose();
         }
     }
 
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
-        if (logCompilationWarningsAndErrors) {
-            compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
-        } else {
-            compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, MessageCollector.Companion.getNONE());
-        }
-        if (moduleName == null) {
-            compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, "main");
-        } else {
-            compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
-        }
-
+        compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
+                new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
+                MessageCollector.Companion.getNONE());
+        compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
         return compilerConfiguration;
     }
 
@@ -252,9 +239,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
-
-        @Nullable
-        private String moduleName;
+        private String moduleName = "main";
 
         public Builder() {
             super(K.CompilationUnit.class);
@@ -287,7 +272,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             return this;
         }
 
-        public Builder moduleName(@Nullable String moduleName) {
+        public Builder moduleName(String moduleName) {
             this.moduleName = moduleName;
             return this;
         }
