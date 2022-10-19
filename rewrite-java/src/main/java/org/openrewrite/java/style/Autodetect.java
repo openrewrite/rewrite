@@ -725,10 +725,12 @@ public class Autodetect extends NamedStyles {
                         for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
                             if (type instanceof JavaType.FullyQualified) {
                                 JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                                if (anImport.getPackageName().equals(fq.getPackageName())) {
-                                    // don't count directly, as JavaType.Parameterized can
-                                    // CONTAIN a FullyQualified that matches a raw FullyQualified
-                                    fqns.add(fq.getFullyQualifiedName());
+                                if (!fq.getClass().getSimpleName().equals("JavaTypeBackReference")) {
+                                    if (anImport.getPackageName().equals(fq.getPackageName())) {
+                                        // don't count directly, as JavaType.Parameterized can
+                                        // CONTAIN a FullyQualified that matches a raw FullyQualified
+                                        fqns.add(fq.getFullyQualifiedName());
+                                    }
                                 }
                             }
                         }
