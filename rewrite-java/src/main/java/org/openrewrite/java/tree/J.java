@@ -916,6 +916,7 @@ public interface J extends Tree {
         @SuppressWarnings("DeprecatedIsStillUsed")
         @Deprecated
         @Nullable
+        @With
         Expression pattern;
 
         /**
@@ -936,14 +937,6 @@ public interface J extends Tree {
          */
         public Expression getPattern() {
             return pattern == null ? getExpressions().get(0) : pattern;
-        }
-
-        /**
-         * @return A new case statement with a different pattern.
-         * @deprecated Prior to Java 12, there could only be one pattern. Use {@link #withExpressions(List)} instead.
-         */
-        public Case withPattern(@Nullable Expression pattern) {
-            return withExpressions(ListUtils.mapFirst(getExpressions(), first -> pattern));
         }
 
         JContainer<Expression> expressions;
