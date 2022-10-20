@@ -479,6 +479,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ReplaceConstantTck : ReplaceConstantTest
 
     @Nested
+    inner class ReplaceThreadRunWithThreadStartTck : ReplaceThreadRunWithThreadStartTest
+
+    @Nested
     inner class ResultOfMethodCallIgnoredTck : ResultOfMethodCallIgnoredTest
 
     @Nested
