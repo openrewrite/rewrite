@@ -17,29 +17,32 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.marker.SearchResult;
-import org.openrewrite.quark.Quark;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markup;
+
+import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class FindQuarks extends Recipe {
+public class FindParseFailures extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Find instances of type `Quark`";
+        return "Find source files with `ParseExceptionResult` markers";
     }
 
     @Override
     public String getDescription() {
-        return "Find instances of type `Quark`.";
+        return "Find source files with `ParseExceptionResult` markers.";
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                if (sourceFile instanceof Quark) {
-                    return SearchResult.found(sourceFile);
+            public @Nullable Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+                Optional<ParseExceptionResult> parseExceptionResult = sourceFile.getMarkers().findFirst(ParseExceptionResult.class);
+                if (parseExceptionResult.isPresent()) {
+                    return Markup.error(sourceFile, parseExceptionResult.get().getMessage(), null);
                 }
                 return sourceFile;
             }
