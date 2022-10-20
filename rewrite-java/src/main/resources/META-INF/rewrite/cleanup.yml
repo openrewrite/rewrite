@@ -35,4 +35,16 @@ recipeList:
   - org.openrewrite.java.cleanup.NeedBraces
   - org.openrewrite.java.cleanup.OperatorWrap
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
+  - org.openrewrite.java.cleanup.ReplaceThreadRunWithThreadStart
 #  - org.openrewrite.java.cleanup.RemoveRedundantTypeCast
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.cleanup.ReplaceThreadRunWithThreadStart
+displayName: Replace calls to `Thread.run()` with `Thread.start()`
+description: '`Thread.run()` should not be called directly.'
+recipeList:
+  - org.openrewrite.java.ChangeMethodName:
+      methodPattern: java.lang.Thread run()
+      newMethodName: start
+tags:
+  - RSPEC-1217
