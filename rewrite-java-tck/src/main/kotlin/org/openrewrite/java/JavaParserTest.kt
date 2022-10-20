@@ -20,77 +20,64 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RewriteTest
 
 /**
  * @author Alex Boyko
  */
-interface JavaParserTest : JavaRecipeTest {
+interface JavaParserTest : RewriteTest {
 
+    @Suppress("Since15")
     @Test
     fun incompleteAssignment() {
-
-        val source =
+        rewriteRun(
+          java(
             """
            @Deprecated(since=)
            public class A {}
-       """.trimIndent()
-
-        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0)
-
-        assertThat(cu.printAll()).isEqualTo(source)
-
-        val newCu = JavaVisitor<ExecutionContext>().visit(cu, InMemoryExecutionContext()) as J.CompilationUnit
-
-        assertThat(newCu.printAll()).isEqualTo(source)
-
+        """
+          )
+        )
     }
 
-
+    @Suppress("RedundantSuppression")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2313")
     fun annotationCommentWithNoSpaceParsesCorrectly() {
-
-        val source =
+        rewriteRun(
+          java(
             """
-                package com.example;
-                
                 @SuppressWarnings("serial")// fred
                 @Deprecated
                 public class PersistenceManagerImpl {
                 }
-            """.trimIndent()
-
-        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0)
-
-        assertThat(cu.printAll()).isEqualTo(source)
-
-        val clazz = cu.classes[0]
-
-        assertThat(clazz.leadingAnnotations).hasSize(2)
+            """
+          ) { spec ->
+              spec.afterRecipe { cu ->
+                  assertThat(cu.classes[0].leadingAnnotations).hasSize(2)
+              }
+          }
+        )
     }
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2313")
     fun annotationCommentWithSpaceParsesCorrectly() {
-
-        val source =
+        rewriteRun(
+          java(
             """
-                package com.example;
-                
                 @SuppressWarnings("serial") // fred
                 @Deprecated
                 public class PersistenceManagerImpl {
                 }
-            """.trimIndent()
-
-        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0)
-
-        assertThat(cu.printAll()).isEqualTo(source)
-
-        val clazz = cu.classes[0]
-
-        assertThat(clazz.leadingAnnotations).hasSize(2)
+            """
+          ) { spec ->
+              spec.afterRecipe { cu ->
+                  assertThat(cu.classes[0].leadingAnnotations).hasSize(2)
+              }
+          }
+        )
     }
-
 }
