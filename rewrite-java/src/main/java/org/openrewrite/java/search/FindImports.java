@@ -48,7 +48,7 @@ public class FindImports extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public JavaIsoVisitor<ExecutionContext> getVisitor() {
         TypeMatcher typeMatcher = new TypeMatcher(typePattern);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
