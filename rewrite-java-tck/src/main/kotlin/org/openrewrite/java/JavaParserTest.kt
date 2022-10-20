@@ -35,9 +35,9 @@ interface JavaParserTest : RewriteTest {
         rewriteRun(
           java(
             """
-           @Deprecated(since=)
-           public class A {}
-        """
+               @Deprecated(since=)
+               public class A {}
+            """
           )
         )
     }
