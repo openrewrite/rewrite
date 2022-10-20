@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -913,36 +914,28 @@ public interface J extends Tree {
             return type == null ? Type.Statement : type;
         }
 
-        @SuppressWarnings("DeprecatedIsStillUsed")
-        @Deprecated
-        @Nullable
-        @With
-        Expression pattern;
-
-        /**
-         * Only for use in {@link JavaVisitor} to not spawn a new instance when
-         * pattern is still in use.
-         * @return The pattern or null if not set.
-         * @deprecated Not intended for use outside of {@link JavaVisitor}.
-         */
-        @Nullable
-        @Deprecated
-        public Expression getPatternUnsafe() {
-            return pattern;
-        }
-
         /**
          * @return The pattern of this case statement.
          * @deprecated Prior to Java 12, there could only be one pattern. Use {@link #getExpressions()} instead.
          */
+        @Deprecated
         public Expression getPattern() {
-            return pattern == null ? getExpressions().get(0) : pattern;
+            return getExpressions().get(0);
+        }
+
+        /**
+         * @return A new Case instance with the assigned pattern.
+         * @deprecated Prior to Java 12, there could only be one pattern. Use {@link #withExpressions(List)} instead.
+         */
+        @Deprecated
+        public Case withPattern(@Nullable Expression pattern) {
+            return withExpressions(ListUtils.mapFirst(getExpressions(), first -> pattern));
         }
 
         JContainer<Expression> expressions;
 
         public List<Expression> getExpressions() {
-            return expressions == null ? singletonList(requireNonNull(pattern)) : expressions.getElements();
+            return expressions.getElements();
         }
 
         public Case withExpressions(List<Expression> expressions) {
@@ -978,6 +971,21 @@ public interface J extends Tree {
 
         public Case withBody(J body) {
             return getPadding().withBody(JRightPadded.withElement(this.body, body));
+        }
+
+        @JsonCreator
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.type = type;
+            if (pattern != null) {
+                this.expressions = requireNonNull(JContainer.withElementsNullable(null, singletonList(pattern)));
+            } else {
+                this.expressions = expressions;
+            }
+            this.statements = statements;
+            this.body = body;
         }
 
         @Override
@@ -1026,7 +1034,7 @@ public interface J extends Tree {
             }
 
             public Case withBody(@Nullable JRightPadded<J> body) {
-                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, t.pattern, t.expressions, t.statements, body);
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, body);
             }
 
             public JContainer<Statement> getStatements() {
@@ -1034,15 +1042,15 @@ public interface J extends Tree {
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, t.pattern, t.expressions, statements, t.body);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, statements, t.body);
             }
 
             public JContainer<Expression> getExpressions() {
-                return t.expressions == null ? JContainer.build(singletonList(JRightPadded.build(requireNonNull(t.pattern)))) : t.expressions;
+                return t.expressions;
             }
 
             public Case withExpressions(JContainer<Expression> expressions) {
-                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, t.pattern, expressions, t.statements, t.body);
+                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.statements, t.body);
             }
         }
     }
