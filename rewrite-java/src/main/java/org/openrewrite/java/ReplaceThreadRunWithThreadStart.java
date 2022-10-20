@@ -15,20 +15,13 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.J;
-
-import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
-public class ReplaceThreadRunWithThreadStart extends Recipe {
-
-    private static final MethodMatcher THREAD_RUN = new MethodMatcher("java.lang.Thread run()");
+public class ReplaceThreadRunWithThreadStart extends ChangeMethodInvocation {
+    public ReplaceThreadRunWithThreadStart() {
+        super("java.lang.Thread run()", "start", true);
+    }
 
     @Override
     public String getDisplayName() {
@@ -43,29 +36,5 @@ public class ReplaceThreadRunWithThreadStart extends Recipe {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1217");
-    }
-
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(2);
-    }
-
-    @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(THREAD_RUN);
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, context);
-                if (THREAD_RUN.matches(m)) {
-                    return m.withName(m.getName().withSimpleName("start"));
-                }
-                return m;
-            }
-        };
     }
 }
