@@ -20,10 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.ChangeFieldName;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.*;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Flag;
@@ -168,7 +165,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                     newName.append(Character.toUpperCase(c));
                     prevIsLower = Character.isLowerCase(c);
                 }
-                return newName.toString();
+                return VariableNameUtils.normalizeName(newName.toString());
             }
         };
     }

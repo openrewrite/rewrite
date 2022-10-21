@@ -20,6 +20,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
+import java.text.Normalizer;
 import java.util.*;
 
 @Incubating(since = "7.25.0")
@@ -64,6 +65,20 @@ public class VariableNameUtils {
         }
 
         return newName;
+    }
+
+    /**
+     * Replace accent and diacritics with normalized characters.
+     * @param name variable name to normalize.
+     * @return normalized name.
+     */
+    public static String normalizeName(String name) {
+        if (name.isEmpty() || Normalizer.isNormalized(name, Normalizer.Form.NFKD)) {
+            return name;
+        }
+
+        String normalized = Normalizer.normalize(name, Normalizer.Form.NFKD);
+        return normalized.replaceAll("\\p{M}", "");
     }
 
     /**

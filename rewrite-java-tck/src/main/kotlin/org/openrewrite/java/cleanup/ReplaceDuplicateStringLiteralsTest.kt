@@ -417,4 +417,24 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2329")
+    @Test
+    fun unicodeCharacterEquivalents() = assertChanged(
+        before = """
+            class A {
+                final String val1 = "āăąēîïĩíĝġńñšŝśûůŷ";
+                final String val2 = "āăąēîïĩíĝġńñšŝśûůŷ";
+                final String val3 = "āăąēîïĩíĝġńñšŝśûůŷ";
+            }
+        """,
+        after = """
+            class A {
+                private static final String AAAEIIIIGGNNSSSUUY = "āăąēîïĩíĝġńñšŝśûůŷ";
+                final String val1 = AAAEIIIIGGNNSSSUUY;
+                final String val2 = AAAEIIIIGGNNSSSUUY;
+                final String val3 = AAAEIIIIGGNNSSSUUY;
+            }
+        """
+    )
 }
