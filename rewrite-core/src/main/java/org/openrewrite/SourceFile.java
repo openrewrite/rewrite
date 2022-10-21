@@ -53,10 +53,6 @@ public interface SourceFile extends Tree {
 
     <T extends SourceFile> T withFileAttributes(@Nullable FileAttributes fileAttributes);
 
-    Markers getMarkers();
-
-    <T extends SourceFile> T withMarkers(Markers markers);
-
     @Nullable
     default <S extends Style> S getStyle(Class<S> style) {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
@@ -71,7 +67,11 @@ public interface SourceFile extends Tree {
     }
 
     default <P> String printAll(P p) {
-        return print(p, new Cursor(null, this));
+        return printAll(new PrintOutputCapture<>(p));
+    }
+
+    default <P> String printAll(PrintOutputCapture<P> out) {
+        return print(new Cursor(null, this), out);
     }
 
     default String printAll() {

@@ -26,7 +26,7 @@ public class ChangeLiteral<P> extends JavaIsoVisitor<P> {
     private final Function<Object, Object> transform;
 
     /**
-     * @param scope     And expression containing a literal, including a binary expression like String concatentation, where
+     * @param scope     And expression containing a literal, including a binary expression like String concatenation, where
      *                  you want to transform the String literals participating in the concatenation.
      * @param transform The transformation to apply to each literal found in the expression scope.
      */

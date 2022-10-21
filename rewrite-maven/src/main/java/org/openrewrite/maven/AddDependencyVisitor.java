@@ -138,7 +138,6 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
         private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
             if (resolvedVersion == null) {
-
                 if (versionComparator == null) {
                     resolvedVersion = version;
                 } else {

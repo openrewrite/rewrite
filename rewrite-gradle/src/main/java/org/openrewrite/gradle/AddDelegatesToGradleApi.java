@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -64,7 +65,7 @@ public class AddDelegatesToGradleApi extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext context) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, context);
-                if(!hasClosureParameter(md) || commentSuggestsNoDelegate(md)) {
+                if(!hasClosureParameter(md) || commentSuggestsNoDelegate(getCursor())) {
                     return md;
                 }
                 md = md.withParameters(ListUtils.map(md.getParameters(), it -> {
@@ -137,9 +138,10 @@ public class AddDelegatesToGradleApi extends Recipe {
     }
 
     private static final Pattern COMMENT_PATTERN = Pattern.compile("(?<!also)[\\s*]++passed[\\s*]+to[\\s*]+the[\\s*]+closure[^.]+parameter", Pattern.DOTALL);
-    private static boolean commentSuggestsNoDelegate(J.MethodDeclaration methodDeclaration) {
-        return methodDeclaration.getComments().stream()
-                .anyMatch(comment -> COMMENT_PATTERN.matcher(comment.printComment()).find());
+
+    private static boolean commentSuggestsNoDelegate(Cursor cursor) {
+        return ((J.MethodDeclaration) cursor.getValue()).getComments().stream()
+                .anyMatch(comment -> COMMENT_PATTERN.matcher(comment.printComment(cursor)).find());
     }
 
     private static boolean hasClosureParameter(J.MethodDeclaration methodDeclaration) {

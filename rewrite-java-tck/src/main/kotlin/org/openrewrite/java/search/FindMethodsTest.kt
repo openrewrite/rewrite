@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.search
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
@@ -215,17 +214,4 @@ interface FindMethodsTest : JavaRecipeTest {
             }
         """
     )
-
-    @Test
-    fun checkValidation() {
-        var recipe = findMethods(null, false)
-        var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse
-        assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-
-        recipe = findMethods("com.foo.Foo bar()", false)
-        valid = recipe.validate()
-        assertThat(valid.isValid).isTrue
-    }
 }

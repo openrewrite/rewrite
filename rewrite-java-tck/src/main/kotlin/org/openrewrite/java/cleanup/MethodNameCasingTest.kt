@@ -27,6 +27,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.test.TypeValidation
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
 @Issue("https://github.com/openrewrite/rewrite/issues/466")
@@ -47,6 +48,10 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
             jp.setSourceSet("test")
             return jp
         }
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(MethodNameCasing(true))
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1741")
     @Test
@@ -81,7 +86,6 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
 
     @Test
     fun changeMethodDeclaration() = assertChanged(
-
         before = """
             class Test {
                 void MyMethod_with_über() {
@@ -91,6 +95,22 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
         after = """
             class Test {
                 void myMethodWithBer() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun changeCamelCaseMethodWithFirstLetterUpperCase() = assertChanged(
+        before = """
+            class Test {
+                void MyMethod() {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                void myMethod() {
                 }
             }
         """
@@ -268,5 +288,108 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
             }
             """
         )
+    )
+
+    @Test
+    fun `keep camel case when removing leading underscore`() = assertChanged(
+        before = """
+            class Test {
+                private void _theMethod() {
+                
+                }
+            }
+        """,
+        after = """
+            class Test {
+                private void theMethod() {
+                
+                }
+            }
+        """
+    )
+
+    @Test
+    fun `keep camel case when removing leading underscore 2`() = assertChanged(
+        before = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> _getNames() {
+                    List<String> result = new ArrayList<>();
+                    result.add("Alice");
+                    result.add("Bob");
+                    result.add("Carol");
+                    return result;
+                }
+                
+                public void run() {
+                    for (String n: _getNames()) {
+                        System.out.println(n);
+                    }
+                }
+            }
+        """,
+        after = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> getNames() {
+                    List<String> result = new ArrayList<>();
+                    result.add("Alice");
+                    result.add("Bob");
+                    result.add("Carol");
+                    return result;
+                }
+                
+                public void run() {
+                    for (String n: getNames()) {
+                        System.out.println(n);
+                    }
+                }
+            }
+        """
+    )
+    @Test
+    fun `change name of method with array argument`() = assertChanged(
+        before = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> _getNames(String[] names) {
+                    List<String> result = new ArrayList<>(Arrays.asList(names));
+                    return result;
+                }
+            }
+        """,
+        after = """
+            import java.util.*;
+            
+            class Test {
+                private List<String> getNames(String[] names) {
+                    List<String> result = new ArrayList<>(Arrays.asList(names));
+                    return result;
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2261")
+    @Test
+    fun unknownParameterTypes() = rewriteRun(
+        { spec ->
+            spec.typeValidationOptions(TypeValidation.none())
+        },
+        java("""
+            class Test {
+                private void _foo(Unknown u) {
+                }
+            }
+        """,
+        """
+            class Test {
+                private void foo(Unknown u) {
+                }
+            }
+        """)
     )
 }

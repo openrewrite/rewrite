@@ -13,22 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("HttpUrlsUsage", "CheckDtdRefs")
+
 package org.openrewrite.xml
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.internal.StringUtils
 import org.openrewrite.test.RewriteTest
 import org.openrewrite.xml.Assertions.xml
 
 class XmlParserTest: RewriteTest {
-    private val parser: XmlParser = XmlParser()
-
-    private fun assertUnchanged(before: String) {
-        val xmlDocument = parser.parse(StringUtils.trimIndent(before)).iterator().next()
-        assertThat(xmlDocument.printAll()).`as`("Source should not be changed").isEqualTo(before)
-    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
     @Test
@@ -37,8 +31,8 @@ class XmlParserTest: RewriteTest {
     )
 
     @Test
-    fun parseXmlDocument() = assertUnchanged(
-        before = """
+    fun parseXmlDocument() = rewriteRun(
+        xml("""
                 <?xml
                     version="1.0" encoding="UTF-8"?>
                 <?xml-stylesheet href="mystyle.css" type="text/css"?>
@@ -47,12 +41,31 @@ class XmlParserTest: RewriteTest {
                 <beans >
                     <bean id="myBean"/>
                 </beans>
-            """.trimIndent()
+            """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2290")
+    @Test
+    fun cdataTagWhitespace() = rewriteRun(
+        xml("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                <suppress>
+                    <notes>
+                        <![CDATA[
+                      file name: foo.jar
+                      ]]>
+                    </notes>
+                    <gav regex="true">^:foo:.*${'$'}</gav>
+                    <cve>CVE-2020-000</cve>
+                </suppress>
+            </suppressions>
+            """)
     )
 
     @Test
-    fun parsePomDocument() = assertUnchanged(
-        before = """
+    fun parsePomDocument() = rewriteRun(
+        xml("""
             <?xml version="1.0" encoding="UTF-8"?>
             <!-- comment -->
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -67,60 +80,60 @@ class XmlParserTest: RewriteTest {
               <packaging>bundle</packaging>
               <name>Guava: Google Core Libraries for Java</name>
             </project>
-        """.trimIndent()
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
     @Test
-    fun commentBeforeContent() = assertUnchanged(
-        before = """
+    fun commentBeforeContent() = rewriteRun(
+        xml("""
             <foo>
                 <a><!-- comment -->a</a>
             </foo>
-        """.trimIndent()
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
     @Test
-    fun commentBeforeContentNewline() = assertUnchanged(
-        before = """
+    fun commentBeforeContentNewline() = rewriteRun(
+        xml("""
             <foo>
                 <a>
                     <!-- comment -->
                     a
                 </a>
             </foo>
-        """.trimIndent()
+        """)
     )
 
 
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
     @Test
-    fun commentAfterContent() = assertUnchanged(
-        before = """
+    fun commentAfterContent() = rewriteRun(
+        xml("""
             <foo>
                 <a>a<!-- comment --></a>
             </foo>
-        """.trimIndent()
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
     @Test
-    fun commentAfterContentNewline() = assertUnchanged(
-        before = """
+    fun commentAfterContentNewline() = rewriteRun(
+        xml("""
             <foo>
                 <a>
                     a
                     <!-- comment -->
                 </a>
             </foo>
-        """.trimIndent()
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1150")
     @Test
-    fun parseDocTypeWithoutExternalId() = assertUnchanged(
-        before = """
+    fun parseDocTypeWithoutExternalId() = rewriteRun(
+        xml("""
             <?xml version="1.0" encoding="UTF-8"?>
             <!DOCTYPE configuration >
 
@@ -130,69 +143,74 @@ class XmlParserTest: RewriteTest {
                     <appender-ref ref="CONSOLE"/>
                 </root>
             </configuration>
-        """.trimIndent()
+        """.trimIndent())
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1203")
     @Test
-    fun dtdSubsetMarkupDecl() = assertUnchanged(
-        before = """
+    fun dtdSubsetMarkupDecl() = rewriteRun(
+        xml("""
             <?xml version="1.0"?>
             <!DOCTYPE p [
                 <!ELEMENT p ANY>
             ]>
             <p>Hello world!</p>
-        """.trimIndent()
+        """.trimIndent())
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1203")
     @Test
-    fun dtdSubsetParamEntityRef() = assertUnchanged(
-        before = """
+    fun dtdSubsetParamEntityRef() = rewriteRun(
+        xml("""
             <?xml version="1.0"?>
             <!DOCTYPE p [
                 %entity;
             ]>
             <p>Hello world!</p>
-        """.trimIndent()
+        """.trimIndent())
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1203")
     @Test
-    fun dtdSubsetComment() = assertUnchanged(
-        before = """
+    fun dtdSubsetComment() = rewriteRun(
+        xml("""
             <?xml version="1.0"?>
             <!DOCTYPE p [
                 <!-- comment -->
             ]>
             <p>Hello world!</p>
-        """.trimIndent()
+        """.trimIndent())
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1243")
     @Test
-    fun processingInstructions() = assertUnchanged(
-        before = """
+    fun processingInstructions() = rewriteRun(
+        xml("""
             <?xml-stylesheet href="mystyle.css" type="text/css"?>
             <execution>
                 <?m2e execute onConfiguration,onIncremental?>
             </execution>
-        """.trimIndent()
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
     @Test
-    fun utf8BOMCharacters() = assertUnchanged(
-        before = """
+    fun utf8BOMCharacters() = rewriteRun(
+        xml("""
             ï»¿<?xml version="1.0" encoding="UTF-8"?>
-                <test></test>
-            <tag></tag>
-        """.trimIndent()
+            <test></test>
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1382")
     @Test
-    fun utf8BOM() = assertUnchanged(
-        before = "\\uFEFF<?xml version=\"1.0\" encoding=\"UTF-8\"?><test></test>"
+    fun utf8BOM() = rewriteRun(
+        xml("""${"\uFEFF"}<?xml version="1.0" encoding="UTF-8"?><test></test>""")
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2250")
+    @Test
+    fun preserveSpaceBeforeAttributeAssignment() = rewriteRun(
+        xml("""<?xml version = "1.0" encoding    =   "UTF-8" standalone = "no" ?><blah></blah>""")
     )
 }

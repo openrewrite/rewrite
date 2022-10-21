@@ -68,7 +68,9 @@ public class ChangeKey extends Recipe {
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext context) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, context);
                 if (matcher.matches(getCursor())) {
-                    e = e.withKey(e.getKey().withValue(newKey));
+                    if (e.getKey() instanceof Yaml.Scalar) {
+                        e = e.withKey(((Yaml.Scalar)e.getKey()).withValue(newKey));
+                    }
                 }
                 return e;
             }

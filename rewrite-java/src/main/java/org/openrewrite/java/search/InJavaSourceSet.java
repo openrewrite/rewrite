@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.SearchResult;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -31,6 +32,6 @@ public class InJavaSourceSet<P> extends JavaIsoVisitor<P> {
         return cu.getMarkers().findFirst(JavaSourceSet.class)
                 .filter(sourceSet -> !sourceSet.getName().equals(this.sourceSet))
                 .map(sourceSet -> cu)
-                .orElse(cu.withMarkers(cu.getMarkers().searchResult()));
+                .orElse(SearchResult.found(cu));
     }
 }

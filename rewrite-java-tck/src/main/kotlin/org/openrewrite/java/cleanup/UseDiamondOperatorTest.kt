@@ -13,23 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("unchecked")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress("Convert2Diamond")
-interface UseDiamondOperatorTest: JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = UseDiamondOperator()
+interface UseDiamondOperatorTest: RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(UseDiamondOperator())
+    }
 
     @Test
-    fun useDiamondOperator(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun useDiamondOperator() = rewriteRun(
+        java("""
             import java.util.*;
 
             class Test<X, Y> {
@@ -41,7 +44,7 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.*;
 
             class Test<X, Y> {
@@ -52,45 +55,190 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                     };
                 }
             }
-        """
+        """)
+    )
+
+
+    @Test
+    fun varArgIsParameterizedNewClass() = rewriteRun(
+        java(
+            """
+            import java.util.*;
+
+            class Foo {
+                void something(List<Integer>... lists) {}
+                void somethingElse(Object[] o, List<Integer> s){}
+                void doSomething() {
+                    something(new ArrayList<Integer>(), new ArrayList<Integer>());
+                    something(new ArrayList<Integer>());
+                    somethingElse(new String[0], new ArrayList<Integer>());
+                }
+            }
+            """,
+            """
+            import java.util.*;
+
+            class Foo {
+                void something(List<Integer>... lists) {}
+                void somethingElse(Object[] o, List<Integer> s){}
+                void doSomething() {
+                    something(new ArrayList<>(), new ArrayList<>());
+                    something(new ArrayList<>());
+                    somethingElse(new String[0], new ArrayList<>());
+                }
+            }
+            """
+        )
+    )
+
+    @Suppress("rawtypes")
+    @Test
+    fun useDiamondOperatorTest2() = rewriteRun(
+        java(
+            """
+            import java.util.ArrayList;
+            import java.util.HashMap;
+            import java.util.function.Predicate;
+            import java.util.List;
+            import java.util.Map;
+            
+            class Foo<T> {
+                Map<String, Integer> map;
+                Map unknownMap;
+                public Foo(Predicate<T> p) {}
+                public void something(Foo<List<String>> foos){}
+                public void somethingEasy(List<List<String>> l){}
+                
+                Foo getFoo() {
+                    // variable type initializer
+                    Foo<List<String>> f = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                    // assignment
+                    map = new HashMap<String, Integer>();
+                    unknownMap = new HashMap<String, Integer>();
+                    // method argument type assignment
+                    something(new Foo<List<String>>(it -> it.stream().anyMatch(b -> true)));
+                    somethingEasy(new ArrayList<List<String>>());
+                    // return type and assignment type unknown
+                    Object o = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                    // return type unknown
+                    return new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                }
+                
+                Foo<List<String>> getFoo2() {
+                    // return type expression
+                    return new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                }
+            }
+        """,
+            """
+            import java.util.ArrayList;
+            import java.util.HashMap;
+            import java.util.function.Predicate;
+            import java.util.List;
+            import java.util.Map;
+            
+            class Foo<T> {
+                Map<String, Integer> map;
+                Map unknownMap;
+                public Foo(Predicate<T> p) {}
+                public void something(Foo<List<String>> foos){}
+                public void somethingEasy(List<List<String>> l){}
+                
+                Foo getFoo() {
+                    // variable type initializer
+                    Foo<List<String>> f = new Foo<>(it -> it.stream().anyMatch(baz -> true));
+                    // assignment
+                    map = new HashMap<>();
+                    unknownMap = new HashMap<String, Integer>();
+                    // method argument type assignment
+                    something(new Foo<>(it -> it.stream().anyMatch(b -> true)));
+                    somethingEasy(new ArrayList<>());
+                    // return type and assignment type unknown
+                    Object o = new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                    // return type unknown
+                    return new Foo<List<String>>(it -> it.stream().anyMatch(baz -> true));
+                }
+                
+                Foo<List<String>> getFoo2() {
+                    // return type expression
+                    return new Foo<>(it -> it.stream().anyMatch(baz -> true));
+                }
+            }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2274")
+    @Test
+    fun returnTypeParamsDoNotMatchNewClassParams() = rewriteRun(
+        java("""
+            import java.util.List;
+            import java.util.function.Predicate;
+            
+            class Test {
+                interface MyInterface<T> { }
+                class MyClass<S, T> implements MyInterface<T>{
+                    public MyClass(Predicate<S> p, T check) {}
+                }
+            
+                public MyInterface<Integer> a() {
+                    return new MyClass<List<String>, Integer>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+                public MyClass<List<String>, Integer> b() {
+                    return new MyClass<List<String>, Integer>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+            }
+        ""","""
+            import java.util.List;
+            import java.util.function.Predicate;
+            
+            class Test {
+                interface MyInterface<T> { }
+                class MyClass<S, T> implements MyInterface<T>{
+                    public MyClass(Predicate<S> p, T check) {}
+                }
+            
+                public MyInterface<Integer> a() {
+                    return new MyClass<List<String>, Integer>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+                public MyClass<List<String>, Integer> b() {
+                    return new MyClass<>(l -> l.stream().anyMatch(String::isEmpty), 0);
+                }
+            }
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1297")
     @Test
-    fun `do not use diamond operators for variables having null or unknown types`(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotUseDiamondOperatorsForVariablesHavingNullOrUnknownTypes() = rewriteRun(
+        java("""
             import lombok.val;
             import java.util.ArrayList;
 
             class Test<X, Y> {
                 void test() {
                     val ls = new ArrayList<String>();
-                    UnknownThing o = new UnknownThing<String>();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun noLeftSide(jp: JavaParser) = assertUnchanged(
-        parser = jp,
-        before = """
+    fun noLeftSide() = rewriteRun(
+        java("""
             import java.util.HashMap;
             class Test {
                 static {
                     new HashMap<String, String>();
                 }
             }
-        """.trimIndent()
+        """)
     )
 
     @Test
-    fun notAsAChainedMethodInvocation(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun notAsAChainedMethodInvocation() = rewriteRun(
+        java("""
             class Test {
-                public static ResponseBuilder<String> bResponse(String entity) {
+                public static ResponseBuilder<String> bResponseEntity(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
                 }
                 public static ResponseBuilder<String> bResponse(String entity) {
@@ -104,9 +252,9 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
-                public static ResponseBuilder<String> bResponse(String entity) {
+                public static ResponseBuilder<String> bResponseEntity(String entity) {
                     return new ResponseBuilder<String>().entity(entity);
                 }
                 public static ResponseBuilder<String> bResponse(String entity) {
@@ -119,34 +267,6 @@ interface UseDiamondOperatorTest: JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
-
-    @Test
-    fun removeUnusedImports(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            import java.util.Map;
-            import java.util.HashMap;
-            import java.math.BigDecimal;
-            import java.util.Date;
-
-            class Test {
-                void test() {
-                    Map<Object,Object> map = new HashMap<BigDecimal,Date>();
-                }
-            }
-        """,
-        after = """
-            import java.util.Map;
-            import java.util.HashMap;
-
-            class Test {
-                void test() {
-                    Map<Object,Object> map = new HashMap<>();
-                }
-            }
-        """
-    )
-
 }

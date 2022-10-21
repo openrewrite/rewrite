@@ -13,22 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("ConstantConditions")
+
 package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
-interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
+interface FindDeprecatedMethodsTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(FindDeprecatedMethods(null, null))
+    }
 
     @Test
-    fun ignoreDeprecationsInDeprecatedMethod(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = FindDeprecatedMethods(null, true),
-        before = """
+    fun ignoreDeprecationsInDeprecatedMethod() = rewriteRun(
+        { spec -> spec.recipe(FindDeprecatedMethods(null, true)) },
+        java("""
             class Test {
                 @Deprecated
                 void test(int n) {
@@ -37,14 +42,13 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun ignoreDeprecationsInDeprecatedClass(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = FindDeprecatedMethods(null, true),
-        before = """
+    fun ignoreDeprecationsInDeprecatedClass(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(FindDeprecatedMethods(null, true)) },
+        java("""
             @Deprecated
             class Test {
                 @Deprecated
@@ -52,19 +56,18 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                 }
                 
                 Test() {
+                    int n = 1;
                     if(n == 1) {
                         test(n + 1);
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun findDeprecations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = FindDeprecatedMethods(null, false),
-        before = """
+    fun findDeprecations(jp: JavaParser) = rewriteRun(
+        java("""
             class Test {
                 @Deprecated
                 void test(int n) {
@@ -74,7 +77,7 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 @Deprecated
                 void test(int n) {
@@ -83,14 +86,13 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun matchOnMethod(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = FindDeprecatedMethods("java.lang.* *(..)", false),
-        before = """
+    fun matchOnMethod(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(FindDeprecatedMethods("java.lang.* *(..)", false)) },
+        java("""
             class Test {
                 @Deprecated
                 void test(int n) {
@@ -100,7 +102,7 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 @Deprecated
                 void test(int n) {
@@ -109,14 +111,13 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun dontMatchWhenMethodDoesntMatch(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = FindDeprecatedMethods("org.junit.jupiter.api.* *(..)", false),
-        before = """
+    fun dontMatchWhenMethodDoesntMatch(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(FindDeprecatedMethods("org.junit.jupiter.api.* *(..)", false)) },
+        java("""
             class Test {
                 @Deprecated
                 void test(int n) {
@@ -125,7 +126,7 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2196")
@@ -191,5 +192,38 @@ interface FindDeprecatedMethodsTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             """)
+    )
+
+    @Test
+    fun hasImport() = rewriteRun(
+        { spec -> spec.recipe(FindDeprecatedMethods("", null)) },
+        java("""
+            package com.yourorg;
+            
+            public class Foo {
+                @Deprecated
+                public void foo() {
+                }
+            }
+            
+        """),
+        java("""
+            import com.yourorg.Foo;
+            
+            class A {
+                void a() {
+                    new Foo().foo();
+                }
+            }
+        """,
+        """
+            import com.yourorg.Foo;
+            
+            class A {
+                void a() {
+                    /*~~>*/new Foo().foo();
+                }
+            }
+        """)
     )
 }

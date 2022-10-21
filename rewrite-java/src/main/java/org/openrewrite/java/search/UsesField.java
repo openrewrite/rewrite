@@ -20,6 +20,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 @RequiredArgsConstructor
 public class UsesField<P> extends JavaIsoVisitor<P> {
@@ -30,7 +31,7 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
             if (variable.getName().equals(field) && TypeUtils.isOfClassType(variable.getOwner(), owner)) {
-                return cu.withMarkers(cu.getMarkers().searchResult());
+                return SearchResult.found(cu);
             }
         }
         return cu;

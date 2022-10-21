@@ -64,7 +64,7 @@ public class MavenMetadata {
 
         public Versioning(
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
-                @Nullable List<SnapshotVersion> snapshotVersions,
+                @JacksonXmlElementWrapper(localName = "snapshotVersions") @Nullable List<SnapshotVersion> snapshotVersions,
                 @Nullable Snapshot snapshot) {
             this.versions = versions;
             this.snapshotVersions = snapshotVersions;
@@ -82,7 +82,11 @@ public class MavenMetadata {
 
     public static MavenMetadata parse(byte[] document) {
         try {
-            return MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
+            MavenMetadata metadata = MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
+            if (metadata.getVersioning() != null && metadata.getVersioning().getVersions() == null) {
+                return new MavenMetadata(new Versioning(emptyList(), metadata.getVersioning().getSnapshotVersions(), metadata.getVersioning().getSnapshot()));
+            }
+            return metadata;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

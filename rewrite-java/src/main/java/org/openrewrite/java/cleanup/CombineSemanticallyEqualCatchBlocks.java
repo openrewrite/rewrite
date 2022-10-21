@@ -305,7 +305,7 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
                 for (int i = 0; i < space1.getComments().size(); i++) {
                     Comment comment1 = space1.getComments().get(i);
                     Comment comment2 = space2.getComments().get(i);
-                    if (!comment1.printComment().equals(comment2.printComment())) {
+                    if (!comment1.printComment(getCursor()).equals(comment2.printComment(getCursor()))) {
                         return true;
                     }
                 }

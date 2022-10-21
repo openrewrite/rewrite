@@ -53,10 +53,6 @@ public interface Json extends Tree {
 
     <J extends Json> J withPrefix(Space prefix);
 
-    <T extends Json> T withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor

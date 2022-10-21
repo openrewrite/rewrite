@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.*;
 import java.nio.charset.Charset;
@@ -97,6 +98,16 @@ public interface Parser<S extends SourceFile> {
     }
 
     /**
+     * Returns the ExecutionContext charset if its defined
+     * otherwise returns {@link java.nio.charset.StandardCharsets#UTF_8}
+     */
+    default Charset getCharset(ExecutionContext ctx) {
+        Charset charset = new ParsingExecutionContextView(ctx).getCharset();
+        return charset == null ? StandardCharsets.UTF_8 : charset;
+    }
+
+
+    /**
      * A source input. {@link Input#path} may be a synthetic path and not
      * represent a resolvable path on disk, as is the case when parsing sources
      * from BigQuery (we have a relative path from the original Github repository
@@ -134,12 +145,16 @@ public interface Parser<S extends SourceFile> {
             return fromString(source, StandardCharsets.UTF_8);
         }
 
+        public static Input fromString(Path sourcePath, String source) {
+            return fromString(sourcePath, source, StandardCharsets.UTF_8);
+        }
+
         public static Input fromString(String source, Charset charset) {
-            return new Input(
-                    Paths.get(Long.toString(System.nanoTime())), null,
-                    () -> new ByteArrayInputStream(source.getBytes(charset)),
-                    true
-            );
+            return fromString(Paths.get(Long.toString(System.nanoTime())), source, charset);
+        }
+
+        public static Input fromString(Path sourcePath, String source, Charset charset) {
+            return new Input(sourcePath, null, () -> new ByteArrayInputStream(source.getBytes(charset)), true);
         }
 
         @SuppressWarnings("unused")
@@ -153,10 +168,15 @@ public interface Parser<S extends SourceFile> {
 
         @SuppressWarnings("unused")
         public static List<Input> fromResource(String resource, String delimiter) {
-            return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource))).split(delimiter))
+            return fromResource(resource, delimiter, StandardCharsets.UTF_8);
+        }
+
+        public static List<Input> fromResource(String resource, String delimiter, @Nullable Charset charset) {
+            Charset resourceCharset = charset == null ? StandardCharsets.UTF_8 : charset;
+            return Arrays.stream(StringUtils.readFully(Objects.requireNonNull(Input.class.getResourceAsStream(resource)), resourceCharset).split(delimiter))
                     .map(source -> new Parser.Input(
                             Paths.get(Long.toString(System.nanoTime())), null,
-                            () -> new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)),
+                            () -> new ByteArrayInputStream(source.getBytes(resourceCharset)),
                             true
                     ))
                     .collect(toList());
@@ -170,8 +190,17 @@ public interface Parser<S extends SourceFile> {
             return relativeTo == null ? path : relativeTo.relativize(path);
         }
 
+        /**
+         * @deprecated Use {@link #getSource(ExecutionContext)} instead which
+         * incorporates overrides of charset.
+         */
+        @Deprecated
         public EncodingDetectingInputStream getSource() {
-            return new EncodingDetectingInputStream(source.get());
+            return getSource(new InMemoryExecutionContext());
+        }
+
+        public EncodingDetectingInputStream getSource(ExecutionContext ctx) {
+            return new EncodingDetectingInputStream(source.get(), ParsingExecutionContextView.view(ctx).getCharset());
         }
 
         public boolean isSynthetic() {

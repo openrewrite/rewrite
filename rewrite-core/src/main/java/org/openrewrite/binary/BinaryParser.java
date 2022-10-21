@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -36,18 +37,22 @@ import static org.openrewrite.Tree.randomId;
 public class BinaryParser implements Parser<Binary> {
     @Override
     public List<Binary> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        List<Binary> plainTexts = new ArrayList<>();
+        List<Binary> binaries = new ArrayList<>();
         for (Input source : sources) {
-            plainTexts.add(new Binary(randomId(),
-                    relativeTo == null ?
-                            source.getPath() :
-                            relativeTo.relativize(source.getPath()).normalize(),
-                    Markers.EMPTY,
-                    source.getFileAttributes(),
-                    null,
-                    readAllBytes(source.getSource())));
+            Path path = source.getRelativePath(relativeTo);
+            try {
+                binaries.add(new Binary(randomId(),
+                        path,
+                        Markers.EMPTY,
+                        source.getFileAttributes(),
+                        null,
+                        readAllBytes(source.getSource(ctx))));
+            } catch (Exception e) {
+                ParsingExecutionContextView.view(ctx).parseFailure(path, e);
+                ctx.getOnError().accept(e);
+            }
         }
-        return plainTexts;
+        return binaries;
     }
 
     @Override

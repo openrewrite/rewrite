@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.TabsAndIndentsVisitor;
@@ -30,6 +31,7 @@ import org.openrewrite.java.tree.Statement;
 
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.singleton;
 
@@ -74,23 +76,24 @@ public class ControlFlowIndentation extends Recipe {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
                 J.Block b = super.visitBlock(block, executionContext);
-                for (Statement s : b.getStatements()) {
-                    if (s instanceof J.If) {
-                        J.If ifs = (J.If) s;
-                        if (shouldReformat(ifs)) {
-                            doAfterVisit(new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, b));
-                            return b;
-                        }
-                    } else if (s instanceof Loop) {
-                        Loop loop = (Loop) s;
-                        Statement body = loop.getBody();
-                        if (!(body instanceof J.Block)) {
-                            doAfterVisit(new TabsAndIndentsVisitor<>(tabsAndIndentsStyle, b));
-                            return b;
-                        }
+                AtomicBoolean foundControlFlowRequiringReformatting = new AtomicBoolean(false);
+                return b.withStatements(ListUtils.map(b.getStatements(), (i, statement) -> {
+                    if(foundControlFlowRequiringReformatting.get() || shouldReformat(statement)) {
+                        foundControlFlowRequiringReformatting.set(true);
+                        return (Statement) new TabsAndIndentsVisitor<>(tabsAndIndentsStyle).visit(statement, executionContext, getCursor());
                     }
+                    return statement;
+                }));
+            }
+
+            boolean shouldReformat(Statement s) {
+                if(s instanceof J.If) {
+                    return shouldReformat((J.If) s);
+                } else if(s instanceof Loop) {
+                    Statement body = ((Loop) s).getBody();
+                    return !(body instanceof J.Block);
                 }
-                return b;
+                return false;
             }
 
             boolean shouldReformat(J.If s) {

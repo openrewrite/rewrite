@@ -13,48 +13,69 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("ClassInitializerMayBeStatic", "EmptyTryBlock")
+
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.Issue
-import org.openrewrite.java.Java17Test
-import org.openrewrite.java.JavaParser
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParserResolver
+import org.openrewrite.test.RewriteTest
 
 @ExtendWith(JavaParserResolver::class)
-class TryCatchJava17Test: JavaTreeTest, Java17Test {
+class TryCatchJava17Test: RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/763")
     @Test
-    fun tryWithResourcesIdentifier(jp: JavaParser) = assertParsePrintAndProcess(
-        jp,
-        JavaTreeTest.NestingLevel.Block,
+    fun tryWithResourcesIdentifier() = rewriteRun(
+        java(
         """
-            InputStream in;
-            try (in) {
+            import java.io.InputStream;
+            class A {
+                {
+                    InputStream in;
+                    try (in) {
+                    }
+                }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1027")
     @Test
-    fun tryWithResourcesIdentifierAndVariables(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.Block, """
-            FileInputStream fis = new FileInputStream(new File("file.txt"));
-            try (fis; Scanner sc = new Scanner("")) {
+    fun tryWithResourcesIdentifierAndVariables() = rewriteRun(
+        java("""
+            import java.io.File;
+            import java.io.FileInputStream;
+            import java.util.Scanner;
+            
+            class A {
+                void a() throws Exception {
+                    FileInputStream fis = new FileInputStream(new File("file.txt"));
+                    try (fis; Scanner sc = new Scanner("")) {
+                    }
+                }
             }
-        """, "java.io.*", "java.util.Scanner"
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1027")
     @Test
-    fun tryWithResourcesIdentifierAndSemicolon(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, JavaTreeTest.NestingLevel.Block, """
-            FileInputStream fis = new FileInputStream(new File("file.txt"));
-            try (fis;) {
-            }
-        """, "java.io.*", "java.util.Scanner"
-    )
+    fun tryWithResourcesIdentifierAndSemicolon() = rewriteRun(
+        java("""
+            import java.io.File;
+            import java.io.FileInputStream;
+            import java.util.Scanner;
 
+            class A {
+                void a() throws Exception {
+                    FileInputStream fis = new FileInputStream(new File("file.txt"));
+                    try (fis;) {
+                    }
+                }
+            }
+        """)
+    )
 }

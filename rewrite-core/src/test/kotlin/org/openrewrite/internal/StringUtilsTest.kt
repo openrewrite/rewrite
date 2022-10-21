@@ -17,6 +17,7 @@ package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.internal.StringUtils.*
 
 class StringUtilsTest {
@@ -227,5 +228,11 @@ class StringUtilsTest {
     @Test
     fun allowConsecutiveLineBreaks() {
         assertThat(trimIndentPreserveCRLF("    \n    \n    a")).isEqualTo("\n\na")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2268")
+    @Test
+    fun trailingCrlf() {
+        assertThat(trimIndentPreserveCRLF("    \r\n    \r\n    a\r\n")).isEqualTo("\r\n\r\na")
     }
 }

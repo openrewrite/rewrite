@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Optional;
 
@@ -39,7 +40,7 @@ public class UsesJavaVersion<P> extends JavaIsoVisitor<P> {
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
         Optional<JavaVersion> javaVersion = cu.getMarkers().findFirst(JavaVersion.class);
         if (javaVersion.isPresent() && isVersionInRange(javaVersion.get().getMajorVersion())) {
-            return cu.withMarkers(cu.getMarkers().searchResult());
+            return SearchResult.found(cu);
         }
 
         return cu;

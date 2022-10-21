@@ -86,10 +86,11 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                     if (isMethodDeclaration) {
                         getCursor().dropParentUntil(J.MethodDeclaration.class::isInstance).putMessage(CONTROL_FLOW_SUMMARY_CURSOR_MESSAGE, dotFile);
                     } else {
-                        return b.withMarkers(b.getMarkers().searchResult(searchResultText).add(new DotResult(Tree.randomId(), dotFile)));
+                        J.Block b2 = SearchResult.found(b, searchResultText);
+                        return b2.withMarkers(b2.getMarkers().add(new DotResult(Tree.randomId(), dotFile)));
                     }
                 }
-                return b.withMarkers(b.getMarkers().searchResult(searchResultText));
+                return SearchResult.found(b, searchResultText);
             }).orElse(b);
         }
         return b;
@@ -127,7 +128,7 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                                     .removeByType(SearchResult.class)
                                     .add(searchResult.withDescription(newDescription)));
                 } else {
-                    return statement.withMarkers(statement.getMarkers().searchResult("" + number + label));
+                    return SearchResult.found(statement, "" + number + label);
                 }
             } else return statement;
         }
@@ -138,7 +139,7 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                 ControlFlowNode b = nodeToBlock.get(expression);
                 assert b != null;
                 int number = nodeNumbers.computeIfAbsent(b, __ -> ++nodeNumber);
-                return expression.withMarkers(expression.getMarkers().searchResult(number + labelDescription(expression)));
+                return SearchResult.found(expression, number + labelDescription(expression));
             } else {
                 return expression;
             }
@@ -150,7 +151,7 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
                 ControlFlowNode b = nodeToBlock.get(elze);
                 assert b != null;
                 int number = nodeNumbers.computeIfAbsent(b, __ -> ++nodeNumber);
-                return elze.withMarkers(elze.getMarkers().searchResult(number + labelDescription(elze)));
+                return SearchResult.found(elze, number + labelDescription(elze));
             } else {
                 return elze;
             }

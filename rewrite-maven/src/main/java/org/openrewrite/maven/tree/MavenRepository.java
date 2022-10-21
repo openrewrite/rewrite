@@ -33,9 +33,9 @@ import java.net.URI;
 @Data
 @RequiredArgsConstructor
 public class MavenRepository {
-    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), true, true, true, null, null);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), true, true, true, null, null);
-    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null);
+    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), true, true, true, null, null, false);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), true, true, true, null, null, false);
+    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null, true);
 
     @EqualsAndHashCode.Include
     @With
@@ -71,8 +71,12 @@ public class MavenRepository {
     @Nullable
     String password;
 
+    @Nullable
+    @NonFinal
+    Boolean deriveMetadataIfMissing;
+
     @JsonIgnore
-    public MavenRepository(@Nullable String id, String uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password) {
+    public MavenRepository(@Nullable String id, String uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password, @Nullable Boolean deriveMetadataIfMissing) {
         this.id = id;
         this.uri = uri;
         this.releases = releases;
@@ -80,6 +84,7 @@ public class MavenRepository {
         this.knownToExist = knownToExist;
         this.username = username;
         this.password = password;
+        this.deriveMetadataIfMissing = deriveMetadataIfMissing;
     }
 
     public boolean acceptsVersion(String version) {

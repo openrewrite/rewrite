@@ -48,9 +48,9 @@ public class XmlParser implements Parser<Xml.Document> {
                             .description("The time spent parsing an XML file")
                             .tag("file.type", "XML");
                     Timer.Sample sample = Timer.start();
-
+                    Path path = sourceFile.getRelativePath(relativeTo);
                     try {
-                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
                         String sourceStr = is.readFully();
 
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
@@ -60,7 +60,7 @@ public class XmlParser implements Parser<Xml.Document> {
                         parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
                         Xml.Document document = new XmlParserVisitor(
-                                sourceFile.getRelativePath(relativeTo),
+                                path,
                                 sourceFile.getFileAttributes(),
                                 sourceStr,
                                 is.getCharset(),
@@ -72,7 +72,8 @@ public class XmlParser implements Parser<Xml.Document> {
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
+                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
+                        ParsingExecutionContextView.view(ctx).parseFailure(path, t);
                         return null;
                     }
                 })

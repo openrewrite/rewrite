@@ -15,7 +15,10 @@
  */
 package org.openrewrite;
 
+import de.danielbechler.diff.ObjectDiffer;
 import de.danielbechler.diff.ObjectDifferBuilder;
+import de.danielbechler.diff.inclusion.Inclusion;
+import de.danielbechler.diff.inclusion.InclusionResolver;
 import de.danielbechler.diff.node.DiffNode;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
@@ -26,13 +29,16 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.beans.Transient;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -71,6 +77,31 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
     private int visitCount;
     private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
+
+    private ObjectDiffer differ;
+    private ObjectDiffer getObjectDiffer() {
+        if(differ == null) {
+            differ = ObjectDifferBuilder.startBuilding()
+                    .inclusion()
+                    .resolveUsing(new InclusionResolver() {
+                        @Override
+                        public Inclusion getInclusion(DiffNode node) {
+                            if(node.getPropertyAnnotation(Transient.class) != null) {
+                                return Inclusion.EXCLUDED;
+                            }
+                            return Inclusion.DEFAULT;
+                        }
+
+                        @Override
+                        public boolean enablesStrictIncludeMode() {
+                            return false;
+                        }
+                    })
+                    .and()
+                    .build();
+        }
+        return differ;
+    }
 
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return true;
@@ -123,9 +154,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public final Cursor getCursor() {
-        if (cursor == null) {
-            throw new IllegalStateException("Cursoring is not enabled for this visitor. " + "Call setCursoringOn() in the visitor's constructor to enable.");
-        }
         return cursor;
     }
 
@@ -172,6 +200,49 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return t;
     }
 
+    @Incubating(since = "7.31.0")
+    public static <R extends Tree, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
+                                                                      Tree tree, C initial) {
+        return collect(visitor, tree, initial, Tree.class, t -> (R) t);
+    }
+
+    @Incubating(since = "7.31.0")
+    public static <U extends Tree, R, C extends Collection<R>> C collect(TreeVisitor<?, ExecutionContext> visitor,
+                                                                         Tree tree, C initial, Class<U> matchOn,
+                                                                         Function<U, R> map) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.addObserver(new TreeObserver.Subscription(new TreeObserver() {
+            @Override
+            public Tree treeChanged(Cursor cursor, Tree newTree) {
+                initial.add(map.apply(matchOn.cast(newTree)));
+                return newTree;
+            }
+        }).subscribeToType(matchOn));
+
+        visitor.visit(tree, ctx);
+        return initial;
+    }
+
+    @Incubating(since = "7.31.0")
+    public P reduce(Iterable<? extends Tree> trees, P p) {
+        for (Tree tree : trees) {
+            visit(tree, p);
+        }
+        return p;
+    }
+
+    @Incubating(since = "7.31.0")
+    public P reduce(Tree tree, P p) {
+        visit(tree, p);
+        return p;
+    }
+
+    @Incubating(since = "7.31.0")
+    public P reduce(Tree tree, P p, Cursor parent) {
+        visit(tree, p, parent);
+        return p;
+    }
+
     @Nullable
     public T visit(@Nullable Tree tree, P p) {
         if (tree == null) {
@@ -213,8 +284,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
                     for (TreeObserver.Subscription observer : ctx.getObservers()) {
                         if (observer.isSubscribed(tree)) {
                             observer.getObserver().treeChanged(getCursor(), t);
+                            DiffNode diff = getObjectDiffer().compare(t, tree);
                             AtomicReference<T> t2 = new AtomicReference<>(t);
-                            DiffNode diff = ObjectDifferBuilder.buildDefault().compare(t, tree);
                             diff.visit((node, visit) -> {
                                 if (!node.hasChildren() && node.getPropertyName() != null) {
                                     //noinspection unchecked
@@ -328,7 +399,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                "type hierarhcy of visitor " + getClass().getName());
+                                           "type hierarhcy of visitor " + getClass().getName());
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {

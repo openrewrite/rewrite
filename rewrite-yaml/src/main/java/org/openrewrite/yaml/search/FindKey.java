@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.JsonPathMatcher;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
@@ -54,7 +55,7 @@ public class FindKey extends Recipe {
             public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = (Yaml.Mapping.Entry) super.visitMappingEntry(entry, ctx);
                 if (matcher.matches(getCursor())) {
-                    e = e.withMarkers(e.getMarkers().searchResult());
+                    e = SearchResult.found(e);
                 }
                 return e;
             }
@@ -63,7 +64,7 @@ public class FindKey extends Recipe {
             public Yaml visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, ctx);
                 if (matcher.matches(getCursor())) {
-                    m = m.withMarkers(m.getMarkers().searchResult());
+                    m = SearchResult.found(m);
                 }
                 return m;
             }

@@ -37,8 +37,9 @@ public class JavaVarKeyword implements Marker {
         return INSTANCE;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T extends Tree> T withId(UUID id) {
+    public JavaVarKeyword withId(UUID id) {
         throw new UnsupportedOperationException();
     }
 }

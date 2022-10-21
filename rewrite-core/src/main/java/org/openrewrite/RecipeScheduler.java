@@ -20,9 +20,9 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MarkerIdPrinter;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.marker.Generated;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.text.PlainTextParser;
@@ -122,22 +122,10 @@ public interface RecipeScheduler {
                         continue;
                     }
 
-                    boolean isChanged = !original.getSourcePath().equals(s.getSourcePath());
-                    if (!isChanged) {
-                        MarkerIdPrinter markerIdPrinter = new MarkerIdPrinter();
-                        PrintOutputCapture<ExecutionContext> originalOutput = new PrintOutputCapture<>(ctx);
-                        PrintOutputCapture<ExecutionContext> sOutput = new PrintOutputCapture<>(ctx);
-                        markerIdPrinter.visit(original, originalOutput);
-                        markerIdPrinter.visit(s, sOutput);
-                        isChanged = !originalOutput.toString().equals(sOutput.toString());
-                    }
-
-                    if (isChanged) {
-                        results.add(new Result(original, s, s.getMarkers()
-                                .findFirst(RecipesThatMadeChanges.class)
-                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change. Did a recipe apply a marker?"))
-                                .getRecipes()));
-                    }
+                    results.add(new Result(original, s, s.getMarkers()
+                            .findFirst(RecipesThatMadeChanges.class)
+                            .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change"))
+                            .getRecipes()));
                 }
             }
         }
@@ -258,8 +246,7 @@ public interface RecipeScheduler {
                     } else if (afterFile != null) {
                         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
                         // and instead we add a marker to the top of the source file to record the exception message.
-                        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(new RecipeRunExceptionResult(new RecipeRunException(t)),
-                                (acc, m) -> acc));
+                        afterFile = Markup.error(afterFile,"Recipe applicable test failed with an exception.", new RecipeRunException(t));
                     }
                 }
 
@@ -404,8 +391,7 @@ class RecipeSchedulerUtils {
                 .parse("Rewrite encountered an uncaught recipe error in " + recipe.getName() + ".")
                 .get(0)
                 .withSourcePath(Paths.get("recipe-exception-" + ctx.incrementAndGetUncaughtExceptionCount() + ".txt"));
-        exception = exception.withMarkers(exception.getMarkers().computeByType(new RecipeRunExceptionResult(new RecipeRunException(t)),
-                (acc, m) -> acc));
+        exception = Markup.error(exception, "Recipe applicable test failed with an exception.", new RecipeRunException(t));
         recipeThatAddedOrDeletedSourceFile.put(exception.getId(), recipeStack);
         return ListUtils.concat(before, exception);
     }

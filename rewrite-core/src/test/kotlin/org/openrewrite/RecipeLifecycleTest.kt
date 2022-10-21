@@ -150,7 +150,7 @@ class RecipeLifecycleTest {
         override fun <P : Any?> isAcceptable(v: TreeVisitor<*, P>, p: P) = v.isAdaptableTo(FooVisitor::class.java)
 
         override fun getMarkers(): Markers = throw NotImplementedError()
-        override fun <T : SourceFile?> withMarkers(markers: Markers): T = throw NotImplementedError()
+        override fun <T : Tree?> withMarkers(markers: Markers): T = throw NotImplementedError()
         override fun getId(): UUID = throw NotImplementedError()
         override fun <T : Tree?> withId(id: UUID): T = throw NotImplementedError()
         override fun getSourcePath() = throw NotImplementedError()

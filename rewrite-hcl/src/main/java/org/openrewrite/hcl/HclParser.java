@@ -57,7 +57,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                             .tag("file.type", "HCL");
                     Timer.Sample sample = Timer.start();
                     try {
-                        EncodingDetectingInputStream is = sourceFile.getSource();
+                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
                         String sourceStr = is.readFully();
 
                         HCLLexer lexer = new HCLLexer(CharStreams.fromString(sourceStr));
@@ -83,6 +83,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                         return configFile;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
+                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile.getRelativePath(relativeTo), t);
                         ctx.getOnError().accept(t);
                         return null;
                     }

@@ -236,7 +236,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private String keepMaximumLines(String whitespace, int max) {
-        long blankLines = whitespace.chars().filter(c -> c == '\n').count() - 1;
+        long blankLines = getNewLineCount(whitespace) - 1;
         if (blankLines > max) {
             int startWhitespaceAtIndex = 0;
             for (int i = 0; i < blankLines - max + 1; i++, startWhitespaceAtIndex++) {
@@ -258,9 +258,10 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
 
     private Space minimumLines(Space prefix, int min) {
         if (prefix.getComments().isEmpty() ||
-                prefix.getWhitespace().contains("\n") ||
-                prefix.getComments().get(0) instanceof Javadoc ||
-                (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0).printComment().contains("\n"))) {
+            prefix.getWhitespace().contains("\n") ||
+            prefix.getComments().get(0) instanceof Javadoc ||
+            (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0)
+                    .printComment(getCursor()).contains("\n"))) {
             return prefix.withWhitespace(minimumLines(prefix.getWhitespace(), min));
         }
 
@@ -274,11 +275,22 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             return whitespace;
         }
         String minWhitespace = whitespace;
-        for (int i = 0; i < min - whitespace.chars().filter(c -> c == '\n').count() + 1; i++) {
+
+        for (int i = 0; i < min - getNewLineCount(whitespace) + 1; i++) {
             //noinspection StringConcatenationInLoop
             minWhitespace = "\n" + minWhitespace;
         }
         return minWhitespace;
+    }
+
+    private static int getNewLineCount(String whitespace) {
+        int newLineCount = 0;
+        for (char c : whitespace.toCharArray()) {
+            if (c == '\n') {
+                newLineCount++;
+            }
+        }
+        return newLineCount;
     }
 
     @Nullable

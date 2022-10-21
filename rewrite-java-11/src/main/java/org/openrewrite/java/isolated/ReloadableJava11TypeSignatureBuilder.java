@@ -266,6 +266,7 @@ class ReloadableJava11TypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         }
-        return owner + "{name=" + symbol.name.toString() + '}';
+
+        return owner + "{name=" + symbol.name.toString() + ",type=" + signature(symbol.type) + '}';
     }
 }

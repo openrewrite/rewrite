@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.config.Environment
+import org.openrewrite.java.style.IntelliJ
 
 class EnvironmentTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/616")
@@ -42,7 +43,10 @@ class EnvironmentTest {
     fun listStyles() {
         val env = Environment.builder().scanRuntimeClasspath().build()
         val styles = env.listStyles()
-        assertThat(styles).isNotEmpty
+        val intelliJStyle = styles.find { it.name.equals(IntelliJ.defaults().name) }
+        assertThat(intelliJStyle)
+            .`as`("Environment should be able to find and activate the IntelliJ style")
+            .isNotNull
     }
 }
 

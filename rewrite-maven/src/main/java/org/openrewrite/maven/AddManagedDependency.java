@@ -22,12 +22,18 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+
+import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.20.0")
 @Getter
@@ -76,7 +82,7 @@ public class AddManagedDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -146,7 +152,7 @@ public class AddManagedDependency extends Recipe {
                         if (dependency != null) {
                             ResolvedDependency match = dependency.findDependency(ga[0], ga[1]);
                             if (match != null) {
-                                t = t.withMarkers(t.getMarkers().searchResult());
+                                t = SearchResult.found(t);
                             }
                         }
                     }
@@ -176,10 +182,47 @@ public class AddManagedDependency extends Recipe {
                         Xml maven = super.visitDocument(document, executionContext);
 
                         if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
-                            doAfterVisit(new AddManagedDependencyVisitor(groupId,artifactId,version,versionPattern,scope,releasesOnly,type,classifier));
+                            Validated versionValidation = Semver.validate(version, versionPattern);
+                            if (versionValidation.isValid()) {
+                                VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
+                                String versionToUse = findVersionToUse(versionComparator, ctx);
+                                if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
+                                    doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
+                                            versionToUse, scope, type, classifier));
+                                    maybeUpdateModel();
+                                }
+                            }
                         }
 
                         return maven;
+                    }
+
+                    @Nullable
+                    private String existingManagedDependencyVersion() {
+                        return getResolutionResult().getPom().getDependencyManagement().stream()
+                                .map(resolvedManagedDep -> {
+                                    if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
+                                        return resolvedManagedDep.getGav().getVersion();
+                                    } else if (resolvedManagedDep.getRequestedBom() != null
+                                               && resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId)
+                                               && resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
+                                        return resolvedManagedDep.getRequestedBom().getVersion();
+                                    }
+                                    return null;
+                                })
+                                .filter(Objects::nonNull)
+                                .findFirst().orElse(null);
+                    }
+
+                    @Nullable
+                    private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) {
+                        MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                        LatestRelease latest = new LatestRelease(versionPattern);
+                        return mavenMetadata.getVersioning().getVersions().stream()
+                                .filter(v -> versionComparator.isValid(null, v))
+                                .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                                .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                                .orElse(null);
                     }
                 }.visit(s, ctx))
                 .map(SourceFile.class::cast)

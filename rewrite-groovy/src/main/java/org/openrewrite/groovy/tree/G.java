@@ -26,6 +26,7 @@ import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.beans.Transient;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -149,6 +150,7 @@ public interface G extends J {
         @Getter
         Space eof;
 
+        @Transient
         public List<Import> getImports() {
             return statements.stream()
                     .map(JRightPadded::getElement)
@@ -157,6 +159,7 @@ public interface G extends J {
                     .collect(Collectors.toList());
         }
 
+        @Transient
         public List<ClassDeclaration> getClasses() {
             return statements.stream()
                     .map(JRightPadded::getElement)
@@ -175,6 +178,7 @@ public interface G extends J {
             return new GroovyPrinter<>();
         }
 
+        @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
             if (this.typesInUse == null) {
@@ -221,6 +225,7 @@ public interface G extends J {
 
             }
 
+            @Transient
             @Override
             public List<JRightPadded<Import>> getImports() {
                 //noinspection unchecked
@@ -297,7 +302,7 @@ public interface G extends J {
         }
 
         @Override
-        public <J2 extends J> J2 withMarkers(Markers markers) {
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
             return (J2) withExpression(expression.withMarkers(markers));
         }
 
@@ -316,6 +321,7 @@ public interface G extends J {
             return (T) withExpression(expression.withType(type));
         }
 
+        @Transient
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -368,6 +374,7 @@ public interface G extends J {
             return v.visitMapEntry(this, p);
         }
 
+        @Transient
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -447,6 +454,7 @@ public interface G extends J {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -523,6 +531,7 @@ public interface G extends J {
             return v.visitListLiteral(this, p);
         }
 
+        @Transient
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -575,6 +584,7 @@ public interface G extends J {
             return v.visitGString(this, p);
         }
 
+        @Transient
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -657,6 +667,7 @@ public interface G extends J {
             return v.visitBinary(this, p);
         }
 
+        @Transient
         @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);

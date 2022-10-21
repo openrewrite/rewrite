@@ -107,9 +107,7 @@ public class QuarkParser implements Parser<Quark> {
         List<Quark> quarks = new ArrayList<>();
         for (Parser.Input source : sources) {
             quarks.add(new Quark(randomId(),
-                    relativeTo == null ?
-                            source.getPath() :
-                            relativeTo.relativize(source.getPath()).normalize(),
+                    source.getRelativePath(relativeTo),
                     Markers.EMPTY,
                     null,
                     source.getFileAttributes()));

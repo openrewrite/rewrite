@@ -22,6 +22,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -40,6 +41,6 @@ public class HasTypeOnClasspathSourceSet<P> extends JavaIsoVisitor<P> {
                     return true;
                 })
                 .map(sourceSet -> cu)
-                .orElse(cu.withMarkers(cu.getMarkers().searchResult()));
+                .orElse(SearchResult.found(cu));
     }
 }

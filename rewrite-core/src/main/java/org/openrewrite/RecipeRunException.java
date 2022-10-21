@@ -16,6 +16,8 @@
 package org.openrewrite;
 
 import lombok.Getter;
+import org.openrewrite.Cursor;
+import org.openrewrite.RecipeScheduler;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.StringJoiner;

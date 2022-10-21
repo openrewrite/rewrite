@@ -25,6 +25,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import com.sun.tools.javac.util.Context;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -341,16 +342,20 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCase(CaseTree node, Space fmt) {
-        Expression pattern;
-        if (node.getExpression() == null) {
-            pattern = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null);
-        } else {
-            skip("case");
-            pattern = convertOrNull(node.getExpression());
-        }
         return new J.Case(randomId(), fmt, Markers.EMPTY,
-                pattern,
-                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY));
+                J.Case.Type.Statement,
+                null,
+                JContainer.build(
+                        node.getExpression() == null ? EMPTY : sourceBefore("case"),
+                        singletonList(node.getExpression() == null ?
+                                JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null)) :
+                                JRightPadded.build(convertOrNull(node.getExpression()))
+                        ),
+                        Markers.EMPTY
+                ),
+                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY),
+                null
+        );
     }
 
     @Override
@@ -470,7 +475,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 members, sourceBefore("}"));
 
-        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams, extendings, implementings, body, (JavaType.FullyQualified) typeMapping.type(node));
+        return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
+                null, extendings, implementings, body, (JavaType.FullyQualified) typeMapping.type(node));
     }
 
     @Override
@@ -1811,7 +1817,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor;
+                i = cursor -1;
                 lastAnnotationPosition = cursor;
                 continue;
             }
@@ -1978,7 +1984,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     ).scan(commentTree, new ArrayList<>(1)));
                     break;
                 } else {
-                    commentCursor += comment.printComment().length() + comment.getSuffix().length();
+                    commentCursor += comment.printComment(new Cursor(null, "root")).length() + comment.getSuffix().length();
                 }
             }
 

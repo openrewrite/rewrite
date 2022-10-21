@@ -59,10 +59,6 @@ public interface Yaml extends Tree {
 
     Yaml withPrefix(String prefix);
 
-    <Y extends Yaml> Y withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -193,7 +189,7 @@ public interface Yaml extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Scalar implements Block {
+    class Scalar implements Block, YamlKey {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -288,7 +284,7 @@ public interface Yaml extends Tree {
 
             String prefix;
             Markers markers;
-            Scalar key;
+            YamlKey key;
 
             // https://yaml.org/spec/1.2/spec.html#:%20mapping%20value//
             String beforeMappingValueIndicator;
@@ -411,7 +407,7 @@ public interface Yaml extends Tree {
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class Alias implements Block {
+    class Alias implements Block, YamlKey {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -427,6 +423,11 @@ public interface Yaml extends Tree {
         @Override
         public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitAlias(this, p);
+        }
+
+        @Override
+        public String getValue() {
+            return anchor.key;
         }
 
         @Override

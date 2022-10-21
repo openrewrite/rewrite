@@ -393,7 +393,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             c = (J.Case) temp;
         }
-        c = c.withPattern(visitAndCast(c.getPattern(), p));
+        c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, p));
+        c = c.getPadding().withBody(visitRightPadded(c.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         c = c.getPadding().withStatements(visitContainer(c.getPadding().getStatements(), JContainer.Location.CASE, p));
         return c;
     }
@@ -435,6 +436,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withName(visitAndCast(c.getName(), p));
         if (c.getPadding().getTypeParameters() != null) {
             c = c.getPadding().withTypeParameters(visitContainer(c.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
+        }
+        if (c.getPadding().getPrimaryConstructor() != null) {
+            c = c.getPadding().withPrimaryConstructor(visitContainer(c.getPadding().getPrimaryConstructor(), JContainer.Location.RECORD_STATE_VECTOR, p));
         }
         if (c.getPadding().getExtends() != null) {
             c = c.getPadding().withExtends(visitLeftPadded(c.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p));
@@ -832,7 +836,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             m = (J.MethodInvocation) temp2;
         }
         if (m.getPadding().getSelect() != null && m.getPadding().getSelect().getElement() instanceof NameTree &&
-                method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
+            method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static)) {
             //noinspection unchecked
             m = m.getPadding().withSelect(
                     (JRightPadded<Expression>) (JRightPadded<?>)
@@ -1024,6 +1028,22 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return s;
     }
 
+    public J visitSwitchExpression(J.SwitchExpression switzh, P p) {
+        J.SwitchExpression s = switzh;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_EXPRESSION_PREFIX, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(s, p);
+        if (!(temp instanceof J.SwitchExpression)) {
+            return temp;
+        } else {
+            s = (J.SwitchExpression) temp;
+        }
+        s = s.withSelector(visitAndCast(s.getSelector(), p));
+        s = s.withCases(visitAndCast(s.getCases(), p));
+        visitType(s.getType(), p);
+        return s;
+    }
+
     public J visitSynchronized(J.Synchronized synch, P p) {
         J.Synchronized s = synch;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SYNCHRONIZED_PREFIX, p));
@@ -1212,6 +1232,20 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return w;
     }
 
+    public J visitYield(J.Yield yield, P p) {
+        J.Yield y = yield;
+        y = y.withPrefix(visitSpace(y.getPrefix(), Space.Location.YIELD_PREFIX, p));
+        y = y.withMarkers(visitMarkers(y.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(y, p);
+        if (!(temp instanceof J.Yield)) {
+            return temp;
+        } else {
+            y = (J.Yield) temp;
+        }
+        y = y.withValue(visitAndCast(y.getValue(), p));
+        return y;
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, P p) {
         if (right == null) {
             //noinspection ConstantConditions
@@ -1267,8 +1301,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
+    public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                         JContainer.Location loc, P p) {
+        if (container == null) {
+            return container;
+        }
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
@@ -1304,10 +1341,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     protected boolean isInSameNameScope(Cursor base, Cursor child) {
         //First establish the base scope by finding the first enclosing element.
         Tree baseScope = base.dropParentUntil(t -> t instanceof J.Block ||
-                t instanceof J.MethodDeclaration ||
-                t instanceof J.Try ||
-                t instanceof J.ForLoop ||
-                t instanceof J.ForEachLoop).getValue();
+                                                   t instanceof J.MethodDeclaration ||
+                                                   t instanceof J.Try ||
+                                                   t instanceof J.ForLoop ||
+                                                   t instanceof J.ForEachLoop).getValue();
 
         //Now walk up the child path looking for the base scope.
         for (Iterator<Object> it = child.getPath(); it.hasNext(); ) {
@@ -1315,7 +1352,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (childScope instanceof J.ClassDeclaration) {
                 J.ClassDeclaration childClass = (J.ClassDeclaration) childScope;
                 if (!(childClass.getKind().equals(J.ClassDeclaration.Kind.Type.Class)) ||
-                        childClass.hasModifier(J.Modifier.Type.Static)) {
+                    childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;
                 }

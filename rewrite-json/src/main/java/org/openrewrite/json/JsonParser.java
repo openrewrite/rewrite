@@ -48,7 +48,7 @@ public class JsonParser implements Parser<Json.Document> {
                             .description("The time spent parsing an Json file")
                             .tag("file.type", "Json");
                     Timer.Sample sample = Timer.start();
-                    try (InputStream sourceStream = sourceFile.getSource()) {
+                    try (InputStream sourceStream = sourceFile.getSource(ctx)) {
                         JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
                                 CharStreams.fromStream(sourceStream))));
 
@@ -58,13 +58,14 @@ public class JsonParser implements Parser<Json.Document> {
                         Json.Document document = new JsonParserVisitor(
                                 sourceFile.getRelativePath(relativeTo),
                                 sourceFile.getFileAttributes(),
-                                sourceFile.getSource()
+                                sourceFile.getSource(ctx)
                         ).visitJson5(parser.json5());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
+                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile.getRelativePath(relativeTo), t);
                         ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
                         return null;
                     }

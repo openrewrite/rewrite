@@ -17,7 +17,7 @@ package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
+import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingEventListener;
@@ -36,18 +36,23 @@ public class PlainTextParser implements Parser<PlainText> {
         List<PlainText> plainTexts = new ArrayList<>();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         for (Input source : sources) {
-            PlainText plainText = new PlainText(randomId(),
-                    relativeTo == null ?
-                            source.getPath() :
-                            relativeTo.relativize(source.getPath()).normalize(),
-                    Markers.EMPTY,
-                    source.getSource().getCharset().name(),
-                    source.getSource().isCharsetBomMarked(),
-                    source.getFileAttributes(),
-                    null,
-                    source.getSource().readFully());
-            plainTexts.add(plainText);
-            parsingListener.parsed(source, plainText);
+            Path path = source.getRelativePath(relativeTo);
+            try {
+                EncodingDetectingInputStream is = source.getSource(ctx);
+                PlainText plainText = new PlainText(randomId(),
+                        path,
+                        Markers.EMPTY,
+                        is.getCharset().name(),
+                        is.isCharsetBomMarked(),
+                        source.getFileAttributes(),
+                        null,
+                        is.readFully());
+                plainTexts.add(plainText);
+                parsingListener.parsed(source, plainText);
+            } catch (Throwable t) {
+                ParsingExecutionContextView.view(ctx).parseFailure(path, t);
+                ctx.getOnError().accept(t);
+            }
         }
         return plainTexts;
     }

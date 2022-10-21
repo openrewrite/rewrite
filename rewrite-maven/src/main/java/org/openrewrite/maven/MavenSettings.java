@@ -82,7 +82,7 @@ public class MavenSettings {
     public static MavenSettings parse(Parser.Input source, ExecutionContext ctx) {
         try {
             return new Interpolator().interpolate(
-                    MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class));
+                    MavenXmlMapper.readMapper().readValue(source.getSource(ctx), MavenSettings.class));
         } catch (IOException e) {
             ctx.getOnError().accept(new IOException("Failed to parse " + source.getPath(), e));
             return null;
@@ -172,7 +172,7 @@ public class MavenSettings {
             return MAVEN_LOCAL_DEFAULT;
         }
         if (mavenLocal == null) {
-            mavenLocal = new MavenRepository("local", asUriString(localRepository), true, true, true, null, null);
+            mavenLocal = new MavenRepository("local", asUriString(localRepository), true, true, true, null, null, false);
         }
         return mavenLocal;
     }

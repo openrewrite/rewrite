@@ -27,6 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 
@@ -80,7 +81,7 @@ public class FindDependency extends Recipe {
                             String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                             assert gav != null;
                             if (gav.startsWith(groupId + ":" + artifactId + ":")) {
-                                return method.withMarkers(method.getMarkers().searchResult());
+                                return SearchResult.found(method);
                             }
                         }
                     }

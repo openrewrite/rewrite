@@ -28,6 +28,7 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -81,25 +82,28 @@ public class MavenParser implements Parser<Xml.Document> {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
-            Path pomPath = (relativeTo == null) ?
-                    source.getPath() :
-                    relativeTo.relativize(source.getPath());
-            Pom pom = RawPom.parse(source.getSource(), null)
-                    .toPom(pomPath, null);
-            if (relativeTo != null) {
+            Path pomPath = source.getRelativePath(relativeTo);
+            try {
+                Pom pom = RawPom.parse(source.getSource(ctx), null)
+                        .toPom(pomPath, null);
+
                 if (pom.getProperties() == null || pom.getProperties().isEmpty()) {
                     pom = pom.withProperties(new LinkedHashMap<>());
                 }
-                pom.getProperties().put("project.basedir", relativeTo.toString());
-                pom.getProperties().put("basedir", relativeTo.toString());
+                String baseDir = pomPath.toAbsolutePath().getParent().toString();
+                pom.getProperties().put("project.basedir", baseDir);
+                pom.getProperties().put("basedir", baseDir);
+
+                Xml.Document xml = new MavenXmlParser()
+                        .parseInputs(singletonList(source), relativeTo, ctx)
+                        .iterator().next();
+
+                projectPoms.put(xml, pom);
+                projectPomsByPath.put(pomPath, pom);
+            } catch (Throwable t) {
+                ParsingExecutionContextView.view(ctx).parseFailure(pomPath, t);
+                ctx.getOnError().accept(t);
             }
-
-            Xml.Document xml = new MavenXmlParser()
-                    .parseInputs(singletonList(source), relativeTo, ctx)
-                    .iterator().next();
-
-            projectPoms.put(xml, pom);
-            projectPomsByPath.put(pomPath, pom);
         }
 
         List<Xml.Document> parsed = new ArrayList<>();

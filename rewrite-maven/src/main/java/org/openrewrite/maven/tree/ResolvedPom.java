@@ -380,16 +380,16 @@ public class ResolvedPom {
                 Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
                         pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
 
+                MavenExecutionContextView.view(ctx)
+                        .getResolutionListener()
+                        .parent(parentPom, pom);
+
                 for (Pom ancestor : pomAncestry) {
                     if (ancestor.getGav().equals(parentPom.getGav())) {
                         // parent cycle
                         return;
                     }
                 }
-
-                MavenExecutionContextView.view(ctx)
-                        .getResolutionListener()
-                        .parent(parentPom, pom);
 
                 pomAncestry.add(0, parentPom);
                 resolveParentDependenciesRecursively(pomAncestry);
@@ -426,7 +426,8 @@ public class ResolvedPom {
                             incomingRepository.isSnapshots(),
                             incomingRepository.isKnownToExist(),
                             incomingRepository.getUsername(),
-                            incomingRepository.getPassword()
+                            incomingRepository.getPassword(),
+                            incomingRepository.getDeriveMetadataIfMissing()
                     );
 
                     if (incoming.getId() != null) {
@@ -642,19 +643,27 @@ public class ResolvedPom {
     }
 
     private Scope getDependencyScope(Dependency d2, ResolvedPom containingPom) {
-        if (d2.getScope() == null) {
-            // project POM's dependency management overrules the dependency's dependencyManagement
+        Scope scopeInContainingPom;
+        if (d2.getScope() != null) {
+            scopeInContainingPom = Scope.fromName(getValue(d2.getScope()));
+        } else {
             //noinspection ConstantConditions
-            Scope s = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
+            scopeInContainingPom = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
                     getValue(d2.getClassifier()));
-            if(s == null) {
-                //noinspection ConstantConditions
-                s = containingPom.getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
-                        getValue(d2.getClassifier()));
+            if (scopeInContainingPom == null) {
+                scopeInContainingPom = Scope.Compile;
             }
-            return s == null ? Scope.Compile : s;
         }
-        return Scope.fromName(getValue(d2.getScope()));
+        //noinspection ConstantConditions
+        Scope scopeInThisProject = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
+                getValue(d2.getClassifier()));
+        if (scopeInThisProject == null) {
+            scopeInThisProject = Scope.Compile;
+        }
+        // project POM's dependency management overrules the containingPom's dependencyManagement
+        // IFF the dependency is in the runtime classpath of the containingPom;
+        // if the dependency was not already in the classpath of the containingPom, then project POM cannot override scope / "promote" it into the classpath
+        return scopeInContainingPom.isInClasspathOf(scopeInThisProject) ? scopeInThisProject : scopeInContainingPom;
     }
 
     private Dependency getValues(Dependency dep, int depth) {

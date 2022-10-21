@@ -380,4 +380,37 @@ class EnvironmentTest : RewriteTest {
         val recipe = env.activateRecipes("test.Foo")
         assertThat(recipe.causesAnotherCycle()).isTrue
     }
+
+    @Test
+    fun willBeValidIfIncludesRecipesFromDependencies() {
+        val env = Environment.builder()
+            .load(YamlResourceLoader(
+                //language=yaml
+                """
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: test.Foo
+                    displayName: Test
+                    recipeList:
+                      - org.openrewrite.config.RecipeNoParameters
+                    
+                """.trimIndent().byteInputStream(),
+                URI.create("rewrite.yml"),
+                Properties()
+            ),
+            listOf(YamlResourceLoader(
+                //language=yaml
+                """
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: org.openrewrite.config.RecipeNoParameters
+                    displayName: Test
+                    recipeList:
+                      - org.openrewrite.config.RecipeSomeParameters
+                    
+                """.trimIndent().byteInputStream(),
+                URI.create("rewrite.yml"),
+                Properties()
+            ))).build()
+        val recipe = env.activateRecipes("test.Foo")
+        assertThat(recipe.validate().isValid).isTrue
+    }
 }

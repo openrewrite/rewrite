@@ -94,8 +94,9 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        List<CompiledGroovySource> compilerCus = parseInputsToCompilerAst(sources, relativeTo, ctx);
+        ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
+        ParsingEventListener parsingListener = pctx.getParsingListener();
+        List<CompiledGroovySource> compilerCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
         List<G.CompilationUnit> cus = new ArrayList<>(compilerCus.size());
 
         for (CompiledGroovySource compiled : compilerCus) {
@@ -103,7 +104,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                         compiled.getInput().getRelativePath(relativeTo),
                         compiled.getInput().getFileAttributes(),
-                        compiled.getInput().getSource(),
+                        compiled.getInput().getSource(ctx),
                         typeCache,
                         ctx
                 );
@@ -111,6 +112,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 cus.add(gcu);
                 parsingListener.parsed(compiled.getInput(), gcu);
             } catch (Throwable t) {
+                pctx.parseFailure(compiled.getInput().getRelativePath(relativeTo), t);
                 ctx.getOnError().accept(t);
             }
         }
@@ -118,7 +120,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         return cus;
     }
 
-    List<CompiledGroovySource> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    List<CompiledGroovySource> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         List<CompiledGroovySource> cus = new ArrayList<>();
 
         for (Input input : sources) {
@@ -138,7 +140,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             ErrorCollector errorCollector = new ErrorCollector(configuration);
             SourceUnit unit = new SourceUnit(
                     "doesntmatter",
-                    new InputStreamReaderSource(input.getSource(), configuration),
+                    new InputStreamReaderSource(input.getSource(ctx), configuration),
                     configuration,
                     null,
                     errorCollector
@@ -162,6 +164,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
                 cus.add(new CompiledGroovySource(input, unit, ast));
             } catch (Throwable t) {
+                ctx.parseFailure(input.getRelativePath(relativeTo), t);
                 ctx.getOnError().accept(t);
             } finally {
                 if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {

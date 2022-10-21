@@ -19,6 +19,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +46,7 @@ public class MaybeUsesImport<P> extends JavaIsoVisitor<P> {
     public J.Import visitImport(J.Import _import, P p) {
         J.Import i = super.visitImport(_import, p);
         if (matchesType(i)) {
-            i = i.withMarkers(i.getMarkers().searchResult());
+            i = SearchResult.found(i);
         }
         return i;
     }

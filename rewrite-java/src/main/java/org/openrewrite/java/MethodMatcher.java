@@ -29,6 +29,7 @@ import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
@@ -149,24 +150,31 @@ public class MethodMatcher {
                 // match constructors
                 (method.getMethodType() != null && methodNamePattern.matcher(method.getMethodType().getName()).matches());
 
+        String arguments = method.getParameters().stream()
+                .map(this::variableDeclarationsType)
+                .filter(Objects::nonNull)
+                .map(MethodMatcher::typePattern)
+                .filter(Objects::nonNull)
+                .collect(joining(","));
         return matchesMethodName &&
-                argumentPattern.matcher(method.getParameters().stream()
-                        .map(v -> {
-                            if (v instanceof J.VariableDeclarations) {
-                                J.VariableDeclarations vd = (J.VariableDeclarations) v;
-                                if (vd.getTypeAsFullyQualified() != null) {
-                                    return vd.getTypeAsFullyQualified();
-                                } else {
-                                    return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
-                                }
-                            } else {
-                                return null;
-                            }
-                        })
-                        .filter(Objects::nonNull)
-                        .map(MethodMatcher::typePattern)
-                        .filter(Objects::nonNull)
-                        .collect(joining(","))).matches();
+                argumentPattern.matcher(arguments).matches();
+    }
+
+    @Nullable
+    private JavaType variableDeclarationsType(Statement v) {
+        if (v instanceof J.VariableDeclarations) {
+            J.VariableDeclarations vd = (J.VariableDeclarations) v;
+            List<J.VariableDeclarations.NamedVariable> variables = vd.getVariables();
+            if (!variables.isEmpty() && variables.get(0).getType() != null) {
+                return variables.get(0).getType();
+            } else if (vd.getTypeAsFullyQualified() != null) {
+                return vd.getTypeAsFullyQualified();
+            } else {
+                return vd.getTypeExpression() != null ? vd.getTypeExpression().getType() : null;
+            }
+        } else {
+            return null;
+        }
     }
 
     public boolean matches(@Nullable Expression maybeMethod) {
@@ -267,7 +275,7 @@ public class MethodMatcher {
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        if (type == null) {
+        if (type == null || type instanceof JavaType.Unknown) {
             return false;
         }
 
@@ -314,6 +322,8 @@ public class MethodMatcher {
                 return ((JavaType.Primitive) type).getClassName();
             }
             return ((JavaType.Primitive) type).getKeyword();
+        } else if(type instanceof JavaType.Unknown) {
+            return "*";
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Array) {

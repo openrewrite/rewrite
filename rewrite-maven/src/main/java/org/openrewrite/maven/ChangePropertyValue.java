@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -72,11 +73,11 @@ public class ChangePropertyValue extends Recipe {
                 String currentValue = getResolutionResult().getPom().getProperties().get(key);
                 boolean trust = Boolean.TRUE.equals(trustParent);
                 if (!trust && !newValue.equals(currentValue)) {
-                    return document.withMarkers(document.getMarkers().searchResult());
+                    return SearchResult.found(document);
                 } else if (trust) {
                     String myValue = getResolutionResult().getPom().getRequested().getProperties().get(key);
                     if (myValue != null && !myValue.equals(newValue)) {
-                        return document.withMarkers(document.getMarkers().searchResult());
+                        return SearchResult.found(document);
                     }
                 }
                 return document;

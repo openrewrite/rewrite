@@ -27,6 +27,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
@@ -106,7 +107,7 @@ public class UpdateGradleWrapper extends Recipe {
                 // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                 String currentDistributionUrl = entry.getValue().getText();
                 if (!gradleWrapper.getPropertiesFormattedUrl().equals(currentDistributionUrl)) {
-                    return entry.withMarkers(entry.getMarkers().searchResult());
+                    return SearchResult.found(entry);
                 }
                 return entry;
             }
@@ -121,7 +122,7 @@ public class UpdateGradleWrapper extends Recipe {
         List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                 PlainText gradlew = (PlainText) setExecutable(sourceFile);
-                String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"));
+                String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"), sourceFile.getCharset());
                 if (!gradlewText.equals(gradlew.getText())) {
                     gradlew = gradlew.withText(gradlewText);
                 }
@@ -129,7 +130,7 @@ public class UpdateGradleWrapper extends Recipe {
             }
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                 PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
-                String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"));
+                String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"), sourceFile.getCharset());
                 if (!gradlewBatText.equals(gradlewBat.getText())) {
                     gradlewBat = gradlewBat.withText(gradlewBatText);
                 }

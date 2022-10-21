@@ -25,6 +25,7 @@ import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -58,7 +59,7 @@ public class FindPlugin extends Recipe {
                 if (pluginMatcher.matches(method)) {
                     if (method.getArguments().get(0) instanceof J.Literal &&
                             pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
-                        return method.withMarkers(method.getMarkers().searchResult());
+                        return SearchResult.found(method);
                     }
                 }
                 return super.visitMethodInvocation(method, ctx);

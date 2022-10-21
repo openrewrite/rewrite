@@ -33,12 +33,15 @@ import java.util.regex.Pattern;
 public class TypeMatcher {
     private Pattern targetTypePattern;
 
+    private final String signature;
+
     /**
      * Whether to match overridden forms of the method on subclasses of {@link #targetTypePattern}.
      */
     private final boolean matchInherited;
 
     public TypeMatcher(String signature, boolean matchInherited) {
+        this.signature = signature;
         this.matchInherited = matchInherited;
         MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
                 CharStreams.fromString(signature + " *(..)"))));
@@ -64,19 +67,10 @@ public class TypeMatcher {
         return tt != null && matches(tt.getType());
     }
 
-    @Nullable
-    private static String typePattern(JavaType type) {
-        if (type instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) type).getKeyword();
-        } else if (type instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified) type).getFullyQualifiedName();
-        } else if (type instanceof JavaType.Array) {
-            JavaType elemType = ((JavaType.Array) type).getElemType();
-            if (elemType != null) {
-                return typePattern(elemType) + "[]";
-            }
-        }
-        return null;
+    public boolean matchesPackage(String packageName) {
+        return targetTypePattern.matcher(packageName).matches() ||
+               targetTypePattern.matcher(packageName.replaceAll("\\.\\*$",
+                       "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {

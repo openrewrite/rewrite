@@ -21,18 +21,20 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTypeSignatureBuilderTest;
+import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.Objects;
 
 import static java.util.Collections.singletonList;
 
 public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
 
     private static final String goat = StringUtils.readFully(
-            GroovyTypeSignatureBuilderTest.class.getResourceAsStream("/GroovyTypeGoat.groovy"));
+            Objects.requireNonNull(GroovyTypeSignatureBuilderTest.class.getResourceAsStream("/GroovyTypeGoat.groovy")));
 
     private static final CompiledGroovySource cu = GroovyParser.builder()
             .logCompilationWarningsAndErrors(true)
@@ -40,7 +42,7 @@ public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
             .parseInputsToCompilerAst(
                     singletonList(new Parser.Input(Paths.get("GroovyTypeGoat.groovy"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
                     null,
-                    new InMemoryExecutionContext(Throwable::printStackTrace))
+                    new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)))
             .iterator()
             .next();
 

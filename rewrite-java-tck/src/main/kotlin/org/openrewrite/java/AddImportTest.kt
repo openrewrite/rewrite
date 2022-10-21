@@ -27,6 +27,58 @@ interface AddImportTest : JavaRecipeTest {
         .map { add -> toRecipe(add) }
         .reduce { r1, r2 -> return r1.doNext(r2) }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2155")
+    @Test
+    fun addImportBeforeImportWithSameInsertIndex(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            { AddImport("org.junit.jupiter.api.Assertions", "assertFalse", false) }
+        ),
+        before = """
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+
+            import org.junit.Test;
+
+            public class MyTest {
+            }
+        """,
+        after = """
+            import static org.junit.jupiter.api.Assertions.assertFalse;
+            import static org.junit.jupiter.api.Assertions.assertTrue;
+
+            import org.junit.Test;
+
+            public class MyTest {
+            }
+        """
+    )
+    @Test
+    fun importIsAddedToCorrectBlock(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = addImports(
+            { AddImport("org.mockito.junit.jupiter.MockitoExtension", null, false) }
+        ),
+        before = """
+            import java.util.List;
+
+            import org.junit.jupiter.api.extension.ExtendWith;
+            import org.mockito.Mock;
+
+            public class MyTest {
+            }
+        """,
+        after = """
+            import java.util.List;
+
+            import org.junit.jupiter.api.extension.ExtendWith;
+            import org.mockito.Mock;
+            import org.mockito.junit.jupiter.MockitoExtension;
+
+            public class MyTest {
+            }
+        """
+    )
+
     @Test
     fun dontDuplicateImports(jp: JavaParser) = assertChanged(
         jp,

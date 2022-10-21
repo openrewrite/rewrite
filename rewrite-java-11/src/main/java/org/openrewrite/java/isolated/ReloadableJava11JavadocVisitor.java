@@ -480,7 +480,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         J ref = visitReference(node.getReference(), body);
         //noinspection ConstantConditions
         if (ref != null) {
-            reference = new Javadoc.Reference(randomId(), ref, lineBreaksInMultilineJReference());
+            reference = new Javadoc.Reference(randomId(), Markers.EMPTY, ref, lineBreaksInMultilineJReference());
         }
 
         List<Javadoc> label = convertMultiline(node.getLabel());
@@ -542,7 +542,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         List<Javadoc> beforeReference = lineBreaksInMultilineJReference();
-        Javadoc.Reference reference = new Javadoc.Reference(randomId(), typeName, beforeReference);
+        Javadoc.Reference reference = new Javadoc.Reference(randomId(), Markers.EMPTY, typeName, beforeReference);
         return new Javadoc.Parameter(
                 randomId(),
                 Markers.EMPTY,
@@ -752,7 +752,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             ref = visitReference((ReferenceTree) node.getReference().get(0), body);
             //noinspection ConstantConditions
             if (ref != null) {
-                reference = new Javadoc.Reference(randomId(), ref, lineBreaksInMultilineJReference());
+                reference = new Javadoc.Reference(randomId(), Markers.EMPTY, ref, lineBreaksInMultilineJReference());
             }
             docs = convertMultiline(node.getReference().subList(1, node.getReference().size()));
         } else {

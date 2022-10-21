@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface JavaParserTypeMappingTest : JavaTypeMappingTest {
@@ -48,13 +49,13 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
             """.trimIndent(),
             """
                 class TypeB extends TypeA<Integer> {
-                    // Attempt to force a race condition in the JavaTypeCache.
+                    // Attempt to force the JavaTypeCache to cache the wrong parameterized super type.
                     java.util.List<String> list = new java.util.ArrayList<>();
                 }
             """.trimIndent(),
             """
                 class TypeC<T extends String> extends java.util.ArrayList<T> {
-                    // Attempt to force a race condition in the JavaTypeCache.
+                    // Attempt to force the JavaTypeCache to cache the wrong parameterized super type.
                     java.util.List<Object> list = new java.util.ArrayList<>();
                 }
             """.trimIndent()
@@ -140,5 +141,152 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
             """.trimIndent()
         val cu = parser.parse(InMemoryExecutionContext { t -> fail(t) }, source)
         assertThat(cu).isNotNull
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2118")
+    @Test
+    fun variousMethodScopeIdentifierTypes() {
+        val source = """
+            import java.util.List;
+            import java.util.stream.Collectors;
+            
+            @SuppressWarnings("ALL")
+            class MakeEasyToFind {
+                void method(List<MultiMap> multiMaps) {
+                    List<Integer> ints;
+                    ints.forEach(it -> {
+                        if (it != null) {
+                        }
+                    });
+            
+                    multiMaps.forEach(it -> {
+                        if (it != null) {
+                        }
+                    });
+            
+                    while (true) {
+                        if (multiMaps.isEmpty()) {
+                            Long it;
+                            break;
+                        }
+                    }
+                }
+            
+                static class MultiMap {
+                    List<Inner> inners;
+                    public List<Inner> getInners() {
+                        return inners;
+                    }
+            
+                    static class Inner {
+                        List<Number> numbers;
+                        public List<Number> getNumbers() {
+                            return numbers;
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val methodBody = (((parser.parse(InMemoryExecutionContext { t -> fail(t) }, source)[0] as J.CompilationUnit)
+            .classes[0] as J.ClassDeclaration)
+            .body.statements[0] as J.MethodDeclaration)
+            .body!!
+
+        val intsItType = ((((((((methodBody
+            .statements[1] as J.MethodInvocation)
+            .arguments[0] as J.Lambda)
+            .body as J.Block)
+            .statements[0] as J.If)
+            .ifCondition as J.ControlParentheses)
+            .tree as J.Binary)
+            .left as J.Identifier)
+            .fieldType as JavaType.Variable)
+            .type
+        assertThat(intsItType.toString()).isEqualTo("java.lang.Integer")
+
+        val multiMapItType = ((((((((methodBody
+            .statements[2] as J.MethodInvocation)
+            .arguments[0] as J.Lambda)
+            .body as J.Block)
+            .statements[0] as J.If)
+            .ifCondition as J.ControlParentheses)
+            .tree as J.Binary)
+            .left as J.Identifier)
+            .fieldType as JavaType.Variable)
+            .type
+        assertThat(multiMapItType.toString()).isEqualTo("MakeEasyToFind${'$'}MultiMap")
+
+        val whileLoopItType = (((((((methodBody
+            .statements[3] as J.WhileLoop)
+            .body as J.Block)
+            .statements[0] as J.If)
+            .thenPart as J.Block)
+            .statements[0] as J.VariableDeclarations)
+            .variables[0] as J.VariableDeclarations.NamedVariable)
+            .name as J.Identifier)
+            .type!!
+        assertThat(whileLoopItType.toString()).isEqualTo("java.lang.Long")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2118")
+    @Test
+    fun multiMapWithSameLambdaParamNames() {
+        val source = """
+            import java.util.List;
+            import java.util.stream.Collectors;
+            
+            @SuppressWarnings("ALL")
+            class MakeEasyToFind {
+                void method(List<MultiMap> multiMaps) {
+                    Object obj = multiMaps.stream()
+                        .map(it -> it.getInners())
+                        .map(it -> it.stream().map(i -> i.getNumbers()))
+                        .collect(Collectors.toList());
+                }
+            
+                static class MultiMap {
+                    List<Inner> inners;
+                    public List<Inner> getInners() {
+                        return inners;
+                    }
+            
+                    static class Inner {
+                        List<Number> numbers;
+                        public List<Number> getNumbers() {
+                            return numbers;
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val methodBody = (((parser.parse(InMemoryExecutionContext { t -> fail(t) }, source)[0] as J.CompilationUnit)
+            .classes[0] as J.ClassDeclaration)
+            .body.statements[0] as J.MethodDeclaration)
+            .body!!
+
+        val multiLambda = ((((methodBody
+            .statements[0] as J.VariableDeclarations)
+            .variables[0] as J.VariableDeclarations.NamedVariable)
+            .initializer as J.MethodInvocation)
+            .select as J.MethodInvocation)
+
+        val firstMultiMapLambdaParamItType = (((((multiLambda
+            .select as J.MethodInvocation)
+            .arguments[0] as J.Lambda)
+            .parameters.parameters[0] as J.VariableDeclarations)
+            .variables[0] as J.VariableDeclarations.NamedVariable)
+            .name as J.Identifier)
+            .type!!
+        assertThat(firstMultiMapLambdaParamItType.toString()).isEqualTo("MakeEasyToFind${'$'}MultiMap")
+
+        val secondMultiMapLambdaParamItType = ((((multiLambda
+            .arguments[0] as J.Lambda)
+            .parameters.parameters[0] as J.VariableDeclarations)
+            .variables[0] as J.VariableDeclarations.NamedVariable)
+            .name as J.Identifier)
+            .type!!
+        assertThat(secondMultiMapLambdaParamItType.toString()).isEqualTo("java.util.List<MakeEasyToFind${'$'}MultiMap${'$'}Inner>")
     }
 }

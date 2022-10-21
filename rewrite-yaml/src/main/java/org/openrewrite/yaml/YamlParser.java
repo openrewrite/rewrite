@@ -22,7 +22,6 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
@@ -31,6 +30,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.yaml.tree.Yaml;
+import org.openrewrite.yaml.tree.YamlKey;
 import org.yaml.snakeyaml.events.*;
 import org.yaml.snakeyaml.parser.Parser;
 import org.yaml.snakeyaml.parser.ParserImpl;
@@ -38,7 +38,10 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
@@ -67,15 +70,17 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             .description("The time spent parsing a YAML file")
                             .tag("file.type", "YAML");
                     Timer.Sample sample = Timer.start();
-                    try (EncodingDetectingInputStream is = sourceFile.getSource()) {
-                        Yaml.Documents yaml = parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                    Path path = sourceFile.getRelativePath(relativeTo);
+                    try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
+                        Yaml.Documents yaml = parseFromInput(path, is);
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, yaml);
                         yaml.withFileAttributes(sourceFile.getFileAttributes());
                         return yaml;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
+                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
+                        ParsingExecutionContextView.view(ctx).parseFailure(path, t);
                         return null;
                     }
                 })
@@ -414,7 +419,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
-        private Yaml.Scalar key;
+        private YamlKey key;
 
         private MappingBuilder(String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
             this.prefix = prefix;
@@ -426,6 +431,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         public void push(Yaml.Block block) {
             if (key == null && block instanceof Yaml.Scalar) {
                 key = (Yaml.Scalar) block;
+            } else if (key == null && block instanceof Yaml.Alias) {
+                key = (Yaml.Alias) block;
             } else {
                 String keySuffix = block.getPrefix();
                 block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));

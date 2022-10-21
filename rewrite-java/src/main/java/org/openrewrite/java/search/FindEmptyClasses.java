@@ -20,6 +20,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -55,7 +56,7 @@ public class FindEmptyClasses extends Recipe {
                 if (classDecl.getType() != null && JavaType.Class.Kind.Class.equals(classDecl.getType().getKind()) &&
                         (classDecl.getBody() == null || classDecl.getBody().getStatements().isEmpty()) &&
                         classDecl.getLeadingAnnotations().isEmpty() && classDecl.getExtends() == null && classDecl.getImplements() == null) {
-                    return classDecl.withMarkers(classDecl.getMarkers().searchResult());
+                    return SearchResult.found(classDecl);
                 }
                 return super.visitClassDeclaration(classDecl, executionContext);
             }

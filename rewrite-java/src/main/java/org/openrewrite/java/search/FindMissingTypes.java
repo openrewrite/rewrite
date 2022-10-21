@@ -18,19 +18,19 @@ package org.openrewrite.java.search;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
 public class FindMissingTypes extends Recipe {
     @Override
@@ -65,7 +65,7 @@ public class FindMissingTypes extends Recipe {
                         } else {
                             printedTree = String.valueOf(j);
                         }
-                        missingTypeResults.add(new MissingTypeResult(message,path, printedTree, j));
+                        missingTypeResults.add(new MissingTypeResult(message, path, printedTree, j));
                     }
                     return super.visitMarker(marker, missingTypeResults);
                 }
@@ -87,23 +87,26 @@ public class FindMissingTypes extends Recipe {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-            J.Identifier ident = super.visitIdentifier(identifier, ctx);
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
-            if (isNullType(ident.getType()) && !isAllowedToHaveNullType(ident)) {
-                ident = ident.withMarkers(ident.getMarkers().searchResult("Identifier type is null"));
+            if (!isWellFormedType(identifier.getType()) && !isAllowedToHaveNullType(identifier)) {
+                identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
             }
-            return ident;
+            return identifier;
         }
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
-            JavaType.Method type = mi.getMethodType();
-            if (isNullType(type)) {
-                mi = mi.withMarkers(mi.getMarkers().searchResult("MethodInvocation type is null"));
-            } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
-                mi = mi.withMarkers(mi.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
+            // If one of the method's arguments or type parameters is missing type, then the invocation very likely will too
+            // Avoid over-reporting the same problem by checking the invocation only when its elements are well-formed
+            if (mi == method) {
+                JavaType.Method type = mi.getMethodType();
+                if (!isWellFormedType(type)) {
+                    mi = SearchResult.found(mi, "MethodInvocation type is missing or malformed");
+                } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
+                    mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
+                }
             }
             return mi;
         }
@@ -112,10 +115,10 @@ public class FindMissingTypes extends Recipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
-            if (isNullType(type)) {
-                md = md.withMarkers(md.getMarkers().searchResult("MethodDeclaration type is null"));
+            if (!isWellFormedType(type)) {
+                md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
-                md = md.withMarkers(md.getMarkers().searchResult("type information has a different method name '" + type.getName() + "'"));
+                md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
             return md;
         }
@@ -124,32 +127,37 @@ public class FindMissingTypes extends Recipe {
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
-            if (isNullType(t)) {
-                return cd.withMarkers(cd.getMarkers().searchResult("ClassDeclaration type is null"));
+            if (!isWellFormedType(t)) {
+                return SearchResult.found(cd, "ClassDeclaration type is missing or malformed");
             }
             if (!cd.getKind().name().equals(t.getKind().name())) {
-                cd = cd.withMarkers(cd.getMarkers().searchResult(
-                        " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind()));
+                cd = SearchResult.found(cd,
+                        " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind());
             }
             J.CompilationUnit jc = getCursor().firstEnclosing(J.CompilationUnit.class);
             if (jc != null) {
                 J.Package pkg = jc.getPackageDeclaration();
                 if (pkg != null && t.getPackageName().equals(pkg.printTrimmed(getCursor()))) {
-                    cd = cd.withMarkers(cd.getMarkers().searchResult(
-                            " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor())));
+                    cd = SearchResult.found(cd,
+                            " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor()));
                 }
             }
             return cd;
         }
 
-        private boolean isNullType(@Nullable JavaType type) {
-            return type == null || type instanceof JavaType.Unknown;
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
+            J.NewClass n = super.visitNewClass(newClass, executionContext);
+            if (n == newClass && !isWellFormedType(n.getType())) {
+                n = SearchResult.found(n, "NewClass type is missing or malformed");
+            }
+            return n;
         }
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName()
-                    || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
-                    || isNewClass(ident) || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField(ident);
+                   || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
+                   || isNewClass(ident) || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField(ident);
         }
 
         private boolean inPackageDeclaration() {
@@ -178,7 +186,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isFieldAccess(J.Identifier ident) {
             J.FieldAccess parent = getCursor().firstEnclosing(J.FieldAccess.class);
             return parent != null
-                    && (parent.getName().equals(ident) || parent.getTarget().equals(ident));
+                   && (parent.getName().equals(ident) || parent.getTarget().equals(ident));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
@@ -198,7 +206,7 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isTypeParameter() {
             return getCursor().getParent() != null
-                    && getCursor().getParent().getValue() instanceof J.TypeParameter;
+                   && getCursor().getParent().getValue() instanceof J.TypeParameter;
         }
 
         private boolean isMemberReference() {
@@ -206,7 +214,7 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isCaseLabel() {
-            return getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.Case;
+            return getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Case;
         }
 
         private boolean isLabel() {
@@ -216,7 +224,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
             return parent != null && parent.getValue() instanceof J.Assignment
-                    && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
+                   && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
     }

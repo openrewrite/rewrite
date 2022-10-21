@@ -13,44 +13,69 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("ClassInitializerMayBeStatic")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress("CStyleArrayDeclaration", "InfiniteLoopStatement", "StatementWithEmptyBody", "ForLoopReplaceableByWhile")
-interface MultipleVariableDeclarationsTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = MultipleVariableDeclarations()
+interface MultipleVariableDeclarationsTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(MultipleVariableDeclarations())
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/812")
     @Test
-    fun arrayDimensionsBeforeName(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun arrayDimensionsBeforeName() = rewriteRun(
+        java("""
             class Test {
                 void test() {
                     int[] m, n;
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void test() {
                     int[] m;
                     int[] n;
                 }
             }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/812")
+    @Test
+    fun arrayDimensionsBeforeName(jp: JavaParser) = rewriteRun(
+        java("""
+            class Test {
+                void test() {
+                    int[] m, n;
+                }
+            }
+        """,
         """
+            class Test {
+                void test() {
+                    int[] m;
+                    int[] n;
+                }
+            }
+        """)
     )
 
     @Test
-    fun replaceWithIndividualVariableDeclarations(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun replaceWithIndividualVariableDeclarations() = rewriteRun(
+        java("""
             class Test {
                 int n = 0, m = 0;
                 int o = 0, p;
@@ -61,7 +86,7 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n = 0;
                 int m = 0;
@@ -74,40 +99,38 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
                     for (int i = 0, j = 0; ; ) ;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun arrayTypes(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun arrayTypes(jp: JavaParser) = rewriteRun(
+        java("""
             class Test {
                 public void method() {
                     Integer[] q = {0}, r[] = {{0}};
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 public void method() {
                     Integer[] q = {0};
                     Integer[][] r = {{0}};
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun singleLineCommentPreserved(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun singleLineCommentPreserved(jp: JavaParser) = rewriteRun(
+        java("""
             class Test {
                 // a before-statement example
                 int a = 0, b = 0;
                 int n = 0, m = 0; // an end-of-line example
             }
         """,
-        after = """
+        """
             class Test {
                 // a before-statement example
                 int a = 0;
@@ -115,13 +138,12 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
                 int n = 0;
                 int m = 0; // an end-of-line example
             }
-        """
+        """)
     )
 
     @Test
-    fun blockCommentPreserved(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun blockCommentPreserved(jp: JavaParser) = rewriteRun(
+        java("""
             class Test {
                 int a = 0;
 
@@ -131,7 +153,7 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
                 private int max = Integer.MAX_VALUE, min = Integer.MIN_VALUE;
             }
         """,
-        after = """
+        """
             class Test {
                 int a = 0;
 
@@ -141,7 +163,27 @@ interface MultipleVariableDeclarationsTest : JavaRecipeTest {
                 private int max = Integer.MAX_VALUE;
                 private int min = Integer.MIN_VALUE;
             }
-        """
+        """)
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2287")
+    @Test
+    fun removeNewlinesFromMultivariablePrefix() = rewriteRun(
+        java("""
+            class A {
+                {
+                    int a = 1,
+                        b = 2;
+                }
+            }
+        """,
+        """
+            class A {
+                {
+                    int a = 1;
+                    int b = 2;
+                }
+            }
+        """)
+    )
 }

@@ -46,6 +46,12 @@ public class EncodingDetectingInputStream extends InputStream {
 
     public EncodingDetectingInputStream(InputStream inputStream) {
         this.inputStream = inputStream;
+        this.charset = null;
+    }
+
+    public EncodingDetectingInputStream(InputStream inputStream, @Nullable Charset charset) {
+        this.inputStream = inputStream;
+        this.charset = charset;
     }
 
     public Charset getCharset() {

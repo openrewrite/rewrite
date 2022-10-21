@@ -26,13 +26,11 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
 import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -40,7 +38,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 public class GradleParser implements Parser<G.CompilationUnit> {
-    private static final byte[] PREAMBLE = StringUtils.readFully(GroovyParser.class.getResourceAsStream("/RewriteGradleProject.groovy"))
+    private static final byte[] PREAMBLE = StringUtils.readFully(GroovyParser.class.getResourceAsStream("/RewriteGradleProject.groovy"), StandardCharsets.UTF_8)
             .trim()
             .replaceAll("\\n}}$", "")
             .getBytes(StandardCharsets.UTF_8);
@@ -68,7 +66,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                                 () -> new SequenceInputStream(
                                         Collections.enumeration(Arrays.asList(
                                                 new ByteArrayInputStream(PREAMBLE),
-                                                source.getSource(),
+                                                source.getSource(ctx),
                                                 new ByteArrayInputStream(new byte[]{'}', '}'})
                                         ))
                                 ),

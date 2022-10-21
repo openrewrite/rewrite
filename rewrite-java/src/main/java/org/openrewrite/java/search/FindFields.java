@@ -26,6 +26,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -66,7 +67,7 @@ public class FindFields extends Recipe {
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
-                    return fieldAccess.withMarkers(fieldAccess.getMarkers().searchResult());
+                    return SearchResult.found(fieldAccess);
                 }
                 return super.visitFieldAccess(fieldAccess, executionContext);
             }
@@ -77,7 +78,7 @@ public class FindFields extends Recipe {
                 JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
-                    i = i.withMarkers(i.getMarkers().searchResult());
+                    i = SearchResult.found(i);
                 }
                 return i;
             }

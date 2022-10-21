@@ -168,7 +168,7 @@ public class ReloadableJava17Parser implements JavaParser {
                         ReloadableJava17ParserVisitor parser = new ReloadableJava17ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 input.getFileAttributes(),
-                                input.getSource(),
+                                input.getSource(ctx),
                                 styles,
                                 typeCache,
                                 ctx,
@@ -191,7 +191,7 @@ public class ReloadableJava17Parser implements JavaParser {
                                                 .tag("file.type", "Java")
                                                 .tag("step", "(3) Map to Rewrite AST"), t)
                                 .register(Metrics.globalRegistry));
-
+                        ParsingExecutionContextView.view(ctx).parseFailure(input.getRelativePath(relativeTo), t);
                         ctx.getOnError().accept(t);
                         return null;
                     }
@@ -239,13 +239,13 @@ public class ReloadableJava17Parser implements JavaParser {
                     .register(Metrics.globalRegistry)
                     .record(() -> {
                         try {
-                            return compiler.parse(new ReloadableJava17ParserInputFileObject(input1));
+                            return compiler.parse(new ReloadableJava17ParserInputFileObject(input1, ctx));
                         } catch (IllegalStateException e) {
                             if ("endPosTable already set".equals(e.getMessage())) {
                                 throw new IllegalStateException(
                                         "Call reset() on JavaParser before parsing another set of source files that " +
                                         "have some of the same fully qualified names. Source file [" +
-                                        input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource()) + "\n]", e);
+                                        input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
                             }
                             throw e;
                         }

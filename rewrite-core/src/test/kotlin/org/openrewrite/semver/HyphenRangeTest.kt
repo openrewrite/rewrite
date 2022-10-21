@@ -19,6 +19,13 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class HyphenRangeTest {
+
+    @Test
+    fun isValidWhenCurrentIsNull() {
+        val hyphenRange: HyphenRange = HyphenRange.build("1-2", null).getValue()!!
+        assertThat(hyphenRange.isValid(null, "1.0.0")).isTrue
+    }
+
     @Test
     fun pattern() {
         assertThat(HyphenRange.build("1 - 2", null).isValid).isTrue

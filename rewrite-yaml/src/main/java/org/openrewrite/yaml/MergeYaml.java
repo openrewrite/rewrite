@@ -53,6 +53,14 @@ public class MergeYaml extends Recipe {
     @Nullable
     String fileMatcher;
 
+    @Incubating(since = "7.30.0")
+    @Option(displayName = "Object identifying property",
+            description = "Name of a property which will be used to identify objects (mapping). This serves as the key to match on when merging entries of a sequence.",
+            required = false,
+            example = "name")
+    @Nullable
+    String objectIdentifyingProperty;
+
     @Override
     public Validated validate() {
         return super.validate()
@@ -91,7 +99,8 @@ public class MergeYaml extends Recipe {
             public Yaml.Document visitDocument(Yaml.Document document, ExecutionContext ctx) {
                 if ("$".equals(key)) {
                     return document.withBlock((Yaml.Block) new MergeYamlVisitor<>(document.getBlock(), yaml,
-                            Boolean.TRUE.equals(acceptTheirs)).visit(document.getBlock(), ctx, getCursor()));
+                            Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(document.getBlock(),
+                            ctx, getCursor()));
                 }
                 return super.visitDocument(document, ctx);
             }
@@ -100,8 +109,8 @@ public class MergeYaml extends Recipe {
             public Yaml.Mapping visitMapping(Yaml.Mapping mapping, ExecutionContext ctx) {
                 Yaml.Mapping m = super.visitMapping(mapping, ctx);
                 if (matcher.matches(getCursor())) {
-                    m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs))
-                            .visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
+                    m = (Yaml.Mapping) new MergeYamlVisitor<>(mapping, incoming, Boolean.TRUE.equals(acceptTheirs),
+                            objectIdentifyingProperty).visitNonNull(mapping, ctx, getCursor().getParentOrThrow());
                 }
                 return m;
             }
@@ -113,7 +122,8 @@ public class MergeYaml extends Recipe {
                     // if it is a sequence, we want to insert into every sequence entry for now.
                     if (!(entry.getValue() instanceof Yaml.Sequence)) {
                         return entry.withValue((Yaml.Block) new MergeYamlVisitor<>(entry.getValue(), incoming,
-                                Boolean.TRUE.equals(acceptTheirs)).visit(entry.getValue(), ctx, getCursor()));
+                                Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty).visit(entry.getValue(),
+                                ctx, getCursor()));
                     }
                 }
                 return super.visitMappingEntry(entry, ctx);
@@ -122,10 +132,10 @@ public class MergeYaml extends Recipe {
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ctx) {
                 if (matcher.matches(getCursor().getParentOrThrow())) {
-                    return sequence.withEntries(ListUtils.map(sequence.getEntries(), entry ->
-                            entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
-                                    Boolean.TRUE.equals(acceptTheirs)).visit(entry.getBlock(), ctx, new Cursor(getCursor(), entry))))
-                    );
+                    return sequence.withEntries(ListUtils.map(sequence.getEntries(),
+                            entry -> entry.withBlock((Yaml.Block) new MergeYamlVisitor<>(entry.getBlock(), incoming,
+                                    Boolean.TRUE.equals(acceptTheirs), objectIdentifyingProperty)
+                                    .visit(entry.getBlock(), ctx, new Cursor(getCursor(), entry)))));
                 }
                 return super.visitSequence(sequence, ctx);
             }

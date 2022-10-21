@@ -20,7 +20,6 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -31,7 +30,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -155,7 +153,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
                                 sourcePathFromSourceText(Paths.get(""), sourceFile), null,
-                                () -> new ByteArrayInputStream(sourceFile.getBytes(StandardCharsets.UTF_8)), true
+                                () -> new ByteArrayInputStream(sourceFile.getBytes(getCharset(ctx))), true
                         ))
                         .collect(toList()),
                 null,
@@ -283,7 +281,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     @Override
     default Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
-        Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
+        Pattern classPattern = Pattern.compile("(class|interface|enum|record)\\s*(<[^>]*>)?\\s+(\\w+)");
 
         Function<String, String> simpleName = sourceStr -> {
             Matcher classMatcher = classPattern.matcher(sourceStr);

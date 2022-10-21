@@ -1,0 +1,162 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.config;
+
+import org.jetbrains.annotations.NotNull;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.StringUtils;
+
+import java.net.URI;
+import java.util.Properties;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.config.CategoryTreeTest.Group.Group1;
+import static org.openrewrite.config.CategoryTreeTest.Group.Group2;
+
+public class CategoryTreeTest {
+    private final Environment env = Environment.builder()
+            .scanRuntimeClasspath()
+            .build();
+
+    private final Environment custom = Environment.builder()
+            .load(new YamlResourceLoader(
+                    requireNonNull(CategoryTreeTest.class.getResourceAsStream("/categories.yml")),
+                    URI.create("custom.yml"),
+                    new Properties()
+            ))
+            .build();
+
+    private final CategoryTree.Root<Group> categoryTree = CategoryTree.<Group>build()
+            .putAll(Group1, env)
+            .putAll(Group2, custom);
+
+    @Test
+    void print() {
+        System.out.println(categoryTree.print(CategoryTree.PrintOptions.builder()
+                .omitCategoryRoots(false)
+                .omitEmptyCategories(false)
+                .nameStyle(CategoryTree.PrintNameStyle.DISPLAY_NAME)
+                .build()));
+    }
+
+    @Test
+    void categoryDescriptorPrecedence() {
+        CategoryDescriptor descriptor = categoryDescriptor();
+        CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
+                .putRecipes(0, recipeDescriptor("org.openrewrite.test"))
+                .putCategories(1, descriptor)
+                .putCategories(2, descriptor.withDisplayName("new display name"));
+
+        CategoryTree<Integer> found = requireNonNull(categoryTree.getCategory("org.openrewrite.test"));
+        assertThat(found.getDescriptor().getDisplayName()).isEqualTo("new display name");
+        assertThat(found.getRecipes()).hasSize(1);
+
+        categoryTree.removeAll(2);
+        found = requireNonNull(categoryTree.getCategory("org.openrewrite.test"));
+        assertThat(found.getDescriptor().getDisplayName()).isEqualTo("Test");
+        assertThat(found.getRecipes()).hasSize(1);
+    }
+
+    @Test
+    void getCategoryThatIsTransitivelyEmpty() {
+        CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
+                .putCategories(1, categoryDescriptor());
+
+        assertThat(categoryTree.getCategory("org", "openrewrite")).isNull();
+        assertThat(categoryTree.getCategory("org", "openrewrite", "test")).isNull();
+    }
+
+    @Test
+    void putRecipe() {
+        CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
+                .putRecipes(1, recipeDescriptor("org.openrewrite"));
+        assertThat(categoryTree.getRecipe("org.openrewrite.MyRecipe")).isNotNull();
+    }
+
+    @NotNull
+    private static RecipeDescriptor recipeDescriptor(String packageName) {
+        return new RecipeDescriptor(packageName + ".MyRecipe",
+                "My recipe", "", emptySet(), null, emptyList(),
+                emptyList(), emptyList(), URI.create("https://openrewrite.org"));
+    }
+
+    @Test
+    void removeCategory() {
+        categoryTree.removeAll(Group2);
+        assertThat(categoryTree.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
+                .doesNotContain("io.moderne.rewrite", "io.moderne.cloud", "io.moderne");
+    }
+
+    @Test
+    void categoryRoots() {
+        assertThat(categoryTree.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
+                .contains(
+                        "io.moderne.rewrite", "io.moderne.cloud", // because "io.moderne" is marked as a root
+                        "org.openrewrite" // because "org" is marked as a root
+                );
+    }
+
+    @Test
+    void getCategory() {
+        assertThat(categoryTree.getCategoryOrThrow("org", "openrewrite")).isNotNull();
+        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite")).isNotNull();
+        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite", "test")).isNotNull();
+        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite.test")).isNotNull();
+    }
+
+    @Test
+    void getRecipeCount() {
+        assertThat(categoryTree.getCategoryOrThrow("org", "openrewrite").getRecipeCount())
+                .isGreaterThan(5);
+    }
+
+    @Test
+    void getRecipes() {
+        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite.text").getRecipes().size())
+                .isGreaterThan(1);
+    }
+
+    @Test
+    void getRecipesInArtificialCorePackage() {
+        assertThat(requireNonNull(categoryTree.getCategory("org", "openrewrite", "core")).getRecipes())
+                .isNotEmpty();
+    }
+
+    @Test
+    void getRecipe() {
+        assertThat(categoryTree.getRecipe("org.openrewrite.DeleteSourceFiles")).isNotNull();
+    }
+
+    @Test
+    void getRecipeGroup() {
+        assertThat(categoryTree.getRecipeGroup("org.openrewrite.DeleteSourceFiles"))
+                .isEqualTo(Group1);
+    }
+
+    private static CategoryDescriptor categoryDescriptor() {
+        return new CategoryDescriptor(StringUtils.capitalize("org.openrewrite.test".substring("org.openrewrite.test".lastIndexOf('.') + 1)),
+                "org.openrewrite.test", "", emptySet(),
+                false, 0, false);
+    }
+
+    enum Group {
+        Group1,
+        Group2
+    }
+}

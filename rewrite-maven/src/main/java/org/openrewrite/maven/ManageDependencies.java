@@ -43,25 +43,17 @@ public class ManageDependencies extends Recipe {
 
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                          "Group is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.*")
     String groupPattern;
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                          "Artifact is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "guava*",
             required = false)
     @Nullable
     String artifactPattern;
-
-    @Option(displayName = "Version",
-            description = "Version to use for the dependency in dependency management. " +
-                    "Defaults to the existing version found on the matching dependency, or the max version if multiple dependencies match the glob expression patterns.",
-            example = "1.0.0",
-            required = false)
-    @Nullable
-    String version;
 
     @Option(displayName = "Add to the root pom",
             description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
@@ -69,6 +61,15 @@ public class ManageDependencies extends Recipe {
             required = false)
     @Nullable
     Boolean addToRootPom;
+
+    @Option(displayName = "Skip model updates",
+            description = "Optionally skip updating the dependency model after managing dependencies. " +
+                          "Updating the model does not affect the source code of the POM," +
+                          "but will cause the resolved dependency model to reflect the changes made to the POM. " +
+                          "If this recipe is ran standalone, it is not necessary to update the model.",
+            required = false)
+    @Nullable
+    Boolean skipModelUpdate;
 
     @Override
     public String getDisplayName() {
@@ -114,26 +115,25 @@ public class ManageDependencies extends Recipe {
                         }
 
                         if (manageableDependencies != null) {
-                            Map<GroupArtifact, GroupArtifactVersion> dependenciesToManage = new HashMap<>();
-                            String selectedVersion = version;
+                            Map<GroupArtifact, ResolvedDependency> maxVersionByGroupArtifact = new HashMap<>(manageableDependencies.size());
 
                             for (ResolvedDependency rmd : manageableDependencies) {
-                                if (version != null) {
-                                    dependenciesToManage.putIfAbsent(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), version));
-                                } else {
-                                    if (selectedVersion == null) {
-                                        selectedVersion = rmd.getVersion();
-                                    } else {
-                                        if (new Version(rmd.getVersion()).compareTo(new Version(selectedVersion)) > 0) {
-                                            selectedVersion = rmd.getVersion();
-                                        }
-                                    }
-                                    dependenciesToManage.put(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()), new GroupArtifactVersion(rmd.getGroupId(), rmd.getArtifactId(), selectedVersion));
+                                String alreadyManagedVersion = getResolutionResult().getPom().getManagedVersion(rmd.getGroupId(), rmd.getArtifactId(), rmd.getType(),
+                                        rmd.getClassifier());
+                                if (rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
+                                    maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
+                                            (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
+                                                    rmd : existing);
                                 }
                             }
 
-                            for (GroupArtifactVersion gav : dependenciesToManage.values()) {
-                                doAfterVisit(new AddManagedDependencyVisitor(gav.getGroupId(), gav.getArtifactId(), gav.getVersion(), null, null, null, null, null));
+                            for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
+                                doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
+                                        rmd.getArtifactId(), rmd.getVersion(), null,
+                                        null, rmd.getRequested().getClassifier()));
+                                if (!Boolean.TRUE.equals(skipModelUpdate)) {
+                                    maybeUpdateModel();
+                                }
                             }
                         }
 
@@ -168,9 +168,7 @@ public class ManageDependencies extends Recipe {
                 tag.getChild("version").ifPresent(versionTag -> doAfterVisit(new RemoveContentVisitor<>(versionTag, false)));
                 return tag;
             }
-
             return super.visitTag(tag, ctx);
         }
     }
-
 }

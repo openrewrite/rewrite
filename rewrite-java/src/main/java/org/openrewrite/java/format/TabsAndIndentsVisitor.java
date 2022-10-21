@@ -496,7 +496,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         char c = chars[i];
                         if (c == '\n') {
                             multiline.append(c);
-                            for (int j = 0; j < Math.abs(shift) && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
+                            for (int j = 0; j < Math.abs(shift) && i+j+1 < chars.length && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
                                 i++;
                             }
                         } else {

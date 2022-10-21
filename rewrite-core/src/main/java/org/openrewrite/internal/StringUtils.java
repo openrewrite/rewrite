@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
@@ -36,7 +37,8 @@ public class StringUtils {
     }
 
     public static String trimIndentPreserveCRLF(String text) {
-        return trimIndent(text.replace('\r', '⏎'))
+        return trimIndent((text.endsWith("\r\n") ? text.substring(0, text.length() - 2) : text)
+                .replace('\r', '⏎'))
                 .replace('⏎', '\r');
     }
 
@@ -229,14 +231,18 @@ public class StringUtils {
         return string == null || string.isEmpty();
     }
 
+    public static String readFully(InputStream inputStream) {
+        return readFully(inputStream, StandardCharsets.UTF_8);
+    }
+
     /**
      * If the input stream is coming from a stream with an unknown encoding, use
      * {@link EncodingDetectingInputStream#readFully()} instead.
      *
      * @param inputStream An input stream.
-     * @return A UTF-8 encoded string.
+     * @return the full contents of the input stream interpreted as a string of the specified encoding
      */
-    public static String readFully(InputStream inputStream) {
+    public static String readFully(InputStream inputStream, Charset charset) {
         try (InputStream is = inputStream) {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buffer = new byte[4096];
@@ -246,7 +252,7 @@ public class StringUtils {
             }
 
             byte[] bytes = bos.toByteArray();
-            return new String(bytes, 0, bytes.length, StandardCharsets.UTF_8);
+            return new String(bytes, 0, bytes.length, charset);
         } catch (IOException e) {
             throw new UnsupportedOperationException(e);
         }

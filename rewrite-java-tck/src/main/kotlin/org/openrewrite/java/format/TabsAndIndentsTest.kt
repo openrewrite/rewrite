@@ -42,6 +42,40 @@ interface TabsAndIndentsTest : JavaRecipeTest {
         )
     )
 
+    @Suppress("SuspiciousIndentAfterControlStatement")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2251")
+    @Test
+    fun multilineCommentStartPositionIsIndented(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+        class A {
+            {
+                if(true)
+                    foo();
+                    foo();
+                  /*
+               line-one
+             line-two
+             */
+            }
+            static void foo() {}
+        }
+        """,
+        after = """
+        class A {
+            {
+                if(true)
+                    foo();
+                foo();
+                /*
+           line-one
+          line-two
+          */
+            }
+            static void foo() {}
+        }
+        """
+    )
     @Issue("https://github.com/openrewrite/rewrite/issues/1913")
     @Test
     fun alignMethodDeclarationParamsWhenMultiple(jp: JavaParser) = assertChanged(
