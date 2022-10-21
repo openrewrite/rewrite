@@ -23,13 +23,11 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.*;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -113,10 +111,39 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                         }
                         J.Literal replaceLiteral = ((J.Literal) duplicateLiteralsMap.get(valueOfLiteral).toArray()[0]).withId(Tree.randomId());
                         String insertStatement = "private static final String " + variableName + " = #{any(String)}";
-                        classDecl = classDecl.withBody(
-                                classDecl.getBody().withTemplate(
+                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
+                            J.EnumValueSet enumValueSet = classDecl.getBody().getStatements().stream()
+                                    .filter(it -> it instanceof J.EnumValueSet)
+                                    .map(it -> (J.EnumValueSet) it)
+                                    .findFirst()
+                                    .orElse(null);
+
+                            if (enumValueSet != null) {
+                                J.Block original = classDecl.getBody();
+                                J.Block newBlock = classDecl.getBody().withTemplate(
                                         JavaTemplate.builder(this::getCursor, insertStatement).build(),
-                                        classDecl.getBody().getCoordinates().firstStatement(), replaceLiteral));
+                                        classDecl.getBody().getCoordinates().firstStatement(), replaceLiteral);
+                                Statement add = newBlock.getStatements().get(0);
+
+                                // Insert the new statement after the EnumValueSet.
+                                List<Statement> statements = new ArrayList<>(original.getStatements().size() + 1);
+                                boolean addNewStatement = false;
+                                for (Statement statement : original.getStatements()) {
+                                    if (statement instanceof J.EnumValueSet) {
+                                        addNewStatement = true;
+                                    } else if (addNewStatement) {
+                                        statements.add(add);
+                                    }
+                                    statements.add(statement);
+                                }
+                                classDecl = classDecl.withBody(classDecl.getBody().withStatements(statements));
+                            }
+                        } else {
+                            classDecl = classDecl.withBody(
+                                    classDecl.getBody().withTemplate(
+                                            JavaTemplate.builder(this::getCursor, insertStatement).build(),
+                                            classDecl.getBody().getCoordinates().firstStatement(), replaceLiteral));
+                        }
                     }
                     variableNames.add(variableName);
                     doAfterVisit(new ReplaceStringLiterals(classDecl, variableName, duplicateLiteralsMap.get(valueOfLiteral)));
