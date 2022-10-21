@@ -24,9 +24,14 @@ import org.openrewrite.java.*;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -110,7 +115,66 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                         }
                         J.Literal replaceLiteral = ((J.Literal) duplicateLiteralsMap.get(valueOfLiteral).toArray()[0]).withId(Tree.randomId());
                         String insertStatement = "private static final String " + variableName + " = #{any(String)}";
-                        if (classDecl.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
+                        if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
+                            J.EnumValueSet enumValueSet = classDecl.getBody().getStatements().stream()
+                                    .filter(it -> it instanceof J.EnumValueSet)
+                                    .map(it -> (J.EnumValueSet) it)
+                                    .findFirst()
+                                    .orElse(null);
+
+                            if (enumValueSet != null) {
+                                // Temporary work around due to an issue in the JavaTemplate related to BlockStatementTemplateGenerator#enumClassDeclaration.
+                                Space prefix = enumValueSet.getPrefix();
+                                Space singleSpace = Space.build(" ", emptyList());
+                                Expression literal = duplicateLiteralsMap.get(valueOfLiteral).toArray(new J.Literal[0])[0].withId(randomId());
+                                J.Modifier privateModifier = new J.Modifier(randomId(), prefix, Markers.EMPTY, J.Modifier.Type.Private, emptyList());
+                                J.Modifier staticModifier = new J.Modifier(randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Static, emptyList());
+                                J.Modifier finalModifier = new J.Modifier(randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Final, emptyList());
+                                J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
+                                        randomId(),
+                                        Space.EMPTY,
+                                        Markers.EMPTY,
+                                        emptyList(),
+                                        Arrays.asList(privateModifier, staticModifier, finalModifier),
+                                        new J.Identifier(
+                                                randomId(),
+                                                singleSpace,
+                                                Markers.EMPTY,
+                                                "String",
+                                                JavaType.ShallowClass.build("java.lang.String"),
+                                                null),
+                                        null,
+                                        emptyList(),
+                                        singletonList(JRightPadded.build(new J.VariableDeclarations.NamedVariable(
+                                                randomId(),
+                                                Space.EMPTY,
+                                                Markers.EMPTY,
+                                                new J.Identifier(
+                                                        randomId(),
+                                                        singleSpace,
+                                                        Markers.EMPTY,
+                                                        variableName,
+                                                        JavaType.ShallowClass.build("java.lang.String"),
+                                                        null),
+                                                emptyList(),
+                                                JLeftPadded.build(literal).withBefore(singleSpace),
+                                                null)))
+                                );
+
+                                // Insert the new statement after the EnumValueSet.
+                                List<Statement> statements = new ArrayList<>(classDecl.getBody().getStatements().size() + 1);
+                                boolean addNewStatement = false;
+                                for (Statement statement : classDecl.getBody().getStatements()) {
+                                    if (statement instanceof J.EnumValueSet) {
+                                        addNewStatement = true;
+                                    } else if (addNewStatement) {
+                                        statements.add(variableDeclarations);
+                                    }
+                                    statements.add(statement);
+                                }
+                                classDecl = classDecl.withBody(classDecl.getBody().withStatements(statements));
+                            }
+                        } else {
                             classDecl = classDecl.withBody(
                                     classDecl.getBody().withTemplate(
                                             JavaTemplate.builder(this::getCursor, insertStatement).build(),
@@ -308,7 +372,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                                 variableName,
                                 isClass.getType(),
                                 JavaType.Primitive.String,
-                                Collections.emptyList()
+                                emptyList()
                         )
                 );
             }

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
@@ -439,7 +438,6 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
         """
     )
 
-    @Disabled("Requires changes to JavaTemplate and enums.")
     @Issue("https://github.com/openrewrite/rewrite/issues/2330")
     @Test
     fun enum() = assertChanged(
