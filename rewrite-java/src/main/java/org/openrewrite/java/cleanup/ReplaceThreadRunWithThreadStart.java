@@ -15,16 +15,19 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.ChangeMethodInvocation;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesMethod;
 
+import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
 
-public class ReplaceThreadRunWithThreadStart extends ChangeMethodInvocation {
-    public ReplaceThreadRunWithThreadStart() {
-        super("java.lang.Thread run()", "start", true);
-    }
-
+public class ReplaceThreadRunWithThreadStart extends Recipe {
     @Override
     public String getDisplayName() {
         return "Replace calls to `Thread.run()` with `Thread.start()`";
@@ -38,5 +41,21 @@ public class ReplaceThreadRunWithThreadStart extends ChangeMethodInvocation {
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1217");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesMethod<>(new MethodMatcher("java.lang.Thread run()"));
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeMethodInvocation("java.lang.Thread run()", "start", true)
+                .getVisitor();
     }
 }
