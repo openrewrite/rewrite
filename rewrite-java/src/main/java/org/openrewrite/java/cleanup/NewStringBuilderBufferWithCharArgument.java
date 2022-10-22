@@ -15,13 +15,15 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -30,9 +32,10 @@ import java.util.Collections;
 import java.util.Set;
 
 public class NewStringBuilderBufferWithCharArgument extends Recipe {
+
     @Override
     public String getDisplayName() {
-        return "Change StringBuilder and StringBuffer character constructor arg to String";
+        return "Change `StringBuilder` and `StringBuffer` character constructor argument to `String`";
     }
 
     @Override
@@ -51,20 +54,18 @@ public class NewStringBuilderBufferWithCharArgument extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesType<>("java.lang.StringBuilder"));
-                doAfterVisit(new UsesType<>("java.lang.StringBuffer"));
-                return cu;
-            }
-        };
+    public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return Applicability.or(
+                new UsesType<>("java.lang.StringBuilder"),
+                new UsesType<>("java.lang.StringBuffer")
+        );
     }
 
     @Override
     public JavaIsoVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
+            private final JavaTemplate toString = JavaTemplate.builder(this::getCursor, "String.valueOf(#{any()})").build();
+
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J.NewClass nc = super.visitNewClass(newClass, executionContext);
@@ -73,12 +74,16 @@ public class NewStringBuilderBufferWithCharArgument extends Recipe {
                     nc.getArguments();
                     if (nc.getArguments().get(0).getType() == JavaType.Primitive.Char) {
                         nc = nc.withArguments(ListUtils.mapFirst(nc.getArguments(), arg -> {
-                            J.Literal l = (J.Literal) arg;
-                            l = l.withType(JavaType.buildType("String"));
-                            if (l.getValueSource() != null) {
-                                l = l.withValueSource(l.getValueSource().replace("'", "\""));
+                            if (arg instanceof J.Literal){
+                                J.Literal l = (J.Literal) arg;
+                                l = l.withType(JavaType.buildType("String"));
+                                if (l.getValueSource() != null) {
+                                    l = l.withValueSource(l.getValueSource().replace("'", "\""));
+                                }
+                                return l;
+                            } else {
+                                return arg.withTemplate(toString, arg.getCoordinates().replace(), arg);
                             }
-                            return l;
                         }));
                     }
                 }
