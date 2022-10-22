@@ -41,12 +41,16 @@ interface NewStringBuilderBufferWithCharArgumentTest : JavaRecipeTest {
             class A {
                 StringBuffer buffer = new StringBuffer('a');
                 StringBuilder builder = new StringBuilder('a');
+                char notALiteral = 'c';
+                StringBuffer buffer = new StringBuffer(notALiteral);
             }
         """,
         after = """
             class A {
                 StringBuffer buffer = new StringBuffer("a");
                 StringBuilder builder = new StringBuilder("a");
+                char notALiteral = 'c';
+                StringBuffer buffer = new StringBuffer(notALiteral.toString());
             }
         """
     )
