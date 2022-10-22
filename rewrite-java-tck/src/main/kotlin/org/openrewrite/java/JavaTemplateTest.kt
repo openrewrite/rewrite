@@ -1792,6 +1792,35 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     )
 
     @Test
+    fun replaceAnnotation(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+                        .javaParser { jp }
+                        .build()
+
+                override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
+                    if(annotation.simpleName == "SuppressWarnings") {
+                        return annotation.withTemplate(t, annotation.coordinates.replace())
+                    }
+                    return annotation
+                }
+            }
+        },
+        before = """
+            @SuppressWarnings("ALL")
+            class Test {
+            }
+        """,
+        after = """
+            @Deprecated
+            class Test {
+            }
+        """
+    )
+
+    @Test
     fun replaceClassImplements(jp: JavaParser) = assertChanged(
         jp,
         recipe = toRecipe {

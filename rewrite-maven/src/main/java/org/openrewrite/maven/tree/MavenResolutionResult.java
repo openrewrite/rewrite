@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
@@ -56,6 +57,18 @@ public class MavenResolutionResult implements Marker {
     @With
     Map<Scope, List<ResolvedDependency>> dependencies;
 
+    @With
+    @Nullable
+    MavenSettings mavenSettings;
+
+    @With
+    List<String> activeProfiles;
+
+    public List<String> getActiveProfiles() {
+        // for backwards compatibility with ASTs that were serialized before activeProfiles was added
+        return activeProfiles == null ? emptyList() : activeProfiles;
+    }
+
     public MavenResolutionResult unsafeSetManagedReference(Integer id) {
         this.managedReference = id;
         return this;
@@ -80,13 +93,12 @@ public class MavenResolutionResult implements Marker {
     /**
      * Finds dependencies (including any transitive dependencies) in the model that match the provided group and
      * artifact ids. The search can optionally be limited to a given scope.
-     *
+     * <p>
      * Note: It is possible for the same dependency to be returned multiple times if it is present in multiple scopes.
      *
      * @param groupId    The groupId as a glob expression
      * @param artifactId The artifactId as a glob expression
      * @param scope      The scope to limit the search to, or null to search all scopes
-     *
      * @return A list of matching dependencies
      */
     @Incubating(since = "7.19.0")
@@ -97,12 +109,11 @@ public class MavenResolutionResult implements Marker {
     /**
      * Finds dependencies (including any transitive dependencies) in the model that match the predicate. The search can
      * optionally be limited to a given scope.
-     *
+     * <p>
      * Note: It is possible for the same dependency to be returned multiple times if it is present in multiple scopes.
      *
      * @param matcher The predicate to match the dependency
      * @param scope   A scope to limit the search to, or null to search all scopes
-     *
      * @return A list of matching dependencies
      */
     @Incubating(since = "7.19.0")

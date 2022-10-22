@@ -18,7 +18,6 @@ package org.openrewrite.maven;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
@@ -129,7 +128,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
     }
 
     private MavenResolutionResult updateResult(ExecutionContext ctx, MavenResolutionResult resolutionResult, Map<Path, Pom> projectPoms) {
-        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx);
+        MavenPomDownloader downloader = new MavenPomDownloader(projectPoms, ctx, getResolutionResult().getMavenSettings(),
+                getResolutionResult().getActiveProfiles());
         ResolvedPom resolved = resolutionResult.getPom().resolve(ctx, downloader);
         return resolutionResult
                 .withPom(resolved)

@@ -48,30 +48,28 @@ public class MavenXmlMapper {
         input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
         input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);
         XmlFactory xmlFactory = new XmlFactory(input, new WstxOutputFactory());
-        {
-            ObjectMapper m = XmlMapper.builder(xmlFactory)
-                    .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-                    .enable(FromXmlParser.Feature.EMPTY_ELEMENT_AS_NULL)
-                    .defaultUseWrapper(false)
-                    .build()
-                    .registerModule(new ParameterNamesModule())
-                    .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
-                    .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
-                    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-            maybeAddKotlinModule(m);
-            readMapper = m.setVisibility(m.getSerializationConfig().getDefaultVisibilityChecker()
-                    .withFieldVisibility(JsonAutoDetect.Visibility.NONE)
-                    .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
-                    .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
-                    .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)).
-                    registerModule(new StringTrimModule());
-        }
-        {
-            writeMapper = XmlMapper.builder(xmlFactory)
-                    .defaultUseWrapper(false)
-                    .build()
-                    .registerModule(new JaxbAnnotationModule());
-        }
+
+        ObjectMapper m = XmlMapper.builder(xmlFactory)
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .enable(FromXmlParser.Feature.EMPTY_ELEMENT_AS_NULL)
+                .defaultUseWrapper(false)
+                .build()
+                .registerModule(new ParameterNamesModule())
+                .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
+                .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        maybeAddKotlinModule(m);
+        readMapper = m.setVisibility(m.getSerializationConfig().getDefaultVisibilityChecker()
+                        .withFieldVisibility(JsonAutoDetect.Visibility.NONE)
+                        .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                        .withSetterVisibility(JsonAutoDetect.Visibility.NONE)
+                        .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY))
+                .registerModule(new StringTrimModule());
+
+        writeMapper = XmlMapper.builder(xmlFactory)
+                .defaultUseWrapper(false)
+                .build()
+                .registerModule(new JaxbAnnotationModule());
     }
 
     private MavenXmlMapper() {
@@ -84,7 +82,6 @@ public class MavenXmlMapper {
     public static ObjectMapper writeMapper() {
         return writeMapper;
     }
-
 
     public static class StringTrimModule extends SimpleModule {
 

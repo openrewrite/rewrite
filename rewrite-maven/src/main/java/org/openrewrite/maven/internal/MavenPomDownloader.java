@@ -29,10 +29,14 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.DirectoryStream;
@@ -49,7 +53,7 @@ import static java.util.stream.Collectors.toList;
 public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
-                    throwable instanceof TimeoutException)
+                                           throwable instanceof TimeoutException)
             .build();
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
@@ -61,16 +65,44 @@ public class MavenPomDownloader {
     private final MavenExecutionContextView ctx;
     private final HttpSender httpSender;
 
+    @Nullable
+    private MavenSettings mavenSettings;
+
+    @Nullable
+    private List<String> activeProfiles;
+
     private final CheckedFunction1<HttpSender.Request, byte[]> sendRequest;
 
+    /**
+     * @param projectPoms    Other POMs in this project.
+     * @param ctx            The execution context, which potentially contain Maven settings customization and
+     *                       and {@link HttpSender} customization.
+     * @param mavenSettings  The Maven settings to use, if any. This argument overrides any Maven settings
+     *                       set on the execution context.
+     * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
+     *                       set on the execution context.
+     */
+    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
+                              @Nullable MavenSettings mavenSettings,
+                              @Nullable List<String> activeProfiles) {
+        this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        this.mavenSettings = mavenSettings;
+        this.activeProfiles = activeProfiles;
+    }
+
+    /**
+     * @param projectPoms Other POMs in this project.
+     * @param ctx         The execution context, which potentially contain Maven settings customization and
+     *                    and {@link HttpSender} customization.
+     */
     public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
     }
 
     /**
      * @param projectPoms Project poms on disk.
-     * @param httpSender The HTTP sender.
-     * @param ctx The execution context.
+     * @param httpSender  The HTTP sender.
+     * @param ctx         The execution context.
      * @deprecated Use {@link #MavenPomDownloader(Map, ExecutionContext)} instead.
      */
     @Deprecated
@@ -134,10 +166,10 @@ public class MavenPomDownloader {
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
                     String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                            gav.getGroupId().replace('.', '/') + '/' +
-                            gav.getArtifactId() + '/' +
-                            (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
-                            "maven-metadata.xml";
+                                 gav.getGroupId().replace('.', '/') + '/' +
+                                 gav.getArtifactId() + '/' +
+                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
+                                 "maven-metadata.xml";
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -223,7 +255,7 @@ public class MavenPomDownloader {
      * and JitPack appear to always publish the metadata. So this method is currently tailored towards Nexus and how
      * it publishes html index pages.
      *
-     * @param gav The artifact coordinates that will be derived.
+     * @param gav  The artifact coordinates that will be derived.
      * @param repo The repository that will be queried for directory results
      * @return Metadata or null if the metadata cannot be derived.
      */
@@ -370,14 +402,14 @@ public class MavenPomDownloader {
         // First try to match the requested download with one of the project POMs.
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                    gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                    Objects.equals(projectPom.getValue(projectPom.getVersion()), projectPom.getValue(gav.getVersion()))) {
+                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
+                Objects.equals(projectPom.getValue(projectPom.getVersion()), projectPom.getValue(gav.getVersion()))) {
                 return projectPom;
             }
         }
 
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-                !StringUtils.isBlank(relativePath)) {
+            !StringUtils.isBlank(relativePath)) {
             Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
                 Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
@@ -386,9 +418,9 @@ public class MavenPomDownloader {
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
                 if (maybeLocalPom != null
-                        && gav.getGroupId().equals(maybeLocalPom.getGroupId())
-                        && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
-                        && gav.getVersion().equals(maybeLocalPom.getVersion())) {
+                    && gav.getGroupId().equals(maybeLocalPom.getGroupId())
+                    && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
+                    && gav.getVersion().equals(maybeLocalPom.getVersion())) {
                     return maybeLocalPom;
                 }
             }
@@ -420,10 +452,10 @@ public class MavenPomDownloader {
             Optional<Pom> result = mavenCache.getPom(resolvedGav);
             if (result == null) {
                 URI uri = URI.create(repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                        gav.getGroupId().replace('.', '/') + '/' +
-                        gav.getArtifactId() + '/' +
-                        gav.getVersion() + '/' +
-                        gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
+                                     gav.getGroupId().replace('.', '/') + '/' +
+                                     gav.getArtifactId() + '/' +
+                                     gav.getVersion() + '/' +
+                                     gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
 
                 if ("file".equals(uri.getScheme())) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
@@ -453,7 +485,7 @@ public class MavenPomDownloader {
                         }
                     } catch (IOException e) {
                         // unable to read the pom from a file-based repository.
-                        repoDownloadFailures.put(repo.getUri(),  "Unable to download dependency. " + e.getMessage());
+                        repoDownloadFailures.put(repo.getUri(), "Unable to download dependency. " + e.getMessage());
                     }
                 } else {
 
@@ -474,7 +506,7 @@ public class MavenPomDownloader {
                         sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
                         return pom;
                     } catch (Throwable exception) {
-                        repoDownloadFailures.put(repo.getUri(),  "Unable to download dependency. " + exception.getMessage());
+                        repoDownloadFailures.put(repo.getUri(), "Unable to download dependency. " + exception.getMessage());
                         if (exception instanceof MavenClientSideException) {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
@@ -485,7 +517,7 @@ public class MavenPomDownloader {
                 sample.stop(timer.tags("outcome", "cached").register(Metrics.globalRegistry));
                 return result.get();
             } else {
-                repoDownloadFailures.put(repo.getUri(),  "Cached empty result.");
+                repoDownloadFailures.put(repo.getUri(), "Cached empty result.");
             }
         }
 
@@ -511,9 +543,9 @@ public class MavenPomDownloader {
         if (gav.getVersion() != null && gav.getVersion().endsWith("-SNAPSHOT")) {
             for (ResolvedGroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
                 if (pinnedSnapshotVersion.getDatedSnapshotVersion() != null &&
-                        pinnedSnapshotVersion.getGroupId().equals(gav.getGroupId()) &&
-                        pinnedSnapshotVersion.getArtifactId().equals(gav.getArtifactId()) &&
-                        pinnedSnapshotVersion.getVersion().equals(gav.getVersion())) {
+                    pinnedSnapshotVersion.getGroupId().equals(gav.getGroupId()) &&
+                    pinnedSnapshotVersion.getArtifactId().equals(gav.getArtifactId()) &&
+                    pinnedSnapshotVersion.getVersion().equals(gav.getVersion())) {
                     return pinnedSnapshotVersion.getDatedSnapshotVersion();
                 }
             }
@@ -548,7 +580,7 @@ public class MavenPomDownloader {
         }
 
         // repositories from maven settings
-        for (MavenRepository repo : ctx.getRepositories()) {
+        for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || normalizedRepo.acceptsVersion(acceptsVersion))) {
                 normalizedRepositories.add(normalizedRepo);
@@ -647,7 +679,7 @@ public class MavenPomDownloader {
      * Returns a Maven Repository with any applicable credentials as sourced from the ExecutionContext
      */
     private MavenRepository applyAuthenticationToRepository(MavenRepository repository) {
-        return MavenRepositoryCredentials.apply(ctx.getCredentials(), repository);
+        return MavenRepositoryCredentials.apply(ctx.getCredentials(mavenSettings), repository);
     }
 
     /**
@@ -661,6 +693,6 @@ public class MavenPomDownloader {
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {
-        return MavenRepositoryMirror.apply(ctx.getMirrors(), repository);
+        return MavenRepositoryMirror.apply(ctx.getMirrors(mavenSettings), repository);
     }
 }
