@@ -21,6 +21,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 
 import java.nio.file.Path;
@@ -56,6 +59,18 @@ public class MavenResolutionResult implements Marker {
     @With
     Map<Scope, List<ResolvedDependency>> dependencies;
 
+    @With
+    @Nullable
+    MavenSettings mavenSettings;
+
+    @With
+    List<String> activeProfiles;
+
+    public List<String> getActiveProfiles() {
+        // for backwards compatibility with ASTs that were serialized before activeProfiles was added
+        return activeProfiles == null ? emptyList() : activeProfiles;
+    }
+
     public MavenResolutionResult unsafeSetManagedReference(Integer id) {
         this.managedReference = id;
         return this;
@@ -80,13 +95,12 @@ public class MavenResolutionResult implements Marker {
     /**
      * Finds dependencies (including any transitive dependencies) in the model that match the provided group and
      * artifact ids. The search can optionally be limited to a given scope.
-     *
+     * <p>
      * Note: It is possible for the same dependency to be returned multiple times if it is present in multiple scopes.
      *
      * @param groupId    The groupId as a glob expression
      * @param artifactId The artifactId as a glob expression
      * @param scope      The scope to limit the search to, or null to search all scopes
-     *
      * @return A list of matching dependencies
      */
     @Incubating(since = "7.19.0")
@@ -97,12 +111,11 @@ public class MavenResolutionResult implements Marker {
     /**
      * Finds dependencies (including any transitive dependencies) in the model that match the predicate. The search can
      * optionally be limited to a given scope.
-     *
+     * <p>
      * Note: It is possible for the same dependency to be returned multiple times if it is present in multiple scopes.
      *
      * @param matcher The predicate to match the dependency
      * @param scope   A scope to limit the search to, or null to search all scopes
-     *
      * @return A list of matching dependencies
      */
     @Incubating(since = "7.19.0")
@@ -154,12 +167,28 @@ public class MavenResolutionResult implements Marker {
         return null;
     }
 
-    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) {
+    private static final Scope[] RESOLVE_SCOPES = new Scope[]{Scope.Compile, Scope.Runtime, Scope.Test, Scope.Provided};
+
+    public MavenResolutionResult resolveDependencies(MavenPomDownloader downloader, ExecutionContext ctx) throws MavenDownloadingExceptions {
         Map<Scope, List<ResolvedDependency>> dependencies = new HashMap<>();
-        dependencies.put(Scope.Compile, pom.resolveDependencies(Scope.Compile, downloader, ctx));
-        dependencies.put(Scope.Test, pom.resolveDependencies(Scope.Test, downloader, ctx));
-        dependencies.put(Scope.Runtime, pom.resolveDependencies(Scope.Runtime, downloader, ctx));
-        dependencies.put(Scope.Provided, pom.resolveDependencies(Scope.Provided, downloader, ctx));
+        MavenDownloadingExceptions exceptions = null;
+
+        Map<GroupArtifact, Set<GroupArtifactVersion>> exceptionsInLowerScopes = new HashMap<>();
+        for (Scope scope : RESOLVE_SCOPES) {
+            try {
+                dependencies.put(scope, pom.resolveDependencies(scope, downloader, ctx));
+            } catch (MavenDownloadingExceptions e) {
+                for (MavenDownloadingException exception : e.getExceptions()) {
+                    if (exceptionsInLowerScopes.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
+                            exception.getRoot().getArtifactId()), ga -> new HashSet<>()).add(exception.getFailedOn())) {
+                        exceptions = MavenDownloadingExceptions.append(exceptions, exception);
+                    }
+                }
+            }
+        }
+        if (exceptions != null) {
+            throw exceptions;
+        }
         return withDependencies(dependencies);
     }
 

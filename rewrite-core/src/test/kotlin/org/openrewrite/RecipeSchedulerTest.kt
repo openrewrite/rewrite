@@ -34,10 +34,7 @@ class RecipeSchedulerTest : RewriteTest {
             },
             text(
                     "hello",
-                    "~~(Recipe failed with an exception.\n" +
-                            "org.openrewrite.BoomException: boom\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:49)\n" +
-                            "  org.openrewrite.BoomRecipe\$getVisitor\$1.visitText(RecipeSchedulerTest.kt:47))~~>hello"
+                    "~~(boom)~~>hello"
             )
     )
 }

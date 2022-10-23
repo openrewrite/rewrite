@@ -16,6 +16,7 @@
 package org.openrewrite.marker;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.Cursor;
@@ -40,7 +41,7 @@ public interface Marker {
      * @param commentWrapper A function that wraps arbitrary text in a multi-line comment that is language-specific.
      * @return The printed representation of the marker.
      */
-    default String print(Cursor cursor, UnaryOperator<String> commentWrapper) {
+    default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
         return "";
     }
 }

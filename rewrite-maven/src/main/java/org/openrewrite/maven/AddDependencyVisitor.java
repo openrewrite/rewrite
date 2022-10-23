@@ -108,22 +108,26 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                                 .orElse(null);
                     }
                     if (versionToUse == null) {
-                        versionToUse = findVersionToUse(groupId, artifactId, ctx);
+                        try {
+                            versionToUse = findVersionToUse(groupId, artifactId, ctx);
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(tag);
+                        }
                     }
                 }
 
                 Xml.Tag dependencyTag = Xml.Tag.build(
                         "\n<dependency>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                (versionToUse == null ? "" :
-                                        "<version>" + versionToUse + "</version>\n") +
-                                (classifier == null ? "" :
-                                        "<classifier>" + classifier + "</classifier>\n") +
-                                (scope == null || "compile".equals(scope) ? "" :
-                                        "<scope>" + scope + "</scope>\n") +
-                                (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
-                                "</dependency>"
+                        "<groupId>" + groupId + "</groupId>\n" +
+                        "<artifactId>" + artifactId + "</artifactId>\n" +
+                        (versionToUse == null ? "" :
+                                "<version>" + versionToUse + "</version>\n") +
+                        (classifier == null ? "" :
+                                "<classifier>" + classifier + "</classifier>\n") +
+                        (scope == null || "compile".equals(scope) ? "" :
+                                "<scope>" + scope + "</scope>\n") +
+                        (Boolean.TRUE.equals(optional) ? "<optional>true</optional>\n" : "") +
+                        "</dependency>"
                 );
 
                 doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
@@ -136,7 +140,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
             return super.visitTag(tag, ctx);
         }
 
-        private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) {
+        private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) throws MavenDownloadingException {
             if (resolvedVersion == null) {
                 if (versionComparator == null) {
                     resolvedVersion = version;

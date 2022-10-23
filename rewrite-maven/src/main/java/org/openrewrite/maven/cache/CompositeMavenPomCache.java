@@ -17,6 +17,7 @@ package org.openrewrite.maven.cache;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.*;
 
@@ -71,7 +72,7 @@ public class CompositeMavenPomCache implements MavenPomCache {
 
     @Nullable
     @Override
-    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
+    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
         Optional<Pom> l1p = l1.getPom(gav);
         if(l1p != null) {
             return l1p;

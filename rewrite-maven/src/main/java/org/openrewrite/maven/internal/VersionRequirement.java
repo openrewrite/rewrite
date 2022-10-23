@@ -22,6 +22,7 @@ import lombok.Value;
 import org.antlr.v4.runtime.*;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.grammar.VersionRangeLexer;
 import org.openrewrite.maven.internal.grammar.VersionRangeParser;
 import org.openrewrite.maven.internal.grammar.VersionRangeParserBaseVisitor;
@@ -34,7 +35,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
@@ -57,7 +57,7 @@ public class VersionRequirement {
         if (nearer != null) {
             builder.append(nearer).append(", ");
         }
-        builder.append(versionSpec.toString());
+        builder.append(versionSpec);
         return builder.toString();
     }
 
@@ -229,7 +229,7 @@ public class VersionRequirement {
     }
 
     @Nullable
-    public String resolve(Supplier<Iterable<String>> availableVersions) {
+    public String resolve(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
         if (selected == null) {
             selected = cacheResolved(availableVersions);
         }
@@ -237,7 +237,7 @@ public class VersionRequirement {
     }
 
     @Nullable
-    private String cacheResolved(Supplier<Iterable<String>> availableVersions) {
+    private String cacheResolved(DownloadOperation<Iterable<String>> availableVersions) throws MavenDownloadingException {
         String nearestSoftRequirement = null;
         VersionRequirement next = this;
         VersionRequirement nearestHardRequirement = null;
@@ -260,7 +260,7 @@ public class VersionRequirement {
         }
         VersionSpec hardRequirement = nearestHardRequirement.versionSpec;
         Version latest = null;
-        for (String availableVersion : availableVersions.get()) {
+        for (String availableVersion : availableVersions.call()) {
             Version version = new Version(availableVersion);
 
             if ((hardRequirement instanceof DynamicVersion && ((DynamicVersion) hardRequirement).matches(version)) ||
@@ -281,7 +281,7 @@ public class VersionRequirement {
     }
 
     @Nullable
-    public String resolve(GroupArtifact groupArtifact, MavenPomDownloader downloader, List<MavenRepository> repositories) {
+    public String resolve(GroupArtifact groupArtifact, MavenPomDownloader downloader, List<MavenRepository> repositories) throws MavenDownloadingException {
         return resolve(() -> {
             MavenMetadata metadata = downloader.downloadMetadata(groupArtifact, null, repositories);
             return metadata.getVersioning().getVersions();

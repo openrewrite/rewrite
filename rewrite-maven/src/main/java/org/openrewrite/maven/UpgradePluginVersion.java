@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Upgrade the version of a plugin using Node Semver
  * <a href="https://github.com/npm/node-semver#advanced-range-syntax">advanced range selectors</a>, allowing
@@ -56,7 +58,7 @@ public class UpgradePluginVersion extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -65,7 +67,7 @@ public class UpgradePluginVersion extends Recipe {
     // needs implementation, left here as syntactic placeholder // todo
     @Option(displayName = "Trust parent POM",
             description = "Even if the parent suggests a version that is older than what we are trying to upgrade to, trust it anyway. " +
-                    "Useful when you want to wait for the parent to catch up before upgrading. The parent is not trusted by default.",
+                          "Useful when you want to wait for the parent to catch up before upgrading. The parent is not trusted by default.",
             example = "false",
             required = false)
     @Nullable
@@ -89,7 +91,7 @@ public class UpgradePluginVersion extends Recipe {
     @Override
     public String getDescription() {
         return "Upgrade the version of a plugin using Node Semver advanced range selectors, " +
-                "allowing more precise control over version updates to patch or minor releases.";
+               "allowing more precise control over version updates to patch or minor releases.";
     }
 
     @Override
@@ -99,46 +101,42 @@ public class UpgradePluginVersion extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        final VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-        assert versionComparator != null;
-
+        VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
         return new MavenVisitor<ExecutionContext>() {
-            @Nullable
-            private Collection<String> availableVersions;
-
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Xml xml = super.visitDocument(document, ctx);
-                FindPlugin.find((Xml.Document) xml, groupId, artifactId).forEach(plugin ->
-                        maybeChangePluginVersion(plugin, ctx));
-                return xml;
-            }
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (isPluginTag(groupId, artifactId)) {
+                    Optional<Xml.Tag> versionTag = tag.getChild("version");
+                    Optional<String> maybeVersionValue = versionTag.flatMap(Xml.Tag::getValue);
+                    if (maybeVersionValue.isPresent()) {
+                        String versionValue = maybeVersionValue.get();
+                        String versionLookup = versionValue.startsWith("${")
+                                ? super.getResolutionResult().getPom().getValue(versionValue.trim())
+                                : versionValue;
 
-            private void maybeChangePluginVersion(Xml.Tag model, ExecutionContext ctx) {
-                Optional<Xml.Tag> versionTag = model.getChild("version");
-                versionTag.flatMap(Xml.Tag::getValue).ifPresent(versionValue -> {
-                    String versionLookup = versionValue.startsWith("${")
-                            ? super.getResolutionResult().getPom().getValue(versionValue.trim())
-                            : versionValue;
-
-                    if (versionLookup != null) {
-                        findNewerDependencyVersion(groupId, artifactId, versionLookup, ctx).ifPresent(newer -> {
-                            ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
-                            doAfterVisit(changeDependencyVersion);
-                        });
-                    }
-
-                });
-            }
-
-            private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion, ExecutionContext ctx) {
-                if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
-                    availableVersions = new ArrayList<>();
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(currentVersion, v)) {
-                            availableVersions.add(v);
+                        if (versionLookup != null) {
+                            try {
+                                findNewerDependencyVersion(groupId, artifactId, versionLookup, ctx).ifPresent(newer -> {
+                                    ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
+                                    doAfterVisit(changeDependencyVersion);
+                                });
+                            } catch (MavenDownloadingException e) {
+                                return e.warn(tag);
+                            }
                         }
+                    }
+                    return tag;
+                }
+                return super.visitTag(tag, ctx);
+            }
+
+            private Optional<String> findNewerDependencyVersion(String groupId, String artifactId,
+                                                                String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
+                MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                Collection<String> availableVersions = new ArrayList<>();
+                for (String v : mavenMetadata.getVersioning().getVersions()) {
+                    if (versionComparator.isValid(currentVersion, v)) {
+                        availableVersions.add(v);
                     }
                 }
                 return versionComparator.upgrade(currentVersion, availableVersions);

@@ -20,6 +20,7 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.VersionRequirement;
 
 import static java.util.Collections.singletonList;
@@ -77,7 +78,12 @@ public class ProfileActivation {
             return true;
         }
 
-        return version.equals(VersionRequirement.fromVersion(jdk, 0).resolve(() -> singletonList(version)));
+        try {
+            return version.equals(VersionRequirement.fromVersion(jdk, 0).resolve(() -> singletonList(version)));
+        } catch (MavenDownloadingException e) {
+            // unreachable
+            return false;
+        }
     }
 
     private boolean isActiveByProperty() {

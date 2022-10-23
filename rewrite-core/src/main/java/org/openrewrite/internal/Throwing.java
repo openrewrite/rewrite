@@ -13,24 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.internal;
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import java.util.function.Consumer;
 
-import static org.openrewrite.java.Assertions.java;
+public final class Throwing {
+    private Throwing() {
+    }
 
-public class RecordTest implements RewriteTest {
+    public static <T> Consumer<T> rethrow(ThrowingConsumer<T> consumer) {
+        return consumer;
+    }
 
-    @Test
-    void javaRecord() {
-        rewriteRun(
-          java(
-            """
-                  public record JavaRecord(String name, @Deprecated int age) {
-                  }
-              """
-          )
-        );
+    /**
+     * The compiler sees the signature with the throws T inferred to a RuntimeException type, so it
+     * allows the unchecked exception to propagate. {@see http://www.baeldung.com/java-sneaky-throws}.
+     */
+    @SuppressWarnings("unchecked")
+    public static <E extends Throwable> void sneakyThrow(Throwable e) throws E {
+        throw (E) e;
     }
 }

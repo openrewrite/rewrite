@@ -156,7 +156,7 @@ public class MavenSettings {
         if (profiles != null) {
             for (Profile profile : profiles.getProfiles()) {
                 if (profile.isActive(activeProfiles) || (this.activeProfiles != null &&
-                        profile.isActive(this.activeProfiles.getActiveProfiles()))) {
+                                                         profile.isActive(this.activeProfiles.getActiveProfiles()))) {
                     if (profile.repositories != null) {
                         activeRepositories.addAll(profile.repositories.getRepositories());
                     }
@@ -359,6 +359,7 @@ public class MavenSettings {
     public static class Servers {
         @JacksonXmlProperty(localName = "server")
         @JacksonXmlElementWrapper(useWrapping = false)
+        @With
         List<Server> servers = emptyList();
 
         public Servers merge(@Nullable Servers servers) {
@@ -375,6 +376,7 @@ public class MavenSettings {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
+    @With
     public static class Server {
         String id;
 

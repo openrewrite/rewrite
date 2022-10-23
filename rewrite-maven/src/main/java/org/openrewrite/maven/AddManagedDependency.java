@@ -119,7 +119,7 @@ public class AddManagedDependency extends Recipe {
         if (!StringUtils.isNullOrEmpty(onlyIfUsing)) {
             validated = validated.and(Validated.test("onlyIfUsing", "invalid group:artifact glob pattern", onlyIfUsing, s -> {
                 try {
-                    return onlyIfUsing.matches("[\\w\\d.]+\\*?:([\\w\\d]+\\*?|\\*)");
+                    return onlyIfUsing.matches("[\\w.]+\\*?:(\\w+\\*?|\\*)");
                 } catch (Throwable t) {
                     return false;
                 }
@@ -185,11 +185,15 @@ public class AddManagedDependency extends Recipe {
                             Validated versionValidation = Semver.validate(version, versionPattern);
                             if (versionValidation.isValid()) {
                                 VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
-                                String versionToUse = findVersionToUse(versionComparator, ctx);
-                                if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
-                                    doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
-                                            versionToUse, scope, type, classifier));
-                                    maybeUpdateModel();
+                                try {
+                                    String versionToUse = findVersionToUse(versionComparator, ctx);
+                                    if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
+                                        doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
+                                                versionToUse, scope, type, classifier));
+                                        maybeUpdateModel();
+                                    }
+                                } catch (MavenDownloadingException e) {
+                                    return e.warn(document);
                                 }
                             }
                         }
@@ -215,7 +219,7 @@ public class AddManagedDependency extends Recipe {
                     }
 
                     @Nullable
-                    private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) {
+                    private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
                         MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                         LatestRelease latest = new LatestRelease(versionPattern);
                         return mavenMetadata.getVersioning().getVersions().stream()

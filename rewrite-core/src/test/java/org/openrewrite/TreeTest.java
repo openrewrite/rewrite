@@ -37,8 +37,8 @@ public class TreeTest implements RewriteTest {
                   new PrintOutputCapture.MarkerPrinter() {
                       @Override
                       public String afterSyntax(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
-                          if (marker instanceof Markup markup) {
-                              return " " + requireNonNull(markup.getDescription());
+                          if (marker instanceof Markup.Info markup) {
+                              return " " + requireNonNull(markup.getMessage());
                           }
                           return "";
                       }

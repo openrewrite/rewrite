@@ -63,7 +63,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
-                        ParsingExecutionContextView.view(ctx).parseFailure(path, t);
+                        ParsingExecutionContextView.view(ctx).parseFailure(path, this, t);
                         return null;
                     }
                 })

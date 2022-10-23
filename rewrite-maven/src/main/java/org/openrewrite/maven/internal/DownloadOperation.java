@@ -13,24 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.maven.internal;
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.maven.MavenDownloadingException;
 
-import static org.openrewrite.java.Assertions.java;
-
-public class RecordTest implements RewriteTest {
-
-    @Test
-    void javaRecord() {
-        rewriteRun(
-          java(
-            """
-                  public record JavaRecord(String name, @Deprecated int age) {
-                  }
-              """
-          )
-        );
-    }
+public interface DownloadOperation<V> {
+    V call() throws MavenDownloadingException;
 }

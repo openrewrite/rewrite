@@ -67,8 +67,8 @@ public class Result {
     @Nullable
     private Path relativeTo;
 
-    public List<RecipeRunException> getRecipeErrors() {
-        List<RecipeRunException> exceptions = new ArrayList<>();
+    public List<Throwable> getRecipeErrors() {
+        List<Throwable> exceptions = new ArrayList<>();
         new TreeVisitor<Tree, Integer>() {
             @Nullable
             @Override

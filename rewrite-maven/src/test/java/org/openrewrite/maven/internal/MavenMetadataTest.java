@@ -19,12 +19,14 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.maven.tree.MavenMetadata;
 
+import java.io.IOException;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MavenMetadataTest {
 
     @Test
-    void deserializeMetadata() {
+    void deserializeMetadata() throws IOException {
         @Language("xml") String metadata = """
             <metadata>
                 <groupId>org.springframework.boot</groupId>
@@ -47,7 +49,7 @@ class MavenMetadataTest {
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void deserializeSnapshotMetadata() {
+    void deserializeSnapshotMetadata() throws IOException {
         @Language("xml") String metadata = """
             <metadata modelVersion="1.1.0">
                 <groupId>org.openrewrite.recipe</groupId>

@@ -29,6 +29,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
@@ -244,7 +245,7 @@ class MavenPomDownloaderTest {
     }
 
     @Test
-    void deriveMetaDataFromFileRepository(@TempDir Path repoPath) throws IOException {
+    void deriveMetaDataFromFileRepository(@TempDir Path repoPath) throws IOException, MavenDownloadingException {
         Path fred = repoPath.resolve("fred/fred");
         Files.createDirectories(fred.resolve("1.0.0"));
         Files.createDirectories(fred.resolve("1.1.0"));
@@ -252,13 +253,13 @@ class MavenPomDownloaderTest {
 
         MavenRepository repository = new MavenRepository("file-based", repoPath.toUri().toString(), true, true, true, null, null, true);
         MavenMetadata metaData  = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
-          .downloadMetadata(new GroupArtifact("fred", "fred"), null, Arrays.asList(repository));
+          .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
         assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
     }
 
     @SuppressWarnings("ConstantConditions")
     @Test
-    void mergeMetadata() {
+    void mergeMetadata() throws IOException {
         @Language("xml") String metadata1 = """
               <metadata>
                   <groupId>org.springframework.boot</groupId>

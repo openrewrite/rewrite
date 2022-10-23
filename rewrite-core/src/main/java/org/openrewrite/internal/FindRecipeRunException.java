@@ -18,7 +18,6 @@ package org.openrewrite.internal;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.RecipeRunException;
 
 import static java.util.Objects.requireNonNull;
 
@@ -35,7 +34,7 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
     @Override
     public Tree preVisit(Tree tree, Integer integer) {
         if (tree == nearestTree) {
-            return Markup.error(tree, "Recipe failed with an exception.", vt);
+            return Markup.error(tree, vt.getCause());
         }
         return tree;
     }

@@ -149,25 +149,29 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                         artifactId = t.getChildValue("artifactId").orElseThrow(NoSuchElementException::new);
                     }
                     if (newVersion != null) {
-                        String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId);
-                        Optional<Xml.Tag> scopeTag = t.getChild("scope");
-                        Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
-                        Optional<Xml.Tag> versionTag = t.getChild("version");
-                        if (!versionTag.isPresent() &&
+                        try {
+                            String resolvedNewVersion = resolveSemverVersion(ctx, groupId, artifactId);
+                            Optional<Xml.Tag> scopeTag = t.getChild("scope");
+                            Scope scope = scopeTag.map(xml -> Scope.fromName(xml.getValue().orElse("compile"))).orElse(Scope.Compile);
+                            Optional<Xml.Tag> versionTag = t.getChild("version");
+                            if (!versionTag.isPresent() &&
                                 (Boolean.TRUE.equals(overrideManagedVersion) || !isDependencyManaged(scope, groupId, artifactId))) {
-                            //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
-                            Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
-                            //noinspection ConstantConditions
-                            t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
-                        } else if (versionTag.isPresent()) {
-                            if (isDependencyManaged(scope, groupId, artifactId)) {
-                                //If the previous dependency had a version but the new artifact is managed, removed the
-                                //version tag.
-                                t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
-                            } else {
-                                //Otherwise, change the version to the new value.
-                                t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                //If the version is not present, add the version if we are explicitly overriding a managed version or if no managed version exists.
+                                Xml.Tag newVersionTag = Xml.Tag.build("<version>" + resolvedNewVersion + "</version>");
+                                //noinspection ConstantConditions
+                                t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
+                            } else if (versionTag.isPresent()) {
+                                if (isDependencyManaged(scope, groupId, artifactId)) {
+                                    //If the previous dependency had a version but the new artifact is managed, removed the
+                                    //version tag.
+                                    t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
+                                } else {
+                                    //Otherwise, change the version to the new value.
+                                    t = changeChildTagValue(t, "version", resolvedNewVersion, ctx);
+                                }
                             }
+                        } catch(MavenDownloadingException e) {
+                            return e.warn(tag);
                         }
                     }
                     if (t != tag) {
@@ -199,7 +203,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
             }
 
             @SuppressWarnings("ConstantConditions")
-            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) {
+            private String resolveSemverVersion(ExecutionContext ctx, String groupId, String artifactId) throws MavenDownloadingException {
                 if (versionComparator == null) {
                     return newVersion;
                 }
@@ -215,7 +219,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 }
                 return availableVersions.isEmpty() ? newVersion : Collections.max(availableVersions, versionComparator);
             }
-
         };
     }
 }
