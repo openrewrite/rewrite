@@ -86,4 +86,16 @@ class HclBlockTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2082")
+    fun emptyBlock() = rewriteRun(
+            hcl("""
+                locals {
+                    myvar = {
+
+                    }
+                }""".trimIndent()
+            )
+    )
 }
