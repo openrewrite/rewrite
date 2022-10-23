@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.internal;
+package org.openrewrite.java.internal;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.RecipeRunException;
+import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.internal.FindRecipeRunException;
+import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;

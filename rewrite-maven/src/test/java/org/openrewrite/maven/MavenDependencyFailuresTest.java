@@ -73,12 +73,14 @@ public class MavenDependencyFailuresTest implements RewriteTest {
                   <version>1</version>
                   <dependencies>
                     <!--~~(Unable to download metadata. Tried repositories:
+                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(Unable to download POM. Tried repositories:
                 https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
                       <groupId>org.jenkins-ci.plugins</groupId>
                       <artifactId>credentials</artifactId>
                       <version>2.3.0</version>
                     </dependency>
                     <!--~~(Unable to download metadata. Tried repositories:
+                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(Unable to download POM. Tried repositories:
                 https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
                       <groupId>org.jenkins-ci.plugins</groupId>
                       <artifactId>appio</artifactId>
