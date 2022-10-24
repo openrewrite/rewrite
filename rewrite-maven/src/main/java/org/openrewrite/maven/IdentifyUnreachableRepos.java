@@ -119,9 +119,9 @@ public class IdentifyUnreachableRepos extends Recipe {
             }
             if (KNOWN_DEFUNCT.containsKey(urlKey)) {
                 // if we know of a replacement, mark it as "replacement"
-                if (KNOWN_DEFUNCT.get(urlKey) != null) {
+                /** if (KNOWN_DEFUNCT.get(urlKey) != null) {
                     return tag.withMarkers(tag.getMarkers().searchResult("replacement"));
-                }
+                } */
                 // otherwise, mark it as (potentially) "dead"
                 if (KNOWN_DEFUNCT.get(urlKey) == null) {
                     return tag.withMarkers(tag.getMarkers().searchResult("dead"));
