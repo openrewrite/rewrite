@@ -50,10 +50,6 @@ public interface Properties extends Tree {
 
     Properties withPrefix(String prefix);
 
-    <T extends Properties> T withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -123,6 +119,11 @@ public interface Properties extends Tree {
         }
     }
 
+    /**
+     * Note that this class cannot easily be made to implement {@link Properties} like it should,
+     * because existing serialized ASTs will not have a {@link com.fasterxml.jackson.annotation.JsonIdentityInfo}
+     * reference to deserialize into the type.
+     */
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With

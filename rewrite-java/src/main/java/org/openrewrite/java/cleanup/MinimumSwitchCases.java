@@ -15,18 +15,20 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.AllArgsConstructor;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class MinimumSwitchCases extends Recipe {
     @Override
@@ -96,6 +98,26 @@ public class MinimumSwitchCases extends Recipe {
                     "}").build();
 
             @Override
+            public J visitBlock(J.Block block, ExecutionContext executionContext) {
+                // Handle the edge case of the extra-pointless switch statement which contains _only_ the default case
+                return block.withStatements(ListUtils.flatMap(block.getStatements(), (statement) -> {
+                    Statement visited = (Statement) visit(statement, executionContext, getCursor());
+                    if(!(visited instanceof J.Switch) || !visited.getMarkers().findFirst(DefaultOnly.class).isPresent()) {
+                        return visited;
+                    }
+                    // Unwrap the contents of the default block, discarding the break statement if one exists
+                    J.Case defaultCase = (J.Case) ((J.Switch)visited).getCases().getStatements().get(0);
+
+                    return ListUtils.map(defaultCase.getStatements(), caseStatement -> {
+                        if(caseStatement instanceof J.Break) {
+                            return null;
+                        }
+                        return autoFormat(caseStatement, executionContext, getCursor());
+                    });
+                }));
+            }
+
+            @Override
             public J visitSwitch(J.Switch switzh, ExecutionContext ctx) {
                 if (switzh.getCases().getStatements().size() < 3) {
                     J.Switch sortedSwitch = (J.Switch) new DefaultComesLast().getVisitor().visit(switzh, ctx);
@@ -117,8 +139,12 @@ public class MinimumSwitchCases extends Recipe {
                     J.If generatedIf;
                     if (TypeUtils.isString(tree.getType())) {
                         if (cases[1] == null) {
-                            generatedIf = switzh.withTemplate(ifString, switzh.getCoordinates().replace(),
-                                    cases[0].getPattern(), tree);
+                            if(isDefault(cases[0])) {
+                                return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
+                            } else {
+                                generatedIf = switzh.withTemplate(ifString, switzh.getCoordinates().replace(),
+                                        cases[0].getPattern(), tree);
+                            }
                         } else if (isDefault(cases[1])) {
                             generatedIf = switzh.withTemplate(ifElseString, switzh.getCoordinates().replace(),
                                     cases[0].getPattern(), tree);
@@ -128,8 +154,12 @@ public class MinimumSwitchCases extends Recipe {
                         }
                     } else if(switchesOnEnum(switzh)) {
                         if (cases[1] == null) {
-                            generatedIf = switzh.withTemplate(ifEnum, switzh.getCoordinates().replace(),
-                                    tree, enumIdentToFieldAccessString(cases[0].getPattern()));
+                            if(isDefault(cases[0])) {
+                                return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
+                            } else {
+                                generatedIf = switzh.withTemplate(ifEnum, switzh.getCoordinates().replace(),
+                                        tree, enumIdentToFieldAccessString(cases[0].getPattern()));
+                            }
                         } else if (isDefault(cases[1])) {
                             generatedIf = switzh.withTemplate(ifElseEnum, switzh.getCoordinates().replace(),
                                     tree, enumIdentToFieldAccessString(cases[0].getPattern()));
@@ -139,8 +169,12 @@ public class MinimumSwitchCases extends Recipe {
                         }
                     } else {
                         if (cases[1] == null) {
-                            generatedIf = switzh.withTemplate(ifPrimitive, switzh.getCoordinates().replace(),
-                                    tree, cases[0].getPattern());
+                            if(isDefault(cases[0])) {
+                                return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
+                            } else {
+                                generatedIf = switzh.withTemplate(ifPrimitive, switzh.getCoordinates().replace(),
+                                        tree, cases[0].getPattern());
+                            }
                         } else if (isDefault(cases[1])) {
                             generatedIf = switzh.withTemplate(ifElsePrimitive, switzh.getCoordinates().replace(),
                                     tree, cases[0].getPattern());
@@ -199,5 +233,15 @@ public class MinimumSwitchCases extends Recipe {
             }
 
         };
+    }
+
+    @Value
+    @With
+    @AllArgsConstructor
+    private static class DefaultOnly implements Marker {
+        UUID id;
+        public DefaultOnly() {
+            id = Tree.randomId();
+        }
     }
 }

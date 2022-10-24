@@ -44,6 +44,25 @@ class XmlParserTest: RewriteTest {
             """)
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2290")
+    @Test
+    fun cdataTagWhitespace() = rewriteRun(
+        xml("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+                <suppress>
+                    <notes>
+                        <![CDATA[
+                      file name: foo.jar
+                      ]]>
+                    </notes>
+                    <gav regex="true">^:foo:.*${'$'}</gav>
+                    <cve>CVE-2020-000</cve>
+                </suppress>
+            </suppressions>
+            """)
+    )
+
     @Test
     fun parsePomDocument() = rewriteRun(
         xml("""

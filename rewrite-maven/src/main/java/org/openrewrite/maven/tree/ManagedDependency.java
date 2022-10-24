@@ -24,6 +24,8 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Dependency management sections contain a combination of single dependency definitions and imports of
  * BOMs and their dependency management sections/properties.
@@ -48,7 +50,7 @@ public interface ManagedDependency {
         List<GroupArtifact> exclusions;
 
         public String getGroupId() {
-            return gav.getGroupId();
+            return requireNonNull(gav.getGroupId());
         }
 
         public String getArtifactId() {
@@ -73,7 +75,7 @@ public interface ManagedDependency {
         GroupArtifactVersion gav;
 
         public String getGroupId() {
-            return gav.getGroupId();
+            return requireNonNull(gav.getGroupId());
         }
 
         public String getArtifactId() {

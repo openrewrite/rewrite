@@ -53,10 +53,6 @@ public interface Proto extends Tree {
 
     <P extends Proto> P withPrefix(Space prefix);
 
-    <P extends Proto> P withMarkers(Markers markers);
-
-    Markers getMarkers();
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor

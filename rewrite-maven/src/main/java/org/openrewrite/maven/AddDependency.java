@@ -189,8 +189,9 @@ public class AddDependency extends Recipe {
                             }
                         }
 
-                        if ("test".equals(resolvedScope)) {
-                            for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Test)) {
+                        Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
+                        if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
+                            for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
                                 if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                     return maven;
                                 }

@@ -16,6 +16,8 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import org.openrewrite.Cursor;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Markers;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
@@ -28,5 +30,11 @@ public interface Comment {
 
     boolean isMultiline();
 
-    String printComment();
+    default String printComment(Cursor cursor) {
+        PrintOutputCapture<Integer> p = new PrintOutputCapture<>(0);
+        printComment(cursor, p);
+        return p.getOut();
+    }
+
+    <P> void printComment(Cursor cursor, PrintOutputCapture<P> p);
 }

@@ -71,7 +71,7 @@ public interface ExecutionContext {
         return putMessageInCollection(key, value, HashSet::new);
     }
 
-    default <T> T getMessage(String key, T defaultValue) {
+    default <T> T getMessage(String key, @Nullable T defaultValue) {
         T t = getMessage(key);
         return t == null ? defaultValue : t;
     }

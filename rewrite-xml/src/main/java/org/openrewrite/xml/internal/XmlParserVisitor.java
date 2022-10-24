@@ -101,13 +101,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml visitContent(XMLParser.ContentContext ctx) {
         if (ctx.CDATA() != null) {
-            Xml.CharData charData = convert(ctx.CDATA(), (cdata, prefix) ->
-                    charData(cdata.getText(), true));
-            cursor++; // otherwise an off-by-one on cursor positioning for close tags?
-            return charData;
+            return convert(ctx.CDATA(), (cdata, prefix) ->
+                    charData(cdata.getText(), true, prefix));
         } else if (ctx.chardata() != null) {
             Xml.CharData charData = convert(ctx.chardata(), (chardata, prefix) ->
-                    charData(chardata.getText(), false));
+                    charData(chardata.getText(), false, prefix));
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
         } else if (ctx.reference() != null) {
@@ -138,16 +136,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return super.visitContent(ctx);
     }
 
-    private Xml.CharData charData(String text, boolean cdata) {
+    private Xml.CharData charData(String text, boolean cdata, String prefix) {
         boolean prefixDone = false;
-        StringBuilder prefix = new StringBuilder();
+        StringBuilder newPrefix = new StringBuilder(prefix);
         StringBuilder value = new StringBuilder();
         StringBuilder suffix = new StringBuilder();
 
         for (int i = 0; i < text.length(); i++) {
             if (!prefixDone) {
                 if (Character.isWhitespace(text.charAt(i))) {
-                    prefix.append(text.charAt(i));
+                    newPrefix.append(text.charAt(i));
                 } else {
                     prefixDone = true;
                     value.append(text.charAt(i));
@@ -166,7 +164,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         valueStr = valueStr.substring(0, valueStr.length() - suffix.length());
 
         return new Xml.CharData(randomId(),
-                prefix.toString(),
+                newPrefix.toString(),
                 Markers.EMPTY,
                 cdata,
                 cdata ?
@@ -201,7 +199,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     String name = convert(ctx.SPECIAL_OPEN(), (n, p) -> n.getText()).substring(2);
 
                     Xml.CharData piText = convert(c.PI_TEXT(), (cdata, p) ->
-                            charData(cdata.getText(), false));
+                            charData(cdata.getText(), false, p));
                     return new Xml.ProcessingInstruction(
                             randomId(),
                             prefix,

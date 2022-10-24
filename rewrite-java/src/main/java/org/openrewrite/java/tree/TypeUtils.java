@@ -17,10 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Pattern;
 
 public class TypeUtils {
@@ -370,6 +367,60 @@ public class TypeUtils {
             }
         }
         return true;
+    }
+
+    /**
+     * Checks whether a type is non-null, non-unknown, and is composed entirely of non-null, non-unknown types.
+     *
+     * @return true when a type has no null, unknown, or invalid parts
+     */
+    public static boolean isWellFormedType(@Nullable JavaType type) {
+        if(type == null || type instanceof JavaType.Unknown) {
+            return false;
+        }
+        return isWellFormedType(new HashSet<>(), type);
+    }
+
+    private static boolean isWellFormedType(Set<JavaType> seen, JavaType type) {
+        if(seen.contains(type)) {
+            return true;
+        }
+        seen.add(type);
+        if(type instanceof JavaType.Parameterized) {
+            JavaType.Parameterized parameterized = (JavaType.Parameterized) type;
+            return isWellFormedType(parameterized.getType()) && parameterized.getTypeParameters().stream().allMatch(it -> isWellFormedType(seen, it));
+        } else if(type instanceof JavaType.Array) {
+            JavaType.Array arr = (JavaType.Array) type;
+            return isWellFormedType(arr.getElemType());
+        } else if(type instanceof JavaType.GenericTypeVariable) {
+            JavaType.GenericTypeVariable gen = (JavaType.GenericTypeVariable) type;
+            return gen.getBounds().stream().allMatch(it -> isWellFormedType(seen, it));
+        } else if(type instanceof JavaType.Variable) {
+            JavaType.Variable var = (JavaType.Variable) type;
+            return isWellFormedType(var.getType()) && isWellFormedType(var.getOwner());
+        } else if(type instanceof JavaType.MultiCatch) {
+            JavaType.MultiCatch mc = (JavaType.MultiCatch) type;
+            return mc.getThrowableTypes().stream().allMatch(it -> isWellFormedType(seen, it));
+        } else if(type instanceof JavaType.Method) {
+            JavaType.Method m = (JavaType.Method) type;
+            return isWellFormedType(m.getReturnType()) && isWellFormedType(m.getDeclaringType()) && m.getParameterTypes().stream().allMatch(it -> isWellFormedType(seen, it));
+        }
+
+        return true;
+    }
+
+    public static JavaType.FullyQualified unknownIfNull(@Nullable JavaType.FullyQualified t) {
+        if(t == null) {
+            return JavaType.Unknown.getInstance();
+        }
+        return t;
+    }
+
+    public static JavaType unknownIfNull(@Nullable JavaType t) {
+        if(t == null) {
+            return JavaType.Unknown.getInstance();
+        }
+        return t;
     }
 
     static boolean deepEquals(@Nullable List<? extends JavaType> ts1, @Nullable List<? extends JavaType> ts2) {

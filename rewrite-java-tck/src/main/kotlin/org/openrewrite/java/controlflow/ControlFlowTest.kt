@@ -2274,6 +2274,7 @@ interface ControlFlowTest : RewriteTest {
     fun `for each loop ending in return statement`() = rewriteRun(
         java(
             """
+            import java.util.ArrayList;
             abstract class Test {
                 abstract boolean conditional1();
                 int test() {
@@ -2286,6 +2287,7 @@ interface ControlFlowTest : RewriteTest {
             }
             """,
             """
+            import java.util.ArrayList;
             abstract class Test {
                 abstract boolean conditional1();
                 int test() /*~~(BB: 4 CN: 2 EX: 2 | 1L)~~>*/{

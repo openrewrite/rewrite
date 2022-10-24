@@ -16,17 +16,29 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Cursor
 import org.openrewrite.PrintOutputCapture
+import org.openrewrite.SourceFile
 import org.openrewrite.marker.Marker
 import org.openrewrite.marker.Range
+import java.util.function.UnaryOperator
 
+@Disabled
 interface UpdateSourcePositionsTest : JavaRecipeTest {
 
+    private fun SourceFile.printWithLines() = printAll(PrintOutputCapture(0, object : PrintOutputCapture.MarkerPrinter {
+        override fun beforePrefix(marker: Marker, cursor: Cursor, commentWrapper: UnaryOperator<String>): String = when (marker) {
+            is Range -> "[(${marker.start.line}, ${marker.start.column}), (${marker.end.line}, ${marker.end.column})]"
+            else -> ""
+        }
+    }))
+
     @Test
-    fun lamdaParameter(jp : JavaParser) {
+    fun lamdaParameter(jp: JavaParser) {
         val cu = jp.parse(
-            """
+                """
                 package org.test;
                               
                 import java.util.function.Consumer;
@@ -41,22 +53,11 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
                 
                 }
             """.trimIndent()
-        );
+        )
 
         val after = UpdateSourcePositions().run(cu).results[0].after!!
 
-        val withLineAndColumn = after.print(
-            object : JavaPrinter<Int>() {
-                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
-                    if (marker is Range) {
-                        p.append("[(${marker.start.line}, ${marker.start.column}), (${marker.end.line}, ${marker.end.column})]")
-                    }
-                    return super.visitMarker(marker, p)
-                }
-            }
-        )
-
-        assertThat(withLineAndColumn).isEqualTo("""
+        assertThat(after.printWithLines()).isEqualTo("""
             [(1, 0), (13, 2)][(1, 0), (1, 16)]package [(1, 8), (1, 16)][(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
                           
             [(3, 1), (3, 35)]import [(3, 8), (3, 35)][(3, 8), (3, 26)][(3, 8), (3, 17)][(3, 8), (3, 12)]java.[(3, 13), (3, 17)]util.[(3, 18), (3, 26)]function.[(3, 27), (3, 35)]Consumer;
@@ -77,7 +78,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
     @Test
     fun updateSourcePositions(jp: JavaParser) {
         val cu = jp.parse(
-            """ 
+                """ 
                 class Test {
                     int n;
                     
@@ -89,18 +90,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
 
         val after = UpdateSourcePositions().run(cu).results[0].after!!
 
-        val withOffsetAndLength = after.print(
-            object : JavaPrinter<Int>() {
-                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
-                    if (marker is Range) {
-                        p.append("[${marker.start.offset},${marker.length()}]")
-                    }
-                    return super.visitMarker(marker, p)
-                }
-            }
-        )
-
-        assertThat(withOffsetAndLength).isEqualTo("""
+        assertThat(after.printWithLines()).isEqualTo("""
             [0,54][0,54]class [6,4]Test [11,43]{
                 [17,5][17,3]int [21,1][21,1]n;
                 
@@ -109,18 +99,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             }
         """.trimIndent())
 
-        val withLineAndColumn = after.print(
-            object : JavaPrinter<Int>() {
-                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
-                    if (marker is Range) {
-                        p.append("[(${marker.start.line}, ${marker.start.column}), (${marker.end.line}, ${marker.end.column})]")
-                    }
-                    return super.visitMarker(marker, p)
-                }
-            }
-        )
-
-        assertThat(withLineAndColumn).isEqualTo("""
+        assertThat(after.printWithLines()).isEqualTo("""
             [(1, 0), (6, 2)][(1, 0), (6, 2)]class [(1, 6), (1, 10)]Test [(1, 11), (6, 2)]{
                 [(2, 5), (2, 10)][(2, 5), (2, 8)]int [(2, 9), (2, 10)][(2, 9), (2, 10)]n;
                 
@@ -132,7 +111,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
     }
 
     @Test
-    fun updateSourcePositions2(jp : JavaParser) {
+    fun updateSourcePositions2(jp: JavaParser) {
         val source = """
             package org.test;
             
@@ -150,25 +129,13 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             }
             """.trimIndent()
 
-        val cu = jp.parse(source);
+        val cu = jp.parse(source)
 
         val after = UpdateSourcePositions().run(cu).results[0].after!!
 
-        assertThat(after.printAll()).isEqualTo(source);
+        assertThat(after.printAll()).isEqualTo(source)
 
-
-        val withOffsetAndLength = after.print(
-            object : JavaPrinter<Int>() {
-                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
-                    if (marker is Range) {
-                        p.append("[${marker.start.offset},${marker.length()}]")
-                    }
-                    return super.visitMarker(marker, p)
-                }
-            }
-        )
-
-        assertThat(withOffsetAndLength).isEqualTo("""
+        assertThat(after.printWithLines()).isEqualTo("""
             [0,266][0,16]package [8,8][8,3]org.[12,4]test;
             
             [19,50]import [26,43][26,38][26,27][26,19][26,3]org.[30,15]springframework.[46,7]context.[54,10]annotation.[65,4]Bean;
@@ -185,18 +152,7 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             }
         """.trimIndent())
 
-        val withLineAndColumn = after.print(
-            object : JavaPrinter<Int>() {
-                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
-                    if (marker is Range) {
-                        p.append("[(${marker.start.line}, ${marker.start.column}), (${marker.end.line}, ${marker.end.column})]")
-                    }
-                    return super.visitMarker(marker, p)
-                }
-            }
-        )
-
-        assertThat(withLineAndColumn).isEqualTo("""
+        assertThat(after.printWithLines()).isEqualTo("""
             [(1, 0), (14, 2)][(1, 0), (1, 16)]package [(1, 8), (1, 16)][(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
 
             [(3, 1), (3, 51)]import [(3, 8), (3, 51)][(3, 8), (3, 46)][(3, 8), (3, 35)][(3, 8), (3, 27)][(3, 8), (3, 11)]org.[(3, 12), (3, 27)]springframework.[(3, 28), (3, 35)]context.[(3, 36), (3, 46)]annotation.[(3, 47), (3, 51)]Bean;
@@ -212,11 +168,11 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
                 }
             }
         """.trimIndent()
-        );
+        )
     }
 
     @Test
-    fun lineColumnTest(jp : JavaParser) {
+    fun lineColumnTest(jp: JavaParser) {
         val source = """
             package com.example;
             
@@ -232,24 +188,13 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
             }
         """.trimIndent()
 
-        val cu = jp.parse(source);
+        val cu = jp.parse(source)
 
         val after = UpdateSourcePositions().run(cu).results[0].after!!
 
-        assertThat(after.printAll()).isEqualTo(source);
+        assertThat(after.printAll()).isEqualTo(source)
 
-        val withLineAndColumn = after.print(
-            object : JavaPrinter<Int>() {
-                override fun <M : Marker> visitMarker(marker: Marker, p: PrintOutputCapture<Int>): M {
-                    if (marker is Range) {
-                        p.append("[(${marker.start.line}, ${marker.start.column}), (${marker.end.line}, ${marker.end.column})]")
-                    }
-                    return super.visitMarker(marker, p)
-                }
-            }
-        )
-
-        assertThat(withLineAndColumn).isEqualTo("""
+        assertThat(after.printWithLines()).isEqualTo("""
             [(1, 0), (12, 2)][(1, 0), (1, 19)]package [(1, 8), (1, 19)][(1, 8), (1, 11)]com.[(1, 12), (1, 19)]example;
             
             [(3, 1), (3, 50)]import [(3, 8), (3, 50)][(3, 8), (3, 32)][(3, 8), (3, 27)][(3, 8), (3, 11)]org.[(3, 12), (3, 27)]springframework.[(3, 28), (3, 32)]boot.[(3, 33), (3, 50)]SpringApplication;
@@ -262,7 +207,6 @@ interface UpdateSourcePositionsTest : JavaRecipeTest {
                     [(10, 9), (10, 72)][(10, 9), (10, 26)]SpringApplication.[(10, 27), (10, 30)]run([(10, 31), (10, 65)][(10, 31), (10, 59)]EmptyBoot15WebAppApplication.[(10, 60), (10, 65)]class, [(10, 67), (10, 71)]args);
                 }
             }
-        """.trimIndent());
-
+        """.trimIndent())
     }
 }

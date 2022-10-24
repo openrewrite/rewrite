@@ -19,30 +19,65 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.InMemoryExecutionContext
+import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.J
+import org.openrewrite.test.RewriteTest
 
 /**
  * @author Alex Boyko
  */
-interface JavaParserTest : JavaRecipeTest {
+interface JavaParserTest : RewriteTest {
 
+    @Suppress("Since15")
     @Test
-    fun incompleteAssignment(jp: JavaParser) {
-
-       val source =
-       """
-           @Deprecated(since=)
-           public class A {}
-       """.trimIndent();
-
-        val cu = JavaParser.fromJavaVersion().build().parse(source).get(0);
-
-        assertThat(cu.printAll()).isEqualTo(source);
-
-        val newCu = JavaVisitor<ExecutionContext>().visit(cu, InMemoryExecutionContext()) as J.CompilationUnit;
-
-        assertThat(newCu.printAll()).isEqualTo(source);
-
+    fun incompleteAssignment() {
+        rewriteRun(
+          java(
+            """
+               @Deprecated(since=)
+               public class A {}
+            """
+          )
+        )
     }
 
+    @Suppress("RedundantSuppression")
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2313")
+    fun annotationCommentWithNoSpaceParsesCorrectly() {
+        rewriteRun(
+          java(
+            """
+                @SuppressWarnings("serial")// fred
+                @Deprecated
+                public class PersistenceManagerImpl {
+                }
+            """
+          ) { spec ->
+              spec.afterRecipe { cu ->
+                  assertThat(cu.classes[0].leadingAnnotations).hasSize(2)
+              }
+          }
+        )
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2313")
+    fun annotationCommentWithSpaceParsesCorrectly() {
+        rewriteRun(
+          java(
+            """
+                @SuppressWarnings("serial") // fred
+                @Deprecated
+                public class PersistenceManagerImpl {
+                }
+            """
+          ) { spec ->
+              spec.afterRecipe { cu ->
+                  assertThat(cu.classes[0].leadingAnnotations).hasSize(2)
+              }
+          }
+        )
+    }
 }

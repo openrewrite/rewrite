@@ -625,34 +625,40 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
         """,
         """
             package org.openrewrite;
-            public static class ThingTwo {
+            public class ThingTwo {
                 public static ThingOne getThingOne() {
                     return new ThingOne();
                 }
             }
         """),
         before = """
+            import java.util.List;
             import org.openrewrite.ThingOne;
             import org.openrewrite.ThingTwo;
             public class B {
-               public <T extends org.openrewrite.Test> T generic(T n, List<? super org.openrewrite.Test> in);
-               public void test() {
-                   org.openrewrite.Test.stat();
-                   this.<org.openrewrite.Test>generic(null, null);
-                   ThingOne t1 = ThingTwo.getThingOne();
-               }
+                public <T extends org.openrewrite.Test> T generic(T n, List<? super org.openrewrite.Test> in) {
+                    return null;
+                }
+                public void test() {
+                    org.openrewrite.Test.stat();
+                    this.<org.openrewrite.Test>generic(null, null);
+                    ThingOne t1 = ThingTwo.getThingOne();
+                }
             }
         """,
         after = """
+            import java.util.List;
             import org.openrewrite.test.ThingOne;
             import org.openrewrite.test.ThingTwo;
             public class B {
-               public <T extends org.openrewrite.test.Test> T generic(T n, List<? super org.openrewrite.test.Test> in);
-               public void test() {
-                   org.openrewrite.test.Test.stat();
-                   this.<org.openrewrite.test.Test>generic(null, null);
-                   ThingOne t1 = ThingTwo.getThingOne();
-               }
+                public <T extends org.openrewrite.test.Test> T generic(T n, List<? super org.openrewrite.test.Test> in) {
+                    return null;
+                }
+                public void test() {
+                    org.openrewrite.test.Test.stat();
+                    this.<org.openrewrite.test.Test>generic(null, null);
+                    ThingOne t1 = ThingTwo.getThingOne();
+                }
             }
         """,
         afterConditions = { cu ->

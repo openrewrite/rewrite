@@ -18,63 +18,68 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress("UnnecessarySemicolon")
-interface RemoveExtraSemicolonsTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = RemoveExtraSemicolons()
+interface RemoveExtraSemicolonsTest : RewriteTest, JavaRecipeTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(RemoveExtraSemicolons())
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1587")
     @Test
-    fun enumSemicolons() = assertChanged(
-        before = """
+    fun enumSemicolons() = rewriteRun(
+       java("""
             public enum FRUITS {
                 BANANA,
                 APPLE;
             }
         """,
-        after = """
+        """
             public enum FRUITS {
                 BANANA,
                 APPLE
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1587")
     @Test
-    fun enumSemicolonsWithOtherStatements() = assertUnchanged(
-        before = """
+    fun enumSemicolonsWithOtherStatements() = rewriteRun(
+        java("""
             public enum FRUITS {
                 BANANA,
                 APPLE;
                 
                 void hiFruit() {}
             }
-        """
+        """)
     )
 
     @Test
-    fun emptyBlockStatements() = assertChanged(
-        before = """
+    fun emptyBlockStatements() = rewriteRun(
+        java("""
             class Test {
                 void test() {
                     ;
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void test() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun tryWithResources() = assertChanged(
-        before = """
+    fun tryWithResources() = rewriteRun(
+        java("""
             import java.io.*;
             class Test {
                 void test() {
@@ -84,7 +89,7 @@ interface RemoveExtraSemicolonsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.io.*;
             class Test {
                 void test() {
@@ -93,6 +98,6 @@ interface RemoveExtraSemicolonsTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 }

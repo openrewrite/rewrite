@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 
 
 @Value
@@ -51,7 +52,7 @@ public class FindSourceFiles extends Recipe {
                     String sourcePath = sourceFile.getSourcePath().toString();
                     if (StringUtils.matchesGlob(sourcePath.matches("^\\.?[/\\\\]") ? sourcePath :
                             "./" + sourcePath, filePattern)) {
-                        return sourceFile.withMarkers(sourceFile.getMarkers().searchResult());
+                        return SearchResult.found(sourceFile);
                     }
                 }
                 return tree;

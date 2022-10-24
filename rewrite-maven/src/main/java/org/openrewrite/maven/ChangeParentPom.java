@@ -22,6 +22,7 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -31,6 +32,8 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -77,7 +80,7 @@ public class ChangeParentPom extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -85,7 +88,7 @@ public class ChangeParentPom extends Recipe {
 
     @Option(displayName = "Allow version downgrades",
             description = "If the new parent has the same group/artifact, this flag can be used to only upgrade the " +
-                    "version if the target version is newer than the current.",
+                          "version if the target version is newer than the current.",
             example = "false",
             required = false)
     @Nullable
@@ -107,8 +110,10 @@ public class ChangeParentPom extends Recipe {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 Parent parent = getResolutionResult().getPom().getRequested().getParent();
-                if (parent != null && oldArtifactId.equals(parent.getArtifactId()) && oldGroupId.equals(parent.getGroupId())) {
-                    return document.withMarkers(document.getMarkers().searchResult());
+                if (parent != null &&
+                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
+                    matchesGlob(parent.getGroupId(), oldGroupId)) {
+                    return SearchResult.found(document);
                 }
                 return document;
             }
@@ -137,9 +142,7 @@ public class ChangeParentPom extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 Xml.Document m = super.visitDocument(document, executionContext);
-                if(m != document) {
-                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
-                    maybeUpdateModel();
+                if (m != document) {
                     doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                 }
                 return m;
@@ -151,29 +154,37 @@ public class ChangeParentPom extends Recipe {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
                 if (isParentTag()) {
-
                     ResolvedPom resolvedPom = getResolutionResult().getPom();
 
                     String targetGroupId = newGroupId == null ? oldGroupId : newGroupId;
                     String targetArtifactId = newArtifactId == null ? oldArtifactId : newArtifactId;
-                    if (oldGroupId.equals(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null))) &&
-                            oldArtifactId.equals(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)))) {
-
+                    if (matchesGlob(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null)), oldGroupId) &&
+                        matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId)) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
-                        Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
-                        if (targetVersion.isPresent()) {
-                            if (!oldGroupId.equals(targetGroupId)) {
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId).visitNonNull(t, ctx);
-                            }
 
-                            if (!oldArtifactId.equals(targetArtifactId)) {
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId).visitNonNull(t, ctx);
-                            }
+                        try {
+                            Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
+                            if (targetVersion.isPresent()) {
+                                if (!oldGroupId.equals(targetGroupId)) {
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                }
 
-                            if (!oldVersion.equals(targetVersion.get())) {
-                                t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()).visitNonNull(t, ctx);
+                                if (!oldArtifactId.equals(targetArtifactId)) {
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                }
+
+                                if (!oldVersion.equals(targetVersion.get())) {
+                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                }
                             }
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(tag);
+                        }
+
+                        if (t != tag) {
+                            maybeUpdateModel();
+                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                         }
                     }
                 }
@@ -181,7 +192,7 @@ public class ChangeParentPom extends Recipe {
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
-                                                                ExecutionContext ctx) {
+                                                                ExecutionContext ctx) throws MavenDownloadingException {
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()

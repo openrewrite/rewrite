@@ -18,7 +18,9 @@ java {
 
 configurations.all {
     exclude("com.google.errorprone", "*")
-    resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
+    resolutionStrategy {
+        cacheDynamicVersionsFor(0, "seconds")
+    }
 }
 
 tasks.withType<KotlinCompile>().configureEach {

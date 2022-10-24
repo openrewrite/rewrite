@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -28,18 +29,26 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
+    private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
     public Collection<Recipe> listRecipes() {
+        List<Recipe> dependencyRecipes = dependencyResourceLoaders.stream()
+                .flatMap(r -> r.listRecipes().stream())
+                .collect(toList());
         List<Recipe> recipes = resourceLoaders.stream()
                 .flatMap(r -> r.listRecipes().stream())
                 .collect(toList());
         for (Recipe recipe : recipes) {
             if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(recipes);
+                List<Recipe> availableRecipes = new ArrayList<>();
+                availableRecipes.addAll(dependencyRecipes);
+                availableRecipes.addAll(recipes);
+                ((DeclarativeRecipe) recipe).initialize(availableRecipes);
             }
         }
         return recipes;
@@ -125,6 +134,13 @@ public class Environment {
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
         this.resourceLoaders = resourceLoaders;
+        this.dependencyResourceLoaders = emptyList();
+    }
+
+    public Environment(Collection<? extends ResourceLoader> resourceLoaders,
+                       Collection<? extends ResourceLoader> dependencyResourceLoaders) {
+        this.resourceLoaders = resourceLoaders;
+        this.dependencyResourceLoaders = dependencyResourceLoaders;
     }
 
     public static Builder builder(Properties properties) {
@@ -138,6 +154,7 @@ public class Environment {
     public static class Builder {
         private final Properties properties;
         private final Collection<ResourceLoader> resourceLoaders = new ArrayList<>();
+        private final Collection<ResourceLoader> dependencyResourceLoaders = new ArrayList<>();
 
         public Builder(Properties properties) {
             this.properties = properties;
@@ -156,8 +173,13 @@ public class Environment {
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
          * @return This builder.
          */
-        public Builder scanJar(Path jar, ClassLoader classLoader) {
-            return load(new ClasspathScanningLoader(jar, properties, classLoader));
+        public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
+            List<ClasspathScanningLoader> list = new ArrayList<>();
+            for (Path dep : dependencies) {
+                ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader(dep, properties, emptyList(), classLoader);
+                list.add(classpathScanningLoader);
+            }
+            return load(new ClasspathScanningLoader(jar, properties, list, classLoader), list);
         }
 
         public Builder scanUserHome() {
@@ -177,8 +199,14 @@ public class Environment {
             return this;
         }
 
+        public Builder load(ResourceLoader resourceLoader, Collection<? extends ResourceLoader> dependencyResourceLoaders) {
+            resourceLoaders.add(resourceLoader);
+            this.dependencyResourceLoaders.addAll(dependencyResourceLoaders);
+            return this;
+        }
+
         public Environment build() {
-            return new Environment(resourceLoaders);
+            return new Environment(resourceLoaders, dependencyResourceLoaders);
         }
     }
 

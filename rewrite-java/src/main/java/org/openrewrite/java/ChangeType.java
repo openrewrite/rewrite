@@ -24,6 +24,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -77,7 +78,7 @@ public class ChangeType extends Recipe {
                 if (!Boolean.TRUE.equals(ignoreDefinition)) {
                     Boolean visit = getCursor().pollNearestMessage("TARGET_CLASS");
                     if (visit != null && visit) {
-                        return sf.withMarkers(sf.getMarkers().searchResult());
+                        return SearchResult.found(sf);
                     }
                 }
                 doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName));

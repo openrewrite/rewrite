@@ -15,7 +15,8 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -27,9 +28,12 @@ import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.dataflow.LocalTaintFlowSpec;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
+
+import static org.openrewrite.TreeVisitor.collect;
 
 /**
  * Finds matching method invocations.
@@ -87,7 +91,7 @@ public class FindMethods extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (!flowEnabled) {
-                        m = m.withMarkers(m.getMarkers().searchResult());
+                        m = SearchResult.found(m);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(method)));
                     }
@@ -113,7 +117,7 @@ public class FindMethods extends Recipe {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
                     if (!flowEnabled) {
-                        n = n.withMarkers(n.getMarkers().searchResult());
+                        n = SearchResult.found(n);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(newClass)));
                     }
@@ -161,27 +165,9 @@ public class FindMethods extends Recipe {
      * @return A set of {@link J.MethodInvocation} and {@link J.MemberReference} representing calls to this method.
      */
     public static Set<J> find(J j, String methodPattern) {
-        MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
-        JavaIsoVisitor<Set<J>> findVisitor = new JavaIsoVisitor<Set<J>>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<J> ms) {
-                if (methodMatcher.matches(method)) {
-                    ms.add(method);
-                }
-                return super.visitMethodInvocation(method, ms);
-            }
-
-            @Override
-            public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<J> ms) {
-                if (methodMatcher.matches(memberRef.getMethodType())) {
-                    ms.add(memberRef);
-                }
-                return super.visitMemberReference(memberRef, ms);
-            }
-        };
-
-        Set<J> ms = new HashSet<>();
-        findVisitor.visit(j, ms);
-        return ms;
+        return TreeVisitor.collect(
+                new FindMethods(methodPattern, null, null).getVisitor(),
+                j, new HashSet<>()
+        );
     }
 }

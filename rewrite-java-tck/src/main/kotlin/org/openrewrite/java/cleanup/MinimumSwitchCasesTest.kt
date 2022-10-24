@@ -28,13 +28,14 @@ import org.openrewrite.test.TypeValidation
 
 @Suppress("SwitchStatementWithTooFewBranches", "ConstantConditions")
 interface MinimumSwitchCasesTest : RewriteTest {
+
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(MinimumSwitchCases())
     }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun primitiveAndDefault() = rewriteRun(
-        { s -> s.typeValidationOptions(TypeValidation().methodInvocations(false)) },
         java(
             """
                 class Test {
@@ -49,6 +50,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                               break;
                         }
                     }
+                    void doSomething() {}
+                    void doSomethingElse() {}
                 }
             """,
             """
@@ -61,6 +64,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                             doSomethingElse();
                         }
                     }
+                    void doSomething() {}
+                    void doSomethingElse() {}
                 }
             """
         )
@@ -69,7 +74,6 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun twoPrimitives() = rewriteRun(
-        { s -> s.typeValidationOptions(TypeValidation().methodInvocations(false)) },
         java(
             """
             class Test {
@@ -84,6 +88,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                           break;
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """,
             """
@@ -96,6 +102,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                         doSomethingElse();
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """
         )
@@ -104,7 +112,6 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun stringAndDefault() = rewriteRun(
-        { s -> s.typeValidationOptions(TypeValidation().methodInvocations(false)) },
         java("""
             class Test {
                 String name;
@@ -118,6 +125,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                           break;
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """,
         """
@@ -130,6 +139,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                         doSomethingElse();
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """)
     )
@@ -137,7 +148,6 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun twoStrings() = rewriteRun(
-        { s -> s.typeValidationOptions(TypeValidation().methodInvocations(false)) },
         java("""
             class Test {
                 String name;
@@ -151,6 +161,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                           break;
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """,
         """
@@ -163,6 +175,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                         doSomethingElse();
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """)
     )
@@ -170,7 +184,6 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun onePrimitive() = rewriteRun(
-        { s -> s.typeValidationOptions(TypeValidation().methodInvocations(false)) },
         java("""
             class Test {
                 int variable;
@@ -181,6 +194,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                           break;
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """,
         """
@@ -191,6 +206,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                         doSomething();
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """)
     )
@@ -198,7 +215,6 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     fun oneString() = rewriteRun(
-        { s -> s.typeValidationOptions(TypeValidation().methodInvocations(false)) },
         java("""
             class Test {
                 String name;
@@ -209,6 +225,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                           break;
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """,
         """
@@ -219,6 +237,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                         doSomething();
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """)
     )
@@ -305,7 +325,6 @@ interface MinimumSwitchCasesTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1701")
     @Test
     fun removeBreaksFromCaseBody()  = rewriteRun(
-        { s -> s.typeValidationOptions(TypeValidation().methodInvocations(false)) },
         java("""
             class Test {
                 String name;
@@ -317,6 +336,8 @@ interface MinimumSwitchCasesTest : RewriteTest {
                       }
                     }
                 }
+                void doSomething() {}
+                void doSomethingElse() {}
             }
         """,
         """
@@ -326,6 +347,44 @@ interface MinimumSwitchCasesTest : RewriteTest {
                     if ("jonathan".equals(name)) {
                         doSomething();
                     }
+                }
+                void doSomething() {}
+                void doSomethingElse() {}
+            }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2258")
+    @Test
+    fun defaultOnly() = rewriteRun(
+        java("""
+            enum Test {
+                A, B, C;
+        
+                @Override
+                public String toString() {
+                    String s;
+                    switch (this) {
+                        default:
+                            s = this.name();
+                            break;
+                    }
+                    switch(this) {
+                        default:
+                            return s;
+                    }
+                }
+            }
+        """,
+        """
+            enum Test {
+                A, B, C;
+        
+                @Override
+                public String toString() {
+                    String s;
+                    s = this.name();
+                    return s;
                 }
             }
         """)

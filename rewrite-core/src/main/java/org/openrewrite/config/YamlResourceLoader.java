@@ -15,12 +15,15 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
@@ -29,8 +32,8 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -59,6 +62,10 @@ public class YamlResourceLoader implements ResourceLoader {
     private final String yamlSource;
 
     private final ObjectMapper mapper;
+
+    @Nullable
+    private final ClassLoader classLoader;
+    private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
@@ -107,7 +114,22 @@ public class YamlResourceLoader implements ResourceLoader {
      * @throws UncheckedIOException On unexpected IOException
      */
     public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, @Nullable ClassLoader classLoader) throws UncheckedIOException {
+        this(yamlInput, source, properties, classLoader, emptyList());
+    }
+
+    /**
+     * Load a declarative recipe, optionally using the specified classloader and optionally including resource loaders
+     * for recipes from dependencies.
+     *
+     * @param yamlInput   Declarative recipe yaml input stream
+     * @param source      Declarative recipe source
+     * @param properties  Placeholder properties
+     * @param classLoader Optional classloader to use with jackson. If not specified, the runtime classloader will be used.
+     * @throws UncheckedIOException On unexpected IOException
+     */
+    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties, @Nullable ClassLoader classLoader, Collection<? extends ResourceLoader> dependencyResourceLoaders) throws UncheckedIOException {
         this.source = source;
+        this.dependencyResourceLoaders = dependencyResourceLoaders;
 
         mapper = JsonMapper.builder()
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
@@ -116,6 +138,8 @@ public class YamlResourceLoader implements ResourceLoader {
                 .registerModule(new ParameterNamesModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
         maybeAddKotlinModule(mapper);
+
+        this.classLoader = classLoader;
 
         if (classLoader != null) {
             TypeFactory tf = TypeFactory.defaultInstance().withClassLoader(classLoader);
@@ -139,7 +163,7 @@ public class YamlResourceLoader implements ResourceLoader {
     private Collection<Map<String, Object>> loadResources(ResourceType resourceType) {
         Collection<Map<String, Object>> resources = new ArrayList<>();
 
-        Yaml yaml = new Yaml(new SafeConstructor());
+        Yaml yaml = new Yaml(new LoaderOptions());
         for (Object resource : yaml.loadAll(yamlSource)) {
             if (resource instanceof Map) {
                 @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
@@ -158,12 +182,17 @@ public class YamlResourceLoader implements ResourceLoader {
         return loadResources(ResourceType.Recipe).stream()
                 .filter(r -> r.containsKey("name"))
                 .map(r -> {
-                    String name = (String) r.get("name");
+                    @Language("markdown") String name = (String) r.get("name");
+
+                    @Language("markdown")
                     String displayName = (String) r.get("displayName");
                     if (displayName == null) {
                         displayName = name;
                     }
+
+                    @Language("markdown")
                     String description = (String) r.get("description");
+
                     Set<String> tags = Collections.emptySet();
                     List<String> rawTags = (List<String>) r.get("tags");
                     if (rawTags != null) {
@@ -172,7 +201,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
                     Duration estimatedEffortPerOccurrence = null;
-                    if(estimatedEffortPerOccurrenceStr != null) {
+                    if (estimatedEffortPerOccurrenceStr != null) {
                         estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
                     }
                     DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
@@ -184,7 +213,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     for (int i = 0; i < recipeList.size(); i++) {
                         Object next = recipeList.get(i);
                         if (next instanceof String) {
-                            recipe.addUninitialized((String) next);
+                            recipe.addUninitialized((String) next, classLoader);
                         } else if (next instanceof Map) {
                             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
                             try {
@@ -197,7 +226,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                         if (e.getCause() instanceof InvalidTypeIdException) {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
                                                     nameAndConfig.getValue(), "Recipe class " +
-                                                            nameAndConfig.getKey() + " cannot be found"));
+                                                                              nameAndConfig.getKey() + " cannot be found"));
                                         } else {
                                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
                                                     "Unable to load Recipe: " + e));
@@ -212,7 +241,7 @@ public class YamlResourceLoader implements ResourceLoader {
                                 e.printStackTrace();
                                 recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
                                         "Unexpected declarative recipe parsing exception " +
-                                                e.getClass().getName()));
+                                        e.getClass().getName()));
                             }
                         } else {
                             recipe.addValidation(invalid(
@@ -235,8 +264,11 @@ public class YamlResourceLoader implements ResourceLoader {
     public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
-                externalRecipes.stream(),
-                internalRecipes.stream()
+                Stream.concat(
+                        externalRecipes.stream(),
+                        internalRecipes.stream()
+                ),
+                dependencyResourceLoaders.stream().flatMap(rl -> rl.listRecipes().stream())
         ).collect(toList());
 
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
@@ -310,18 +342,36 @@ public class YamlResourceLoader implements ResourceLoader {
     @Override
     public Collection<CategoryDescriptor> listCategoryDescriptors() {
         return loadResources(ResourceType.Category).stream()
-                .filter(r -> r.containsKey("name") && r.containsKey("packageName"))
+                .filter(r -> r.containsKey("packageName"))
                 .map(c -> {
+                    @Language("markdown")
                     String name = (String) c.get("name");
+
+                    @Language("markdown")
                     String packageName = (String) c.get("packageName");
+                    if (packageName.endsWith("." + CategoryTree.CORE) ||
+                        packageName.contains("." + CategoryTree.CORE + ".")) {
+                        throw new IllegalArgumentException("The package name 'core' is reserved.");
+                    }
+
+                    if (name == null) {
+                        name = packageName;
+                    }
+
+                    @Language("markdown")
                     String description = (String) c.get("description");
+
                     Set<String> tags = Collections.emptySet();
                     @SuppressWarnings("unchecked")
                     List<String> rawTags = (List<String>) c.get("tags");
                     if (rawTags != null) {
                         tags = new HashSet<>(rawTags);
                     }
-                    return new CategoryDescriptor(name, packageName, description, tags);
+
+                    boolean root = c.containsKey("root") && (Boolean) c.get("root");
+                    int priority = c.containsKey("priority") ? (Integer) c.get("priority") : CategoryDescriptor.LOWEST_PRECEDENCE;
+
+                    return new CategoryDescriptor(name, packageName, description, tags, root, priority, false);
                 })
                 .collect(toList());
     }

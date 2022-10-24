@@ -50,7 +50,7 @@ public interface JavaTypeSignatureBuilderTest {
     @Test
     default void parameterizedField() {
         assertThat(fieldSignature("parameterizedField"))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=parameterizedField}");
+                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=parameterizedField,type=org.openrewrite.java.PT<org.openrewrite.java.JavaTypeGoat$TypeA>}");
     }
 
     @Test

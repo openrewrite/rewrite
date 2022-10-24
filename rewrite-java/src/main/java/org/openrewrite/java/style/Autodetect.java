@@ -31,12 +31,8 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
 
 public class Autodetect extends NamedStyles {
     @JsonCreator
@@ -144,7 +140,8 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class IndentStatistics {
-        private final Map<Integer, Long> indentFrequencies = new HashMap<>();
+        private final Map<Integer, Long> spaceIndentFrequencies = new HashMap<>();
+        private final Map<Integer, Long> tabIndentFrequencies = new HashMap<>();
         private int linesWithSpaceIndents = 0;
         private int linesWithTabIndents = 0;
 
@@ -158,30 +155,42 @@ public class Autodetect extends NamedStyles {
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             boolean useTabs = !isIndentedWithSpaces();
 
-            Map.Entry<Integer, Long> i1 = null;
-            Map.Entry<Integer, Long> i2 = null;
+            int indent = 0;
+            int continuationIndent = 0;
+            long indentCount = 0;
+            long continuationIndentCount = 0;
 
-            for (Map.Entry<Integer, Long> sample : indentFrequencies.entrySet()) {
-                if (sample.getKey() == 0) {
+            Map<Integer, Long> indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
+            for (Map.Entry<Integer, Long> current : indentFrequencies.entrySet()) {
+                if (current.getKey() <= 0) {
                     continue;
                 }
-                if (i1 == null || i1.getValue() < sample.getValue()) {
-                    i1 = sample;
-                } else if (i2 == null || i2.getValue() < sample.getValue()) {
-                    i2 = sample;
+                long currentCount = 0;
+                for (Map.Entry<Integer, Long> candidate : indentFrequencies.entrySet()) {
+                    if (candidate.getKey() <= 0) {
+                        continue;
+                    }
+                    if (candidate.getKey() % current.getKey() == 0) {
+                        currentCount += candidate.getValue();
+                    }
+                }
+                if (currentCount > indentCount) {
+                    indent = current.getKey();
+                    indentCount = currentCount;
+                } else if (currentCount == indentCount) {
+                    indent = Math.min(indent, current.getKey());
+                } else if (currentCount > continuationIndentCount) {
+                    continuationIndent = current.getKey();
+                    continuationIndentCount = currentCount;
+                } else if (currentCount == continuationIndentCount) {
+                    continuationIndent = Math.min(continuationIndent, current.getKey());
                 }
             }
 
-            int indent1 = i1 == null ? 4 : i1.getKey();
-            int indent2 = i2 == null ? indent1 : i2.getKey();
-
-            int indent = Math.min(indent1, indent2);
-            int continuationIndent = Math.max(indent1, indent2);
-
             return new TabsAndIndentsStyle(
                     useTabs,
-                    useTabs ? indent : 1,
-                    useTabs ? 1 : indent,
+                    indent,
+                    indent,
                     continuationIndent,
                     false,
                     new TabsAndIndentsStyle.MethodDeclarationParameters(
@@ -240,56 +249,46 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Space visitSpace(Space space, Space.Location loc, IndentStatistics stats) {
-            Integer lastIndent = getCursor().getNearestMessage("lastIndent");
-            if (lastIndent == null) {
-                lastIndent = 0;
-            }
-
             String prefix = space.getWhitespace();
+            if(!prefix.contains("\n")) {
+                return space;
+            }
             char[] chars = prefix.toCharArray();
 
-            int indent = 0;
+            int spaceIndent = 0;
+            int tabIndent = 0;
+            boolean mixed = false;
             // Note: new lines in multiline comments will not be counted.
             for (char c : chars) {
                 if (c == '\n' || c == '\r') {
-                    indent = 0;
+                    spaceIndent = 0;
+                    tabIndent = 0;
+                    mixed = false;
                     continue;
                 }
-                if (Character.isWhitespace(c)) {
-                    indent++;
+                if (c == ' ') {
+                    if (tabIndent > 0) {
+                        mixed = true;
+                    }
+                    spaceIndent++;
+                } else if (Character.isWhitespace(c)) {
+                    if (spaceIndent > 0) {
+                        mixed = true;
+                    }
+                    tabIndent++;
                 }
             }
 
-            AtomicBoolean takeWhile = new AtomicBoolean(true);
-            if (prefix.chars()
-                    .filter(c -> {
-                        takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
-                        return takeWhile.get();
-                    })
-                    .count() > 0) {
-                stats.indentFrequencies.merge(indent - lastIndent, 1L, Long::sum);
-                getCursor().putMessage("lastIndent", indent);
+            if (spaceIndent > 0 || tabIndent > 0) {
+                if (!mixed) {
+                    stats.spaceIndentFrequencies.merge(spaceIndent, 1L, Long::sum);
+                    stats.tabIndentFrequencies.merge(tabIndent, 1L, Long::sum);
+                }
 
-                AtomicBoolean dropWhile = new AtomicBoolean(false);
-                takeWhile.set(true);
-                Map<Boolean, Long> indentTypeCounts = prefix.chars()
-                        .filter(c -> {
-                            dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
-                            return dropWhile.get();
-                        })
-                        .filter(c -> {
-                            takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
-                            return takeWhile.get();
-                        })
-                        .mapToObj(c -> c == ' ')
-                        .collect(Collectors.groupingBy(identity(), counting()));
-
-                if (!indentTypeCounts.isEmpty()) {
-                    if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-                        stats.linesWithSpaceIndents++;
-                    } else {
-                        stats.linesWithTabIndents++;
-                    }
+                if (spaceIndent > tabIndent) {
+                    stats.linesWithSpaceIndents++;
+                } else {
+                    stats.linesWithTabIndents++;
                 }
             }
 
@@ -743,7 +742,7 @@ public class Autodetect extends NamedStyles {
 
                 staticBlock = anImport.isStatic();
                 i++;
-                previousPkg = importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".");
+                previousPkg = importLayoutStatistics.pkgToBlockPattern.getOrDefault(anImport.getPackageName() + ".", "");
             }
 
             if (i - blockStart > 0) {

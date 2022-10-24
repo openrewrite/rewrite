@@ -116,19 +116,7 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
                 ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(variable.getSimpleName());
             }
 
-            return variable;
-        }
-
-        @SuppressWarnings("all")
-        @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-            Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = (Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY");
-            for (J.VariableDeclarations.NamedVariable variableToRename : renameVariablesMap.keySet()) {
-                if (variableToRename.getSimpleName().equals(identifier.getSimpleName())) {
-                    return identifier;
-                }
-            }
-            return identifier;
+            return super.visitVariable(variable, ctx);
         }
 
         /**

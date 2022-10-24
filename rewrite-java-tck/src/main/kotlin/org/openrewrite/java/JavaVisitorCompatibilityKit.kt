@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.controlflow.ControlFlowDotFileViewerTest
-import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.controlflow.ControlFlowTest
 import org.openrewrite.java.controlflow.GuardTest
+import org.openrewrite.java.dataflow.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.recipes.ExecutionContextParameterNameTest
 import org.openrewrite.java.recipes.PublicGetVisitorTest
@@ -182,6 +182,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class FindAnnotationsTck : FindAnnotationsTest
 
     @Nested
+    inner class FindMissingTypesTck : FindMissingTypesTest
+
+    @Nested
     inner class FixSerializableFieldsTck : FixSerializableFieldsTest
 
     @Nested
@@ -243,6 +246,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class FindTextTck : FindTextTest
+
+    @Nested
+    inner class FindImportsTck : FindImportsTest
 
     @Nested
     inner class FindTypesTck : FindTypesTest
@@ -395,10 +401,16 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RecipeExceptionDemonstrationTck : RecipeExceptionDemonstrationTest
 
     @Nested
+    inner class RecipeMarkupDemonstrationTck : RecipeMarkupDemonstrationTest
+
+    @Nested
     inner class RedundantFileCreationTck : RedundantFileCreationTest
 
     @Nested
     inner class RemoveAnnotationTck : RemoveAnnotationTest
+
+    @Nested
+    inner class RemoveCallsToSystemGcTck : RemoveCallsToSystemGcTest
 
     @Nested
     inner class RemoveExtraSemicolonsTck : RemoveExtraSemicolonsTest
@@ -468,6 +480,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ReplaceConstantTck : ReplaceConstantTest
+
+    @Nested
+    inner class ReplaceThreadRunWithThreadStartTck : ReplaceThreadRunWithThreadStartTest
 
     @Nested
     inner class ResultOfMethodCallIgnoredTck : ResultOfMethodCallIgnoredTest

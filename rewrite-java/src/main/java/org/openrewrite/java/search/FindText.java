@@ -24,11 +24,14 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TextComment;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
+
+import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -78,8 +81,11 @@ public class FindText extends Recipe {
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext context) {
                 return space.withComments(ListUtils.map(space.getComments(), comment -> {
                     if(comment instanceof TextComment) {
-                        if (compiledPatterns.stream().anyMatch(p -> p.matcher(((TextComment) comment).getText()).find())) {
-                            return comment.withMarkers(comment.getMarkers().searchResult());
+                        for (Pattern p : compiledPatterns) {
+                            if (p.matcher(((TextComment) comment).getText()).find()) {
+                                return comment.withMarkers(comment.getMarkers().
+                                        computeByType(new SearchResult(randomId(), null), (s1, s2) -> s1 == null ? s2 : s1));
+                            }
                         }
                     }
                     return comment;
@@ -95,7 +101,7 @@ public class FindText extends Recipe {
                 assert literal.getValue() != null;
                 if (compiledPatterns.stream().anyMatch(p -> p
                         .matcher(literal.getValue().toString()).find())) {
-                    return literal.withMarkers(literal.getMarkers().searchResult());
+                    return SearchResult.found(literal);
                 }
 
                 return literal;

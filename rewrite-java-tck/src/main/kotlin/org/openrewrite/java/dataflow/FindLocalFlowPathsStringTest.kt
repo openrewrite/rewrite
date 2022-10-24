@@ -493,7 +493,7 @@ interface FindLocalFlowPathsStringTest : RewriteTest {
     )
 
     @Test
-    fun `assignment of value inside of if block`() = rewriteRun(
+    fun `assignment of value inside if block`() = rewriteRun(
         java(
             """
             class Test {

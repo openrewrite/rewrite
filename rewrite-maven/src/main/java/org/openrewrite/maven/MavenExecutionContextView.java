@@ -36,6 +36,8 @@ import static org.openrewrite.maven.tree.MavenRepository.MAVEN_LOCAL_DEFAULT;
 public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final MavenPomCache DEFAULT_POM_CACHE = new InMemoryMavenPomCache();
 
+    private static final String MAVEN_SETTINGS = "org.openrewrite.maven.settings";
+    private static final String MAVEN_ACTIVE_PROFILES = "org.openrewrite.maven.activeProfiles";
     private static final String MAVEN_MIRRORS = "org.openrewrite.maven.mirrors";
     private static final String MAVEN_CREDENTIALS = "org.openrewrite.maven.auth";
     private static final String MAVEN_LOCAL_REPOSITORY = "org.openrewrite.maven.localRepo";
@@ -49,7 +51,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public static MavenExecutionContextView view(ExecutionContext ctx) {
-        if(ctx instanceof MavenExecutionContextView) {
+        if (ctx instanceof MavenExecutionContextView) {
             return (MavenExecutionContextView) ctx;
         }
         return new MavenExecutionContextView(ctx);
@@ -64,12 +66,25 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_RESOLUTION_LISTENER, ResolutionEventListener.NOOP);
     }
 
-    public MavenExecutionContextView setMirrors(Collection<MavenRepositoryMirror> mirrors) {
+    public MavenExecutionContextView setMirrors(@Nullable Collection<MavenRepositoryMirror> mirrors) {
         putMessage(MAVEN_MIRRORS, mirrors);
         return this;
     }
 
     public Collection<MavenRepositoryMirror> getMirrors() {
+        return getMessage(MAVEN_MIRRORS, emptyList());
+    }
+
+    /**
+     * Get mirrors set on this execution context, unless overridden by a supplied maven settings file.
+     *
+     * @param mavenSettings The maven settings defining mirrors to use, if any.
+     * @return The mirrors to use for dependency resolution.
+     */
+    public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
+        if (mavenSettings != null) {
+            return mapMirrors(mavenSettings);
+        }
         return getMessage(MAVEN_MIRRORS, emptyList());
     }
 
@@ -79,6 +94,19 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     public Collection<MavenRepositoryCredentials> getCredentials() {
+        return getMessage(MAVEN_CREDENTIALS, emptyList());
+    }
+
+    /**
+     * Get credentials set on this execution context, unless overridden by a supplied maven settings file.
+     *
+     * @param mavenSettings The maven settings defining credentials (in its server configuration) to use, if any.
+     * @return The credentials to use for dependency resolution.
+     */
+    public Collection<MavenRepositoryCredentials> getCredentials(@Nullable MavenSettings mavenSettings) {
+        if (mavenSettings != null) {
+            return mapCredentials(mavenSettings);
+        }
         return getMessage(MAVEN_CREDENTIALS, emptyList());
     }
 
@@ -110,6 +138,21 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     }
 
     /**
+     * Get repositories set on this execution context, unless overridden by a supplied maven settings file.
+     *
+     * @param mavenSettings  The maven settings defining repositories to use, if any.
+     * @param activeProfiles The active profiles to use, if any, with the accompanying maven settings.
+     * @return The repositories to use for dependency resolution.
+     */
+    public List<MavenRepository> getRepositories(@Nullable MavenSettings mavenSettings,
+                                                 @Nullable List<String> activeProfiles) {
+        if (mavenSettings != null) {
+            return mapRepositories(mavenSettings, activeProfiles == null ? emptyList() : activeProfiles);
+        }
+        return getMessage(MAVEN_REPOSITORIES, emptyList());
+    }
+
+    /**
      * Require dependency resolution that encounters a matching group:artifact:version coordinate to resolve to a
      * particular dated snapshot version, effectively making snapshot resolution deterministic.
      *
@@ -124,26 +167,55 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
         return getMessage(MAVEN_PINNED_SNAPSHOT_VERSIONS, emptyList());
     }
 
+    public MavenExecutionContextView setActiveProfiles(List<String> activeProfiles) {
+        putMessage(MAVEN_ACTIVE_PROFILES, activeProfiles);
+        return this;
+    }
+
+    public List<String> getActiveProfiles() {
+        return getMessage(MAVEN_ACTIVE_PROFILES, emptyList());
+    }
+
     public MavenExecutionContextView setMavenSettings(@Nullable MavenSettings settings, String... activeProfiles) {
         if (settings == null) {
             return this;
         }
 
-        if (settings.getServers() != null) {
-            setCredentials(settings.getServers().getServers().stream()
-                    .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
-                    .collect(Collectors.toList()));
-        }
-
-        if (settings.getMirrors() != null) {
-            setMirrors(settings.getMirrors().getMirrors().stream()
-                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots()))
-                    .collect(Collectors.toList()));
-        }
-
+        putMessage(MAVEN_SETTINGS, settings);
+        setActiveProfiles(Arrays.asList(activeProfiles));
+        setCredentials(mapCredentials(settings));
+        setMirrors(mapMirrors(settings));
         setLocalRepository(settings.getMavenLocal());
+        setRepositories(mapRepositories(settings, Arrays.asList(activeProfiles)));
 
-        setRepositories(settings.getActiveRepositories(Arrays.asList(activeProfiles)).stream()
+        return this;
+    }
+
+    @Nullable
+    public MavenSettings getSettings() {
+        return getMessage(MAVEN_SETTINGS, null);
+    }
+
+    private static List<MavenRepositoryCredentials> mapCredentials(MavenSettings settings) {
+        if (settings.getServers() != null) {
+            return settings.getServers().getServers().stream()
+                    .map(server -> new MavenRepositoryCredentials(server.getId(), server.getUsername(), server.getPassword()))
+                    .collect(Collectors.toList());
+        }
+        return emptyList();
+    }
+
+    private static List<MavenRepositoryMirror> mapMirrors(MavenSettings settings) {
+        if (settings.getMirrors() != null) {
+            return settings.getMirrors().getMirrors().stream()
+                    .map(mirror -> new MavenRepositoryMirror(mirror.getId(), mirror.getUrl(), mirror.getMirrorOf(), mirror.getReleases(), mirror.getSnapshots()))
+                    .collect(Collectors.toList());
+        }
+        return emptyList();
+    }
+
+    private List<MavenRepository> mapRepositories(MavenSettings settings, List<String> activeProfiles) {
+        return settings.getActiveRepositories(activeProfiles).stream()
                 .map(repo -> {
                     try {
                         return new MavenRepository(
@@ -163,8 +235,6 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                     }
                 })
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList()));
-
-        return this;
+                .collect(Collectors.toList());
     }
 }

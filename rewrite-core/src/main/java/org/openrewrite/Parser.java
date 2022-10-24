@@ -145,12 +145,16 @@ public interface Parser<S extends SourceFile> {
             return fromString(source, StandardCharsets.UTF_8);
         }
 
+        public static Input fromString(Path sourcePath, String source) {
+            return fromString(sourcePath, source, StandardCharsets.UTF_8);
+        }
+
         public static Input fromString(String source, Charset charset) {
-            return new Input(
-                    Paths.get(Long.toString(System.nanoTime())), null,
-                    () -> new ByteArrayInputStream(source.getBytes(charset)),
-                    true
-            );
+            return fromString(Paths.get(Long.toString(System.nanoTime())), source, charset);
+        }
+
+        public static Input fromString(Path sourcePath, String source, Charset charset) {
+            return new Input(sourcePath, null, () -> new ByteArrayInputStream(source.getBytes(charset)), true);
         }
 
         @SuppressWarnings("unused")

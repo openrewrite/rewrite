@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -53,7 +54,7 @@ public class UnnecessaryCloseInTryWithResources extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Try.Resource visitTryResource(J.Try.Resource tryResource, ExecutionContext executionContext) {
-                return tryResource.withMarkers(tryResource.getMarkers().searchResult());
+                return SearchResult.found(tryResource);
             }
         };
     }

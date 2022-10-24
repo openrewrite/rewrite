@@ -15,11 +15,16 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public JavadocPrinter() {
@@ -28,7 +33,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Javadoc visitAttribute(Javadoc.Attribute attribute, PrintOutputCapture<P> p) {
-        visitMarkers(attribute.getMarkers(), p);
+        beforeSyntax(attribute, p);
         p.append(attribute.getName());
         if (attribute.getSpaceBeforeEqual() != null) {
             visit(attribute.getSpaceBeforeEqual(), p);
@@ -37,205 +42,228 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
                 visit(attribute.getValue(), p);
             }
         }
+        afterSyntax(attribute, p);
         return attribute;
     }
 
     @Override
     public Javadoc visitAuthor(Javadoc.Author author, PrintOutputCapture<P> p) {
-        visitMarkers(author.getMarkers(), p);
+        beforeSyntax(author, p);
         p.append("@author");
         visit(author.getName(), p);
+        afterSyntax(author, p);
         return author;
     }
 
     @Override
     public Javadoc visitDeprecated(Javadoc.Deprecated deprecated, PrintOutputCapture<P> p) {
-        visitMarkers(deprecated.getMarkers(), p);
+        beforeSyntax(deprecated, p);
         p.append("@deprecated");
         visit(deprecated.getDescription(), p);
+        afterSyntax(deprecated, p);
         return deprecated;
     }
 
     @Override
     public Javadoc visitDocComment(Javadoc.DocComment javadoc, PrintOutputCapture<P> p) {
-        visitMarkers(javadoc.getMarkers(), p);
+        beforeSyntax(javadoc, p);
         p.append("/**");
         visit(javadoc.getBody(), p);
         p.append("*/");
+        afterSyntax(javadoc, p);
         return javadoc;
     }
 
     @Override
     public Javadoc visitDocRoot(Javadoc.DocRoot docRoot, PrintOutputCapture<P> p) {
-        visitMarkers(docRoot.getMarkers(), p);
+        beforeSyntax(docRoot, p);
         p.append("{@docRoot");
         visit(docRoot.getEndBrace(), p);
+        afterSyntax(docRoot, p);
         return docRoot;
     }
 
     @Override
     public Javadoc visitDocType(Javadoc.DocType docType, PrintOutputCapture<P> p) {
-        visitMarkers(docType.getMarkers(), p);
+        beforeSyntax(docType, p);
         p.append("<!doctype");
         visit(docType.getText(), p);
         p.append('>');
+        afterSyntax(docType, p);
         return docType;
     }
 
     @Override
     public Javadoc visitEndElement(Javadoc.EndElement endElement, PrintOutputCapture<P> p) {
-        visitMarkers(endElement.getMarkers(), p);
+        beforeSyntax(endElement, p);
         p.append("</").append(endElement.getName());
         visit(endElement.getSpaceBeforeEndBracket(), p);
         p.append('>');
+        afterSyntax(endElement, p);
         return endElement;
     }
 
     @Override
     public Javadoc visitErroneous(Javadoc.Erroneous erroneous, PrintOutputCapture<P> p) {
-        visitMarkers(erroneous.getMarkers(), p);
+        beforeSyntax(erroneous, p);
         visit(erroneous.getText(), p);
+        afterSyntax(erroneous, p);
         return erroneous;
     }
 
     @Override
     public Javadoc visitHidden(Javadoc.Hidden hidden, PrintOutputCapture<P> p) {
-        visitMarkers(hidden.getMarkers(), p);
+        beforeSyntax(hidden, p);
         p.append("@hidden");
         visit(hidden.getBody(), p);
+        afterSyntax(hidden, p);
         return hidden;
     }
 
     @Override
     public Javadoc visitIndex(Javadoc.Index index, PrintOutputCapture<P> p) {
-        visitMarkers(index.getMarkers(), p);
+        beforeSyntax(index, p);
         p.append("{@index");
         visit(index.getSearchTerm(), p);
         visit(index.getDescription(), p);
         visit(index.getEndBrace(), p);
+        afterSyntax(index, p);
         return index;
     }
 
     @Override
     public Javadoc visitInheritDoc(Javadoc.InheritDoc inheritDoc, PrintOutputCapture<P> p) {
-        visitMarkers(inheritDoc.getMarkers(), p);
+        beforeSyntax(inheritDoc, p);
         p.append("{@inheritDoc");
         visit(inheritDoc.getEndBrace(), p);
+        afterSyntax(inheritDoc, p);
         return inheritDoc;
     }
 
     @Override
     public Javadoc visitInlinedValue(Javadoc.InlinedValue value, PrintOutputCapture<P> p) {
-        visitMarkers(value.getMarkers(), p);
+        beforeSyntax(value, p);
         p.append("{@value");
         visit(value.getSpaceBeforeTree(), p);
         javaVisitor.visit(value.getTree(), p);
         visit(value.getEndBrace(), p);
+        afterSyntax(value, p);
         return value;
     }
 
     @Override
     public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
-        visitMarkers(lineBreak.getMarkers(), p);
+        beforeSyntax(lineBreak, p);
         p.append(lineBreak.getMargin());
+        afterSyntax(lineBreak, p);
         return lineBreak;
     }
 
     @Override
     public Javadoc visitLink(Javadoc.Link link, PrintOutputCapture<P> p) {
-        visitMarkers(link.getMarkers(), p);
+        beforeSyntax(link, p);
         p.append(link.isPlain() ? "{@linkplain" : "{@link");
         visit(link.getSpaceBeforeTree(), p);
         visit(link.getTreeReference(), p);
         visit(link.getLabel(), p);
         visit(link.getEndBrace(), p);
+        afterSyntax(link, p);
         return link;
     }
 
     @Override
     public Javadoc visitLiteral(Javadoc.Literal literal, PrintOutputCapture<P> p) {
-        visitMarkers(literal.getMarkers(), p);
+        beforeSyntax(literal, p);
         p.append(literal.isCode() ? "{@code" : "{@literal");
         visit(literal.getDescription(), p);
         visit(literal.getEndBrace(), p);
+        afterSyntax(literal, p);
         return literal;
     }
 
     @Override
     public Javadoc visitParameter(Javadoc.Parameter parameter, PrintOutputCapture<P> p) {
-        visitMarkers(parameter.getMarkers(), p);
+        beforeSyntax(parameter, p);
         p.append("@param");
         visit(parameter.getSpaceBeforeName(), p);
         visit(parameter.getNameReference(), p);
         visit(parameter.getDescription(), p);
+        afterSyntax(parameter, p);
         return parameter;
     }
 
     @Override
     public Javadoc visitProvides(Javadoc.Provides provides, PrintOutputCapture<P> p) {
-        visitMarkers(provides.getMarkers(), p);
+        beforeSyntax(provides, p);
         p.append("@provides");
         visit(provides.getSpaceBeforeServiceType(), p);
         javaVisitor.visit(provides.getServiceType(), p);
         visit(provides.getDescription(), p);
+        afterSyntax(provides, p);
         return provides;
     }
 
     @Override
     public Javadoc visitReturn(Javadoc.Return aReturn, PrintOutputCapture<P> p) {
-        visitMarkers(aReturn.getMarkers(), p);
+        beforeSyntax(aReturn, p);
         p.append("@return");
         visit(aReturn.getDescription(), p);
+        afterSyntax(aReturn, p);
         return aReturn;
     }
 
     @Override
     public Javadoc visitSee(Javadoc.See see, PrintOutputCapture<P> p) {
-        visitMarkers(see.getMarkers(), p);
+        beforeSyntax(see, p);
         p.append("@see");
         visit(see.getSpaceBeforeTree(), p);
         visit(see.getTreeReference(), p);
         visit(see.getReference(), p);
+        afterSyntax(see, p);
         return see;
     }
 
     @Override
     public Javadoc visitSerial(Javadoc.Serial serial, PrintOutputCapture<P> p) {
-        visitMarkers(serial.getMarkers(), p);
+        beforeSyntax(serial, p);
         p.append("@serial");
         visit(serial.getDescription(), p);
+        afterSyntax(serial, p);
         return serial;
     }
 
     @Override
     public Javadoc visitSerialData(Javadoc.SerialData serialData, PrintOutputCapture<P> p) {
-        visitMarkers(serialData.getMarkers(), p);
+        beforeSyntax(serialData, p);
         p.append("@serialData");
         visit(serialData.getDescription(), p);
+        afterSyntax(serialData, p);
         return serialData;
     }
 
     @Override
     public Javadoc visitSerialField(Javadoc.SerialField serialField, PrintOutputCapture<P> p) {
-        visitMarkers(serialField.getMarkers(), p);
+        beforeSyntax(serialField, p);
         p.append("@serialField");
         javaVisitor.visit(serialField.getName(), p);
         javaVisitor.visit(serialField.getType(), p);
         visit(serialField.getDescription(), p);
+        afterSyntax(serialField, p);
         return serialField;
     }
 
     @Override
     public Javadoc visitSince(Javadoc.Since since, PrintOutputCapture<P> p) {
-        visitMarkers(since.getMarkers(), p);
+        beforeSyntax(since, p);
         p.append("@since");
         visit(since.getDescription(), p);
+        afterSyntax(since, p);
         return since;
     }
 
     @Override
     public Javadoc visitStartElement(Javadoc.StartElement startElement, PrintOutputCapture<P> p) {
-        visitMarkers(startElement.getMarkers(), p);
+        beforeSyntax(startElement, p);
         p.append('<').append(startElement.getName());
         visit(startElement.getAttributes(), p);
         visit(startElement.getSpaceBeforeEndBracket(), p);
@@ -243,67 +271,75 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             p.append('/');
         }
         p.append('>');
+        afterSyntax(startElement, p);
         return startElement;
     }
 
     @Override
     public Javadoc visitSummary(Javadoc.Summary summary, PrintOutputCapture<P> p) {
-        visitMarkers(summary.getMarkers(), p);
+        beforeSyntax(summary, p);
         p.append("{@summary");
         visit(summary.getSummary(), p);
         visit(summary.getBeforeBrace(), p);
+        afterSyntax(summary, p);
         return summary;
     }
 
     @Override
     public Javadoc visitText(Javadoc.Text text, PrintOutputCapture<P> p) {
-        visitMarkers(text.getMarkers(), p);
+        beforeSyntax(text, p);
         p.append(text.getText());
+        afterSyntax(text, p);
         return text;
     }
 
     @Override
     public Javadoc visitThrows(Javadoc.Throws aThrows, PrintOutputCapture<P> p) {
-        visitMarkers(aThrows.getMarkers(), p);
+        beforeSyntax(aThrows, p);
         p.append(aThrows.isThrowsKeyword() ? "@throws" : "@exception");
         visit(aThrows.getSpaceBeforeExceptionName(), p);
         javaVisitor.visit(aThrows.getExceptionName(), p);
         visit(aThrows.getDescription(), p);
+        afterSyntax(aThrows, p);
         return aThrows;
     }
 
     @Override
     public Javadoc visitUnknownBlock(Javadoc.UnknownBlock unknownBlock, PrintOutputCapture<P> p) {
-        visitMarkers(unknownBlock.getMarkers(), p);
+        beforeSyntax(unknownBlock, p);
         p.append("@").append(unknownBlock.getName());
         visit(unknownBlock.getContent(), p);
+        afterSyntax(unknownBlock, p);
         return unknownBlock;
     }
 
     @Override
     public Javadoc visitUnknownInline(Javadoc.UnknownInline unknownInline, PrintOutputCapture<P> p) {
-        visitMarkers(unknownInline.getMarkers(), p);
+        beforeSyntax(unknownInline, p);
         p.append("{@").append(unknownInline.getName());
         visit(unknownInline.getContent(), p);
         visit(unknownInline.getEndBrace(), p);
+        afterSyntax(unknownInline, p);
         return unknownInline;
     }
 
     @Override
     public Javadoc visitUses(Javadoc.Uses uses, PrintOutputCapture<P> p) {
-        visitMarkers(uses.getMarkers(), p);
+        beforeSyntax(uses, p);
         p.append("@uses");
         visit(uses.getBeforeServiceType(), p);
         javaVisitor.visit(uses.getServiceType(), p);
         visit(uses.getDescription(), p);
+        afterSyntax(uses, p);
         return uses;
     }
 
     @Override
     public Javadoc visitVersion(Javadoc.Version since, PrintOutputCapture<P> p) {
-        visitMarkers(since.getMarkers(), p);
+        beforeSyntax(since, p);
         p.append("@version");
         visit(since.getBody(), p);
+        afterSyntax(since, p);
         return since;
     }
 
@@ -320,65 +356,66 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAKS", reference.getLineBreaks());
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", 0);
         javaVisitor.visit(reference.getTree(), p, getCursor());
+        afterSyntax(reference, p);
         return reference;
     }
 
     static class JavadocJavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
-            visitMarkers(method.getMarkers(), p);
-            visitSpace(method.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
+            beforeSyntax(method, Space.Location.IDENTIFIER_PREFIX, p);
             visit(method.getSelect(), p);
             if (method.getSelect() != null) {
                 p.append('#');
             }
             p.append(method.getSimpleName());
             visitContainer("(", method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
+            afterSyntax(method, p);
             return method;
         }
 
         @Override
         public J visitIdentifier(J.Identifier ident, PrintOutputCapture<P> p) {
-            visitMarkers(ident.getMarkers(), p);
-            visitSpace(ident.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
+            beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
             p.append(ident.getSimpleName());
+            afterSyntax(ident, p);
             return ident;
         }
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
-            visitSpace(fieldAccess.getPrefix(), Space.Location.FIELD_ACCESS_PREFIX, p);
-            visitMarkers(fieldAccess.getMarkers(), p);
+            beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
             visit(fieldAccess.getTarget(), p);
             visitLeftPadded(".", fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
+            afterSyntax(fieldAccess, p);
             return fieldAccess;
         }
 
         @Override
         public J visitMemberReference(J.MemberReference memberRef, PrintOutputCapture<P> p) {
-            visitSpace(memberRef.getPrefix(), Space.Location.MEMBER_REFERENCE_PREFIX, p);
-            visitMarkers(memberRef.getMarkers(), p);
+            beforeSyntax(memberRef, Space.Location.MEMBER_REFERENCE_PREFIX, p);
             visit(memberRef.getContaining(), p);
             visitLeftPadded("#", memberRef.getPadding().getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
+            afterSyntax(memberRef, p);
             return memberRef;
         }
 
         @Override
         public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
-            visitSpace(type.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
-            visitMarkers(type.getMarkers(), p);
+            beforeSyntax(type, Space.Location.IDENTIFIER_PREFIX, p);
             visit(type.getClazz(), p);
             visitContainer("<", type.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            afterSyntax(type, p);
             return type;
         }
 
         @Override
         public J visitTypeParameter(J.TypeParameter typeParam, PrintOutputCapture<P> p) {
-            visitSpace(typeParam.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p);
-            visitMarkers(typeParam.getMarkers(), p);
+            beforeSyntax(typeParam, Space.Location.TYPE_PARAMETERS_PREFIX, p);
             p.append("<");
             visit(typeParam.getName(), p);
             p.append(">");
+            afterSyntax(typeParam, p);
             return typeParam;
         }
 
@@ -406,9 +443,22 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             return space;
         }
 
+        @Override
+        public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+            if (marker instanceof SearchResult) {
+                String description = ((SearchResult) marker).getDescription();
+                p.append("~~")
+                        .append(description == null ? "" : "(" + description + ")~~")
+                        .append(">");
+            }
+            //noinspection unchecked
+            return (M) marker;
+        }
+
         private void visitLineBreak(Javadoc.LineBreak lineBreak, PrintOutputCapture<P> p) {
-            visitMarkers(lineBreak.getMarkers(), p);
+            beforeSyntax(Space.EMPTY, lineBreak.getMarkers(), null, p);
             p.append(lineBreak.getMargin());
+            afterSyntax(lineBreak.getMarkers(), p);
         }
 
         private void visitLeftPadded(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, JLeftPadded.Location location, PrintOutputCapture<P> p) {
@@ -441,6 +491,57 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
                     p.append(suffixBetween);
                 }
             }
+        }
+
+        private void beforeSyntax(J j, Space.Location loc, PrintOutputCapture<P> p) {
+            beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
+        }
+
+        private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
+            for (Marker marker : markers.getMarkers()) {
+                p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+            }
+            if (loc != null) {
+                visitSpace(prefix, loc, p);
+            }
+            visitMarkers(markers, p);
+            for (Marker marker : markers.getMarkers()) {
+                p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+            }
+        }
+
+        private void afterSyntax(J j, PrintOutputCapture<P> p) {
+            afterSyntax(j.getMarkers(), p);
+        }
+
+        private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
+            for (Marker marker : markers.getMarkers()) {
+                p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+            }
+        }
+    }
+
+    private static final UnaryOperator<String> JAVADOC_MARKER_WRAPPER =
+            out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
+
+    private void beforeSyntax(Javadoc j, PrintOutputCapture<P> p) {
+        beforeSyntax(j.getMarkers(), p);
+    }
+
+    private void beforeSyntax(Markers markers, PrintOutputCapture<P> p) {
+        visitMarkers(markers, p);
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+        }
+    }
+
+    private void afterSyntax(Javadoc j, PrintOutputCapture<P> p) {
+        afterSyntax(j.getMarkers(), p);
+    }
+
+    private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
         }
     }
 }

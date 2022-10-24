@@ -24,6 +24,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.SearchResult;
 
 import static org.openrewrite.java.tree.J.Modifier.Type.Protected;
 import static org.openrewrite.java.tree.J.Modifier.Type.Public;
@@ -50,7 +51,7 @@ public class PublicGetVisitor extends Recipe {
             public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
                 for (JavaType.Method type : cu.getTypesInUse().getDeclaredMethods()) {
                     if (getVisitor.matches(type)) {
-                        return cu.withMarkers(cu.getMarkers().searchResult());
+                        return SearchResult.found(cu);
                     }
                 }
                 return cu;

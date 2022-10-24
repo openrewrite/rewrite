@@ -28,12 +28,15 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -91,33 +94,46 @@ public class UpgradePluginVersion extends Recipe {
         return new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (versionMatcher.matches(method) &&
-                        method.getSelect() instanceof J.MethodInvocation &&
-                        pluginMatcher.matches(method.getSelect())) {
-                    List<Expression> pluginArgs = ((J.MethodInvocation) method.getSelect()).getArguments();
-                    if (pluginArgs.get(0) instanceof J.Literal) {
-                        String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
-                        assert pluginId != null;
-                        if (StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
-                            List<Expression> versionArgs = method.getArguments();
-                            if (versionArgs.get(0) instanceof J.Literal) {
-                                String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
-                                if (currentVersion != null) {
-                                    return versionComparator.upgrade(currentVersion, availablePluginVersions(pluginId, ctx))
-                                            .map(upgradeVersion -> method.withArguments(ListUtils.map(versionArgs, v -> {
-                                                J.Literal versionLiteral = (J.Literal) v;
-                                                assert versionLiteral.getValueSource() != null;
-                                                return versionLiteral
-                                                        .withValue(upgradeVersion)
-                                                        .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
-                                            })))
-                                            .orElse(method);
-                                }
-                            }
-                        }
-                    }
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+                if (!(versionMatcher.matches(m) &&
+                        m.getSelect() instanceof J.MethodInvocation &&
+                        pluginMatcher.matches(m.getSelect()))) {
+                    return m;
                 }
-                return super.visitMethodInvocation(method, ctx);
+                List<Expression> pluginArgs = ((J.MethodInvocation) m.getSelect()).getArguments();
+                if (!(pluginArgs.get(0) instanceof J.Literal)) {
+                    return m;
+                }
+                String pluginId = (String) ((J.Literal) pluginArgs.get(0)).getValue();
+                if(pluginId == null || !StringUtils.matchesGlob(pluginId, pluginIdPattern)) {
+                    return m;
+                }
+
+                List<Expression> versionArgs = m.getArguments();
+                if (!(versionArgs.get(0) instanceof J.Literal)) {
+                    return m;
+                }
+                String currentVersion = (String) ((J.Literal) versionArgs.get(0)).getValue();
+                if(currentVersion == null) {
+                    return m;
+                }
+                Optional<String> version;
+                if(versionComparator instanceof ExactVersion) {
+                    version = versionComparator.upgrade(currentVersion, Collections.singletonList(newVersion));
+                } else {
+                    version = versionComparator.upgrade(currentVersion, availablePluginVersions(pluginId, ctx));
+                }
+                J.MethodInvocation finalM = m;
+                m = version.map(upgradeVersion -> finalM.withArguments(ListUtils.map(versionArgs, v -> {
+                            J.Literal versionLiteral = (J.Literal) v;
+                            assert versionLiteral.getValueSource() != null;
+                            return versionLiteral
+                                    .withValue(upgradeVersion)
+                                    .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
+                        })))
+                        .orElse(m);
+
+                return m;
             }
         };
     }

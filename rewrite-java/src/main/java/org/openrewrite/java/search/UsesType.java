@@ -19,6 +19,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.regex.Pattern;
 
@@ -67,7 +68,7 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         }
 
         if (TypeUtils.isAssignableTo(typePattern, fq)) {
-            return c.withMarkers(c.getMarkers().searchResult());
+            return SearchResult.found(c);
         }
 
         return c;

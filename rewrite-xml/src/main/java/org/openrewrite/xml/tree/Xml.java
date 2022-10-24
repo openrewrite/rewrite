@@ -15,28 +15,24 @@
  */
 package org.openrewrite.xml.tree;
 
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.internal.WithPrefix;
-import org.openrewrite.xml.internal.XmlListMarkersVisitor;
 import org.openrewrite.xml.internal.XmlPrinter;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -75,23 +71,6 @@ public interface Xml extends Tree {
      * referential equality check.
      */
     Xml withPrefixUnsafe(String prefix);
-
-    <T extends Xml> T withMarkers(Markers markers);
-
-    Markers getMarkers();
-
-    /**
-     * Find all subtrees marked with a particular marker rooted at this tree.
-     *
-     * @param markerType The marker type to look for
-     * @param <Xml2>     The expected supertype common to all subtrees that could be found.
-     * @return The set of matching subtrees.
-     */
-    default <Xml2 extends Xml> Set<Xml2> findMarkedWith(Class<? extends Marker> markerType) {
-        Set<Xml2> trees = new HashSet<>();
-        new XmlListMarkersVisitor<Xml2>(markerType).visit(this, trees);
-        return trees;
-    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -348,7 +327,7 @@ public interface Xml extends Tree {
         }
 
         /**
-         * Locate an child tag with the given name and set its text value.
+         * Locate a child tag with the given name and set its text value.
          *
          * @param childName The child tag to locate. This assumes there is one and only one.
          * @param text      The text value to set.
@@ -480,7 +459,7 @@ public interface Xml extends Tree {
         }
     }
 
-    @Value
+    @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     class Attribute implements Xml {

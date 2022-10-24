@@ -47,6 +47,96 @@ interface RenameVariableTest : JavaRecipeTest {
             }
         }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2285")
+    @Test
+    fun variableNameExistsMultipleScopes(jp: JavaParser) = assertChanged(
+        recipe = renameVariableTest("A", "val", "myVal"),
+        before = """
+            class A {
+                String val = "";
+                String getVal(String val) {
+                    return this.val + val;
+                }
+            }
+        """,
+        after = """
+            class A {
+                String myVal = "";
+                String getVal(String val) {
+                    return this.myVal + val;
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2285")
+    @Test
+    fun staticVariableReferencedByClassName(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = renameVariableTest("A", "val", "aVal"),
+        before = """
+            class A {
+                static String val = "";
+                String getVal(String val) {
+                    return A.val;
+                }
+                class B {
+                    String val = "x";
+                    String getVal() {
+                        return A.val + val;
+                    }
+                }
+            }
+        """,
+        after = """
+            class A {
+                static String aVal = "";
+                String getVal(String val) {
+                    return A.aVal;
+                }
+                class B {
+                    String val = "x";
+                    String getVal() {
+                        return A.aVal + val;
+                    }
+                }
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2285")
+    @Test
+    fun isParameterizedClass(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = renameVariableTest("A", "_val", "val"),
+        before = """
+            package org.openrewrite;
+            
+            public class A<T> {
+                private String _val;
+                private String name;
+                 
+                A(String name, String _val) {
+                    this._val = _val;
+                    this.name = name;
+                }
+            }
+        """,
+        after = """
+            package org.openrewrite;
+            
+            public class A<T> {
+                private String val;
+                private String name;
+                 
+                A(String name, String _val) {
+                    this.val = _val;
+                    this.name = name;
+                }
+            }
+        """
+    )
+
     @Test
     fun doNotChangeToJavaKeyword(jp: JavaParser) = assertUnchanged(
         jp,

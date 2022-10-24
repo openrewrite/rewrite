@@ -18,6 +18,7 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
@@ -93,9 +94,9 @@ public class DependencyInsight extends Recipe {
                         ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
                         if (match != null) {
                             if (match == dependency) {
-                                t = t.withMarkers(t.getMarkers().searchResult());
+                                t = SearchResult.found(t);
                             } else {
-                                t = t.withMarkers(t.getMarkers().searchResult(match.getGav().toString()));
+                                t = SearchResult.found(t, match.getGav().toString());
                             }
                         }
                     }

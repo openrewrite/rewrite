@@ -269,4 +269,14 @@ public abstract class CoordinateBuilder {
             return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.BEFORE, idealOrdering);
         }
     }
+
+    public static class Yield extends Statement {
+        Yield(J.Yield tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates replace() {
+            return replace(Space.Location.YIELD_PREFIX);
+        }
+    }
 }

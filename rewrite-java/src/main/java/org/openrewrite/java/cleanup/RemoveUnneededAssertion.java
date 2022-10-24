@@ -26,6 +26,7 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.function.BiPredicate;
 
@@ -72,7 +73,7 @@ public class RemoveUnneededAssertion extends Recipe {
             @Override
             public J.Assert visitAssert(J.Assert _assert, ExecutionContext executionContext) {
                 if (J.Literal.isLiteralValue(_assert.getCondition(), true)) {
-                    return _assert.withMarkers(_assert.getMarkers().searchResult());
+                    return SearchResult.found(_assert);
                 }
                 return _assert;
             }

@@ -6,11 +6,13 @@ plugins {
 }
 
 dependencies {
+    compileOnly("org.projectlombok:lombok:latest.release")
+    testCompileOnly("org.projectlombok:lombok:latest.release")
+    annotationProcessor("org.projectlombok:lombok:latest.release")
+    api(platform("com.fasterxml.jackson:jackson-bom:2.13.4.20221013"))
+
     implementation("org.jetbrains:annotations:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")
-
-    compileOnly("org.projectlombok:lombok:latest.release")
-    annotationProcessor("org.projectlombok:lombok:latest.release")
 
     testImplementation(platform("org.junit:junit-bom:latest.release"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")

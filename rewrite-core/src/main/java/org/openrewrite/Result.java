@@ -24,6 +24,7 @@ import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.Markup;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -66,8 +67,8 @@ public class Result {
     @Nullable
     private Path relativeTo;
 
-    public List<RecipeRunException> getRecipeErrors() {
-        List<RecipeRunException> exceptions = new ArrayList<>();
+    public List<Throwable> getRecipeErrors() {
+        List<Throwable> exceptions = new ArrayList<>();
         new TreeVisitor<Tree, Integer>() {
             @Nullable
             @Override
@@ -76,7 +77,7 @@ public class Result {
                     try {
                         Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
                         Markers markers = (Markers) getMarkers.invoke(tree);
-                        markers.findFirst(RecipeRunExceptionResult.class)
+                        markers.findFirst(Markup.Error.class)
                                 .ifPresent(e -> exceptions.add(e.getException()));
                     } catch (Throwable ignored) {
                     }
@@ -164,21 +165,27 @@ public class Result {
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
     public String diff(@Nullable Path relativeTo) {
+        return diff(relativeTo, null);
+    }
+
+    @Incubating(since = "7.31.0")
+    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
         String d;
         if (this.diff == null) {
-            d = computeDiff(relativeTo);
+            d = computeDiff(relativeTo, markerPrinter);
             this.diff = new WeakReference<>(d);
         } else {
             d = this.diff.get();
             if (d == null || !Objects.equals(this.relativeTo, relativeTo)) {
-                d = computeDiff(relativeTo);
+                d = computeDiff(relativeTo, markerPrinter);
                 this.diff = new WeakReference<>(d);
             }
         }
         return d;
     }
 
-    private String computeDiff(@Nullable Path relativeTo) {
+    private String computeDiff(@Nullable Path relativeTo,
+                               @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
 
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
@@ -188,12 +195,16 @@ public class Result {
             afterPath = after.getSourcePath();
         }
 
+        PrintOutputCapture<Integer> out = markerPrinter == null ?
+                new PrintOutputCapture<>(0) :
+                new PrintOutputCapture<>(0, markerPrinter);
+
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 beforePath,
                 afterPath,
                 relativeTo,
-                before == null ? "" : before.printAll(),
-                after == null ? "" : after.printAll(),
+                before == null ? "" : before.printAll(out),
+                after == null ? "" : after.printAll(out.clone()),
                 recipes.stream().map(Stack::peek).collect(Collectors.toSet())
         )) {
             this.relativeTo = relativeTo;

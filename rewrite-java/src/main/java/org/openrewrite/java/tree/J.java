@@ -15,10 +15,12 @@
  */
 package org.openrewrite.java.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.StringUtils;
@@ -34,18 +36,20 @@ import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
+import java.beans.Transient;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
@@ -86,10 +90,6 @@ public interface J extends Tree {
     default <J2 extends J> J2 withTemplate(SourceTemplate<J, JavaCoordinates> template, JavaCoordinates coordinates, Object... parameters) {
         return template.withTemplate(this, coordinates, parameters);
     }
-
-    <J2 extends J> J2 withMarkers(Markers markers);
-
-    Markers getMarkers();
 
     /**
      * @return This tree, printed.
@@ -155,6 +155,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -220,6 +221,7 @@ public interface J extends Tree {
             return v.visitAnnotation(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Annotation getCoordinates() {
             return new CoordinateBuilder.Annotation(this);
         }
@@ -288,6 +290,7 @@ public interface J extends Tree {
             return v.visitArrayAccess(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -340,6 +343,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -372,6 +376,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -419,6 +424,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -434,6 +440,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return singletonList(this);
         }
@@ -523,11 +530,13 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return singletonList(this);
         }
@@ -625,10 +634,12 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
 
+        @Transient
         @Override
         public List<J> getSideEffects() {
             List<J> sideEffects = new ArrayList<>(2);
@@ -745,6 +756,7 @@ public interface J extends Tree {
             return v.visitBlock(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
         }
@@ -862,6 +874,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -895,9 +908,45 @@ public interface J extends Tree {
         Markers markers;
 
         @With
-        @Getter
-        Expression pattern;
+        Type type;
 
+        public Type getType() {
+            return type == null ? Type.Statement : type;
+        }
+
+        /**
+         * @return The pattern of this case statement.
+         * @deprecated Prior to Java 12, there could only be one pattern. Use {@link #getExpressions()} instead.
+         */
+        @Deprecated
+        public Expression getPattern() {
+            return getExpressions().get(0);
+        }
+
+        /**
+         * @return A new Case instance with the assigned pattern.
+         * @deprecated Prior to Java 12, there could only be one pattern. Use {@link #withExpressions(List)} instead.
+         */
+        @Deprecated
+        public Case withPattern(@Nullable Expression pattern) {
+            return withExpressions(ListUtils.mapFirst(getExpressions(), first -> pattern));
+        }
+
+        JContainer<Expression> expressions;
+
+        public List<Expression> getExpressions() {
+            return expressions.getElements();
+        }
+
+        public Case withExpressions(List<Expression> expressions) {
+            return getPadding().withExpressions(requireNonNull(JContainer.withElementsNullable(this.expressions, expressions)));
+        }
+
+        /**
+         * For case with kind {@link Type#Statement}, returns the statements labeled by the case.
+         * This container will be empty for case with kind {@link Type#Rule}, but possess the prefix
+         * before the arrow.
+         */
         JContainer<Statement> statements;
 
         public List<Statement> getStatements() {
@@ -905,8 +954,38 @@ public interface J extends Tree {
         }
 
         public Case withStatements(List<Statement> statements) {
-            return getPadding().withStatements(this.statements.getPadding().withElements(JRightPadded.withElements(
-                    this.statements.getPadding().getElements(), statements)));
+            return getPadding().withStatements(JContainer.withElements(this.statements, statements));
+        }
+
+        /**
+         * For case with kind {@link Type#Rule}, returns the statement or expression after the arrow.
+         * Returns null for case with kind {@link Type#Statement}.
+         */
+        @Nullable
+        JRightPadded<J> body;
+
+        @Nullable
+        public J getBody() {
+            return body == null ? null : body.getElement();
+        }
+
+        public Case withBody(J body) {
+            return getPadding().withBody(JRightPadded.withElement(this.body, body));
+        }
+
+        @JsonCreator
+        public Case(UUID id, Space prefix, Markers markers, Type type, @Deprecated @Nullable Expression pattern, JContainer<Expression> expressions, JContainer<Statement> statements, @Nullable JRightPadded<J> body) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.type = type;
+            if (pattern != null) {
+                this.expressions = requireNonNull(JContainer.withElementsNullable(null, singletonList(pattern)));
+            } else {
+                this.expressions = expressions;
+            }
+            this.statements = statements;
+            this.body = body;
         }
 
         @Override
@@ -915,6 +994,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -939,16 +1019,38 @@ public interface J extends Tree {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
         }
 
+        public enum Type {
+            Statement,
+            Rule
+        }
+
         @RequiredArgsConstructor
         public static class Padding {
             private final Case t;
+
+            @Nullable
+            public JRightPadded<J> getBody() {
+                return t.body;
+            }
+
+            public Case withBody(@Nullable JRightPadded<J> body) {
+                return t.body == body ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, t.statements, body);
+            }
 
             public JContainer<Statement> getStatements() {
                 return t.statements;
             }
 
             public Case withStatements(JContainer<Statement> statements) {
-                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.pattern, statements);
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.type, null, t.expressions, statements, t.body);
+            }
+
+            public JContainer<Expression> getExpressions() {
+                return t.expressions;
+            }
+
+            public Case withExpressions(JContainer<Expression> expressions) {
+                return t.expressions == expressions ? t : new Case(t.id, t.prefix, t.markers, t.type, null, expressions, t.statements, t.body);
             }
         }
     }
@@ -1019,6 +1121,18 @@ public interface J extends Tree {
         }
 
         @Nullable
+        JContainer<Statement> primaryConstructor;
+
+        @Nullable
+        public List<Statement> getPrimaryConstructor() {
+            return primaryConstructor == null ? null : primaryConstructor.getElements();
+        }
+
+        public ClassDeclaration withPrimaryConstructor(@Nullable List<Statement> primaryConstructor) {
+            return getPadding().withPrimaryConstructor(JContainer.withElementsNullable(this.primaryConstructor, primaryConstructor));
+        }
+
+        @Nullable
         JLeftPadded<TypeTree> extendings;
 
         @Nullable
@@ -1061,7 +1175,7 @@ public interface J extends Tree {
                 throw new IllegalArgumentException("A class can only be type attributed with a fully qualified type name");
             }
 
-            return new ClassDeclaration(id, prefix, markers, leadingAnnotations, modifiers, kind, name, typeParameters, extendings, implementings, body, (JavaType.FullyQualified) type);
+            return new ClassDeclaration(id, prefix, markers, leadingAnnotations, modifiers, kind, name, typeParameters, primaryConstructor, extendings, implementings, body, (JavaType.FullyQualified) type);
         }
 
         @Override
@@ -1080,6 +1194,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.ClassDeclaration getCoordinates() {
             return new CoordinateBuilder.ClassDeclaration(this);
         }
@@ -1118,7 +1233,8 @@ public interface J extends Tree {
                 Class,
                 Enum,
                 Interface,
-                Annotation
+                Annotation,
+                Record
             }
         }
 
@@ -1146,12 +1262,21 @@ public interface J extends Tree {
             private final ClassDeclaration t;
 
             @Nullable
+            public JContainer<Statement> getPrimaryConstructor() {
+                return t.primaryConstructor;
+            }
+
+            public ClassDeclaration withPrimaryConstructor(@Nullable JContainer<Statement> primaryConstructor) {
+                return t.primaryConstructor == primaryConstructor ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, primaryConstructor, t.extendings, t.implementings, t.body, t.type);
+            }
+
+            @Nullable
             public JLeftPadded<TypeTree> getExtends() {
                 return t.extendings;
             }
 
             public ClassDeclaration withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
-                return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, extendings, t.implementings, t.body, t.type);
+                return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, extendings, t.implementings, t.body, t.type);
             }
 
             @Nullable
@@ -1160,7 +1285,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withImplements(@Nullable JContainer<TypeTree> implementings) {
-                return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.extendings, implementings, t.body, t.type);
+                return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, implementings, t.body, t.type);
             }
 
             public Kind getKind() {
@@ -1168,7 +1293,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withKind(Kind kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
+                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.type);
             }
 
             @Nullable
@@ -1177,7 +1302,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.extendings, t.implementings, t.body, t.type);
+                return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.type);
             }
         }
 
@@ -1205,7 +1330,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withKind(Kind kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
+                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.type);
             }
         }
     }
@@ -1299,6 +1424,7 @@ public interface J extends Tree {
         @Getter
         Space eof;
 
+        @Transient
         @Override
         public long getWeight(Predicate<Object> uniqueIdentity) {
             AtomicInteger n = new AtomicInteger();
@@ -1306,7 +1432,7 @@ public interface J extends Tree {
                 final JavaTypeVisitor<AtomicInteger> typeVisitor = new JavaTypeVisitor<AtomicInteger>() {
                     @Override
                     public JavaType visit(@Nullable JavaType javaType, AtomicInteger n) {
-                        if(javaType != null && uniqueIdentity.test(javaType)) {
+                        if (javaType != null && uniqueIdentity.test(javaType)) {
                             n.incrementAndGet();
                             return super.visit(javaType, n);
                         }
@@ -1360,6 +1486,7 @@ public interface J extends Tree {
             return new JavaPrinter<>();
         }
 
+        @Transient
         public TypesInUse getTypesInUse() {
             TypesInUse cache;
             if (this.typesInUse == null) {
@@ -1441,6 +1568,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1501,6 +1629,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1573,6 +1702,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1656,6 +1786,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1740,6 +1871,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return target.getSideEffects();
         }
@@ -1809,6 +1941,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -1863,6 +1996,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2029,6 +2163,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2196,6 +2331,7 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Identifier getCoordinates() {
             return new CoordinateBuilder.Identifier(this);
         }
@@ -2254,6 +2390,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2449,7 +2586,7 @@ public interface J extends Tree {
                 String name = part.getSimpleName();
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                            "." + name);
+                                       "." + name);
                     break;
                 } else {
                     part = (FieldAccess) part.getTarget();
@@ -2472,7 +2609,7 @@ public interface J extends Tree {
          */
         public String getPackageName() {
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
-            if(fq != null) {
+            if (fq != null) {
                 return fq.getPackageName();
             }
             String typeName = getTypeName();
@@ -2482,7 +2619,7 @@ public interface J extends Tree {
 
         public String getClassName() {
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
-            if(fq != null) {
+            if (fq != null) {
                 return fq.getClassName();
             }
             String typeName = getTypeName();
@@ -2541,6 +2678,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2608,6 +2746,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -2687,6 +2826,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2758,6 +2898,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -2799,6 +2940,7 @@ public interface J extends Tree {
                 return getPadding().withParams(JRightPadded.withElements(this.parameters, parameters));
             }
 
+            @Transient
             public CoordinateBuilder.Lambda.Parameters getCoordinates() {
                 return new CoordinateBuilder.Lambda.Parameters(this);
             }
@@ -2881,6 +3023,7 @@ public interface J extends Tree {
             return v.visitLiteral(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -2987,6 +3130,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -3238,6 +3382,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.MethodDeclaration getCoordinates() {
             return new CoordinateBuilder.MethodDeclaration(this);
         }
@@ -3261,8 +3406,8 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return "MethodDeclaration{" +
-                    (getMethodType() == null ? "unknown" : getMethodType()) +
-                    "}";
+                   (getMethodType() == null ? "unknown" : getMethodType()) +
+                   "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3475,6 +3620,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.MethodInvocation getCoordinates() {
             return new CoordinateBuilder.MethodInvocation(this);
         }
@@ -3489,6 +3635,7 @@ public interface J extends Tree {
             return name.getSimpleName();
         }
 
+        @Transient
         @Override
         public List<J> getSideEffects() {
             return singletonList(this);
@@ -3736,6 +3883,7 @@ public interface J extends Tree {
             return v.visitNewArray(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -3955,11 +4103,13 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return singletonList(this);
         }
@@ -4039,6 +4189,7 @@ public interface J extends Tree {
             return v.visitPackage(this, p);
         }
 
+        @Transient
         public CoordinateBuilder.Package getCoordinates() {
             return new CoordinateBuilder.Package(this);
         }
@@ -4102,6 +4253,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4179,6 +4331,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getSideEffects() : emptyList();
         }
@@ -4199,6 +4352,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4275,6 +4429,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return tree.getElement() instanceof Expression ? ((Expression) tree.getElement()).getSideEffects() : emptyList();
         }
@@ -4303,6 +4458,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4389,6 +4545,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -4418,6 +4575,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4454,8 +4612,63 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class SwitchExpression implements J, Expression {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        ControlParentheses<Expression> selector;
+
+        @With
+        Block cases;
+
+        @Override
+        @Transient
+        @Nullable
+        public JavaType getType() {
+            return new JavaVisitor<AtomicReference<JavaType>>() {
+                @Override
+                public J visitCase(Case caze, AtomicReference<JavaType> javaType) {
+                    if (!caze.getExpressions().isEmpty()) {
+                        javaType.set(caze.getExpressions().get(0).getType());
+                    }
+                    return caze;
+                }
+            }.reduce(this, new AtomicReference<>()).get();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            // a switch expression's type is driven by its case statements
+            //noinspection unchecked
+            return (T) this;
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitSwitchExpression(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 
@@ -4485,6 +4698,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4562,6 +4776,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4616,6 +4831,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4687,6 +4903,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -4832,6 +5049,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -5036,11 +5254,13 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
 
         @Override
+        @Transient
         public List<J> getSideEffects() {
             return expression.getSideEffects();
         }
@@ -5150,6 +5370,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.VariableDeclarations getCoordinates() {
             return new CoordinateBuilder.VariableDeclarations(this);
         }
@@ -5380,6 +5601,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
         }
@@ -5469,6 +5691,7 @@ public interface J extends Tree {
         }
 
         @Override
+        @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
@@ -5510,6 +5733,29 @@ public interface J extends Tree {
             public Wildcard withBound(@Nullable JLeftPadded<Bound> bound) {
                 return t.bound == bound ? t : new Wildcard(t.id, t.prefix, t.markers, bound, t.boundedType);
             }
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class Yield implements J, Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        boolean implicit;
+        Expression value;
+
+        @Override
+        public CoordinateBuilder.Yield getCoordinates() {
+            return new CoordinateBuilder.Yield(this);
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitYield(this, p);
         }
     }
 }

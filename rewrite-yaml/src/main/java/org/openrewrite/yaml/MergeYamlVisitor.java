@@ -38,13 +38,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     @Nullable
     private final String objectIdentifyingProperty;
 
-    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs,@Nullable String objectIdentifyingProperty) {
+    public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty) {
         this(scope, new YamlParser().parse(yamlString).get(0).getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
     }
 
     @Override
     public Yaml visitScalar(Yaml.Scalar existingScalar, P p) {
-        if (scope.isScope(existingScalar)) {
+        if (scope.isScope(existingScalar) && incoming instanceof Yaml.Scalar) {
             return mergeScalar(existingScalar, (Yaml.Scalar) incoming);
         }
         return super.visitScalar(existingScalar, p);
@@ -85,9 +85,9 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                 .findAny();
 
         return nameToAdd.map(nameToAddValue -> m1.getEntries().stream()
-                .filter(e -> objectIdentifyingProperty.equals(e.getKey().getValue()))
-                .map(e -> ((Yaml.Scalar) e.getValue()).getValue())
-                .anyMatch(existingName -> existingName.equals(nameToAddValue)))
+                        .filter(e -> objectIdentifyingProperty.equals(e.getKey().getValue()))
+                        .map(e -> ((Yaml.Scalar) e.getValue()).getValue())
+                        .anyMatch(existingName -> existingName.equals(nameToAddValue)))
                 .orElse(false);
     }
 
@@ -127,7 +127,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
             List<Yaml.Sequence.Entry> incomingEntries = new ArrayList<>(s2.getEntries());
 
-            nextEntry: for (Yaml.Sequence.Entry entry : s1.getEntries()) {
+            nextEntry:
+            for (Yaml.Sequence.Entry entry : s1.getEntries()) {
                 if (entry.getBlock() instanceof Yaml.Scalar) {
                     String existingScalar = ((Yaml.Scalar) entry.getBlock()).getValue();
                     for (Yaml.Sequence.Entry incomingEntry : incomingEntries) {
@@ -141,14 +142,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
             return s1.withEntries(ListUtils.concatAll(s1.getEntries(),
                     ListUtils.map(incomingEntries, incomingEntry -> autoFormat(incomingEntry, p, cursor))));
-        }
-        else {
+        } else {
 
             if (objectIdentifyingProperty == null) {
                 // No identifier set to match entries on, so cannot continue
                 return s1;
-            }
-            else {
+            } else {
                 List<Yaml.Sequence.Entry> mutatedEntries = ListUtils.map(s2.getEntries(), entry -> {
                     Yaml.Mapping incomingMapping = (Yaml.Mapping) entry.getBlock();
                     for (Yaml.Sequence.Entry existingEntry : s1.getEntries()) {

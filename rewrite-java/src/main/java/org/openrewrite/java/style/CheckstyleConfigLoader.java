@@ -574,8 +574,8 @@ public class CheckstyleConfigLoader {
         @Override
         public String toString() {
             return "Module{" +
-                    "name='" + name + '\'' +
-                    '}';
+                   "name='" + name + '\'' +
+                   '}';
         }
     }
 
@@ -604,13 +604,12 @@ public class CheckstyleConfigLoader {
         List<Module> modules = new ArrayList<>();
         for (Configuration firstLevelChild : checkstyleConfig.getChildren()) {
             if ("TreeWalker".equals(firstLevelChild.getName())) {
-
                 modules.addAll(Arrays.stream(firstLevelChild.getChildren())
                         .map(child -> {
                             try {
                                 Map<String, String> props = new HashMap<>();
-                                for (String propertyName : child.getAttributeNames()) {
-                                    props.put(propertyName, child.getAttribute(propertyName));
+                                for (String propertyName : child.getPropertyNames()) {
+                                    props.put(propertyName, child.getProperty(propertyName));
                                 }
                                 return new Module(child.getName(), props);
                             } catch (CheckstyleException e) {
@@ -620,12 +619,10 @@ public class CheckstyleConfigLoader {
                         .filter(Objects::nonNull)
                         .collect(toList())
                 );
-            } else if ("SuppressionFilter".equals(firstLevelChild.getName())) {
-                continue;
-            } else {
+            } else if (!"SuppressionFilter".equals(firstLevelChild.getName())) {
                 Map<String, String> props = new HashMap<>();
-                for (String propertyName : firstLevelChild.getAttributeNames()) {
-                    props.put(propertyName, firstLevelChild.getAttribute(propertyName));
+                for (String propertyName : firstLevelChild.getPropertyNames()) {
+                    props.put(propertyName, firstLevelChild.getProperty(propertyName));
                 }
                 modules.add(new Module(firstLevelChild.getName(), props));
             }

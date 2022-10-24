@@ -23,6 +23,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -77,7 +78,7 @@ public class ChangePackage extends Recipe {
                     String original = cu.getPackageDeclaration().getExpression()
                             .printTrimmed(getCursor()).replaceAll("\\s", "");
                     if (original.startsWith(oldPackageName)) {
-                        return cu.withMarkers(cu.getMarkers().searchResult());
+                        return SearchResult.found(cu);
                     }
                 }
                 if (recursive != null && recursive) {

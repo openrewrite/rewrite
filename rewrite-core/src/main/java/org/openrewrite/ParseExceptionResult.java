@@ -15,23 +15,22 @@
  */
 package org.openrewrite;
 
-import lombok.Getter;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.marker.SearchResult;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.internal.ExceptionUtils;
+import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-public class ParseExceptionResult extends SearchResult {
+import static org.openrewrite.Tree.randomId;
 
-    @Getter
-    private final Throwable throwable;
+@Value
+@With
+public class ParseExceptionResult implements Marker {
+    UUID id;
+    String message;
 
-    public ParseExceptionResult(Throwable t) {
-        this(Tree.randomId(), t);
-    }
-
-    public ParseExceptionResult(UUID id, Throwable t) {
-        super(id, t.toString());
-        throwable = t;
+    public static ParseExceptionResult build(Parser<?> parser, Throwable t) {
+        return new ParseExceptionResult(randomId(), ExceptionUtils.sanitizeStackTrace(t, parser.getClass()));
     }
 }

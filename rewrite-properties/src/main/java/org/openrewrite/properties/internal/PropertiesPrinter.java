@@ -15,54 +15,72 @@
  */
 package org.openrewrite.properties.internal;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
+
+import java.util.function.UnaryOperator;
 
 public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Properties visitFile(Properties.File file, PrintOutputCapture<P> p) {
-        p.out.append(file.getPrefix());
-        visitMarkers(file.getMarkers(), p);
+        beforeSyntax(file, p);
         visit(file.getContent(), p);
         p.out.append(file.getEof());
+        afterSyntax(file, p);
         return file;
     }
 
     @Override
     public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
-        p.out.append(entry.getPrefix());
-        visitMarkers(entry.getMarkers(), p);
+        beforeSyntax(entry, p);
         p.out.append(entry.getKey())
                 .append(entry.getBeforeEquals())
-                .append('=')
-                .append(entry.getValue().getPrefix());
-        visitMarkers(entry.getValue().getMarkers(), p);
+                .append('=');
+        beforeSyntax(entry.getValue().getPrefix(), entry.getValue().getMarkers(), p);
         p.out.append(entry.getValue().getText());
+        afterSyntax(entry.getValue().getMarkers(), p);
+        afterSyntax(entry, p);
         return entry;
     }
 
     @Override
     public Properties visitComment(Properties.Comment comment, PrintOutputCapture<P> p) {
-        p.out.append(comment.getPrefix());
-        visitMarkers(comment.getMarkers(), p);
-        p.out.append('#')
-                .append(comment.getMessage());
+        beforeSyntax(comment, p);
+        p.out.append('#').append(comment.getMessage());
+        afterSyntax(comment, p);
         return comment;
     }
 
-    @Override
-    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-        if (marker instanceof SearchResult) {
-            String description = ((SearchResult) marker).getDescription();
-            p.out.append("~~")
-                    .append(description == null ? "" : "(" + description + ")~~")
-                    .append(">");
+    private static final UnaryOperator<String> PROPERTIES_MARKER_WRAPPER =
+            out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
+
+    private void beforeSyntax(Properties props, PrintOutputCapture<P> p) {
+        beforeSyntax(props.getPrefix(), props.getMarkers(), p);
+    }
+
+    private void beforeSyntax(String prefix, Markers markers, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
         }
-        //noinspection unchecked
-        return (M) marker;
+        p.out.append(prefix);
+        visitMarkers(markers, p);
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
+        }
+    }
+
+    private void afterSyntax(Properties props, PrintOutputCapture<P> p) {
+        afterSyntax(props.getMarkers(), p);
+    }
+
+    private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
+        }
     }
 }

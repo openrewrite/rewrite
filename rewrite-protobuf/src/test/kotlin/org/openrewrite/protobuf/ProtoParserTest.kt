@@ -33,7 +33,7 @@ open class ProtoParserTest {
             StringUtils.trimIndent(before))
         val p2 = FindNonBlankWhitespace().visitNonNull(protoDocument, 0) as Proto.Document
         if(p2 !== protoDocument) {
-            Assertions.fail<Any>("Found non-whitespace characters inside of whitespace. Something didn't parse correctly:\n%s",
+            Assertions.fail<Any>("Found non-whitespace characters inside whitespace. Something didn't parse correctly:\n%s",
                 p2.printAll())
         }
         withAst(protoDocument)

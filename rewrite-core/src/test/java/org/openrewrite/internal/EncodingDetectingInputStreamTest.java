@@ -104,7 +104,7 @@ public class EncodingDetectingInputStreamTest {
     }
 
     private EncodingDetectingInputStream read(String s, Charset charset) {
-        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(s.getBytes(charset)), null);
+        EncodingDetectingInputStream is = new EncodingDetectingInputStream(new ByteArrayInputStream(s.getBytes(charset)));
         is.readFully();
         return is;
     }

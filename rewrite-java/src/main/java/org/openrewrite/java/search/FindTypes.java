@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -79,7 +80,7 @@ public class FindTypes extends Recipe {
                     JavaType.FullyQualified type = TypeUtils.asFullyQualified(ident.getType());
                     if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                             ident.getSimpleName().equals(type.getClassName())) {
-                        return ident.withMarkers(ident.getMarkers().searchResult());
+                        return SearchResult.found(ident);
                     }
                 }
                 return super.visitIdentifier(ident, executionContext);
@@ -91,7 +92,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(n.getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         getCursor().firstEnclosing(J.Import.class) == null) {
-                    return n.withMarkers(n.getMarkers().searchResult());
+                    return SearchResult.found(n);
                 }
                 return n;
             }
@@ -102,7 +103,7 @@ public class FindTypes extends Recipe {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(fa.getTarget().getType());
                 if (typeMatches(Boolean.TRUE.equals(checkAssignability), fullyQualifiedType, type) &&
                         fa.getName().getSimpleName().equals("class")) {
-                    return fa.withMarkers(fa.getMarkers().searchResult());
+                    return SearchResult.found(fa);
                 }
                 return fa;
             }

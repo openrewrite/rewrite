@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.Recipe
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
@@ -34,6 +35,20 @@ import java.util.Comparator.comparing
 
 @Suppress("Convert2MethodRef", "UnnecessaryBoxing")
 interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
+
+    val replaceToStringWithLiteralRecipe: Recipe
+        get() = RewriteTest.toRecipe{object : JavaVisitor<ExecutionContext>() {
+            private var TO_STRING = MethodMatcher("java.lang.String toString()")
+            private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
+
+            override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
+                val mi = super.visitMethodInvocation(method, ctx) as J
+                if (mi is J.MethodInvocation && TO_STRING.matches(mi)) {
+                    return mi.withTemplate(t, mi.coordinates.replace(), mi.select)
+                }
+                return mi
+            }
+        }}
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1339")
     @Test
@@ -1371,24 +1386,93 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         }
     )
 
-    @Test
-    fun replaceClassAnnotation(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
-            object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@Deprecated")
-                    .build()
+    val replaceAnnotationRecipe: Recipe
+        get() = RewriteTest.toRecipe{object : JavaIsoVisitor<ExecutionContext>() {
+            val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+                .build()
 
-                override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
-                    if (annotation.simpleName == "SuppressWarnings") {
-                        return annotation.withTemplate(t, annotation.coordinates.replace())
-                    }
-                    return super.visitAnnotation(annotation, p)
+            override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
+                if (annotation.simpleName == "SuppressWarnings") {
+                    return annotation.withTemplate(t, annotation.coordinates.replace())
+                } else if (annotation.simpleName == "A1") {
+                    return annotation.withTemplate(JavaTemplate.builder({ cursor }, "@A2")
+                        .build(), annotation.coordinates.replace())
                 }
+                return super.visitAnnotation(annotation, p)
             }
-        },
-        before = "@SuppressWarnings(\"ALL\") class Test {}",
-        after = "@Deprecated class Test {}"
+        }}
+    @Test
+    fun replaceClassAnnotation() = rewriteRun(
+        { spec -> spec.recipe(replaceAnnotationRecipe)},
+        java("""@SuppressWarnings("ALL") class Test {}""",
+        """@Deprecated class Test {}""")
+    )
+
+    @Test
+    fun replaceMethodDeclarationAnnotation() = rewriteRun(
+        { spec -> spec.recipe(replaceAnnotationRecipe)},
+        java(
+            """
+                class A {
+                    @SuppressWarnings("ALL")
+                    void someTest() {}
+                }
+            """,
+            """
+                class A {
+                    @Deprecated
+                    void someTest() {}
+                }
+            """
+        )
+    )
+
+    @Test
+    fun replaceVariableDeclarationAnnotation() = rewriteRun(
+        { spec -> spec.recipe(replaceAnnotationRecipe)},
+        java(
+            """
+                class A {
+                    @interface A1{}
+                    @interface A2{}
+                    
+                    @A1
+                    Object someObject;
+                }
+            """,
+            """
+                class A {
+                    @interface A1{}
+                    @interface A2{}
+                    
+                    @A2
+                    Object someObject;
+                }
+            """
+        )
+    )
+
+    @Test
+    fun replaceMethodDeclarationVariableDeclarationAnnotation() = rewriteRun(
+        { spec -> spec.recipe(replaceAnnotationRecipe)},
+        java(
+            """
+                class A {
+                    @interface A1{}
+                    @interface A2{}
+                    
+                    void someMethod(@A1 String a){}
+                }
+            """,
+            """
+                class A {
+                    @interface A1{}
+                    @interface A2{}
+                    
+                    void someMethod(@A2 String a){}
+                }
+            """
+        )
     )
 
     @Test
@@ -1703,6 +1787,35 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 @SuppressWarnings("other")
                 class Inner1 {
                 }
+            }
+        """
+    )
+
+    @Test
+    fun replaceAnnotation(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = toRecipe {
+            object : JavaIsoVisitor<ExecutionContext>() {
+                val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+                        .javaParser { jp }
+                        .build()
+
+                override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
+                    if(annotation.simpleName == "SuppressWarnings") {
+                        return annotation.withTemplate(t, annotation.coordinates.replace())
+                    }
+                    return annotation
+                }
+            }
+        },
+        before = """
+            @SuppressWarnings("ALL")
+            class Test {
+            }
+        """,
+        after = """
+            @Deprecated
+            class Test {
             }
         """
     )
@@ -2350,21 +2463,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2185")
     @Test
     fun chainedMethodInvocationsAsNewClassArgument() = rewriteRun(
-        { spec ->
-            spec.recipe(toRecipe {
-                object : JavaVisitor<ExecutionContext>() {
-                    private var TO_STRING = MethodMatcher("java.lang.String toString()")
-                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
-
-                    override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
-                        val mi = super.visitMethodInvocation(method, ctx) as J
-                        if (mi is J.MethodInvocation && TO_STRING.matches(mi)) {
-                            return mi.withTemplate(t, mi.coordinates.replace(), mi.select)
-                        }
-                        return mi
-                    }
-                }
-            })
+        { spec -> spec.recipe(replaceToStringWithLiteralRecipe)
         },
         java(
             """
@@ -2396,22 +2495,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
 
     @Test
     fun chainedMethodInvocationsAsNewClassArgument2() = rewriteRun(
-        { spec ->
-            spec.recipe(toRecipe {
-                object : JavaVisitor<ExecutionContext>() {
-                    private var TO_STRING = MethodMatcher("java.lang.String toString()")
-                    private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
-
-                    override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
-                        val mi = super.visitMethodInvocation(method, ctx) as J
-                        if (mi is J.MethodInvocation && TO_STRING.matches(mi)) {
-                            return mi.withTemplate(t, mi.coordinates.replace(), mi.select)
-                        }
-                        return mi
-                    }
-                }
-            })
-        },
+        { spec -> spec.recipe(replaceToStringWithLiteralRecipe)},
         java(
             """
             class T {
@@ -2522,4 +2606,46 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             }
         """)
     )
+
+    @Test
+    fun enumClassWithAnonymousInnerClassConstructor() = rewriteRun(
+        { spec -> spec.recipe(replaceToStringWithLiteralRecipe)},
+        java(
+            """
+            enum MyEnum {
+                THING_ONE(new MyEnumThing() {
+                    @Override 
+                    public String getName() {
+                        return "Thing One".toString();
+                    }
+                });
+                private final MyEnumThing enumThing;
+                MyEnum(MyEnumThing myEnumThing) {
+                    this.enumThing = myEnumThing;
+                }
+                interface MyEnumThing {
+                    String getName();
+                }
+            }
+            """,
+            """
+            enum MyEnum {
+                THING_ONE(new MyEnumThing() {
+                    @Override 
+                    public String getName() {
+                        return "Thing One";
+                    }
+                });
+                private final MyEnumThing enumThing;
+                MyEnum(MyEnumThing myEnumThing) {
+                    this.enumThing = myEnumThing;
+                }
+                interface MyEnumThing {
+                    String getName();
+                }
+            }
+            """
+        )
+    )
+
 }

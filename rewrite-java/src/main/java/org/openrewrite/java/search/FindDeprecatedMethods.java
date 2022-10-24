@@ -28,6 +28,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Iterator;
 import java.util.List;
@@ -43,7 +44,7 @@ public class FindDeprecatedMethods extends Recipe {
     String methodPattern;
 
     @Option(displayName = "Ignore deprecated scopes",
-            description = "When a deprecated method is used in a deprecated method or class, ignore it.",
+            description = "When set to `true` deprecated methods used within deprecated methods or classes will be ignored.",
             required = false)
     @Nullable
     Boolean ignoreDeprecatedScopes;
@@ -60,7 +61,7 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern, true);
+        MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
 
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
@@ -69,7 +70,7 @@ public class FindDeprecatedMethods extends Recipe {
                     if (methodMatcher == null || methodMatcher.matches(method)) {
                         for (JavaType.FullyQualified annotation : method.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
-                                return cu.withMarkers(cu.getMarkers().searchResult());
+                                return SearchResult.found(cu);
                             }
                         }
                     }
@@ -81,7 +82,7 @@ public class FindDeprecatedMethods extends Recipe {
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = methodPattern == null ? null : new MethodMatcher(methodPattern, true);
+        MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -104,7 +105,7 @@ public class FindDeprecatedMethods extends Recipe {
                                 }
                             }
 
-                            m = m.withMarkers(m.getMarkers().searchResult());
+                            m = SearchResult.found(m);
                         }
                     }
                 }

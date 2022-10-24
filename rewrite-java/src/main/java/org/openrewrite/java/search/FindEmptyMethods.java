@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Collections;
 import java.util.List;
@@ -81,7 +82,7 @@ public class FindEmptyMethods extends Recipe {
                     checkConstructor = executionContext.getMessage("CHECK_CONSTRUCTOR") != null;
                 }
                 if (checkConstructor != null && checkConstructor || isEmptyMethod(method)) {
-                    method = method.withMarkers(method.getMarkers().searchResult());
+                    method = SearchResult.found(method);
                 }
                 return super.visitMethodDeclaration(method, executionContext);
             }

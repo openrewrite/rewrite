@@ -37,7 +37,8 @@ public class StringUtils {
     }
 
     public static String trimIndentPreserveCRLF(String text) {
-        return trimIndent(text.replace('\r', '⏎'))
+        return trimIndent((text.endsWith("\r\n") ? text.substring(0, text.length() - 2) : text)
+                .replace('\r', '⏎'))
                 .replace('⏎', '\r');
     }
 

@@ -24,6 +24,11 @@ class LatestReleaseTest {
     private val latestRelease = LatestRelease(null)
 
     @Test
+    fun isValidWhenCurrentIsNull() {
+        assertThat(latestRelease.isValid(null, "1.0.0")).isTrue
+    }
+
+    @Test
     fun onlyNumericPartsValid() {
         assertAll(
             { assertThat(latestRelease.isValid("1.0", "1.1.1.1")).isTrue },

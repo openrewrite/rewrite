@@ -5,15 +5,13 @@ plugins {
     id("org.openrewrite.maven-publish")
 }
 
-apply(plugin = "nebula.integtest-standalone")
-
-val integTestImplementation = configurations.getByName("integTestImplementation")
 val rocksDbVersion = "7.4.3" // https://github.com/facebook/rocksdb/issues/10448
+
 dependencies {
     api(project(":rewrite-xml"))
     api("org.jetbrains:annotations:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations")
 
     compileOnly(project(":rewrite-test"))
     compileOnly(kotlin("bom"))
@@ -26,10 +24,10 @@ dependencies {
     // FIXME: switch to `latest.release`
     // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
     implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
-    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations:latest.release")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:latest.release")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
+    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
 
     // needed by AddDependency
     implementation(project(":rewrite-java"))
@@ -44,22 +42,6 @@ dependencies {
 
     implementation("org.apache.commons:commons-text:latest.release")
 
-    integTestImplementation("org.eclipse.aether:aether-api:latest.release")
-    integTestImplementation("org.eclipse.aether:aether-spi:latest.release")
-    integTestImplementation("org.eclipse.aether:aether-util:latest.release")
-    integTestImplementation("org.eclipse.aether:aether-connector-basic:latest.release")
-    integTestImplementation("org.eclipse.aether:aether-transport-file:latest.release")
-    integTestImplementation("org.eclipse.aether:aether-transport-http:latest.release")
-    integTestImplementation("org.apache.maven:maven-aether-provider:latest.release")
-    integTestImplementation("org.apache.maven:maven-core:latest.release")
-    integTestImplementation("io.micrometer:micrometer-registry-prometheus:1.9+")
-    integTestImplementation("org.rocksdb:rocksdbjni:$rocksDbVersion")
-
-    integTestImplementation(project(":rewrite-java-17"))
-    integTestImplementation(project(":rewrite-properties"))
-    integTestImplementation(project(":rewrite-xml"))
-    integTestImplementation(project(":rewrite-yaml"))
-
     testImplementation(project(":rewrite-test"))
     testImplementation("ch.qos.logback:logback-classic:1.2.11")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
@@ -70,7 +52,6 @@ dependencies {
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:$rocksDbVersion")
-    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin:latest.release")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {

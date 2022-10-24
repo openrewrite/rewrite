@@ -212,11 +212,14 @@ public class JavaSourceSet implements SourceSet {
                 }
                 if(i == outerClasses.size() - 1) {
                     sb.append(outerClass.getName()).append(".");
+                } else if (!outerClass.getName().startsWith(sb.toString())) {
+                    // Code obfuscaters can generate inner classes which don't share a common package prefix with their outer class
+                    return classInfo.getName();
                 } else {
                     sb.append(outerClass.getName().substring(sb.length())).append(".");
                 }
             }
-            if (sb.length() >= classInfo.getName().length()) {
+            if (!classInfo.getName().startsWith(sb.toString())) {
                 // Code obfuscaters can generate inner classes which don't share a common package prefix with their outer class
                 return classInfo.getName();
             }

@@ -28,6 +28,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Iterator;
 import java.util.List;
@@ -61,7 +62,7 @@ public class FindDeprecatedClasses extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find uses of deprecated classes, optionally ignoring those classes that are inside of deprecated scopes.";
+        return "Find uses of deprecated classes, optionally ignoring those classes that are inside deprecated scopes.";
     }
 
     @Override
@@ -76,7 +77,7 @@ public class FindDeprecatedClasses extends Recipe {
                     if (fqn != null && (typeMatcher == null || typeMatcher.matches(fqn))) {
                         for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
                             if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
-                                return cu.withMarkers(cu.getMarkers().searchResult());
+                                return SearchResult.found(cu);
                             }
                         }
                     }
@@ -113,7 +114,7 @@ public class FindDeprecatedClasses extends Recipe {
                                     }
                                 }
 
-                                return nameTree.withMarkers(nameTree.getMarkers().searchResult());
+                                return SearchResult.found(nameTree);
                             }
                         }
                     }

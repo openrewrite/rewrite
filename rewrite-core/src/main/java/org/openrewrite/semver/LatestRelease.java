@@ -108,8 +108,8 @@ public class LatestRelease implements VersionComparator {
         v1Gav.matches();
         v2Gav.matches();
 
-        //Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
-        //parts are the same:
+        // Remove the metadata pattern from the normalized versions, this only impacts the comparison when all version
+        // parts are the same:
         //
         // HyphenRange [25-28] should include "28-jre" and "28-android" as possible candidates.
         String normalized1 = metadataPattern == null ? nv1.toString() : nv1.toString().replace(metadataPattern, "");
@@ -131,8 +131,8 @@ public class LatestRelease implements VersionComparator {
                 }
             }
         } catch (IllegalStateException exception) {
-            //Provide a better error message if an error is thrown while getting groups from the regular expression.
-            throw new IllegalStateException("Illegal State while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]");
+            // Provide a better error message if an error is thrown while getting groups from the regular expression.
+            throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]");
         }
 
         return normalized1.compareTo(normalized2);

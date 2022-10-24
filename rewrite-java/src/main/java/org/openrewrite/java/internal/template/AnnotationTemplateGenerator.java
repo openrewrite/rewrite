@@ -73,9 +73,10 @@ public class AnnotationTemplateGenerator {
                     template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
 
                     J j = cursor.getValue();
-                    if (j instanceof J.MethodDeclaration) {
+                    J annotationParent = j instanceof J.Annotation && cursor.getParent() != null ? cursor.getParent().firstEnclosing(J.class) : null;
+                    if (j instanceof J.MethodDeclaration || annotationParent instanceof J.MethodDeclaration) {
                         after.insert(0, " void $method() {}");
-                    } else if (j instanceof J.VariableDeclarations) {
+                    } else if (j instanceof J.VariableDeclarations || annotationParent instanceof J.VariableDeclarations) {
                         after.insert(0, " int $variable;");
                     } else if (j instanceof J.ClassDeclaration) {
                         if (cursor.getParentOrThrow().getValue() instanceof JavaSourceFile) {

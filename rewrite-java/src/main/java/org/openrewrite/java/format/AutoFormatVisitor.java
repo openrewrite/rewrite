@@ -83,6 +83,12 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
+        // Avoid reformatting entire Groovy source files, or other J-derived ASTs
+        // Java AutoFormat does OK for a snippet of Groovy, But whole-file reformatting is inadvisable and there is
+        // currently no easy way to customize or fine-tune for Groovy
+        if(!(cu instanceof J.CompilationUnit)) {
+            return cu;
+        }
         JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
 
         t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))

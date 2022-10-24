@@ -192,8 +192,8 @@ public abstract class Recipe implements Cloneable {
      * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
      * set of source files (or even be listed in a suggested list of recipes for a particular codebase).
      * <p>
-     * To identify a tree as applicable, the visitor should mark or otherwise any tree at any level. Any mutation
-     * that the applicability test visitor makes to a tree will not included in the results.
+     * To identify a tree as applicable, the visitor should mark or otherwise modify any tree at any level.
+     * Any change made by the applicability test visitor will not be included in the results.
      *
      * @return A tree visitor that performs an applicability test.
      */
@@ -256,12 +256,16 @@ public abstract class Recipe implements Cloneable {
 
     /**
      * Override this to generate new source files or delete source files.
+     * Note that here, as throughout OpenRewrite, we use referential equality to detect that a change has occured.
+     * To indicate to rewrite that the recipe has made changes a different instance must be returned than the instance
+     * passed in as "before".
+     *
+     * Currently, the list passed in as "before" is not immutable, but you should treat it as such anyway.
      *
      * @param before The set of source files to operate on.
      * @param ctx    The current execution context.
      * @return A set of source files, with some files potentially added/deleted/modified.
      */
-    @SuppressWarnings("unused")
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         return before;
     }

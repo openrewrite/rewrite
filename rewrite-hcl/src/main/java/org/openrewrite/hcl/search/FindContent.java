@@ -24,6 +24,7 @@ import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.JsonPathMatcher;
 import org.openrewrite.hcl.tree.BodyContent;
+import org.openrewrite.marker.SearchResult;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -53,7 +54,7 @@ public class FindContent extends Recipe {
             public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
                 BodyContent b = super.visitBodyContent(bodyContent, ctx);
                 if (pathMatcher.matches(getCursor())) {
-                    return b.withMarkers(b.getMarkers().searchResult());
+                    return SearchResult.found(b);
                 }
                 return b;
             }
