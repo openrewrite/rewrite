@@ -971,6 +971,43 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
         )
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2328")
+    @Test
+    fun renameSingleSegmentPackage() = rewriteRun(
+        {spec -> spec.recipe(ChangePackage("x", "y", false))},
+        java("""
+            package x;
+            
+            class A {
+            }
+        """,
+            """
+            package y;
+            
+            class A {
+            }
+        """
+        )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2328")
+    @Test
+    fun removePackage() = rewriteRun(
+        {spec -> spec.recipe(ChangePackage("x.y.z", "x", false))},
+        java(
+        """
+            package x.y.z;
+            
+            class A {
+            }
+        ""","""
+            package x;
+            
+            class A {
+            }
+        """)
+    )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
