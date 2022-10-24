@@ -112,4 +112,27 @@ interface FinalClassTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2339")
+    @Test
+    fun classWithAnnotation() = assertChanged(
+        before = """
+            class A {
+            
+                @Deprecated
+                class B {
+                    private B() {}
+                }
+            }
+        """,
+        after = """
+            class A {
+            
+                @Deprecated
+                final class B {
+                    private B() {}
+                }
+            }
+        """
+    )
 }
