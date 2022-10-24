@@ -319,6 +319,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+            after.append(";");
         } else if(j instanceof J.MethodInvocation) {
             // If prior is an argument, wrap in __M__.any(prior)
             // If prior is a type parameter, wrap in __M__.anyT<prior>()
