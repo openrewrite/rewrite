@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml
+package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 
-class IdentifyUnreachableReposTest : XmlRecipeTest {
+class IdentifyUnreachableReposTest : MavenRecipeTest {
 
     // HTTPS yields "ambiguous"
     @Test
@@ -25,6 +25,14 @@ class IdentifyUnreachableReposTest : XmlRecipeTest {
         recipe = IdentifyUnreachableRepos(),
         before = """
                 <project>
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    
                     <repositories>
                         <repository>
                             <id>central</id>
@@ -43,10 +51,66 @@ class IdentifyUnreachableReposTest : XmlRecipeTest {
             """,
         after = """
                 <project>
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <modelVersion>4.0.0</modelVersion>
+
+                    <groupId>org.openrewrite.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    
                     <repositories>
                         <repository>
                             <id>central</id>
                             <!--~~(replacement)~~>--><url>https://maven.glassfish.org/content/groups/public</url>
+                        </repository>
+                        <repository>
+                            <id>spring-snapshots</id>
+                            <url>https://repo.spring.io/snapshot</url>
+                        </repository>
+                        <repository>
+                            <id>spring-milestones</id>
+                            <url>https://repo.spring.io/milestone</url>
+                        </repository>
+                    </repositories>
+                </project>
+            """
+    )
+
+    // HTTP yields "dead"
+    @Test
+    fun `http maven glassfish dead repo within property` () = assertChanged(
+        recipe = IdentifyUnreachableRepos(),
+        before = """
+                <project>
+                    <properties>
+                        <my-repo-url>http://maven.glassfish.org/content/groups/public</my-repo-url>
+                    </properties>
+                    <repositories>
+                        <repository>
+                            <id>central</id>
+                            <url>${'$'}{my-repo-url}</url>
+                        </repository>
+                        <repository>
+                            <id>spring-snapshots</id>
+                            <url>https://repo.spring.io/snapshot</url>
+                        </repository>
+                        <repository>
+                            <id>spring-milestones</id>
+                            <url>https://repo.spring.io/milestone</url>
+                        </repository>
+                    </repositories>
+                </project>
+            """,
+        after = """
+                <project>
+                    <properties>
+                        <!--~~(replacement)~~>--><my-repo-url>http://maven.glassfish.org/content/groups/public</my-repo-url>
+                    </properties>
+                    <repositories>
+                        <repository>
+                            <id>central</id>
+                            <url>${'$'}{my-repo-url}</url>
                         </repository>
                         <repository>
                             <id>spring-snapshots</id>
