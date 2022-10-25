@@ -276,7 +276,7 @@ public class CategoryTree<G> {
                 String subtreePackage = subtree.getDescriptor().getPackageName();
                 if (subtreePackage.equals(categoryPackage) || categoryPackage.startsWith(subtreePackage + ".")) {
                     if (!subtree.groups.contains(group)) {
-                        subtree.groups.add(group);
+                        subtree.groups.add(0, group);
                         subtree.descriptorsByGroup.put(group, new CategoryDescriptor(
                                 StringUtils.capitalize(subtreePackage.substring(subtreePackage.lastIndexOf('.') + 1)),
                                 subtreePackage,
