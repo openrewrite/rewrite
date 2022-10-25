@@ -275,6 +275,18 @@ public class CategoryTree<G> {
             for (CategoryTree<G> subtree : subtrees) {
                 String subtreePackage = subtree.getDescriptor().getPackageName();
                 if (subtreePackage.equals(categoryPackage) || categoryPackage.startsWith(subtreePackage + ".")) {
+                    if (!subtree.groups.contains(group)) {
+                        subtree.groups.add(group);
+                        subtree.descriptorsByGroup.put(group, new CategoryDescriptor(
+                                StringUtils.capitalize(subtreePackage.substring(subtreePackage.lastIndexOf('.') + 1)),
+                                subtreePackage,
+                                "",
+                                emptySet(),
+                                false,
+                                0,
+                                true
+                        ));
+                    }
                     return subtree.findOrAddCategory(group, category);
                 }
             }

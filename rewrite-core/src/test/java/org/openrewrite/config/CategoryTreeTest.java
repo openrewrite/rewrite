@@ -42,13 +42,33 @@ public class CategoryTreeTest {
             ))
             .build();
 
-    private final CategoryTree.Root<Group> categoryTree = CategoryTree.<Group>build()
-            .putAll(Group1, env)
-            .putAll(Group2, custom);
+    private final CategoryTree.Root<Group> categoryTree() {
+        return CategoryTree.<Group>build()
+          .putAll(Group1, env)
+          .putAll(Group2, custom);
+    }
+
+    /**
+     * Ensure that removing a group doesn't lop off a subtree belonging to another group
+     * when they share a common package prefix.
+     */
+    @Test
+    void removingGroupRemovesIntermediateCategory() {
+        CategoryTree.Root<Integer> categoryTree = CategoryTree.<Integer>build();
+        categoryTree.putCategories(1, categoryDescriptor("org.openrewrite.java"));
+        categoryTree
+          .putRecipes(2, recipeDescriptor("org.openrewrite.java.test"))
+          .putCategories(2, categoryDescriptor("org.openrewrite.java.test"));
+
+        // this should leave group 2 subpackages of org.openrewrite.java still accessible
+        categoryTree.removeAll(1);
+
+        assertThat(categoryTree.getCategory("org.openrewrite.java.test")).isNotNull();
+    }
 
     @Test
     void print() {
-        System.out.println(categoryTree.print(CategoryTree.PrintOptions.builder()
+        System.out.println(categoryTree().print(CategoryTree.PrintOptions.builder()
                 .omitCategoryRoots(false)
                 .omitEmptyCategories(false)
                 .nameStyle(CategoryTree.PrintNameStyle.DISPLAY_NAME)
@@ -57,7 +77,7 @@ public class CategoryTreeTest {
 
     @Test
     void categoryDescriptorPrecedence() {
-        CategoryDescriptor descriptor = categoryDescriptor();
+        CategoryDescriptor descriptor = categoryDescriptor("org.openrewrite.test");
         CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
                 .putRecipes(0, recipeDescriptor("org.openrewrite.test"))
                 .putCategories(1, descriptor)
@@ -76,7 +96,7 @@ public class CategoryTreeTest {
     @Test
     void getCategoryThatIsTransitivelyEmpty() {
         CategoryTree<Integer> categoryTree = CategoryTree.<Integer>build()
-                .putCategories(1, categoryDescriptor());
+                .putCategories(1, categoryDescriptor("org.openrewrite.test"));
 
         assertThat(categoryTree.getCategory("org", "openrewrite")).isNull();
         assertThat(categoryTree.getCategory("org", "openrewrite", "test")).isNull();
@@ -98,14 +118,16 @@ public class CategoryTreeTest {
 
     @Test
     void removeCategory() {
-        categoryTree.removeAll(Group2);
-        assertThat(categoryTree.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
+        CategoryTree.Root<Group> ct = categoryTree();
+        ct.removeAll(Group2);
+        assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
                 .doesNotContain("io.moderne.rewrite", "io.moderne.cloud", "io.moderne");
     }
 
     @Test
     void categoryRoots() {
-        assertThat(categoryTree.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
+        CategoryTree.Root<Group> ct = categoryTree();
+        assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
                 .contains(
                         "io.moderne.rewrite", "io.moderne.cloud", // because "io.moderne" is marked as a root
                         "org.openrewrite" // because "org" is marked as a root
@@ -114,44 +136,45 @@ public class CategoryTreeTest {
 
     @Test
     void getCategory() {
-        assertThat(categoryTree.getCategoryOrThrow("org", "openrewrite")).isNotNull();
-        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite")).isNotNull();
-        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite", "test")).isNotNull();
-        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite.test")).isNotNull();
+        CategoryTree.Root<Group> ct = categoryTree();
+        assertThat(ct.getCategoryOrThrow("org", "openrewrite")).isNotNull();
+        assertThat(ct.getCategoryOrThrow("org.openrewrite")).isNotNull();
+        assertThat(ct.getCategoryOrThrow("org.openrewrite", "test")).isNotNull();
+        assertThat(ct.getCategoryOrThrow("org.openrewrite.test")).isNotNull();
     }
 
     @Test
     void getRecipeCount() {
-        assertThat(categoryTree.getCategoryOrThrow("org", "openrewrite").getRecipeCount())
+        assertThat(categoryTree().getCategoryOrThrow("org", "openrewrite").getRecipeCount())
                 .isGreaterThan(5);
     }
 
     @Test
     void getRecipes() {
-        assertThat(categoryTree.getCategoryOrThrow("org.openrewrite.text").getRecipes().size())
+        assertThat(categoryTree().getCategoryOrThrow("org.openrewrite.text").getRecipes().size())
                 .isGreaterThan(1);
     }
 
     @Test
     void getRecipesInArtificialCorePackage() {
-        assertThat(requireNonNull(categoryTree.getCategory("org", "openrewrite", "core")).getRecipes())
+        assertThat(requireNonNull(categoryTree().getCategory("org", "openrewrite", "core")).getRecipes())
                 .isNotEmpty();
     }
 
     @Test
     void getRecipe() {
-        assertThat(categoryTree.getRecipe("org.openrewrite.DeleteSourceFiles")).isNotNull();
+        assertThat(categoryTree().getRecipe("org.openrewrite.DeleteSourceFiles")).isNotNull();
     }
 
     @Test
     void getRecipeGroup() {
-        assertThat(categoryTree.getRecipeGroup("org.openrewrite.DeleteSourceFiles"))
+        assertThat(categoryTree().getRecipeGroup("org.openrewrite.DeleteSourceFiles"))
                 .isEqualTo(Group1);
     }
 
-    private static CategoryDescriptor categoryDescriptor() {
-        return new CategoryDescriptor(StringUtils.capitalize("org.openrewrite.test".substring("org.openrewrite.test".lastIndexOf('.') + 1)),
-                "org.openrewrite.test", "", emptySet(),
+    private static CategoryDescriptor categoryDescriptor(String packageName) {
+        return new CategoryDescriptor(StringUtils.capitalize(packageName.substring(packageName.lastIndexOf('.') + 1)),
+                packageName, "", emptySet(),
                 false, 0, false);
     }
 
