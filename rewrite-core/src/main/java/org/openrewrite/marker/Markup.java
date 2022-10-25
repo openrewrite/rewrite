@@ -15,126 +15,176 @@
  */
 package org.openrewrite.marker;
 
-import lombok.Getter;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
-import org.openrewrite.RecipeRunException;
+import org.openrewrite.RecipeScheduler;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ExceptionUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
 
-@Getter
 @Incubating(since = "7.31.0")
-public abstract class Markup extends SearchResult {
+public interface Markup extends Marker {
+
+    String getMessage();
+
     @Nullable
-    private final String detail;
+    String getDetail();
 
-    private final Level level;
-
-    public Markup(UUID id, Level level, String message, @Nullable String detail) {
-        super(id, message + (detail != null ? "\n" + detail : ""));
-        this.level = level;
-        this.detail = detail;
+    @Override
+    default String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
+        if (verbose) {
+            return commentWrapper.apply("(" + getDetail() + ")");
+        }
+        return commentWrapper.apply("(" + getMessage() + ")");
     }
 
-    public enum Level {
-        DEBUG,
-        INFO,
-        WARNING,
-        ERROR
+    static <T extends Tree> T error(T t, Throwable throwable) {
+        return markup(t, new Markup.Error(randomId(), throwable));
     }
 
-    public static class Error extends Markup {
-        @Getter
+    static <T extends Tree> T warn(T t, Throwable throwable) {
+        return markup(t, new Markup.Warn(randomId(), throwable));
+    }
+
+    static <T extends Tree> T info(T t, String message) {
+        return info(t, message, null);
+    }
+
+    static <T extends Tree> T info(T t, String message, @Nullable String detail) {
+        return markup(t, new Markup.Info(randomId(), message, detail));
+    }
+
+    static <T extends Tree> T debug(T t, String message) {
+        return debug(t, message, null);
+    }
+
+    static <T extends Tree> T debug(T t, String message, @Nullable String detail) {
+        return markup(t, new Markup.Debug(randomId(), message, detail));
+    }
+
+    static <T extends Tree> T markup(T t, Markup markup) {
+        return t.withMarkers(t.getMarkers().compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
+    }
+
+    @Value
+    @With
+    class Error implements Markup {
+        UUID id;
+        Throwable exception;
+
+        @Override
+        public String getMessage() {
+            return exception.getMessage();
+        }
+
+        @Override
+        @NonNull
+        public String getDetail() {
+            return ExceptionUtils.sanitizeStackTrace(exception, RecipeScheduler.class);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Error error = (Error) o;
+            return getDetail().equals(error.getDetail());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getDetail());
+        }
+    }
+
+    @Value
+    @With
+    class Warn implements Markup {
+        UUID id;
+        Throwable exception;
+
+        @Override
+        public String getMessage() {
+            return exception.getMessage();
+        }
+
+        @Override
+        @NonNull
+        public String getDetail() {
+            return ExceptionUtils.sanitizeStackTrace(exception, RecipeScheduler.class);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Warn error = (Warn) o;
+            return getDetail().equals(error.getDetail());
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(getDetail());
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @With
+    class Info implements Markup {
+        UUID id;
+
+        @EqualsAndHashCode.Include
+        String message;
+
+        @EqualsAndHashCode.Include
         @Nullable
-        private final RecipeRunException exception;
+        String detail;
 
-        public Error(UUID id, String message, @Nullable RecipeRunException exception) {
-            super(
-                    id,
-                    Level.ERROR,
-                    message,
-                    exception == null ? null : exception.getSanitizedStackTrace()
-            );
-            this.exception = exception;
+
+        @Override
+        public String getMessage() {
+            return message;
         }
-    }
 
-    public static class Warn extends Markup {
-        @Getter
         @Nullable
-        private final RecipeRunException exception;
-
-        public Warn(UUID id, String message, @Nullable RecipeRunException exception) {
-            super(
-                    id,
-                    Level.WARNING,
-                    message,
-                    exception == null ? null : exception.getSanitizedStackTrace()
-            );
-            this.exception = exception;
+        @Override
+        public String getDetail() {
+            return detail;
         }
     }
 
-    public static class Info extends Markup {
-        public Info(UUID id, String message) {
-            super(id, Level.INFO, message, null);
-        }
-    }
+    @Value
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @With
+    class Debug implements Markup {
+        UUID id;
 
-    public static class Debug extends Markup {
-        public Debug(UUID id, String message) {
-            super(id, Level.DEBUG, message, null);
-        }
-    }
+        @EqualsAndHashCode.Include
+        String message;
 
-    public static <T extends Tree> T error(T t, String message, Throwable throwable) {
-        return markup(t, Level.ERROR, message, throwable);
-    }
+        @EqualsAndHashCode.Include
+        @Nullable
+        String detail;
 
-    public static <T extends Tree> T warn(T t, String message, Throwable throwable) {
-        return markup(t, Level.WARNING, message, throwable);
-    }
-
-    public static <T extends Tree> T info(T t, String message) {
-        return markup(t, Level.INFO, message, null);
-    }
-
-    public static <T extends Tree> T debug(T t, String message) {
-        return markup(t, Level.DEBUG, message, null);
-    }
-
-    public static <T extends Tree> T markup(T t, Level level, String message) {
-        return markup(t, level, message, null);
-    }
-
-    public static <T extends Tree> T markup(T t, Level level, String message, @Nullable Throwable throwable) {
-        RecipeRunException rre = null;
-        if (throwable instanceof RecipeRunException) {
-            rre = (RecipeRunException) throwable;
-        } else if (throwable != null) {
-            rre = new RecipeRunException(throwable);
+        public String getMessage() {
+            return message;
         }
 
-        Markup markup;
-        switch (level) {
-            case DEBUG:
-                markup = new Markup.Debug(randomId(), message);
-                break;
-            case INFO:
-                markup = new Markup.Info(randomId(), message);
-                break;
-            case WARNING:
-                markup = new Markup.Warn(randomId(), message, rre);
-                break;
-            case ERROR:
-            default:
-                markup = new Markup.Error(randomId(), message, rre);
-                break;
+        @Nullable
+        @Override
+        public String getDetail() {
+            return detail;
         }
-
-        return t.withMarkers(t.getMarkers().computeByType(markup, (s1, s2) -> s1 == null ? s2 : s1));
     }
 }

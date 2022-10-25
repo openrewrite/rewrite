@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.maven;
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
+public class UncheckedMavenDownloadingException extends RuntimeException {
+    public UncheckedMavenDownloadingException(String message, MavenDownloadingExceptions e) {
+        super(message, e);
+    }
 
-import static org.openrewrite.java.Assertions.java;
-
-public class RecordTest implements RewriteTest {
-
-    @Test
-    void javaRecord() {
-        rewriteRun(
-          java(
-            """
-                  public record JavaRecord(String name, @Deprecated int age) {
-                  }
-              """
-          )
-        );
+    public UncheckedMavenDownloadingException(String message, MavenDownloadingException e) {
+        super(message, e);
     }
 }

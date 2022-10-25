@@ -22,17 +22,22 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
+import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenExecutionContextView;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.tree.*;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.DirectoryStream;
@@ -43,13 +48,14 @@ import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("OptionalAssignedToNull")
 public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
-                    throwable instanceof TimeoutException)
+                                           throwable instanceof TimeoutException)
             .build();
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
@@ -61,16 +67,44 @@ public class MavenPomDownloader {
     private final MavenExecutionContextView ctx;
     private final HttpSender httpSender;
 
+    @Nullable
+    private MavenSettings mavenSettings;
+
+    @Nullable
+    private List<String> activeProfiles;
+
     private final CheckedFunction1<HttpSender.Request, byte[]> sendRequest;
 
+    /**
+     * @param projectPoms    Other POMs in this project.
+     * @param ctx            The execution context, which potentially contain Maven settings customization and
+     *                       and {@link HttpSender} customization.
+     * @param mavenSettings  The Maven settings to use, if any. This argument overrides any Maven settings
+     *                       set on the execution context.
+     * @param activeProfiles The active profiles to use, if any. This argument overrides any active profiles
+     *                       set on the execution context.
+     */
+    public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx,
+                              @Nullable MavenSettings mavenSettings,
+                              @Nullable List<String> activeProfiles) {
+        this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        this.mavenSettings = mavenSettings;
+        this.activeProfiles = activeProfiles;
+    }
+
+    /**
+     * @param projectPoms Other POMs in this project.
+     * @param ctx         The execution context, which potentially contain Maven settings customization and
+     *                    and {@link HttpSender} customization.
+     */
     public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
         this(projectPoms, HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
     }
 
     /**
      * @param projectPoms Project poms on disk.
-     * @param httpSender The HTTP sender.
-     * @param ctx The execution context.
+     * @param httpSender  The HTTP sender.
+     * @param ctx         The execution context.
      * @deprecated Use {@link #MavenPomDownloader(Map, ExecutionContext)} instead.
      */
     @Deprecated
@@ -83,27 +117,25 @@ public class MavenPomDownloader {
                     try (HttpSender.Response response = httpSender.send(request)) {
                         if (response.isSuccessful()) {
                             return response.getBodyAsBytes();
-                        } else if (response.getCode() >= 400 && response.getCode() <= 404) {
-                            //Throw a different exception for client-side failures to allow downstream callers to handle those
-                            //differently.
-                            throw new MavenClientSideException("Failed to download " + request.getUrl(), response.getCode());
                         }
-                        throw new MavenDownloadingException("Failed to download " + request.getUrl() + ": " + response.getCode());
+                        throw new HttpSenderResponseException(null, response.getCode());
+                    } catch (Throwable t) {
+                        throw new HttpSenderResponseException(t, null);
                     }
                 });
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
     }
 
-    public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) {
+    public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
         return downloadMetadata(new GroupArtifactVersion(groupArtifact.getGroupId(), groupArtifact.getArtifactId(), null),
                 containingPom,
                 repositories);
     }
 
-    public MavenMetadata downloadMetadata(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) {
+    public MavenMetadata downloadMetadata(GroupArtifactVersion gav, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
         if (gav.getGroupId() == null) {
-            throw new MavenDownloadingException("Unable to download maven metadata because of a missing groupId.");
+            throw new MavenDownloadingException("Missing group id.", null, gav);
         }
 
         Timer.Sample sample = Timer.start();
@@ -114,19 +146,16 @@ public class MavenPomDownloader {
 
         MavenMetadata mavenMetadata = null;
         Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
-        Map<String, String> repoDownloadFailures = new HashMap<>();
+        Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         for (MavenRepository repo : normalizedRepos) {
             String version = gav.getVersion();
             if (version != null) {
                 if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
-                    repoDownloadFailures.put(repo.getUri(), "Version is a snapshot but the repository does not support snapshots.");
                     continue;
                 } else if (!version.endsWith("-SNAPSHOT") && !repo.isReleases()) {
-                    repoDownloadFailures.put(repo.getUri(), "Version is a release but the repository does not support releases.");
                     continue;
                 }
             }
-
             Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
             if (result == null) {
                 // Not in the cache, attempt to download it.
@@ -134,10 +163,10 @@ public class MavenPomDownloader {
                 try {
                     String scheme = URI.create(repo.getUri()).getScheme();
                     String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                            gav.getGroupId().replace('.', '/') + '/' +
-                            gav.getArtifactId() + '/' +
-                            (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
-                            "maven-metadata.xml";
+                                 gav.getGroupId().replace('.', '/') + '/' +
+                                 gav.getArtifactId() + '/' +
+                                 (gav.getVersion() == null ? "" : gav.getVersion() + '/') +
+                                 "maven-metadata.xml";
 
                     if ("file".equals(scheme)) {
                         // A maven repository can be expressed as a URI with a file scheme
@@ -149,12 +178,14 @@ public class MavenPomDownloader {
                         byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri);
                         result = Optional.of(MavenMetadata.parse(responseBody));
                     }
-                } catch (Throwable exception) {
-                    repoDownloadFailures.put(repo.getUri(), "Unable to download metadata. " + exception.getMessage());
-                    if (exception instanceof MavenClientSideException) {
+                } catch (HttpSenderResponseException e) {
+                    repositoryResponses.put(repo, e.getMessage());
+                    if (e.isClientSideException()) {
                         //If we have a 400-404, cache an empty result.
                         cacheEmptyResult = true;
                     }
+                } catch (IOException e) {
+                    repositoryResponses.put(repo, e.getMessage());
                 }
 
                 if (result == null) {
@@ -169,13 +200,8 @@ public class MavenPomDownloader {
                                     .register(Metrics.globalRegistry);
                             result = Optional.of(derivedMeta);
                         }
-                    } catch (Throwable exception) {
-                        String repoFailure = "Unable to derive metadata. " + exception.getMessage();
-                        String existingFailure = repoDownloadFailures.get(repo.getUri());
-                        if (existingFailure != null) {
-                            repoFailure = existingFailure + " (" + repoFailure + ")";
-                        }
-                        repoDownloadFailures.put(repo.getUri(), repoFailure);
+                    } catch (HttpSenderResponseException | MavenDownloadingException e) {
+                        repositoryResponses.put(repo, e.getMessage());
                     }
                 }
                 if (result == null && cacheEmptyResult) {
@@ -184,7 +210,7 @@ public class MavenPomDownloader {
                     mavenCache.putMavenMetadata(URI.create(repo.getUri()), gav, null);
                 }
             } else if (!result.isPresent()) {
-                repoDownloadFailures.put(repo.getUri(), "Cached empty result");
+                repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
 
             // Merge metadata from repository and cache metadata result.
@@ -200,17 +226,8 @@ public class MavenPomDownloader {
 
         if (mavenMetadata == null) {
             sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
-
-            StringBuilder message = new StringBuilder("Unable to Download metadata for [").append(gav).append("] from the following repositories :");
-
-            for (MavenRepository repository : normalizedRepos) {
-                message.append("\n  ").append(repository.getUri());
-                String repoFailure = repoDownloadFailures.get(repository.getUri());
-                if (repoFailure != null) {
-                    message.append(" - ").append(repoFailure);
-                }
-            }
-            throw new MavenDownloadingException(message.toString());
+            throw new MavenDownloadingException("Unable to download metadata.", null, gav)
+                    .setRepositoryResponses(repositoryResponses);
         }
 
         sample.stop(timer.tags("outcome", "success").register(Metrics.globalRegistry));
@@ -223,12 +240,12 @@ public class MavenPomDownloader {
      * and JitPack appear to always publish the metadata. So this method is currently tailored towards Nexus and how
      * it publishes html index pages.
      *
-     * @param gav The artifact coordinates that will be derived.
+     * @param gav  The artifact coordinates that will be derived.
      * @param repo The repository that will be queried for directory results
      * @return Metadata or null if the metadata cannot be derived.
      */
     @Nullable
-    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws Throwable {
+    private MavenMetadata deriveMetadata(GroupArtifactVersion gav, MavenRepository repo) throws HttpSenderResponseException, MavenDownloadingException {
         if ((repo.getDeriveMetadataIfMissing() != null && !repo.getDeriveMetadataIfMissing()) || gav.getVersion() != null) {
             // Do not derive metadata if we cannot navigate/browse the artifacts.
             // Do not derive metadata if a specific version has been defined.
@@ -237,13 +254,13 @@ public class MavenPomDownloader {
 
         String scheme = URI.create(repo.getUri()).getScheme();
         String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                     gav.getGroupId().replace('.', '/') + '/' +
+                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                      gav.getArtifactId();
 
         try {
             MavenMetadata.Versioning versioning;
             if ("file".equals(scheme)) {
-                versioning = directoryToVersioning(uri);
+                versioning = directoryToVersioning(uri, gav);
             } else {
                 // Only compute the metadata for http-based repositories.
                 String responseBody = new String(requestAsAuthenticatedOrAnonymous(repo, uri));
@@ -255,17 +272,17 @@ public class MavenPomDownloader {
             } else {
                 return new MavenMetadata(versioning);
             }
-        } catch (MavenClientSideException exception) {
-            if (exception.getResponseCode() != null && exception.getResponseCode() != 404) {
+        } catch (HttpSenderResponseException e) {
+            if (e.isClientSideException() && e.getResponseCode() != null && e.getResponseCode() != 404) {
                 // If access was denied, do not attempt to derive metadata from this repository in the future.
                 repo.setDeriveMetadataIfMissing(false);
             }
-            throw exception;
+            throw e;
         }
     }
 
     @Nullable
-    private MavenMetadata.Versioning directoryToVersioning(String uri) {
+    private MavenMetadata.Versioning directoryToVersioning(String uri, GroupArtifactVersion gav) throws MavenDownloadingException {
         Path dir = Paths.get(URI.create(uri));
         if (Files.exists(dir)) {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
@@ -277,7 +294,7 @@ public class MavenPomDownloader {
                 }
                 return new MavenMetadata.Versioning(versions, null, null);
             } catch (IOException e) {
-                throw new MavenDownloadingException("Unable to derive metadata from file repository. " + e.getMessage());
+                throw new MavenDownloadingException("Unable to derive metadata from file repository. " + e.getMessage(), null, gav);
             }
         }
         return null;
@@ -285,7 +302,6 @@ public class MavenPomDownloader {
 
     @Nullable
     private MavenMetadata.Versioning htmlIndexToVersioning(String responseBody, String uri) {
-
         // A very primitive approach, this just finds hrefs with trailing "/",
         List<String> versions = new ArrayList<>();
         int start = responseBody.indexOf("<a href=\"");
@@ -326,9 +342,7 @@ public class MavenPomDownloader {
         }
     }
 
-    @NonNull
     protected MavenMetadata mergeMetadata(MavenMetadata m1, MavenMetadata m2) {
-
         return new MavenMetadata(new MavenMetadata.Versioning(
                 mergeVersions(m1.getVersioning().getVersions(), m2.getVersioning().getVersions()),
                 Stream.concat(m1.getVersioning().getSnapshotVersions() == null ? Stream.empty() : m1.getVersioning().getSnapshotVersions().stream(),
@@ -359,25 +373,24 @@ public class MavenPomDownloader {
                         @Nullable ResolvedPom containingPom,
                         List<MavenRepository> repositories) throws MavenDownloadingException {
         if (gav.getGroupId() == null || gav.getArtifactId() == null || gav.getVersion() == null) {
-            String errorText = "Unable to download dependency " + gav;
             if (containingPom != null) {
                 ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
             }
-            throw new MavenDownloadingException(errorText);
+            throw new MavenDownloadingException("Group id, artifact id, or version are missing.", null, gav);
         }
 
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project POMs.
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                    gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                    Objects.equals(projectPom.getValue(projectPom.getVersion()), projectPom.getValue(gav.getVersion()))) {
+                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
+                Objects.equals(projectPom.getValue(projectPom.getVersion()), projectPom.getValue(gav.getVersion()))) {
                 return projectPom;
             }
         }
 
         if (containingPom != null && containingPom.getRequested().getSourcePath() != null &&
-                !StringUtils.isBlank(relativePath)) {
+            !StringUtils.isBlank(relativePath)) {
             Path folderContainingPom = containingPom.getRequested().getSourcePath().getParent();
             if (folderContainingPom != null) {
                 Pom maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
@@ -386,9 +399,9 @@ public class MavenPomDownloader {
                 // So double check that the GAV coordinates match so that we don't get a relative path from a remote
                 // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
                 if (maybeLocalPom != null
-                        && gav.getGroupId().equals(maybeLocalPom.getGroupId())
-                        && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
-                        && gav.getVersion().equals(maybeLocalPom.getVersion())) {
+                    && gav.getGroupId().equals(maybeLocalPom.getGroupId())
+                    && gav.getArtifactId().equals(maybeLocalPom.getArtifactId())
+                    && gav.getVersion().equals(maybeLocalPom.getVersion())) {
                     return maybeLocalPom;
                 }
             }
@@ -402,16 +415,13 @@ public class MavenPomDownloader {
                 .tag("artifact.id", gav.getArtifactId())
                 .tag("type", "pom");
 
-        Map<String, String> repoDownloadFailures = new HashMap<>();
+        Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         for (MavenRepository repo : normalizedRepos) {
-
             String version = gav.getVersion();
             if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
-                repoDownloadFailures.put(repo.getUri(), "Version is a snapshot but the repository does not support snapshots.");
                 continue;
             } else if (!version.endsWith("-SNAPSHOT") && !repo.isReleases()) {
-                repoDownloadFailures.put(repo.getUri(), "Version is a release but the repository does not support releases.");
                 continue;
             }
 
@@ -420,10 +430,10 @@ public class MavenPomDownloader {
             Optional<Pom> result = mavenCache.getPom(resolvedGav);
             if (result == null) {
                 URI uri = URI.create(repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                        gav.getGroupId().replace('.', '/') + '/' +
-                        gav.getArtifactId() + '/' +
-                        gav.getVersion() + '/' +
-                        gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
+                                     gav.getGroupId().replace('.', '/') + '/' +
+                                     gav.getArtifactId() + '/' +
+                                     gav.getVersion() + '/' +
+                                     gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
 
                 if ("file".equals(uri.getScheme())) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
@@ -453,10 +463,9 @@ public class MavenPomDownloader {
                         }
                     } catch (IOException e) {
                         // unable to read the pom from a file-based repository.
-                        repoDownloadFailures.put(repo.getUri(),  "Unable to download dependency. " + e.getMessage());
+                        repositoryResponses.put(repo, e.getMessage());
                     }
                 } else {
-
                     try {
                         byte[] responseBody = requestAsAuthenticatedOrAnonymous(repo, uri.toString());
 
@@ -473,9 +482,9 @@ public class MavenPomDownloader {
                         ctx.getResolutionListener().downloadSuccess(resolvedGav, containingPom);
                         sample.stop(timer.tags("outcome", "downloaded").register(Metrics.globalRegistry));
                         return pom;
-                    } catch (Throwable exception) {
-                        repoDownloadFailures.put(repo.getUri(),  "Unable to download dependency. " + exception.getMessage());
-                        if (exception instanceof MavenClientSideException) {
+                    } catch (HttpSenderResponseException e) {
+                        repositoryResponses.put(repo, e.getMessage());
+                        if (e.isClientSideException()) {
                             //If the exception is a common, client-side exception, cache an empty result.
                             mavenCache.putPom(resolvedGav, null);
                         }
@@ -485,7 +494,7 @@ public class MavenPomDownloader {
                 sample.stop(timer.tags("outcome", "cached").register(Metrics.globalRegistry));
                 return result.get();
             } else {
-                repoDownloadFailures.put(repo.getUri(),  "Cached empty result.");
+                repositoryResponses.put(repo, "Did not attempt to download because of a previous failure to retrieve from this repository.");
             }
         }
 
@@ -494,16 +503,8 @@ public class MavenPomDownloader {
             ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
         }
 
-        StringBuilder message = new StringBuilder("Unable to download dependency [" + gav + "] from the following repositories :");
-
-        for (MavenRepository repository : normalizedRepos) {
-            message.append("\n  ").append(repository.getUri());
-            String repoFailure = repoDownloadFailures.get(repository.getUri());
-            if (repoFailure != null) {
-                message.append(" - ").append(repoFailure);
-            }
-        }
-        throw new MavenDownloadingException(message.toString());
+        throw new MavenDownloadingException("Unable to download POM.", null, gav)
+                .setRepositoryResponses(repositoryResponses);
     }
 
     @Nullable
@@ -511,9 +512,9 @@ public class MavenPomDownloader {
         if (gav.getVersion() != null && gav.getVersion().endsWith("-SNAPSHOT")) {
             for (ResolvedGroupArtifactVersion pinnedSnapshotVersion : new MavenExecutionContextView(ctx).getPinnedSnapshotVersions()) {
                 if (pinnedSnapshotVersion.getDatedSnapshotVersion() != null &&
-                        pinnedSnapshotVersion.getGroupId().equals(gav.getGroupId()) &&
-                        pinnedSnapshotVersion.getArtifactId().equals(gav.getArtifactId()) &&
-                        pinnedSnapshotVersion.getVersion().equals(gav.getVersion())) {
+                    pinnedSnapshotVersion.getGroupId().equals(gav.getGroupId()) &&
+                    pinnedSnapshotVersion.getArtifactId().equals(gav.getArtifactId()) &&
+                    pinnedSnapshotVersion.getVersion().equals(gav.getVersion())) {
                     return pinnedSnapshotVersion.getDatedSnapshotVersion();
                 }
             }
@@ -548,7 +549,7 @@ public class MavenPomDownloader {
         }
 
         // repositories from maven settings
-        for (MavenRepository repo : ctx.getRepositories()) {
+        for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
             if (normalizedRepo != null && (acceptsVersion == null || normalizedRepo.acceptsVersion(acceptsVersion))) {
                 normalizedRepositories.add(normalizedRepo);
@@ -616,6 +617,10 @@ public class MavenPomDownloader {
                                     repository.isSnapshots(),
                                     repository.getUsername(),
                                     repository.getPassword());
+                        } catch (HttpSenderResponseException e) {
+                            if (!e.isClientSideException()) {
+                                return originalRepository;
+                            }
                         } catch (Throwable ignored) {
                             // ok to fall through here and cache a null
                         }
@@ -635,11 +640,13 @@ public class MavenPomDownloader {
     /**
      * Replicates Apache Maven's behavior to attempt anonymous download if repository credentials prove invalid
      */
-    private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws Throwable {
+    private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException {
         try {
             return sendRequest.apply(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
-        } catch (MavenClientSideException e) {
-            return sendRequest.apply(httpSender.get(uriString).build());
+        } catch (HttpSenderResponseException e) {
+            throw e;
+        } catch (Throwable t) {
+            throw new RuntimeException(t); // unreachable
         }
     }
 
@@ -647,7 +654,7 @@ public class MavenPomDownloader {
      * Returns a Maven Repository with any applicable credentials as sourced from the ExecutionContext
      */
     private MavenRepository applyAuthenticationToRepository(MavenRepository repository) {
-        return MavenRepositoryCredentials.apply(ctx.getCredentials(), repository);
+        return MavenRepositoryCredentials.apply(ctx.getCredentials(mavenSettings), repository);
     }
 
     /**
@@ -661,6 +668,27 @@ public class MavenPomDownloader {
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {
-        return MavenRepositoryMirror.apply(ctx.getMirrors(), repository);
+        return MavenRepositoryMirror.apply(ctx.getMirrors(mavenSettings), repository);
+    }
+
+    @Getter
+    private static class HttpSenderResponseException extends Exception {
+        @Nullable
+        private final Integer responseCode;
+
+        public HttpSenderResponseException(@Nullable Throwable cause, @Nullable Integer responseCode) {
+            super(cause);
+            this.responseCode = responseCode;
+        }
+
+        public boolean isClientSideException() {
+            return responseCode != null && responseCode >= 400 && responseCode <= 404;
+        }
+
+        public String getMessage() {
+            return responseCode == null ?
+                    requireNonNull(getCause()).getMessage() :
+                    "HTTP " + responseCode;
+        }
     }
 }

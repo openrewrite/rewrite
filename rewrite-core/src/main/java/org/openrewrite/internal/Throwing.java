@@ -13,7 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NonNullApi
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.NonNullApi;
+import java.util.function.Consumer;
+
+public final class Throwing {
+    private Throwing() {
+    }
+
+    public static <T> Consumer<T> rethrow(ThrowingConsumer<T> consumer) {
+        return consumer;
+    }
+
+    /**
+     * The compiler sees the signature with the throws T inferred to a RuntimeException type, so it
+     * allows the unchecked exception to propagate. {@see http://www.baeldung.com/java-sneaky-throws}.
+     */
+    @SuppressWarnings("unchecked")
+    public static <E extends Throwable> void sneakyThrow(Throwable e) throws E {
+        throw (E) e;
+    }
+}

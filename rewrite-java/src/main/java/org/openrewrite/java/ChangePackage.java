@@ -152,7 +152,7 @@ public class ChangePackage extends Recipe {
             if (original.equals(oldPackageName)) {
                 getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, newPackageName);
 
-                if (newPackageName.contains(".")) {
+                if (!newPackageName.isEmpty()) {
                     pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, newPackageName).build(), pkg.getCoordinates().replace());
                 } else {
                     // Covers unlikely scenario where the package is removed.

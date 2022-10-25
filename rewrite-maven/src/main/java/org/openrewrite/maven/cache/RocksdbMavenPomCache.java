@@ -28,7 +28,7 @@ import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.internal.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.*;
 import org.rocksdb.Options;
@@ -143,11 +143,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
     }
 
     @Override
-    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) {
+    public Optional<Pom> getPom(ResolvedGroupArtifactVersion gav) throws MavenDownloadingException {
         try {
             return deserializePom(cache.get(serialize(gav.toString().getBytes(StandardCharsets.UTF_8))));
         } catch (RocksDBException e) {
-            throw new MavenDownloadingException(e);
+            throw new MavenDownloadingException("Failed to deserialize POM from RocksDB cache", e,
+                    new GroupArtifactVersion(gav.getGroupId(), gav.getArtifactId(), gav.getVersion()));
         }
     }
 

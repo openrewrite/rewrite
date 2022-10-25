@@ -16,25 +16,23 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.EnumSource
+import org.junit.jupiter.params.provider.ValueSource
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.marker.Markup
 import org.openrewrite.test.RewriteTest
-import java.util.*
 
 interface RecipeMarkupDemonstrationTest : RewriteTest {
 
     @ParameterizedTest
-    @EnumSource(Markup.Level::class)
-    fun markup(level: Markup.Level) = rewriteRun(
-            { spec -> spec.recipe(RecipeMarkupDemonstration(level.name.lowercase())) },
+    @ValueSource(strings = ["debug", "info", "warning", "error"])
+    fun markup(level: String) = rewriteRun(
+            { spec -> spec.recipe(RecipeMarkupDemonstration(level)) },
             java(
-                """
+                    """
                     class Test {
                     }
                 """,
-                """
-                    /*~~(This is a ${level.name.lowercase()} message.)~~>*/class Test {
+                    """
+                    /*~~(This is a${if (level == "error" || level == "info") "n" else ""} $level message.)~~>*/class Test {
                     }
                 """
             )

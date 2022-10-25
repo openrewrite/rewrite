@@ -13,24 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+@NonNullApi
+package org.openrewrite.java.internal;
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RewriteTest;
-
-import static org.openrewrite.java.Assertions.java;
-
-public class RecordTest implements RewriteTest {
-
-    @Test
-    void javaRecord() {
-        rewriteRun(
-          java(
-            """
-                  public record JavaRecord(String name, @Deprecated int age) {
-                  }
-              """
-          )
-        );
-    }
-}
+import org.openrewrite.internal.lang.NonNullApi;

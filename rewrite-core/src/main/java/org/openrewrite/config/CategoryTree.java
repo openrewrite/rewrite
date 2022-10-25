@@ -275,6 +275,18 @@ public class CategoryTree<G> {
             for (CategoryTree<G> subtree : subtrees) {
                 String subtreePackage = subtree.getDescriptor().getPackageName();
                 if (subtreePackage.equals(categoryPackage) || categoryPackage.startsWith(subtreePackage + ".")) {
+                    if (!subtree.groups.contains(group)) {
+                        subtree.groups.add(group);
+                        subtree.descriptorsByGroup.put(group, new CategoryDescriptor(
+                                StringUtils.capitalize(subtreePackage.substring(subtreePackage.lastIndexOf('.') + 1)),
+                                subtreePackage,
+                                "",
+                                emptySet(),
+                                false,
+                                0,
+                                true
+                        ));
+                    }
                     return subtree.findOrAddCategory(group, category);
                 }
             }
@@ -316,6 +328,10 @@ public class CategoryTree<G> {
     }
 
     void addRecipe(G group, RecipeDescriptor recipe) {
+        if (!recipe.getName().contains(".")) {
+            throw new IllegalArgumentException("Expected recipe with name '" + recipe.getName() + "' to have" +
+                                               "a package, but it did not.");
+        }
         String category = recipe.getName().substring(0, recipe.getName().lastIndexOf('.'));
         CategoryTree<G> categoryTree = findOrAddCategory(group, new CategoryDescriptor(
                 StringUtils.capitalize(category.substring(category.lastIndexOf('.') + 1)),

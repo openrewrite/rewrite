@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -101,7 +102,7 @@ public class MavenParser implements Parser<Xml.Document> {
                 projectPoms.put(xml, pom);
                 projectPomsByPath.put(pomPath, pom);
             } catch (Throwable t) {
-                ParsingExecutionContextView.view(ctx).parseFailure(pomPath, t);
+                ParsingExecutionContextView.view(ctx).parseFailure(pomPath, this, t);
                 ctx.getOnError().accept(t);
             }
         }
@@ -113,11 +114,25 @@ public class MavenParser implements Parser<Xml.Document> {
         }
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
+        MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
+        MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
+                .withServers(mavenCtx.getSettings().getServers() == null ? null :
+                        mavenCtx.getSettings().getServers().withServers(
+                                ListUtils.map(mavenCtx.getSettings().getServers().getServers(), server ->
+                                        server.withUsername(null).withPassword(null))
+                        ));
+
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
-            ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
-            MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap())
-                    .resolveDependencies(downloader, ctx);
-            parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
+            try {
+                ResolvedPom resolvedPom = docToPom.getValue().resolve(activeProfiles, downloader, ctx);
+                MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
+                        .resolveDependencies(downloader, ctx);
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
+            } catch(MavenDownloadingExceptions e) {
+                throw new UncheckedMavenDownloadingException("Failed to download dependencies for " + docToPom.getKey().getSourcePath(), e);
+            } catch (MavenDownloadingException e) {
+                throw new UncheckedMavenDownloadingException("Failed to download dependencies for " + docToPom.getKey().getSourcePath(), e);
+            }
         }
 
         for (int i = 0; i < parsed.size(); i++) {
@@ -134,9 +149,9 @@ public class MavenParser implements Parser<Xml.Document> {
                         .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
                 Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
-                        resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
-                        resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
-                        resolutionResult.getPom().getVersion().equals(resolutionResult.getPom().getValue(parent.getVersion()))) {
+                    resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&
+                    resolutionResult.getPom().getArtifactId().equals(resolutionResult.getPom().getValue(parent.getArtifactId())) &&
+                    resolutionResult.getPom().getVersion().equals(resolutionResult.getPom().getValue(parent.getVersion()))) {
                     moduleResolutionResult.unsafeSetParent(resolutionResult);
                     modules.add(moduleResolutionResult);
                 }

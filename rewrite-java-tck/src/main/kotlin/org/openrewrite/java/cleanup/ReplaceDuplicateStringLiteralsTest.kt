@@ -417,4 +417,52 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
             }
         """
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2329")
+    @Test
+    fun unicodeCharacterEquivalents() = assertChanged(
+        before = """
+            class A {
+                final String val1 = "āăąēîïĩíĝġńñšŝśûůŷ";
+                final String val2 = "āăąēîïĩíĝġńñšŝśûůŷ";
+                final String val3 = "āăąēîïĩíĝġńñšŝśûůŷ";
+            }
+        """,
+        after = """
+            class A {
+                private static final String AAAEIIIIGGNNSSSUUY = "āăąēîïĩíĝġńñšŝśûůŷ";
+                final String val1 = AAAEIIIIGGNNSSSUUY;
+                final String val2 = AAAEIIIIGGNNSSSUUY;
+                final String val3 = AAAEIIIIGGNNSSSUUY;
+            }
+        """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2330")
+    @Test
+    fun enum() = assertChanged(
+        before = """
+            enum A {
+                ONE, TWO, THREE;
+                
+                public void example() {
+                    final String val1 = "value";
+                    final String val2 = "value";
+                    final String val3 = "value";
+                }
+            }
+        """,
+        after = """
+            enum A {
+                ONE, TWO, THREE;
+                private static final String VALUE = "value";
+                
+                public void example() {
+                    final String val1 = VALUE;
+                    final String val2 = VALUE;
+                    final String val3 = VALUE;
+                }
+            }
+        """
+    )
 }

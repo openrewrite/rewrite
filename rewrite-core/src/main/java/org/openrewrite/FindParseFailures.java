@@ -17,14 +17,12 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
-
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindParseFailures extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Find source files with `ParseExceptionResult` markers";
@@ -32,19 +30,18 @@ public class FindParseFailures extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find source files with `ParseExceptionResult` markers.";
+        return "This recipe explores parse failures after an AST is produced for classifying the types of " +
+               "failures that can occur and prioritizing fixes according to the most common problems.";
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                Optional<ParseExceptionResult> parseExceptionResult = sourceFile.getMarkers().findFirst(ParseExceptionResult.class);
-                if (parseExceptionResult.isPresent()) {
-                    return Markup.error(sourceFile, parseExceptionResult.get().getMessage(), null);
-                }
-                return sourceFile;
+            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+                return sourceFile.getMarkers().findFirst(ParseExceptionResult.class)
+                        .<Tree>map(exceptionResult -> Markup.info(sourceFile, exceptionResult.getMessage()))
+                        .orElse(sourceFile);
             }
         };
     }

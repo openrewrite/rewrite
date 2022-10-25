@@ -15,10 +15,7 @@
  */
 package org.openrewrite.tree;
 
-import org.openrewrite.DelegatingExecutionContext;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.ParseExceptionResult;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 
@@ -58,12 +55,12 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
     }
 
     @SuppressWarnings("UnusedReturnValue")
-    public ParsingExecutionContextView parseFailure(Path path, Throwable t) {
+    public ParsingExecutionContextView parseFailure(Path path, Parser<?> parser, Throwable t) {
         if(path.isAbsolute()) {
             throw new RuntimeException("Relative paths only");
         }
         putMessageInCollection(PARSING_FAILURES,
-                new Quark(Tree.randomId(), path, Markers.EMPTY.addIfAbsent(new ParseExceptionResult(t)), null, null),
+                new Quark(Tree.randomId(), path, Markers.EMPTY.addIfAbsent(ParseExceptionResult.build(parser, t)), null, null),
                 ArrayList::new);
         return this;
     }

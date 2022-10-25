@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.hcl.Assertions.hcl
 import org.openrewrite.test.RewriteTest
 
@@ -53,5 +54,22 @@ class HclCommentTest : RewriteTest {
                 }
             """.replace("\r\n", "\n").replace("\n", "\r\n")
         )
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2079")
+    fun bracesInComment() = rewriteRun(
+            hcl(
+            """
+            locals {
+                myvar = {
+                  # below {attributes}
+                  myattribute = "myvalue"
+
+                  # add more attributes {here}
+                }
+            }
+            """
+            )
     )
 }

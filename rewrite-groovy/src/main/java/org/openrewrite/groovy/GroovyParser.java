@@ -112,7 +112,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 cus.add(gcu);
                 parsingListener.parsed(compiled.getInput(), gcu);
             } catch (Throwable t) {
-                pctx.parseFailure(compiled.getInput().getRelativePath(relativeTo), t);
+                pctx.parseFailure(compiled.getInput().getRelativePath(relativeTo), this, t);
                 ctx.getOnError().accept(t);
             }
         }
@@ -164,7 +164,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
                 cus.add(new CompiledGroovySource(input, unit, ast));
             } catch (Throwable t) {
-                ctx.parseFailure(input.getRelativePath(relativeTo), t);
+                ctx.parseFailure(input.getRelativePath(relativeTo), this, t);
                 ctx.getOnError().accept(t);
             } finally {
                 if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {
