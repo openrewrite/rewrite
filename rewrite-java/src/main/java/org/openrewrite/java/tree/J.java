@@ -4650,6 +4650,11 @@ public interface J extends Tree {
                     }
                     return caze;
                 }
+
+                @Override
+                public J visitSwitchExpression(SwitchExpression switzh,  AtomicReference<JavaType> javaType) {
+                    return switzh;
+                }
             }.reduce(this, new AtomicReference<>()).get();
         }
 
