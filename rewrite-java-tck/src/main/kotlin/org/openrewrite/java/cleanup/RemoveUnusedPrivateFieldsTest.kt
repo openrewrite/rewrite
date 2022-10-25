@@ -77,6 +77,19 @@ interface RemoveUnusedPrivateFieldsTest : RewriteTest {
     )
 
     @Test
+    fun usedInClassScope() = rewriteRun(
+        java("""
+            public class Test {
+                private String value = "";
+                private String useValue = method(value);
+                String method(String arg0) {
+                    return arg0 + useValue;
+                }
+            }
+        """)
+    )
+
+    @Test
     fun removeUnusedPrivateField() = rewriteRun(
         java(
             """

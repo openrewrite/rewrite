@@ -116,6 +116,7 @@ public class RemoveUnusedPrivateFields extends Recipe {
             for (J.VariableDeclarations.NamedVariable variable : declarations.getVariables()) {
                 if (variable.getVariableType() != null) {
                     found.computeIfAbsent(variable, k -> new ArrayList<>());
+                    // Note: Using a variable type signature is only safe to find uses of class fields.
                     signatureMap.put(variable.getVariableType().toString(), variable);
                 }
             }
@@ -131,10 +132,9 @@ public class RemoveUnusedPrivateFields extends Recipe {
                                 is instanceof J.VariableDeclarations ||
                                 is instanceof J.ClassDeclaration);
 
-                        if (parent.getValue() instanceof J.VariableDeclarations) {
-                            J.VariableDeclarations vd = parent.getValue();
+                        if (!(parent.getValue() instanceof J.VariableDeclarations && parent.getValue() == declarations)) {
                             J.VariableDeclarations.NamedVariable name = signatureMap.get(identifier.getFieldType().toString());
-                            if (!vd.getVariables().contains(name)) {
+                            if (declarations.getVariables().contains(name)) {
                                 J.VariableDeclarations.NamedVariable used = signatureMap.get(identifier.getFieldType().toString());
                                 identifiers.computeIfAbsent(used, k -> new ArrayList<>())
                                         .add(identifier);
