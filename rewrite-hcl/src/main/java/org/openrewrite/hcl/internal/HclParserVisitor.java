@@ -93,7 +93,14 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
     @Override
     public Hcl visitBinaryOp(HCLParser.BinaryOpContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            Expression left = (Expression) visit(c.exprTerm(0));
+            Expression left, right;
+
+            // left can be unaryOp or exprTerm, right can be another operation or exprTerm
+            if (c.unaryOp() != null) {
+                left = (Expression) visit(c.unaryOp());
+            }else {
+                left = (Expression) visit(c.exprTerm(0));
+            }
 
             Hcl.Binary.Type op;
             switch (ctx.binaryOperator().getText()) {
@@ -141,13 +148,19 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
             Space opPrefix = Space.format(prefix(ctx.binaryOperator()));
             cursor = ctx.binaryOperator().getStop().getStopIndex() + 1;
 
+            if (c.unaryOp() != null) {
+                right = (Expression) visit(c.operation() != null ? c.operation() : c.exprTerm(0));
+            }else {
+                right = (Expression) visit(c.operation() != null ? c.operation() : c.exprTerm(1));
+            }
+
             return new Hcl.Binary(
                     randomId(),
                     Space.format(prefix),
                     Markers.EMPTY,
                     left,
                     new HclLeftPadded<>(opPrefix, op, Markers.EMPTY),
-                    (Expression) visit(c.exprTerm(1))
+                    right
             );
         });
     }

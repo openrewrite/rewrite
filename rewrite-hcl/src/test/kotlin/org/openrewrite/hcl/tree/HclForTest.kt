@@ -27,9 +27,9 @@ class HclForTest : RewriteTest {
             """
                 a = [ for v in ["a", "b"] : v ]
                 b = [ for i, v in ["a", "b"] : i ]
-                c = [for i, v in ["a", "b", "c"]: v if 0]
+                c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
                 d = [
-                  for i, v in ["a", "b", "c"]: v if 0
+                  for i, v in ["a", "b", "c"]: v if 0 || 1
                 ]
                 e = [
                   for i, v in ["a", "b", "c"]: v 
