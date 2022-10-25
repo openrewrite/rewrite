@@ -65,7 +65,8 @@ public class CategoryTree<G> {
 
     public static class Root<G> extends CategoryTree<G> {
         private static final CategoryDescriptor ROOT_DESCRIPTOR = new CategoryDescriptor(
-                "ε", "", "", emptySet(), true, 0, true);
+                "ε", "", "", emptySet(), true,
+                CategoryDescriptor.LOWEST_PRECEDENCE, true);
 
         private Root() {
             super();
@@ -132,6 +133,7 @@ public class CategoryTree<G> {
             CategoryDescriptor test = descriptorsByGroup.get(group);
             if (!test.isSynthetic() && test.getPriority() > currentPriority) {
                 categoryDescriptor = test;
+                currentPriority = test.getPriority();
             }
         }
 
@@ -283,7 +285,7 @@ public class CategoryTree<G> {
                                 "",
                                 emptySet(),
                                 false,
-                                0,
+                                CategoryDescriptor.LOWEST_PRECEDENCE,
                                 true
                         ));
                     }
@@ -309,7 +311,7 @@ public class CategoryTree<G> {
                         "",
                         emptySet(),
                         false,
-                        0,
+                        CategoryDescriptor.LOWEST_PRECEDENCE,
                         true
                 )).findOrAddCategory(group, category);
             }
@@ -339,7 +341,7 @@ public class CategoryTree<G> {
                 "",
                 emptySet(),
                 false,
-                0,
+                CategoryDescriptor.LOWEST_PRECEDENCE,
                 true
         ));
         categoryTree.recipesByGroup.computeIfAbsent(group, g -> new CopyOnWriteArrayList<>()).add(recipe);
@@ -435,7 +437,7 @@ public class CategoryTree<G> {
                         "",
                         emptySet(),
                         false,
-                        0,
+                        CategoryDescriptor.LOWEST_PRECEDENCE,
                         true
                 );
             }
