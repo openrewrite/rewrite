@@ -129,9 +129,9 @@ public class MavenParser implements Parser<Xml.Document> {
                         .resolveDependencies(downloader, ctx);
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch(MavenDownloadingExceptions e) {
-                throw new UncheckedMavenDownloadingException("Failed to download dependencies for " + docToPom.getKey().getSourcePath(), e);
+                throw new UncheckedMavenDownloadingException(docToPom.getKey(), e);
             } catch (MavenDownloadingException e) {
-                throw new UncheckedMavenDownloadingException("Failed to download dependencies for " + docToPom.getKey().getSourcePath(), e);
+                throw new UncheckedMavenDownloadingException(docToPom.getKey(), e);
             }
         }
 
