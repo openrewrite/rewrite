@@ -39,12 +39,12 @@ public class Assertions {
         return yaml;
     }
 
-    public static SourceSpecs yaml(@Language("yml") @Nullable String before, @Language("yml") String after) {
+    public static SourceSpecs yaml(@Language("yml") @Nullable String before, @Language("yml") @Nullable String after) {
         return yaml(before, after, s -> {
         });
     }
 
-    public static SourceSpecs yaml(@Language("yml") @Nullable String before, @Language("yml") String after,
+    public static SourceSpecs yaml(@Language("yml") @Nullable String before, @Language("yml") @Nullable String after,
                              Consumer<SourceSpec<Yaml.Documents>> spec) {
         SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, YamlParser.builder(), before, after);
         spec.accept(yaml);

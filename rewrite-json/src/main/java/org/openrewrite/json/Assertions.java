@@ -40,12 +40,12 @@ public class Assertions {
         return json;
     }
 
-    public static SourceSpecs json(@Language("json") @Nullable String before, @Language("json") String after) {
+    public static SourceSpecs json(@Language("json") @Nullable String before, @Language("json") @Nullable String after) {
         return json(before, after, s -> {
         });
     }
 
-    public static SourceSpecs json(@Language("json") @Nullable String before, @Language("json") String after,
+    public static SourceSpecs json(@Language("json") @Nullable String before, @Language("json") @Nullable String after,
                              Consumer<SourceSpec<Json.Document>> spec) {
         SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, JsonParser.builder(), before, after);
         spec.accept(json);

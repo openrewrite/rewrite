@@ -69,7 +69,7 @@ public class Java11UnrestrictedClassLoader extends ClassLoader {
 
             String internalName = name.replace('.', '/') + ".class";
 
-            //If the class is in the package "org.openrewrite.java.internal", load it from this class loader.
+            //If the class is in the package "org.openrewrite.java.isolated", load it from this class loader.
             Class<?> _class = loadIsolatedClass(name);
             if (_class != null) {
                 return _class;
@@ -89,8 +89,8 @@ public class Java11UnrestrictedClassLoader extends ClassLoader {
                     throw new RuntimeException(e);
                 }
             }
+            return super.loadClass(name);
         }
-        return super.loadClass(name);
     }
 
     @Nullable

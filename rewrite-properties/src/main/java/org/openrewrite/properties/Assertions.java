@@ -37,12 +37,12 @@ public class Assertions {
         return properties;
     }
 
-    public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") String after) {
+    public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") @Nullable String after) {
         return properties(before, after, s -> {
         });
     }
 
-    public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") String after,
+    public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") @Nullable String after,
                                    Consumer<SourceSpec<Properties.File>> spec) {
         SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, after);
         spec.accept(properties);

@@ -41,12 +41,12 @@ public class Assertions {
         return groovy;
     }
 
-    public static SourceSpecs groovy(@Language("groovy") @Nullable String before, @Language("groovy") String after) {
+    public static SourceSpecs groovy(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after) {
         return groovy(before, after, s -> {
         });
     }
 
-    public static SourceSpecs groovy(@Language("groovy") @Nullable String before, @Language("groovy") String after,
+    public static SourceSpecs groovy(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
                                      Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, after);
         spec.accept(groovy);

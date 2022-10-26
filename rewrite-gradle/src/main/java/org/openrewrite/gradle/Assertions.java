@@ -25,7 +25,6 @@ import org.openrewrite.test.SourceSpecs;
 
 import java.nio.file.Paths;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 public class Assertions {
 
@@ -47,12 +46,12 @@ public class Assertions {
         return gradle;
     }
 
-    public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") String after) {
+    public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after) {
         return buildGradle(before, after, s -> {
         });
     }
 
-    public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") String after,
+    public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
                                     Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, after);
         gradle.path("build.gradle");

@@ -440,6 +440,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveUnusedLocalVariablesTck : RemoveUnusedLocalVariablesTest
 
     @Nested
+    inner class RemoveUnusedPrivateFieldsTck : RemoveUnusedPrivateFieldsTest
+
+    @Nested
     inner class RemoveUnusedPrivateMethodsTck : RemoveUnusedPrivateMethodsTest
 
     @Nested

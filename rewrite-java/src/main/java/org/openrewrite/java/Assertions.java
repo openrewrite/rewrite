@@ -103,12 +103,12 @@ public class Assertions {
         return java;
     }
 
-    public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after) {
+    public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") @Nullable String after) {
         return java(before, after, s -> {
         });
     }
 
-    public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") String after,
+    public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") @Nullable String after,
                                    Consumer<SourceSpec<J.CompilationUnit>> spec) {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParser, before, after,
                 Assertions::validateTypes,

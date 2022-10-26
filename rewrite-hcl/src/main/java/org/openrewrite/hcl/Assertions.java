@@ -36,12 +36,12 @@ public class Assertions {
         return hcl;
     }
 
-    public static SourceSpecs hcl(@Nullable String before, String after) {
+    public static SourceSpecs hcl(@Nullable String before, @Nullable String after) {
         return hcl(before, after, s -> {
         });
     }
 
-    public static SourceSpecs hcl(@Nullable String before, String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
+    public static SourceSpecs hcl(@Nullable String before, @Nullable String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
         SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(),  before, after);
         spec.accept(hcl);
         return hcl;
