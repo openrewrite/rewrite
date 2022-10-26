@@ -2222,7 +2222,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                         cd = cd.withBody(
                             cd.body.withTemplate(
                                 JavaTemplate.builder(
-                                    this::getCursor, """
+                                    { cursor.parentOrThrow }, """
                                 /**
                                  * comment
                                  */

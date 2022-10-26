@@ -230,7 +230,7 @@ public class Autodetect extends NamedStyles {
                     // Compare to the prefix of the first arg.
                     alignTo = method.getParameters().get(0).getPrefix().getLastWhitespace().length() - 1;
                 } else {
-                    String source = method.print(getCursor());
+                    String source = method.print(getCursor().getParentOrThrow());
                     alignTo = source.indexOf(method.getParameters().get(0).print(getCursor())) - 1;
                 }
                 List<Statement> parameters = method.getParameters();
