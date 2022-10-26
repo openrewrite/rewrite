@@ -172,7 +172,7 @@ unaryOp
     ;
 
 binaryOp
-    : exprTerm binaryOperator exprTerm
+    : (exprTerm | unaryOp) binaryOperator (exprTerm | operation)
     ;
 
 binaryOperator

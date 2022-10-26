@@ -25,9 +25,13 @@ class HclBinaryTest : RewriteTest {
     fun binary() = rewriteRun(
         hcl(
             """
-                a = 1 + 2
-                b = 1 <= 2
-                c = true && false
+                foo {
+                    a = 1 + 2
+                    b = 1 <= 2
+                    c = true && false
+                    d = !true && !false || !true
+                    e = !true && (!false || !true)
+                }
             """
         )
     )
