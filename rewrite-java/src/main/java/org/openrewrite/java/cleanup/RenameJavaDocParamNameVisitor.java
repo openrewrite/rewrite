@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
@@ -23,9 +24,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Javadoc;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Incubating(since = "7.33.0")
 public class RenameJavaDocParamNameVisitor<P> extends JavaIsoVisitor<P> {
@@ -46,17 +44,13 @@ public class RenameJavaDocParamNameVisitor<P> extends JavaIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
         if (methodMatcher.matches(md.getMethodType()) && md.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment)) {
-            List<Comment> comments = new ArrayList<>(md.getComments().size());
-            for (Comment comment : md.getComments()) {
-                if (comment instanceof Javadoc.DocComment) {
-                    Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
-                    Comment newComment = (Comment) new RenameParamVisitor<P>(oldName, newName).visit(docComment, p);
-                    comments.add(newComment);
-                } else {
-                    comments.add(comment);
+            md = md.withComments(ListUtils.map(md.getComments(), it -> {
+                if (it instanceof Javadoc.DocComment) {
+                    Javadoc.DocComment docComment = (Javadoc.DocComment) it;
+                    return (Comment) new RenameParamVisitor<P>(oldName, newName).visitDocComment(docComment, p);
                 }
-            }
-            md = md.withPrefix(md.getPrefix().withComments(comments));
+                return it;
+            }));
         }
         return md;
     }

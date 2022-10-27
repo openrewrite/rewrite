@@ -413,6 +413,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class RemoveCallsToSystemGcTck : RemoveCallsToSystemGcTest
 
     @Nested
+    inner class RemoveEmptyJavaDocParametersTck : RemoveEmptyJavaDocParametersTest
+
+    @Nested
     inner class RemoveExtraSemicolonsTck : RemoveExtraSemicolonsTest
 
     @Nested
