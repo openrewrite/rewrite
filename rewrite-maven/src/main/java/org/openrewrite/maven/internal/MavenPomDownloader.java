@@ -114,14 +114,16 @@ public class MavenPomDownloader {
         this.sendRequest = Retry.decorateCheckedFunction(
                 mavenDownloaderRetry,
                 request -> {
+                    int responseCode;
                     try (HttpSender.Response response = httpSender.send(request)) {
                         if (response.isSuccessful()) {
                             return response.getBodyAsBytes();
                         }
-                        throw new HttpSenderResponseException(null, response.getCode());
+                        responseCode = response.getCode();
                     } catch (Throwable t) {
                         throw new HttpSenderResponseException(t, null);
                     }
+                    throw new HttpSenderResponseException(null, responseCode);
                 });
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
@@ -594,9 +596,11 @@ public class MavenPomDownloader {
                 try {
                     sendRequest.apply(request.build());
                     normalized = repository.withUri(httpsUri);
-                } catch (HttpSenderResponseException exception) {
+                } catch (HttpSenderResponseException e) {
                     // response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                    normalized = repository.withUri(httpsUri);
+                    if (e.getResponseCode() != null) {
+                        normalized = repository.withUri(httpsUri);
+                    }
                 } catch (Throwable t) {
                     if (!httpsUri.equals(originalUrl)) {
                         try {

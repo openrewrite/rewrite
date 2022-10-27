@@ -45,7 +45,9 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
-            .recipeExecutionContext(new InMemoryExecutionContext()),
+            .recipeExecutionContext(new InMemoryExecutionContext())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           pomXml(
             """
               <project>
@@ -100,7 +102,9 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
-            .recipeExecutionContext(new InMemoryExecutionContext()),
+            .recipeExecutionContext(new InMemoryExecutionContext())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           pomXml(
             """
               <project>
@@ -163,7 +167,9 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setLocalRepository(mavenLocal)
               .setPomCache(new InMemoryMavenPomCache())
-            ),
+            )
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           pomXml(
             """
               <project>
