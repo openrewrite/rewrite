@@ -594,8 +594,8 @@ public class MavenPomDownloader {
                 try {
                     sendRequest.apply(request.build());
                     normalized = repository.withUri(httpsUri);
-                } catch (MavenDownloadingException exception) {
-                    //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
+                } catch (HttpSenderResponseException exception) {
+                    // response was returned from the server, but it was not a 200 OK. The server therefore exists.
                     normalized = repository.withUri(httpsUri);
                 } catch (Throwable t) {
                     if (!httpsUri.equals(originalUrl)) {
