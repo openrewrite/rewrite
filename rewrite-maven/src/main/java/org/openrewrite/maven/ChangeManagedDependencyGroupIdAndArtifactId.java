@@ -73,15 +73,6 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     @Nullable
     String versionPattern;
 
-
-    @Option(displayName = "Override version if it is defined as a property and that property is not defined in the same pom.xml file.",
-            description = "This flag can be set to explicitly override a managed dependency's version if it has been expressed as a property placeholder and the property is not defined in the same pom.xml file. The default for this flag is `false`.",
-            example = "false",
-            required = false)
-    @Nullable
-    Boolean overridePropertyVersion;
-
-
     public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
@@ -89,18 +80,16 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
         this.newArtifactId = newArtifactId;
         this.newVersion = newVersion;
         this.versionPattern = null;
-        overridePropertyVersion = false;
     }
 
     @JsonCreator
-    public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overridePropertyVersion) {
+    public ChangeManagedDependencyGroupIdAndArtifactId(String oldGroupId, String oldArtifactId, String newGroupId, String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this.oldGroupId = oldGroupId;
         this.oldArtifactId = oldArtifactId;
         this.newGroupId = newGroupId;
         this.newArtifactId = newArtifactId;
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
-        this.overridePropertyVersion = overridePropertyVersion;
     }
 
     @Override
@@ -153,14 +142,9 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                             Optional<Xml.Tag> versionTag = t.getChild("version");
 
                             if (versionTag.isPresent()) {
-                                String requestedVersion = versionTag.get().getValue().orElse(null);
-                                if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
-                                    doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), resolvedNewVersion, overridePropertyVersion, false));
-                                } else {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor());
-                                }
-                                changed = true;
+                                t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), resolvedNewVersion).visitNonNull(t, 0, getCursor());
                             }
+                            changed = true;
                         } catch(MavenDownloadingException e) {
                             return e.warn(t);
                         }
