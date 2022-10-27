@@ -25,12 +25,12 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class DateBoundSuppressionsTest implements RewriteTest {
+public class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
 
     @Test
     void addsUntilIfNotPresent() {
         rewriteRun(
-                spec -> spec.recipe(new DateBoundSuppressions("2020-01-01")),
+                spec -> spec.recipe(new AddOwaspDateBoundSuppressions("2020-01-01")),
                 xml("""
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -56,7 +56,7 @@ public class DateBoundSuppressionsTest implements RewriteTest {
         LocalDate thirtyDaysFromNow = today.plusDays(30);
         String thirtyDaysFromNowString = thirtyDaysFromNow + "Z";
         rewriteRun(
-                spec -> spec.recipe(new DateBoundSuppressions(null)),
+                spec -> spec.recipe(new AddOwaspDateBoundSuppressions(null)),
                 xml("""
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -84,7 +84,7 @@ public class DateBoundSuppressionsTest implements RewriteTest {
         LocalDate thirtyDaysFromNow = today.plusDays(30);
         String thirtyDaysFromNowString = thirtyDaysFromNow + "Z";
         rewriteRun(
-                spec -> spec.recipe(new DateBoundSuppressions("")),
+                spec -> spec.recipe(new AddOwaspDateBoundSuppressions("")),
                 xml("""
                                 <?xml version="1.0" encoding="UTF-8" ?>
                                 <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -111,6 +111,6 @@ public class DateBoundSuppressionsTest implements RewriteTest {
             "2022,false",
             "2022-01-01,true"})
     void valid(String untilDate, boolean valid) {
-        assertThat(new DateBoundSuppressions(untilDate).validate().isValid()).isEqualTo(valid);
+        assertThat(new AddOwaspDateBoundSuppressions(untilDate).validate().isValid()).isEqualTo(valid);
     }
 }
