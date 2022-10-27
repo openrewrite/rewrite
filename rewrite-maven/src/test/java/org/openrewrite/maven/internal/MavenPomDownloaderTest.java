@@ -83,7 +83,6 @@ class MavenPomDownloaderTest {
         assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
     }
 
-    @Disabled("MockServer is crashing on StringIndexOutOfBoundsException")
     @ParameterizedTest
     @ValueSource(ints = {500, 400})
     void normalizeAcceptErrorStatuses(Integer status) {
@@ -110,7 +109,6 @@ class MavenPomDownloaderTest {
         assertThat(normalizedRepository).isEqualTo(null);
     }
 
-    @Disabled("MockServer is crashing on StringIndexOutOfBoundsException")
     @Test
     void invalidArtifact() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
