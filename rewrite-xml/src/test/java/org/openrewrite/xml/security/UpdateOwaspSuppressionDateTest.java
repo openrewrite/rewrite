@@ -107,6 +107,6 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
             "2022,false",
             "2022-01-01,true"})
     void valid(String untilDate, boolean valid) {
-        assertThat(new DateBoundSuppressions(untilDate).validate().isValid()).isEqualTo(valid);
+        assertThat(new UpdateOwaspSuppressionDate("",untilDate).validate().isValid()).isEqualTo(valid);
     }
 }
