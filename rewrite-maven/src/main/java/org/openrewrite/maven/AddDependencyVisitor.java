@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.Version;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -142,7 +143,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
 
         private String findVersionToUse(String groupId, String artifactId, ExecutionContext ctx) throws MavenDownloadingException {
             if (resolvedVersion == null) {
-                if (versionComparator == null) {
+                if (versionComparator == null || versionComparator instanceof ExactVersion) {
                     resolvedVersion = version;
                 } else {
                     MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
