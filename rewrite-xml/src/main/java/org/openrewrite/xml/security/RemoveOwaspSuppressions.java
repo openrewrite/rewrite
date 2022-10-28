@@ -32,7 +32,7 @@ import java.time.temporal.ChronoUnit;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class RemoveSuppressions extends Recipe {
+public class RemoveOwaspSuppressions extends Recipe {
 
     @Override
     public String getDisplayName() {
