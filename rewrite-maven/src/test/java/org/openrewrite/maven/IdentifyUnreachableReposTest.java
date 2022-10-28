@@ -6,7 +6,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class IdentifyUnreachableReposTest2 implements RewriteTest {
+public class IdentifyUnreachableReposTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new IdentifyUnreachableRepos());
@@ -85,7 +85,7 @@ public class IdentifyUnreachableReposTest2 implements RewriteTest {
                     <repositories>
                         <repository>
                             <id>central</id>
-                            <url>${'$'}{my-repo-url}</url>
+                            <url>${my-repo-url}</url>
                         </repository>
                         <repository>
                             <id>spring-snapshots</id>
@@ -106,7 +106,7 @@ public class IdentifyUnreachableReposTest2 implements RewriteTest {
                     <repositories>
                         <repository>
                             <id>central</id>
-                            <url>${'$'}{my-repo-url}</url>
+                            <url>${my-repo-url}</url>
                         </repository>
                         <repository>
                             <id>spring-snapshots</id>
