@@ -21,6 +21,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.test.RewriteTest;
 
 import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
@@ -30,7 +32,7 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
     @Test
     void noUpdateIfCveDoesNotExist() {
         rewriteRun(
-                spec -> spec.recipe(new UpdateOwaspSuppressionDate("CVE-2022-5678", "2020-02-01")),
+                spec -> spec.recipe(new UpdateOwaspSuppressionDate(Collections.singletonList("CVE-2022-5678"), "2020-02-01")),
                 xml("""
                     <?xml version="1.0" encoding="UTF-8" ?>
                     <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -48,7 +50,7 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
     @Test
     void updatesUntilIfCveExists() {
         rewriteRun(
-                spec -> spec.recipe(new UpdateOwaspSuppressionDate("CVE-2022-1234", "2020-02-01")),
+                spec -> spec.recipe(new UpdateOwaspSuppressionDate(Collections.singletonList("CVE-2022-1234"), "2020-02-01")),
                 xml("""
                     <?xml version="1.0" encoding="UTF-8" ?>
                     <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -78,7 +80,7 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
         LocalDate thirtyDaysFromNow = today.plusDays(30);
         String thirtyDaysFromNowString = thirtyDaysFromNow + "Z";
         rewriteRun(
-                spec -> spec.recipe(new UpdateOwaspSuppressionDate("CVE-2022-1234", null)),
+                spec -> spec.recipe(new UpdateOwaspSuppressionDate(List.of("CVE-2022-1234","CVE-2022-5678"), null)),
                 xml("""
                     <?xml version="1.0" encoding="UTF-8" ?>
                     <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -87,6 +89,18 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
                             </notes>
                             <cve>CVE-2019-10321</cve>
                             <cve>CVE-2022-1234</cve>
+                        </suppress>
+                        <suppress until="2020-01-01Z">
+                            <notes>
+                            </notes>
+                            <cve>CVE-2019-10321</cve>
+                            <cve>CVE-2022-5678</cve>
+                        </suppress>
+                        <suppress until="2020-01-01Z">
+                            <notes>
+                            </notes>
+                            <cve>CVE-2019-10321</cve>
+                            <cve>CVE-2022-00011</cve>
                         </suppress>
                     </suppressions>""", """
                     <?xml version="1.0" encoding="UTF-8" ?>
@@ -97,7 +111,19 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
                             <cve>CVE-2019-10321</cve>
                             <cve>CVE-2022-1234</cve>
                         </suppress>
-                    </suppressions>""".formatted(thirtyDaysFromNowString),
+                        <suppress until="%s">
+                            <notes>
+                            </notes>
+                            <cve>CVE-2019-10321</cve>
+                            <cve>CVE-2022-5678</cve>
+                        </suppress>
+                        <suppress until="2020-01-01Z">
+                            <notes>
+                            </notes>
+                            <cve>CVE-2019-10321</cve>
+                            <cve>CVE-2022-00011</cve>
+                        </suppress>
+                    </suppressions>""".formatted(thirtyDaysFromNowString, thirtyDaysFromNowString),
                 spec -> spec.path("suppressions.xml"))
         );
     }
@@ -107,6 +133,6 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
             "2022,false",
             "2022-01-01,true"})
     void valid(String untilDate, boolean valid) {
-        assertThat(new UpdateOwaspSuppressionDate("",untilDate).validate().isValid()).isEqualTo(valid);
+        assertThat(new UpdateOwaspSuppressionDate(Collections.singletonList(""), untilDate).validate().isValid()).isEqualTo(valid);
     }
 }

@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -44,10 +45,10 @@ public class UpdateOwaspSuppressionDate extends Recipe {
                 "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html";
     }
 
-    @Option(displayName = "CVE",
-            description = "Update suppressions having the specified CVE tag.",
+    @Option(displayName = "CVE List",
+            description = "Update suppressions having any of the specified CVE tags.",
             example = "CVE-2022-1234")
-    String cve;
+    List<String> cveList;
 
     @Option(displayName = "Until date",
             required = false,
@@ -86,12 +87,14 @@ public class UpdateOwaspSuppressionDate extends Recipe {
             Xml.Tag t = super.visitTag(tag, ctx);
             if (new XPathMatcher("/suppressions/suppress").matches(getCursor())) {
                 boolean hasCve = false;
-                List<Xml.Tag> cveList = t.getChildren("cve");
-                for (Xml.Tag xml : cveList) {
+                List<Xml.Tag> cveTags = t.getChildren("cve");
+                for (Xml.Tag xml : cveTags) {
                     String cveNum = xml.getValue().orElse("");
-                    if (cve.equals(cveNum)) {
-                        hasCve = true;
-                        break;
+                    for (String cve : cveList) {
+                        if (!StringUtils.isNullOrEmpty(cve) && cve.equals(cveNum)) {
+                            hasCve = true;
+                            break;
+                        }
                     }
                 }
                 if (hasCve) {
