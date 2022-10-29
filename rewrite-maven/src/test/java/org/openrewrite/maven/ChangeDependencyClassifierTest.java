@@ -72,6 +72,63 @@ public class ChangeDependencyClassifierTest implements RewriteTest {
     }
 
     @Test
+    void addClassifierUsingGlobsExpressions() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ChangeDependencyClassifier("org.ehcache", "*", "jakarta")
+          ),
+          pomXml(
+            """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                  
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.ehcache</groupId>
+                        <artifactId>ehcache</artifactId>
+                        <version>3.10.0</version>
+                      </dependency>
+                      <dependency>
+                        <groupId>org.ehcache</groupId>
+                        <artifactId>ehcache-transactions</artifactId>
+                        <version>3.10.0</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+              """,
+            """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                  
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.ehcache</groupId>
+                        <artifactId>ehcache</artifactId>
+                        <version>3.10.0</version>
+                        <classifier>jakarta</classifier>
+                      </dependency>
+                      <dependency>
+                        <groupId>org.ehcache</groupId>
+                        <artifactId>ehcache-transactions</artifactId>
+                        <version>3.10.0</version>
+                        <classifier>jakarta</classifier>
+                      </dependency>
+                    </dependencies>
+                  </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void classifierToClassifier() {
         rewriteRun(
           pomXml(
