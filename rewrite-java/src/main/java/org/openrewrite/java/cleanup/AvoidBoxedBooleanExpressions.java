@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -58,9 +59,9 @@ public class AvoidBoxedBooleanExpressions extends Recipe {
             public Expression visitExpression(Expression expression, ExecutionContext ctx) {
                 Expression e = (Expression) super.visitExpression(expression, ctx);
                 if (TypeUtils.isOfClassType(e.getType(), "java.lang.Boolean")) {
-                    Object parent = getCursor().dropParentUntil(J.class::isInstance).getValue();
-                    if (parent instanceof J.ControlParentheses ||
-                        parent instanceof J.Ternary) {
+                    Cursor parentCursor = getCursor().dropParentUntil(J.class::isInstance);
+                    if (parentCursor.getValue() instanceof J.ControlParentheses &&
+                        parentCursor.dropParentUntil(J.class::isInstance).getValue() instanceof J.If) {
                         return e.withTemplate(
                                 JavaTemplate.builder(this::getCursor,
                                         "Boolean.TRUE.equals(#{any(java.lang.Boolean)})").build(),
