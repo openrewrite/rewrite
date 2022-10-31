@@ -72,6 +72,20 @@ public class AvoidBoxedBooleanExpressions extends Recipe {
                 }
                 return e;
             }
+
+            @Override
+            public J visitUnary(J.Unary unary, ExecutionContext executionContext) {
+                J.Unary un = (J.Unary) super.visitUnary(unary, executionContext);
+                if (J.Unary.Type.Not == un.getOperator() && TypeUtils.isOfClassType(un.getExpression().getType(), "java.lang.Boolean")) {
+                    return un.withTemplate(
+                            JavaTemplate.builder(this::getCursor,
+                                    "Boolean.FALSE.equals(#{any(java.lang.Boolean)})").build(),
+                            un.getCoordinates().replace(),
+                            un.getExpression()
+                    );
+                }
+                return un;
+            }
         };
     }
 }

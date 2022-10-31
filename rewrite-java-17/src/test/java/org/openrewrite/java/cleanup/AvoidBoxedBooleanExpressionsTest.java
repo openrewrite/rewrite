@@ -37,9 +37,9 @@ public class AvoidBoxedBooleanExpressionsTest implements RewriteTest {
                   Boolean b;
                   int test() {
                       if (b) {
-                        return 1;
+                          return 1;
                       } else {
-                        return 2;
+                          return 2;
                       }
                   }
               }
@@ -49,13 +49,49 @@ public class AvoidBoxedBooleanExpressionsTest implements RewriteTest {
                   Boolean b;
                   int test() {
                       if (Boolean.TRUE.equals(b)) {
-                        return 1;
+                          return 1;
                       } else {
-                        return 2;
+                          return 2;
                       }
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void guardAgainstNpeUnaryExpressions() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                int test(Boolean b) {
+                    if (!b) {
+                        return 0;
+                    } else if (isTrue(b)) {
+                        return 1;
+                    }
+                }
+                Boolean isTrue(Boolean b) {
+                    return b != null && b.equals(true);
+                }
+            }
+            """,
+            """
+            class Test {
+                int test(Boolean b) {
+                    if (Boolean.FALSE.equals(b)) {
+                        return 0;
+                    } else if (Boolean.TRUE.equals(isTrue(b))) {
+                        return 1;
+                    }
+                }
+                Boolean isTrue(Boolean b) {
+                    return b != null && b.equals(true);
+                }
+            }
+            """
           )
         );
     }
