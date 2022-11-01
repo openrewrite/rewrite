@@ -28,7 +28,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     }
 
     @Test
-    fun `assert true`() = rewriteRun(
+    fun assertTrue() = rewriteRun(
         java(
             """
                 public class A {
@@ -51,7 +51,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `assert false`() = rewriteRun(
+    fun assertFalse() = rewriteRun(
         java(
             """
                 public class A {
@@ -66,7 +66,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit jupiter assertTrue(true)`() = rewriteRun(
+    fun junitJupiterAssertTrue() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit-jupiter-api") )},
         java(
             """
@@ -87,7 +87,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit jupiter assertFalse(false)`() = rewriteRun(
+    fun junitJupiterAssertFalse() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit-jupiter-api") )},
         java(
             """
@@ -108,7 +108,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit jupiter assertTrue(true, message)`() = rewriteRun(
+    fun junitJupiterAssertTrueMessage() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit-jupiter-api") )},
         java(
             """
@@ -129,7 +129,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit jupiter assertFalse(false, message)`() = rewriteRun(
+    fun junitJupiterAssertFalseMessage() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit-jupiter-api") )},
         java(
             """
@@ -150,7 +150,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit4 assertTrue(true)`() = rewriteRun(
+    fun junit4AssertTrueWithTrueArgument() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit") )},
         java(
             """
@@ -171,7 +171,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit4 assertFalse(false)`() = rewriteRun(
+    fun junit4AssertFalseWithFalseArgument() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit") )},
         java(
             """
@@ -192,7 +192,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit4 assertTrue(message, true)`() = rewriteRun(
+    fun junit4AssertTrueWithMessageAndTrueArgument() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit") )},
         java(
             """
@@ -213,7 +213,7 @@ interface RemoveUnneededAssertionTest: RewriteTest {
     )
 
     @Test
-    fun `junit4 assertFalse(message, false)`() = rewriteRun(
+    fun junit4AssertTrueWithMessageAndFalseArgument() = rewriteRun(
         { spec -> spec.parser( JavaParser.fromJavaVersion().classpath("junit") )},
         java(
             """
