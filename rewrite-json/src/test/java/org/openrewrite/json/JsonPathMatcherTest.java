@@ -790,7 +790,7 @@ class JsonPathMatcherTest {
             public Json visitMember(Json.Member member, List<String> p) {
                 var e = super.visitMember(member, p);
                 if (matcher.matches(getCursor())) {
-                    var match = e.printTrimmed(getCursor());
+                    var match = e.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitMember");
                         System.out.println(match);
@@ -805,7 +805,7 @@ class JsonPathMatcherTest {
             public Json visitObject(Json.JsonObject obj, List<String> p) {
                 var e = super.visitObject(obj, p);
                 if (matcher.matches(getCursor())) {
-                    var match = e.printTrimmed(getCursor());
+                    var match = e.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitObject");
                         System.out.println(match);
@@ -821,7 +821,7 @@ class JsonPathMatcherTest {
                 var e = super.visitArray(array, p);
                 if (matcher.matches(getCursor())) {
                     var j = e.withPrefix(Space.EMPTY);
-                    var match = j.printTrimmed(getCursor());
+                    var match = j.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitArray");
                         System.out.println(match);
@@ -837,7 +837,7 @@ class JsonPathMatcherTest {
                 var e = super.visitLiteral(literal, p);
                 if (matcher.matches(getCursor())) {
                     var j = e.withPrefix(Space.EMPTY);
-                    var match = j.printTrimmed(getCursor());
+                    var match = j.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitLiteral");
                         System.out.println(match);
