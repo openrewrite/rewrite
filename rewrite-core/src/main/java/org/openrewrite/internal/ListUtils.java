@@ -225,7 +225,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<T> t) {
+    public static <T> List<T> concatAll(@Nullable List<T> ls, @Nullable List<? extends T> t) {
         if (ls == null && t == null) {
             //noinspection ConstantConditions
             return null;
@@ -233,7 +233,8 @@ public final class ListUtils {
             //noinspection ConstantConditions
             return ls;
         } else if (ls == null || ls.isEmpty()) {
-            return t;
+            //noinspection unchecked
+            return (List<T>) t;
         }
 
         List<T> newLs = new ArrayList<>(ls);
