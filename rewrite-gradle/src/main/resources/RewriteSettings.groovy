@@ -71,12 +71,9 @@ import com.gradle.scan.plugin.*
 import com.gradle.enterprise.gradleplugin.GradleEnterpriseExtension
 
 interface SettingsPluginSpec {
-    Plugin id(String i)
-}
-
-interface SettingsPlugin {
-    Plugin version(String v)
-    Plugin apply(boolean a)
+    SettingsPluginSpec id(String i)
+    SettingsPluginSpec version(String v)
+    SettingsPluginSpec apply(boolean a)
 }
 
 interface GradleEnterpriseSpec extends GradleEnterpriseExtension {
@@ -85,7 +82,7 @@ interface GradleEnterpriseSpec extends GradleEnterpriseExtension {
 
 abstract class RewriteSettings implements Settings {
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=SettingsPluginSpec) Closure cl)
-    abstract GradleEnterpriseSpec gradleEnterprise()
+    abstract void gradleEnterprise(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=GradleEnterpriseSpec) Closure cl)
 
     void __script__() {
 }}
