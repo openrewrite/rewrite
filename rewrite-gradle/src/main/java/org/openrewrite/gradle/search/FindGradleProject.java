@@ -35,12 +35,15 @@ public class FindGradleProject extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                if (sourceFile.getSourcePath().endsWith(Paths.get("build.gradle")) ||
-                    sourceFile.getSourcePath().endsWith(Paths.get("build.gradle.kts"))) {
-                    return SearchResult.found(sourceFile);
+            public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                if(tree instanceof SourceFile) {
+                    SourceFile sourceFile = (SourceFile) tree;
+                    if (sourceFile.getSourcePath().endsWith(Paths.get("build.gradle")) ||
+                        sourceFile.getSourcePath().endsWith(Paths.get("build.gradle.kts"))) {
+                        return SearchResult.found(sourceFile);
+                    }
                 }
-                return sourceFile;
+                return tree;
             }
         };
     }

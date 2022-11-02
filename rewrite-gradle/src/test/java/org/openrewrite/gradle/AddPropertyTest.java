@@ -22,11 +22,11 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.properties.Assertions.properties;
 
-public class ConfigureGradleBuildCacheTest implements RewriteTest {
+public class AddPropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ConfigureGradleBuildCache());
+        spec.recipe(new AddProperty("org.gradle.caching", "true", true));
     }
 
     @Test
@@ -36,6 +36,24 @@ public class ConfigureGradleBuildCacheTest implements RewriteTest {
           properties(
             """
               project.name=helloworld
+              """,
+            """
+              project.name=helloworld
+              org.gradle.caching=true
+              """,
+            spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void overwriteExistingProperty() {
+        rewriteRun(
+          buildGradle("plugins { id 'java' }"),
+          properties(
+            """
+              project.name=helloworld
+              org.gradle.caching=false
               """,
             """
               project.name=helloworld

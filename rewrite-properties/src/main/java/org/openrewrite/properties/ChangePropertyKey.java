@@ -87,5 +87,4 @@ public class ChangePropertyKey extends Recipe {
             return super.visitEntry(entry, p);
         }
     }
-
 }

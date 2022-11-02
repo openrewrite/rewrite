@@ -31,14 +31,23 @@ import java.io.ByteArrayInputStream;
 import java.io.SequenceInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static java.util.Arrays.asList;
+
 public class GradleParser implements Parser<G.CompilationUnit> {
+    @SuppressWarnings("ConstantConditions")
     private static final byte[] PREAMBLE = StringUtils.readFully(GroovyParser.class.getResourceAsStream("/RewriteGradleProject.groovy"), StandardCharsets.UTF_8)
+            .trim()
+            .replaceAll("\\n}}$", "")
+            .getBytes(StandardCharsets.UTF_8);
+
+    @SuppressWarnings("ConstantConditions")
+    private static final byte[] SETTINGS_PREAMBLE = StringUtils.readFully(GroovyParser.class.getResourceAsStream("/RewriteSettings.groovy"), StandardCharsets.UTF_8)
             .trim()
             .replaceAll("\\n}}$", "")
             .getBytes(StandardCharsets.UTF_8);
@@ -49,7 +58,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         try {
             this.groovyParser = groovyParser
                     .classpath("gradle-core-api", "gradle-language-groovy", "gradle-language-java", "gradle-resources",
-                            "gradle-testing-base", "gradle-testing-jvm")
+                            "gradle-testing-base", "gradle-testing-jvm", "gradle-enterprise-gradle-plugin")
                     .build();
         } catch (IllegalArgumentException e) {
             // when gradle API has been fatjared into the rewrite-gradle distribution
@@ -64,8 +73,9 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                         new Parser.Input(
                                 source.getPath(), source.getFileAttributes(),
                                 () -> new SequenceInputStream(
-                                        Collections.enumeration(Arrays.asList(
-                                                new ByteArrayInputStream(PREAMBLE),
+                                        Collections.enumeration(asList(
+                                                new ByteArrayInputStream(source.getPath().endsWith(Paths.get("settings.gradle")) ?
+                                                        SETTINGS_PREAMBLE : PREAMBLE),
                                                 source.getSource(ctx),
                                                 new ByteArrayInputStream(new byte[]{'}', '}'})
                                         ))
@@ -96,7 +106,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("build.gradle");
     }
-
 
     public static Builder builder() {
         return new Builder();
