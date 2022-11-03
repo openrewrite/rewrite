@@ -34,9 +34,17 @@ public class UseForEachRemoveInsteadOfSetRemoveAllTest implements RewriteTest {
         rewriteRun(
           java("""
             import java.util.Collection;
+            import java.util.Collections;
+            import java.util.List;
             import java.util.Set;
             
             class T {
+                static {
+                    Set<String> s = new HashSet<>();
+                    List<String> l = Collections.singletonList("a");
+                    s.removeAll(l);
+                }
+                
                 Set<String> removeFromSet(Set<String> s, Collection<String> c) {
                     s.removeAll(c);
                     return s;
@@ -44,9 +52,17 @@ public class UseForEachRemoveInsteadOfSetRemoveAllTest implements RewriteTest {
             }
             ""","""
             import java.util.Collection;
+            import java.util.Collections;
+            import java.util.List;
             import java.util.Set;
             
             class T {
+                static {
+                    Set<String> s = new HashSet<>();
+                    List<String> l = Collections.singletonList("a");
+                    l.forEach(s::remove);
+                }
+                
                 Set<String> removeFromSet(Set<String> s, Collection<String> c) {
                     c.forEach(s::remove);
                     return s;
@@ -114,9 +130,11 @@ public class UseForEachRemoveInsteadOfSetRemoveAllTest implements RewriteTest {
         rewriteRun(
           java("""
             import java.util.Collection;
-            import java.util.HashSet;import java.util.Set;
+            import java.util.HashSet;
+            import java.util.Set;
             
             class T {
+            
                 Set<String> removeFromSet(Set<String> s, Collection<String> c) {
                     if (s.removeAll(c)) {
                         return s;
