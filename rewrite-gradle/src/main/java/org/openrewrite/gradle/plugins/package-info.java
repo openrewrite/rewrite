@@ -13,19 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle;
+@NonNullApi
+package org.openrewrite.gradle.plugins;
 
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.marker.SearchResult;
-
-public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
-    @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        if (cu.getSourcePath().toString().endsWith(".gradle") &&
-            !cu.getSourcePath().toString().endsWith("settings.gradle")) {
-            return SearchResult.found(cu);
-        }
-        return super.visitJavaSourceFile(cu, p);
-    }
-}
+import org.openrewrite.internal.lang.NonNullApi;

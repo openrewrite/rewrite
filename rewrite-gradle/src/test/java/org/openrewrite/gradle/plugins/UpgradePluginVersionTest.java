@@ -13,37 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.format;
+package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpecs;
 
-import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-public class OmitParenthesesForLastArgumentLambdaTest implements RewriteTest {
-    final SourceSpecs closureApi = groovy(
-      """
-        public class Test {
-          public static void test(Closure closure) {
-          }
-        }
-        """
-    );
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new OmitParenthesesForLastArgumentLambda());
-    }
+public class UpgradePluginVersionTest implements RewriteTest {
 
     @Test
-    void lastClosureArgument() {
+    void upgradeGradleSettingsPlugin() {
         rewriteRun(
-          closureApi,
-          groovy(
-            "Test.test({ it })",
-            "Test.test { it }"
+          spec -> spec.recipe(new UpgradePluginVersion("com.gradle.enterprise", "3.10.x", null)),
+          settingsGradle(
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.10.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.10.3'
+              }
+              """
           )
         );
     }

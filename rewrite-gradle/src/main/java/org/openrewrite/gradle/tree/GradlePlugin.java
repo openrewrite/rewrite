@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.search
+package org.openrewrite.gradle.tree;
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.gradle.GradleRecipeTest
+import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
 
-class FindPluginTest : GradleRecipeTest {
-    @Test
-    fun findPlugin() = assertChanged(
-        recipe = FindPlugin("com.jfrog.bintray"),
-        before = """
-            plugins {
-                id 'com.jfrog.bintray' version '1.8.5'
-            }
-        """,
-        after = """
-            plugins {
-                /*~~>*/id 'com.jfrog.bintray' version '1.8.5'
-            }
-        """
-    )
+@Value
+public class GradlePlugin {
+    J.MethodInvocation pluginDefinition;
+
+    String pluginId;
+
+    @Nullable
+    String version;
 }

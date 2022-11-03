@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,11 +19,12 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
-public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
+import java.nio.file.Paths;
+
+public class IsSettingsGradle<P> extends JavaIsoVisitor<P> {
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        if (cu.getSourcePath().toString().endsWith(".gradle") &&
-            !cu.getSourcePath().toString().endsWith("settings.gradle")) {
+        if (cu.getSourcePath().toString().endsWith("settings.gradle")) {
             return SearchResult.found(cu);
         }
         return super.visitJavaSourceFile(cu, p);
