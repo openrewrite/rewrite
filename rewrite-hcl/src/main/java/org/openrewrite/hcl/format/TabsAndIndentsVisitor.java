@@ -27,7 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 import java.util.Optional;
 
-class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
+public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 

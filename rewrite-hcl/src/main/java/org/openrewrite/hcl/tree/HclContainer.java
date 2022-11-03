@@ -91,6 +91,16 @@ public class HclContainer<T> {
         return elements.isEmpty() ? Space.EMPTY : elements.get(elements.size() - 1).getAfter();
     }
 
+    public HclContainer<T> withLastSpace(Space space) {
+        final List<HclRightPadded<T>> newElements = ListUtils.map(elements, (i, elem) -> {
+            if (i == elements.size() -1) {
+                return elem.withAfter(space);
+            }
+            return elem;
+        });
+        return elements.isEmpty() || getLastSpace() == space ? this : build(before, newElements, markers);
+    }
+
     public enum Location {
         FOR_VARIABLES(Space.Location.FOR_VARIABLES, HclRightPadded.Location.FOR_VARIABLE_ARGUMENT),
         FUNCTION_CALL_ARGUMENTS(Space.Location.FUNCTION_CALL_ARGUMENTS, HclRightPadded.Location.FUNCTION_CALL_ARGUMENT),
