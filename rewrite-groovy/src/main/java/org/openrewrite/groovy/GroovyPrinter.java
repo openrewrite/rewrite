@@ -217,8 +217,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             p.out.append('{');
             visitMarkers(lambda.getParameters().getMarkers(), p);
             visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
             if (!lambda.getParameters().getParameters().isEmpty()) {
+                visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.out.append("->");
             }
             if (lambda.getBody() instanceof J.Block) {
@@ -325,7 +325,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitReturn(J.Return retrn, PrintOutputCapture<P> p) {
-            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
+            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
+                retrn.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
                 visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
                 visitMarkers(retrn.getMarkers(), p);
                 visit(retrn.getExpression(), p);

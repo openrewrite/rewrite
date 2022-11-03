@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -151,7 +152,8 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Return visitReturn(J.Return retrn, P p) {
         J.Return r = super.visitReturn(retrn, p);
-        if (r.getExpression() != null && r.getExpression().getPrefix().getWhitespace().isEmpty()) {
+        if (r.getExpression() != null && r.getExpression().getPrefix().getWhitespace().isEmpty() &&
+            !retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
             r = r.withExpression(r.getExpression().withPrefix(r.getExpression().getPrefix().withWhitespace(" ")));
         }
         return r;

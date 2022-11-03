@@ -13,19 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.marker;
+@NonNullApi
+package org.openrewrite.groovy.format;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.marker.Marker;
-
-import java.util.UUID;
-
-/**
- * @deprecated Use {@link org.openrewrite.java.marker.ImplicitReturn} instead.
- */
-@Value
-@With
-public class ImplicitReturn implements Marker {
-    UUID id;
-}
+import org.openrewrite.internal.lang.NonNullApi;

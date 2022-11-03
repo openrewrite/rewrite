@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.marker;
+package org.openrewrite.java.marker;
 
 import lombok.Value;
 import lombok.With;
@@ -21,9 +21,6 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-/**
- * @deprecated Use {@link org.openrewrite.java.marker.ImplicitReturn} instead.
- */
 @Value
 @With
 public class ImplicitReturn implements Marker {

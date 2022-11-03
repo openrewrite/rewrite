@@ -111,7 +111,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         return new Builder();
     }
 
-
     @Accessors(chain=true)
     @Setter
     @Getter
