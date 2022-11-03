@@ -29,12 +29,12 @@ public class UseListSort extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replace invocations of `Collections.sort(List, Comparator)` with `List.sort(Comparator)`.";
+        return "Replace invocations of `Collections#sort(List, Comparator)` with `List#sort(Comparator)`.";
     }
 
     @Override
     public String getDescription() {
-        return "The `Collections.sort(..)` implementation defers to the `List.sort(Comparator)` and can be replaced it with the `List.sort(Comparator)` implementation.";
+        return "The `java.util.Collections#sort(..)` implementation defers to the `java.util.List#sort(Comparator)`, replaced it with the `java.util.List#sort(Comparator)` implementation for better readability.";
     }
 
     @Override
