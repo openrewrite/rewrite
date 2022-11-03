@@ -16,7 +16,6 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,8 +26,7 @@ public class UseForEachRemoveInsteadOfSetRemoveAllTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UseForEachRemoveInsteadOfSetRemoveAll())
-          .parser(JavaParser.fromJavaVersion().logCompilationWarningsAndErrors(true));
+        spec.recipe(new UseForEachRemoveInsteadOfSetRemoveAll());
     }
 
     @Test
@@ -126,7 +124,7 @@ public class UseForEachRemoveInsteadOfSetRemoveAllTest implements RewriteTest {
                     return new HashSet<>(c);
                 }
                 
-                Set<String> idk(Set<String> s, Collection<String> c) {
+                Set<String> doSomething(Set<String> s, Collection<String> c) {
                     if (!c.isEmpty() && s.removeAll(c)) {
                         return s;
                     } else if (s.isEmpty()) {
@@ -137,7 +135,11 @@ public class UseForEachRemoveInsteadOfSetRemoveAllTest implements RewriteTest {
                 
                 void workWithSet(Set<String> s, Collection<String> c) {
                     boolean removedALl = s.removeAll(c);
+                }
+                
+                String didItRemoveAnything(Set<String> s, Collection<String> c) {
                     String success = s.removeAll(c) ? "YES" : "NO";
+                    return success;
                 }
                 
                 void returnsResult(Set<String> s, Collection<String> c) {
