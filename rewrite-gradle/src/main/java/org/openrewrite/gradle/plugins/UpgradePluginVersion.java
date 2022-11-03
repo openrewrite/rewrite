@@ -20,6 +20,7 @@ import lombok.Value;
 import org.junit.jupiter.api.Disabled;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -76,7 +77,7 @@ public class UpgradePluginVersion extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
+        return Applicability.or(new IsBuildGradle<>(), new IsSettingsGradle<>());
     }
 
     @Override
