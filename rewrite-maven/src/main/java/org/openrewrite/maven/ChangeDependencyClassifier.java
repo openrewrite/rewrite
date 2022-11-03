@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -34,12 +33,12 @@ import java.util.Optional;
 public class ChangeDependencyClassifier extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "guava")
     String artifactId;
 
@@ -69,19 +68,16 @@ public class ChangeDependencyClassifier extends Recipe {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag()) {
-                    if (groupId.equals(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId())) &&
-                            artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
-                        Optional<Xml.Tag> scope = tag.getChild("classifier");
-                        if (scope.isPresent()) {
-                            if (newClassifier == null) {
-                                doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
-                            } else if (!newClassifier.equals(scope.get().getValue().orElse(null))) {
-                                doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newClassifier));
-                            }
-                        } else if (newClassifier != null) {
-                            doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<classifier>" + newClassifier + "</classifier>")));
+                if (isDependencyTag(groupId, artifactId)) {
+                    Optional<Xml.Tag> scope = tag.getChild("classifier");
+                    if (scope.isPresent()) {
+                        if (newClassifier == null) {
+                            doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
+                        } else if (!newClassifier.equals(scope.get().getValue().orElse(null))) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newClassifier));
                         }
+                    } else if (newClassifier != null) {
+                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<classifier>" + newClassifier + "</classifier>")));
                     }
                 }
 

@@ -74,8 +74,8 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
              * But, first and foremost, the main rationale is because it's hopefully conceptually easier to distinguish the steps
              * required for HideUtilityClassConstructorVisitor to work.
              */
-            c = (J.ClassDeclaration) new UtilityClassWithImplicitDefaultConstructorVisitor<>().visit(c, p, getCursor());
-            c = (J.ClassDeclaration) new UtilityClassWithExposedConstructorInspectionVisitor<>().visit(c, p, getCursor());
+            c = (J.ClassDeclaration) new UtilityClassWithImplicitDefaultConstructorVisitor<>().visit(c, p, getCursor().getParentOrThrow());
+            c = (J.ClassDeclaration) new UtilityClassWithExposedConstructorInspectionVisitor<>().visit(c, p, getCursor().getParentOrThrow());
         }
         return c;
     }
@@ -121,7 +121,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
                     new MethodMatcher(method),
                     J.Modifier.Type.Private
             );
-            md = (J.MethodDeclaration) changeMethodAccessLevelVisitor.visit(md, p, getCursor());
+            md = (J.MethodDeclaration) changeMethodAccessLevelVisitor.visit(md, p, getCursor().getParentOrThrow());
             assert md != null;
             return md;
         }

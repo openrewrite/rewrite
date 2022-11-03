@@ -84,17 +84,27 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         //      J visitClassDeclaration(J.ClassDeclaration c, Integer p) {
         //            c.getBody().withTemplate(template, c.getBody().coordinates.lastStatement());
         //      }
+        Cursor parentScope = parentScopeGetter.get();
+        if(!(parentScope.getValue() instanceof J)) {
+            // Handle the provided parent cursor pointing to a JRightPadded or similar
+            parentScope = parentScope.dropParentUntil(it -> it instanceof J || it == null);
+        }
         new JavaIsoVisitor<Integer>() {
             @Nullable
             @Override
             public J visit(@Nullable Tree tree, Integer integer) {
                 if (tree != null && tree.isScope(changing)) {
-                    parentCursorRef.set(getCursor());
+                    // Currently getCursor still points to the parent, because super.visit() has the logic to update it
+                    Cursor cursor = getCursor();
+                    if(!(cursor.getValue() instanceof J)) {
+                        cursor = cursor.dropParentUntil(it -> it instanceof J || it == null);
+                    }
+                    parentCursorRef.set(cursor);
                     return (J) tree;
                 }
                 return super.visit(tree, integer);
             }
-        }.visit(parentScopeGetter.get().getValue(), 0, parentScopeGetter.get().getParentOrThrow());
+        }.visit(parentScope.getValue(), 0, parentScope.getParentOrThrow());
 
         Cursor parentCursor = parentCursorRef.get();
 

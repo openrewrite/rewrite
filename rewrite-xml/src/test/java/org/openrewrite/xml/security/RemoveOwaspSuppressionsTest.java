@@ -23,11 +23,11 @@ import java.time.LocalDate;
 
 import static org.openrewrite.xml.Assertions.xml;
 
-class RemoveSuppressionsTest implements RewriteTest {
+class RemoveOwaspSuppressionsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveSuppressions());
+        spec.recipe(new RemoveOwaspSuppressions());
     }
 
     @Test

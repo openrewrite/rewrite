@@ -15,12 +15,22 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Getter;
+import org.openrewrite.xml.tree.Xml;
+
+@Getter
 public class UncheckedMavenDownloadingException extends RuntimeException {
-    public UncheckedMavenDownloadingException(String message, MavenDownloadingExceptions e) {
-        super(message, e);
+    private final Xml.Document pomWithWarnings;
+
+    public UncheckedMavenDownloadingException(Xml.Document pom, MavenDownloadingExceptions e) {
+        super("Failed to download dependencies for " + pom.getSourcePath() + ":\n" +
+              e.warn(pom).printAllTrimmed(), e);
+        this.pomWithWarnings = e.warn(pom);
     }
 
-    public UncheckedMavenDownloadingException(String message, MavenDownloadingException e) {
-        super(message, e);
+    public UncheckedMavenDownloadingException(Xml.Document pom, MavenDownloadingException e) {
+        super("Failed to download dependencies for " + pom.getSourcePath() + ":\n" +
+              MavenDownloadingExceptions.append(null, e).warn(pom).printAllTrimmed(), e);
+        this.pomWithWarnings = MavenDownloadingExceptions.append(null, e).warn(pom);
     }
 }

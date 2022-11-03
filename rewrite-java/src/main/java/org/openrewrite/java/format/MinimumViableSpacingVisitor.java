@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -40,9 +41,9 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                 c = c.withModifiers(Space.formatFirstPrefix(c.getModifiers(),
                         c.getModifiers().iterator().next().getPrefix().withWhitespace(" ")));
             }
-            if(c.getModifiers().size() > 1) {
+            if (c.getModifiers().size() > 1) {
                 c = c.withModifiers(ListUtils.map(c.getModifiers(), (index, modifier) -> {
-                    if(index > 0 && modifier.getPrefix().getWhitespace().isEmpty()) {
+                    if (index > 0 && modifier.getPrefix().getWhitespace().isEmpty()) {
                         return modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
                     }
                     return modifier;
@@ -82,6 +83,12 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             Space before = c.getPadding().getImplements().getBefore();
             if (before.getWhitespace().isEmpty()) {
                 c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(before.withWhitespace(" ")));
+                c = c.withImplements(ListUtils.mapFirst(c.getImplements(), anImplements -> {
+                    if (anImplements.getPrefix().getWhitespace().isEmpty()) {
+                        return anImplements.withPrefix(anImplements.getPrefix().withWhitespace(" "));
+                    }
+                    return anImplements;
+                }));
             }
         }
 
@@ -98,9 +105,9 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
                 m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(),
                         m.getModifiers().iterator().next().getPrefix().withWhitespace(" ")));
             }
-            if(m.getModifiers().size() > 1) {
+            if (m.getModifiers().size() > 1) {
                 m = m.withModifiers(ListUtils.map(m.getModifiers(), (index, modifier) -> {
-                    if(index > 0 && modifier.getPrefix().getWhitespace().isEmpty()) {
+                    if (index > 0 && modifier.getPrefix().getWhitespace().isEmpty()) {
                         return modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
                     }
                     return modifier;
@@ -145,7 +152,8 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.Return visitReturn(J.Return retrn, P p) {
         J.Return r = super.visitReturn(retrn, p);
-        if (r.getExpression() != null && r.getExpression().getPrefix().getWhitespace().isEmpty()) {
+        if (r.getExpression() != null && r.getExpression().getPrefix().getWhitespace().isEmpty() &&
+            !retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
             r = r.withExpression(r.getExpression().withPrefix(r.getExpression().getPrefix().withWhitespace(" ")));
         }
         return r;
@@ -177,7 +185,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (!first && v.getTypeExpression() != null) {
-            if(v.getTypeExpression().getPrefix().getWhitespace().isEmpty()) {
+            if (v.getTypeExpression().getPrefix().getWhitespace().isEmpty()) {
                 v = v.withTypeExpression(v.getTypeExpression().withPrefix(v.getTypeExpression().getPrefix().withWhitespace(" ")));
             }
         }

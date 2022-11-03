@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.Block
 import org.openrewrite.java.tree.JavaTreeTest.NestingLevel.CompilationUnit
@@ -67,6 +68,32 @@ interface NewClassTest : JavaTreeTest {
                         return false;
                     }
                 };
+            }
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2367")
+    @Test
+    fun anonymousClassWithMultipleVariableDeclarations(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, CompilationUnit, """
+            import java.io.File;
+            import java.util.ArrayList;
+            import java.util.Arrays;
+            import java.util.Comparator;
+            
+            class Test {
+                void method() {
+                    Arrays.sort(new ArrayList[]{new ArrayList<File>()}, new Comparator<Object>() {
+                        long time1, time2;
+                
+                        @Override
+                        public int compare(Object o1, Object o2) {
+                            time1 = ((File) o1).lastModified();
+                            time2 = ((File) o2).lastModified();
+                            return time1 > time2 ? 1 : 0;
+                        }
+                    });
+                }
             }
         """.trimIndent()
     )

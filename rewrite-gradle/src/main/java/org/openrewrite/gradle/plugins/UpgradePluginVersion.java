@@ -13,18 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle;
+package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.openrewrite.*;
+import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -32,15 +32,11 @@ import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
+import static org.openrewrite.gradle.plugins.GradlePluginUtils.availablePluginVersions;
 
 @Disabled("Gradle plugin portal is down on August 23, 2022")
 @Value
@@ -81,7 +77,7 @@ public class UpgradePluginVersion extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
+        return Applicability.or(new IsBuildGradle<>(), new IsSettingsGradle<>());
     }
 
     @Override
@@ -136,34 +132,5 @@ public class UpgradePluginVersion extends Recipe {
                 return m;
             }
         };
-    }
-
-    public static List<String> availablePluginVersions(String pluginId, ExecutionContext ctx) {
-        String uri = "https://plugins.gradle.org/plugin/" + pluginId;
-        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-
-        try (HttpSender.Response response = httpSender.send(httpSender.get(uri).build())) {
-            if (response.isSuccessful()) {
-                @Language("xml")
-                String responseBody = StringUtils.readFully(response.getBody(), StandardCharsets.UTF_8);
-
-                List<String> versions = new ArrayList<>();
-                Matcher matcher = Pattern.compile("href=\"/plugin/" + pluginId + "/([^\"]+)\"").matcher(responseBody);
-                int lastFind = 0;
-                while (matcher.find(lastFind)) {
-                    versions.add(matcher.group(1));
-                    lastFind = matcher.end();
-                }
-
-                matcher = Pattern.compile("Version (\\S+) \\(latest\\)").matcher(responseBody);
-                if (matcher.find()) {
-                    versions.add(matcher.group(1));
-                }
-
-                return versions;
-            }
-        } catch (Throwable ignored) {
-        }
-        return emptyList();
     }
 }

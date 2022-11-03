@@ -31,8 +31,10 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
@@ -973,7 +975,19 @@ public class GroovyParserVisitor {
                 }
             }
 
-            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params, arrow, visit(expression.getCode()), closureType));
+            J body = visit(expression.getCode());
+            if (body instanceof J.Block) {
+                J.Block block = (J.Block) body;
+                body = block.withStatements(ListUtils.mapFirst(block.getStatements(), s -> s.withPrefix(arrow)));
+            } else {
+                body = body.withPrefix(params.getParameters().isEmpty() ? arrow : EMPTY);
+            }
+
+            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params,
+                    params.getParameters().isEmpty() ? EMPTY : arrow,
+                    body,
+                    closureType));
+
             cursor += 1; // skip '}'
         }
 

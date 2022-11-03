@@ -236,7 +236,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitAttribute(attribute: Hcl.Attribute, p: MutableList<String>): Hcl.Attribute {
                     val a = super.visitAttribute(attribute, p)
                     if (matcher.matches(cursor)) {
-                        val match = a.printTrimmed(cursor)
+                        val match = a.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitAttribute")
                             println(match)
@@ -253,7 +253,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.AttributeAccess {
                     val a = super.visitAttributeAccess(attributeAccess, p)
                     if (matcher.matches(cursor)) {
-                        val match = a.printTrimmed(cursor)
+                        val match = a.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitAttributeAccess")
                             println(match)
@@ -267,7 +267,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitBinary(binary: Hcl.Binary, p: MutableList<String>): Hcl.Binary {
                     val b = super.visitBinary(binary, p)
                     if (matcher.matches(cursor)) {
-                        val match = b.printTrimmed(cursor)
+                        val match = b.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitBinary")
                             println(match)
@@ -281,7 +281,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitBlock(block: Hcl.Block, p: MutableList<String>): Hcl.Block {
                     val b = super.visitBlock(block, p)
                     if (matcher.matches(cursor)) {
-                        val match = b.printTrimmed(cursor)
+                        val match = b.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitBlock")
                             println(match)
@@ -295,7 +295,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitConditional(conditional: Hcl.Conditional, p: MutableList<String>): Hcl.Conditional {
                     val c = super.visitConditional(conditional, p)
                     if (matcher.matches(cursor)) {
-                        val match = c.printTrimmed(cursor)
+                        val match = c.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitConditional")
                             println(match)
@@ -309,7 +309,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitConfigFile(configFile: Hcl.ConfigFile, p: MutableList<String>): Hcl.ConfigFile {
                     val c = super.visitConfigFile(configFile, p)
                     if (matcher.matches(cursor)) {
-                        val match = c.printTrimmed(cursor)
+                        val match = c.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitConfigFile")
                             println(match)
@@ -323,7 +323,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitEmpty(empty: Hcl.Empty, p: MutableList<String>): Hcl.Empty {
                     val e = super.visitEmpty(empty, p)
                     if (matcher.matches(cursor)) {
-                        val match = e.printTrimmed(cursor)
+                        val match = e.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitEmpty")
                             println(match)
@@ -337,7 +337,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitForIntro(forIntro: Hcl.ForIntro, p: MutableList<String>): Hcl.ForIntro {
                     val f = super.visitForIntro(forIntro, p)
                     if (matcher.matches(cursor)) {
-                        val match = f.printTrimmed(cursor)
+                        val match = f.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitForIntro")
                             println(match)
@@ -351,7 +351,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitForObject(forObject: Hcl.ForObject, p: MutableList<String>): Hcl.ForObject {
                     val f = super.visitForObject(forObject, p)
                     if (matcher.matches(cursor)) {
-                        val match = f.printTrimmed(cursor)
+                        val match = f.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitForObject")
                             println(match)
@@ -365,7 +365,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitForTuple(forTuple: Hcl.ForTuple, p: MutableList<String>): Hcl.ForTuple {
                     val f = super.visitForTuple(forTuple, p)
                     if (matcher.matches(cursor)) {
-                        val match = f.printTrimmed(cursor)
+                        val match = f.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitForTuple")
                             println(match)
@@ -382,7 +382,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.FunctionCall {
                     val f = super.visitFunctionCall(functionCall, p)
                     if (matcher.matches(cursor)) {
-                        val match = f.printTrimmed(cursor)
+                        val match = f.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitFunctionCall")
                             println(match)
@@ -399,7 +399,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.HeredocTemplate {
                     val h = super.visitHeredocTemplate(heredocTemplate, p)
                     if (matcher.matches(cursor)) {
-                        val match = h.printTrimmed(cursor)
+                        val match = h.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitHeredocTemplate")
                             println(match)
@@ -413,7 +413,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitIdentifier(identifier: Hcl.Identifier, p: MutableList<String>): Hcl.Identifier {
                     val i = super.visitIdentifier(identifier, p)
                     if (matcher.matches(cursor)) {
-                        val match = i.printTrimmed(cursor)
+                        val match = i.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitIdentifier")
                             println(match)
@@ -427,7 +427,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitIndex(index: Hcl.Index, p: MutableList<String>): Hcl.Index {
                     val i = super.visitIndex(index, p)
                     if (matcher.matches(cursor)) {
-                        val match = i.printTrimmed(cursor)
+                        val match = i.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitIndex")
                             println(match)
@@ -444,7 +444,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.Index.Position {
                     val i = super.visitIndexPosition(indexPosition, p)
                     if (matcher.matches(cursor)) {
-                        val match = i.printTrimmed(cursor)
+                        val match = i.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitIndexPosition")
                             println(match)
@@ -458,7 +458,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitLiteral(literal: Hcl.Literal, p: MutableList<String>): Hcl.Literal {
                     val l = super.visitLiteral(literal, p)
                     if (matcher.matches(cursor)) {
-                        val match = l.printTrimmed(cursor)
+                        val match = l.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitLiteral")
                             println(match)
@@ -472,7 +472,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitObjectValue(objectValue: Hcl.ObjectValue, p: MutableList<String>): Hcl.ObjectValue {
                     val o = super.visitObjectValue(objectValue, p)
                     if (matcher.matches(cursor)) {
-                        val match = o.printTrimmed(cursor)
+                        val match = o.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitObjectValue")
                             println(match)
@@ -486,7 +486,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitParentheses(parentheses: Hcl.Parentheses, p: MutableList<String>): Hcl.Parentheses {
                     val pp = super.visitParentheses(parentheses, p)
                     if (matcher.matches(cursor)) {
-                        val match = pp.printTrimmed(cursor)
+                        val match = pp.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitParentheses")
                             println(match)
@@ -503,7 +503,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.QuotedTemplate {
                     val q = super.visitQuotedTemplate(template, p)
                     if (matcher.matches(cursor)) {
-                        val match = q.printTrimmed(cursor)
+                        val match = q.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitQuotedTemplate")
                             println(match)
@@ -517,7 +517,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitSplat(splat: Hcl.Splat, p: MutableList<String>): Hcl.Splat {
                     val s = super.visitSplat(splat, p)
                     if (matcher.matches(cursor)) {
-                        val match = s.printTrimmed(cursor)
+                        val match = s.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitSplat")
                             println(match)
@@ -534,7 +534,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.Splat.Operator {
                     val s = super.visitSplatOperator(splatOperator, p)
                     if (matcher.matches(cursor)) {
-                        val match = s.printTrimmed(cursor)
+                        val match = s.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitSplatOperator")
                             println(match)
@@ -551,7 +551,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.TemplateInterpolation {
                     val t = super.visitTemplateInterpolation(template, p)
                     if (matcher.matches(cursor)) {
-                        val match = t.printTrimmed(cursor)
+                        val match = t.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitSplatOperator")
                             println(match)
@@ -565,7 +565,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitTuple(tuple: Hcl.Tuple, p: MutableList<String>): Hcl.Tuple {
                     val t = super.visitTuple(tuple, p)
                     if (matcher.matches(cursor)) {
-                        val match = t.printTrimmed(cursor)
+                        val match = t.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitSplatOperator")
                             println(match)
@@ -579,7 +579,7 @@ class JsonPathMatcherTest : RewriteTest {
                 override fun visitUnary(unary: Hcl.Unary, p: MutableList<String>): Hcl.Unary {
                     val u = super.visitUnary(unary, p)
                     if (matcher.matches(cursor)) {
-                        val match = u.printTrimmed(cursor)
+                        val match = u.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitSplatOperator")
                             println(match)
@@ -596,7 +596,7 @@ class JsonPathMatcherTest : RewriteTest {
                 ): Hcl.VariableExpression {
                     val v = super.visitVariableExpression(variableExpression, p)
                     if (matcher.matches(cursor)) {
-                        val match = v.printTrimmed(cursor)
+                        val match = v.printTrimmed(cursor.parentOrThrow)
                         if (printMatches) {
                             println("matched in visitVariableExpression")
                             println(match)

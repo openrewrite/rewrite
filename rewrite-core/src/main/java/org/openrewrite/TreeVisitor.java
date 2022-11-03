@@ -29,7 +29,6 @@ import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.Markup;
 
 import java.beans.Transient;
 import java.lang.reflect.ParameterizedType;

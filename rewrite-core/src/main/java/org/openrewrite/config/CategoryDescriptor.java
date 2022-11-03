@@ -24,7 +24,8 @@ import java.util.Set;
 @Value
 @With
 public class CategoryDescriptor {
-    public static final int LOWEST_PRECEDENCE = 0;
+    public static final int LOWEST_PRECEDENCE = -1;
+    public static final int DEFAULT_PRECEDENCE = 0;
     public static final int HIGHEST_PRECEDENCE = Integer.MAX_VALUE;
 
     @Language("markdown")

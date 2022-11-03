@@ -164,7 +164,7 @@ public class UpgradeDependencyVersion extends Recipe {
                         if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
                             doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
                         } else {
-                            t = (Xml.Tag) new ChangeTagValueVisitor<>(version.get(), newerVersion).visitNonNull(t, 0, getCursor());
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(version.get(), newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                         }
                     } else if (Boolean.TRUE.equals(overrideManagedVersion)) {
                         ResolvedManagedDependency dm = findManagedDependency(t);
@@ -232,7 +232,7 @@ public class UpgradeDependencyVersion extends Recipe {
             } else {
                 Xml.Tag childVersionTag = t.getChild("version").orElse(null);
                 if (childVersionTag != null) {
-                    t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(childVersionTag, newerVersion).visitNonNull(t, 0, getCursor());
+                    t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(childVersionTag, newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                 }
             }
 

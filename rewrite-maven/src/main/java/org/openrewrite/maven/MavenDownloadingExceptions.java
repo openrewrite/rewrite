@@ -16,10 +16,19 @@
 package org.openrewrite.maven;
 
 import lombok.Getter;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.Parent;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import static java.util.Objects.requireNonNull;
 
 @Getter
 public class MavenDownloadingExceptions extends Exception {
@@ -45,5 +54,43 @@ public class MavenDownloadingExceptions extends Exception {
         }
         current.exceptions.addAll(exceptions.getExceptions());
         return current;
+    }
+
+    public Xml.Document warn(Xml.Document document) {
+        Map<GroupArtifact, List<MavenDownloadingException>> byGav = new HashMap<>();
+        for (MavenDownloadingException exception : exceptions) {
+            byGav.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
+                    exception.getRoot().getArtifactId()), ga -> new ArrayList<>()).add(exception);
+        }
+
+        return (Xml.Document) new MavenIsoVisitor<Integer>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, Integer integer) {
+                return sourceFile instanceof Xml.Document;
+            }
+
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, Integer integer) {
+                Xml.Tag t = tag;
+                for (GroupArtifact ga : byGav.keySet()) {
+                    boolean hasException = (isDependencyTag() || isManagedDependencyTag()) &&
+                                           tag.getChildValue("groupId").map(a -> ga.getGroupId().equals(a)).orElse(false) &&
+                                           tag.getChildValue("artifactId").map(a -> ga.getArtifactId().equals(a)).orElse(false);
+                    if (isParentTag()) {
+                        Parent parent = requireNonNull(getResolutionResult().getPom().getRequested().getParent());
+                        if (parent.getGroupId().equals(ga.getGroupId()) && parent.getArtifactId().equals(ga.getArtifactId())) {
+                            hasException = true;
+                        }
+                    }
+
+                    if (hasException) {
+                        for (MavenDownloadingException exception : byGav.get(ga)) {
+                            t = Markup.warn(t, exception);
+                        }
+                    }
+                }
+                return super.visitTag(t, integer);
+            }
+        }.visitNonNull(document, 0);
     }
 }

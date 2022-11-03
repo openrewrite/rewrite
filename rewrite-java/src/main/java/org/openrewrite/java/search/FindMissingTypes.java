@@ -28,6 +28,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
@@ -61,7 +62,7 @@ public class FindMissingTypes extends Recipe {
                         J j = getCursor().firstEnclosing(J.class);
                         String printedTree;
                         if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
-                            printedTree = j != null ? j.printTrimmed(new InMemoryExecutionContext(), getCursor()) : "";
+                            printedTree = j != null ? j.printTrimmed(new InMemoryExecutionContext(), getCursor().getParentOrThrow()) : "";
                         } else {
                             printedTree = String.valueOf(j);
                         }

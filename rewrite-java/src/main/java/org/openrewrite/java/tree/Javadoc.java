@@ -160,7 +160,7 @@ public interface Javadoc extends Tree {
 
         @Override
         public <P> void printComment(Cursor cursor, PrintOutputCapture<P> print) {
-            new JavadocPrinter<P>().visit(this, print, new Cursor(cursor, this));
+            new JavadocPrinter<P>().visit(this, print, cursor);
         }
     }
 

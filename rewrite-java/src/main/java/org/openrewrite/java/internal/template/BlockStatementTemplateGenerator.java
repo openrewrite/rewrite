@@ -319,6 +319,9 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.VariableDeclarations) {
             before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+            // Skip appending ";" as variable declarations can appear in contexts such as try-with-resources,
+            // where a semicolon is not always required.
+            // When templating a declaration on its own, the semicolon should be included in the template string
         } else if(j instanceof J.MethodInvocation) {
             // If prior is an argument, wrap in __M__.any(prior)
             // If prior is a type parameter, wrap in __M__.anyT<prior>()

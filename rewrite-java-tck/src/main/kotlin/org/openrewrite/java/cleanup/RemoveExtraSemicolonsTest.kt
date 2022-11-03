@@ -17,7 +17,6 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.test.RecipeSpec
@@ -77,6 +76,7 @@ interface RemoveExtraSemicolonsTest : RewriteTest, JavaRecipeTest {
         """)
     )
 
+    @Suppress("EmptyTryBlock")
     @Test
     fun tryWithResources() = rewriteRun(
         java("""

@@ -18,7 +18,6 @@ package org.openrewrite.maven;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
@@ -26,8 +25,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static java.util.Objects.requireNonNull;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
@@ -111,7 +108,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             return document.withMarkers(document.getMarkers().computeByType(getResolutionResult(),
                     (original, ignored) -> updated));
         } catch (MavenDownloadingExceptions e) {
-            return markExceptions(document, e);
+            return e.warn(document);
         }
     }
 
@@ -159,37 +156,5 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         } catch (MavenDownloadingException e) {
             throw MavenDownloadingExceptions.append(exceptions.get(), e);
         }
-    }
-
-    private Xml.Document markExceptions(Xml.Document document, MavenDownloadingExceptions e) {
-        Map<GroupArtifact, List<MavenDownloadingException>> byGav = new HashMap<>();
-        for (MavenDownloadingException exception : e.getExceptions()) {
-            byGav.computeIfAbsent(new GroupArtifact(exception.getRoot().getGroupId(),
-                    exception.getRoot().getArtifactId()), ga -> new ArrayList<>()).add(exception);
-        }
-
-        return (Xml.Document) new MavenIsoVisitor<Integer>() {
-            @Override
-            public Xml.Tag visitTag(Xml.Tag tag, Integer integer) {
-                Xml.Tag t = tag;
-                for (GroupArtifact ga : byGav.keySet()) {
-                    boolean hasException = isDependencyTag(ga.getGroupId(), ga.getArtifactId()) ||
-                                           isManagedDependencyTag(ga.getGroupId(), ga.getArtifactId());
-                    if (isParentTag()) {
-                        Parent parent = requireNonNull(getResolutionResult().getPom().getRequested().getParent());
-                        if (parent.getGroupId().equals(ga.getGroupId()) && parent.getArtifactId().equals(ga.getArtifactId())) {
-                            hasException = true;
-                        }
-                    }
-
-                    if (hasException) {
-                        for (MavenDownloadingException exception : byGav.get(ga)) {
-                            t = Markup.warn(t, exception);
-                        }
-                    }
-                }
-                return super.visitTag(t, integer);
-            }
-        }.visitNonNull(document, 0);
     }
 }

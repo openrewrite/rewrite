@@ -52,8 +52,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         if (cu.getShebang() != null) {
             p.append(cu.getShebang());
         }
-        visitSpace(cu.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
-        visitMarkers(cu.getMarkers(), p);
+        beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
 
         JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
         if (pkg != null) {
@@ -218,8 +217,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             p.out.append('{');
             visitMarkers(lambda.getParameters().getMarkers(), p);
             visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
             if (!lambda.getParameters().getParameters().isEmpty()) {
+                visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.out.append("->");
             }
             if (lambda.getBody() instanceof J.Block) {
@@ -326,7 +325,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitReturn(J.Return retrn, PrintOutputCapture<P> p) {
-            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
+            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
+                retrn.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
                 visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
                 visitMarkers(retrn.getMarkers(), p);
                 visit(retrn.getExpression(), p);
@@ -377,11 +377,28 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     private static final UnaryOperator<String> JAVA_MARKER_WRAPPER =
             out -> "/*~~" + out + (out.isEmpty() ? "" : "~~") + ">*/";
 
+    private void beforeSyntax(G g, Space.Location loc, PrintOutputCapture<P> p) {
+        beforeSyntax(g.getPrefix(), g.getMarkers(), loc, p);
+    }
+
     private void beforeSyntax(G g, GSpace.Location loc, PrintOutputCapture<P> p) {
         beforeSyntax(g.getPrefix(), g.getMarkers(), loc, p);
     }
 
     private void beforeSyntax(Space prefix, Markers markers, @Nullable GSpace.Location loc, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        }
+        if (loc != null) {
+            visitSpace(prefix, loc, p);
+        }
+        visitMarkers(markers, p);
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        }
+    }
+
+    private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
             p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }

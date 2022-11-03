@@ -525,15 +525,15 @@ public class ResolvedPom {
                 Dependency d = dd.getDefinedIn().getValues(dd.getDependency(), depth);
                 //The dependency may be modified by the current pom's managed dependencies
                 d = getValues(d, depth);
-                if (d.getVersion() == null) {
-                    throw new MavenParsingException("No version provided for dependency " + d.getGroupId() + ":" + d.getArtifactId());
-                }
-
-                if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {
-                    continue;
-                }
-
                 try {
+                    if (d.getVersion() == null) {
+                        throw new MavenDownloadingException("No version provided", null, dd.getDependency().getGav());
+                    }
+
+                    if (d.getType() != null && (!"jar".equals(d.getType()) && !"pom".equals(d.getType()))) {
+                        continue;
+                    }
+
                     GroupArtifact ga = new GroupArtifact(d.getGroupId(), d.getArtifactId());
                     VersionRequirement existingRequirement = requirements.get(ga);
                     if (existingRequirement == null) {
@@ -568,6 +568,12 @@ public class ResolvedPom {
                             // so just skip and continue on
                             continue;
                         }
+                    }
+
+                    if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
+                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                        throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
                     }
 
                     Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());

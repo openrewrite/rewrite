@@ -333,7 +333,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
 
             body.addAll(whitespaceBefore());
-            body.add((Javadoc) scan(blockTag, body));
+            body.addAll(convertMultiline(singletonList(blockTag)));
         }
 
         // The javadoc ends with trailing whitespace.

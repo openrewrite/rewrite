@@ -47,6 +47,43 @@ class AddDependencyTest implements RewriteTest {
           }
       """;
 
+    @Test
+    void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
+        rewriteRun(
+          spec -> spec
+            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <!--~~(Unable to download POM. Tried repositories:
+                    https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+                                <groupId>doesnotexist</groupId>
+                                <artifactId>doesnotexist</artifactId>
+                                <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingTestScope(String onlyIfUsing) {

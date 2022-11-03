@@ -736,7 +736,7 @@ class JsonPathMatcherTest {
                 Yaml m = super.visitMapping(mapping, p);
                 if (matcher.matches(getCursor())) {
                     var j = m.withPrefix("");
-                    var match = j.printTrimmed(getCursor());
+                    var match = j.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitMapping");
                         System.out.println(match);
@@ -752,7 +752,7 @@ class JsonPathMatcherTest {
                 Yaml e = super.visitMappingEntry(entry, p);
                 if (matcher.matches(getCursor())) {
                     var j = e.withPrefix("");
-                    var match = j.printTrimmed(getCursor());
+                    var match = j.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitMappingEntry");
                         System.out.println(match);
@@ -768,7 +768,7 @@ class JsonPathMatcherTest {
                 Yaml s = super.visitSequence(sequence, p);
                 if (matcher.matches(getCursor())) {
                     var j = s.withPrefix("");
-                    var match = j.printTrimmed(getCursor());
+                    var match = j.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitSequence");
                         System.out.println(match);
@@ -784,7 +784,7 @@ class JsonPathMatcherTest {
                 Yaml e = super.visitSequenceEntry(entry, p);
                 if (matcher.matches(getCursor())) {
                     var j = e.withPrefix("");
-                    var match = j.printTrimmed(getCursor());
+                    var match = j.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitSequenceEntry");
                         System.out.println(match);
@@ -800,7 +800,7 @@ class JsonPathMatcherTest {
                 Yaml s = super.visitScalar(scalar, p);
                 if (matcher.matches(getCursor())) {
                     var j = s.withPrefix("");
-                    var match = j.printTrimmed(getCursor());
+                    var match = j.printTrimmed(getCursor().getParentOrThrow());
                     if (printMatches) {
                         System.out.println("matched in visitScalar");
                         System.out.println(match);

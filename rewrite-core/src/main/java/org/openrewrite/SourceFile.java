@@ -79,7 +79,7 @@ public interface SourceFile extends Tree {
     }
 
     default <P> String printAllTrimmed(P p) {
-        return printTrimmed(p, new Cursor(null, this));
+        return printTrimmed(p, new Cursor(null, "root"));
     }
 
     default String printAllTrimmed() {

@@ -30,6 +30,25 @@ interface RemoveUnusedImportsTest : RewriteTest {
         spec.recipe(RemoveUnusedImports())
     }
 
+    @Test
+    fun enums() = rewriteRun(
+        java("""
+            package org.openrewrite;
+            public enum E {
+                A, B, C
+            }
+        """),
+        java("""
+            import org.openrewrite.E;
+            import static org.openrewrite.E.A;
+            import static org.openrewrite.E.B;
+            public class Test {
+                E a = A;
+                E b = B;
+            }
+        """)
+    )
+
     @Issue("https://github.com/openrewrite/rewrite/issues/969")
     @Test
     fun doNotRemoveInnerClassImport() = rewriteRun(

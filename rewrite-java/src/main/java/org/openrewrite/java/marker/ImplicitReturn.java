@@ -13,24 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.search
+package org.openrewrite.java.marker;
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.gradle.GradleRecipeTest
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Marker;
 
-class FindPluginTest : GradleRecipeTest {
-    @Test
-    fun findPlugin() = assertChanged(
-        recipe = FindPlugin("com.jfrog.bintray"),
-        before = """
-            plugins {
-                id 'com.jfrog.bintray' version '1.8.5'
-            }
-        """,
-        after = """
-            plugins {
-                /*~~>*/id 'com.jfrog.bintray' version '1.8.5'
-            }
-        """
-    )
+import java.util.UUID;
+
+@Value
+@With
+public class ImplicitReturn implements Marker {
+    UUID id;
 }

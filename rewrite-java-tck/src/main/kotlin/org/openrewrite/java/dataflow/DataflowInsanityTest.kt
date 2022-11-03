@@ -62,7 +62,7 @@ interface DataflowInsanityTest : RewriteTest {
                             })
                             return method
                         }
-                    }.visitNonNull(classDecl, p, cursor)
+                    }.visitNonNull(classDecl, p, cursor.parentOrThrow)
                     return classDecl
                 }
 

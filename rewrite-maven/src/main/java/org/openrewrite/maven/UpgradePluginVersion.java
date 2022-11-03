@@ -116,7 +116,15 @@ public class UpgradePluginVersion extends Recipe {
 
                         if (versionLookup != null) {
                             try {
-                                findNewerDependencyVersion(groupId, artifactId, versionLookup, ctx).ifPresent(newer -> {
+                                String tagGroupId = getResolutionResult().getPom().getValue(
+                                        tag.getChildValue("groupId").orElse(groupId)
+                                );
+                                String tagArtifactId = getResolutionResult().getPom().getValue(
+                                        tag.getChildValue("artifactId").orElse(artifactId)
+                                );
+                                assert tagGroupId != null;
+                                assert tagArtifactId != null;
+                                findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer -> {
                                     ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
                                     doAfterVisit(changeDependencyVersion);
                                 });

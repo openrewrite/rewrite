@@ -10,6 +10,9 @@ repositories {
     maven {
         url = uri("https://repo.gradle.org/gradle/libs-releases-local/")
     }
+    maven {
+        url = uri("https://plugins.gradle.org/m2/")
+    }
 }
 
 dependencies {
@@ -31,6 +34,8 @@ dependencies {
     compileOnly("org.gradle:gradle-testing-base:latest.release")
     compileOnly("org.gradle:gradle-testing-jvm:latest.release")
 
+    compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
+
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
@@ -48,6 +53,7 @@ dependencies {
     testRuntimeOnly("org.gradle:gradle-resources:latest.release")
     testRuntimeOnly("org.gradle:gradle-testing-base:latest.release")
     testRuntimeOnly("org.gradle:gradle-testing-jvm:latest.release")
+    testRuntimeOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
 }
 
@@ -56,5 +62,6 @@ tasks.withType<ShadowJar> {
     exclude("org/gradle/internal/logging/slf4j/**.class")
     dependencies {
         include(dependency("org.gradle:"))
+        include(dependency("com.gradle:"))
     }
 }

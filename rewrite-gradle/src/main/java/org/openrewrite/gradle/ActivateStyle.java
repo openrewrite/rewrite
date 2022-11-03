@@ -156,7 +156,7 @@ public class ActivateStyle extends Recipe {
                     ctx.putMessage(STYLE_PRESENT, true);
                     return m;
                 }
-                J.MethodInvocation maybeModified = (J.MethodInvocation) new ModifyActiveStyleInvocation().visitNonNull(m, ctx, getCursor());
+                J.MethodInvocation maybeModified = (J.MethodInvocation) new ModifyActiveStyleInvocation().visitNonNull(m, ctx, getCursor().getParentOrThrow());
                 if (maybeModified != m) {
                     ctx.putMessage(STYLE_PRESENT, true);
                     return maybeModified;
@@ -196,7 +196,7 @@ public class ActivateStyle extends Recipe {
                 } else {
                     m = m.withArguments(ListUtils.concat(m.getArguments(), newEntry));
                 }
-                m = autoFormat(m, executionContext, getCursor());
+                m = autoFormat(m, executionContext, getCursor().getParentOrThrow());
             }
             return m;
         }

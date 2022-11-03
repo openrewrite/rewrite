@@ -30,6 +30,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -137,7 +138,7 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
                 JavaSourceFile enclosingCU = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
                 Cursor parentScope = getCursorToParentScope(getCursor());
                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                if(enclosingClass == null) {
+                if (enclosingClass == null) {
                     return v;
                 }
                 while (// don't use a variable name of any existing variable "downstream" of the renamed variable's scope
@@ -148,6 +149,16 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
                     nextName = nextName(nextName);
                 }
                 doAfterVisit(new RenameVariable<>(v, nextName));
+                if (parentScope.getValue() instanceof J.MethodDeclaration) {
+                    Optional<J.VariableDeclarations> variableParameter = ((J.MethodDeclaration) parentScope.getValue()).getParameters().stream()
+                            .filter(it -> it instanceof J.VariableDeclarations)
+                            .map(it -> (J.VariableDeclarations) it)
+                            .filter(it -> it.getVariables().contains(v))
+                            .findFirst();
+                    if (variableParameter.isPresent()) {
+                        doAfterVisit(new RenameJavaDocParamNameVisitor<>(parentScope.getValue(), v.getSimpleName(), nextName));
+                    }
+                }
             }
             return v;
         }
@@ -243,7 +254,6 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
                 if (!isIgnorableSetter && !isIgnorableConstructorParam && !isIgnorableAbstractMethod) {
                     ctx.add(v);
                 }
-
             }
             return v;
         }
