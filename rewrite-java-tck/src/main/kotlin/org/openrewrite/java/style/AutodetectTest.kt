@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("JUnitMalformedDeclaration")
 
 package org.openrewrite.java.style
 
@@ -21,11 +20,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.style.TabsAndIndentsStyle.MethodDeclarationParameters
 import org.openrewrite.style.GeneralFormatStyle
 import org.openrewrite.style.NamedStyles
 import java.util.*
 
+@Suppress("JUnitMalformedDeclaration")
 interface AutodetectTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")
@@ -449,6 +448,44 @@ interface AutodetectTest {
 
         assertThat(spacesStyle.other.beforeComma).isFalse
         assertThat(spacesStyle.other.afterComma).isTrue
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2098")
+    @Test
+    fun detectNoSpacesWithinMethodCall(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        a("a","b","c");
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.within.methodCallParentheses).isFalse
+        assertThat(spacesStyle.within.methodCallParentheses).isFalse
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2098")
+    @Test
+    fun detectSpacesWithinMethodCall(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void i() {
+                        a( "a","b","c" );
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
+
+        assertThat(spacesStyle.within.methodCallParentheses).isTrue
+        assertThat(spacesStyle.within.methodCallParentheses).isTrue
     }
 
     @Test

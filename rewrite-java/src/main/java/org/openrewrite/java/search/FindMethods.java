@@ -32,6 +32,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.TreeVisitor.collect;
 
@@ -166,8 +167,13 @@ public class FindMethods extends Recipe {
      */
     public static Set<J> find(J j, String methodPattern) {
         return TreeVisitor.collect(
-                new FindMethods(methodPattern, null, null).getVisitor(),
-                j, new HashSet<>()
-        );
+                        new FindMethods(methodPattern, null, null).getVisitor(),
+                        j,
+                        new HashSet<>()
+                )
+                .stream()
+                .filter(t -> t instanceof J.MethodInvocation || t instanceof J.MethodDeclaration)
+                .map(t -> (J) t)
+                .collect(Collectors.toSet());
     }
 }

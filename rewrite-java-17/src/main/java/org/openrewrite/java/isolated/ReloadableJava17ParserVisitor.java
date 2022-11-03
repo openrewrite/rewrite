@@ -1109,7 +1109,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             }
 
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    convertAll(members, noDelim, noDelim), sourceBefore("}"));
+                    convertStatements(members), sourceBefore("}"));
         }
 
         JCNewClass jcNewClass = (JCNewClass) node;

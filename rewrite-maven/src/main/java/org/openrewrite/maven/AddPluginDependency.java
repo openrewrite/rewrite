@@ -103,7 +103,7 @@ public class AddPluginDependency extends Recipe {
                 } else {
                     formatAllDependencies = true;
                     dependencies = Xml.Tag.build("<dependencies />").withPrefix("\n");
-                    plugins = addToTag(plugins, plugin, dependencies, getCursor());
+                    plugins = addToTag(plugins, plugin, dependencies, getCursor().getParentOrThrow());
                 }
                 Xml.Tag newDependencyTag = Xml.Tag.build("<dependency>\n<groupId>" + groupId + "</groupId>\n<artifactId>"
                                 + artifactId + "</artifactId>" + ((version == null) ? "\n" : "\n<version>" + version + "</version>\n") + "</dependency>")
@@ -126,7 +126,7 @@ public class AddPluginDependency extends Recipe {
                         return it;
                     });
                 } else {
-                    plugins = addToTag(plugins, dependencies, newDependencyTag, getCursor());
+                    plugins = addToTag(plugins, dependencies, newDependencyTag, getCursor().getParentOrThrow());
                 }
                 if (formatAllDependencies) {
                     plugins = autoFormat(plugins, dependencies, ctx, getCursor().getParentOrThrow());

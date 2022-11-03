@@ -49,8 +49,6 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
 
         t = new MinimumViableSpacingVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
-        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
-
         t = new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p, cursor.fork());
@@ -77,6 +75,8 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
         t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
                 .orElse(autodetectGeneralFormatStyle(cu)), stopAfter)
                 .visit(t, p, cursor.fork());
+
+        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         return t;
     }

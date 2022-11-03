@@ -72,6 +72,17 @@ class MavenPomDownloaderTest {
         }
     }
 
+    @Test
+    void normalizeOssSnapshots() {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        MavenRepository oss = downloader.normalizeRepository(new MavenRepository("oss",
+          "https://oss.sonatype.org/content/repositories/snapshots", false, true, false,
+          null, null, null), null);
+
+        assertThat(oss).isNotNull();
+        assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {500, 400})
     void normalizeAcceptErrorStatuses(Integer status) {

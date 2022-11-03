@@ -22,7 +22,8 @@ import org.openrewrite.marker.SearchResult;
 public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        if (cu.getSourcePath().toString().endsWith(".gradle")) {
+        if (cu.getSourcePath().toString().endsWith(".gradle") &&
+            !cu.getSourcePath().toString().endsWith("settings.gradle")) {
             return SearchResult.found(cu);
         }
         return super.visitJavaSourceFile(cu, p);

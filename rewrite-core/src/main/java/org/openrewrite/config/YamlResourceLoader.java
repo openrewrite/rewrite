@@ -369,7 +369,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     }
 
                     boolean root = c.containsKey("root") && (Boolean) c.get("root");
-                    int priority = c.containsKey("priority") ? (Integer) c.get("priority") : CategoryDescriptor.LOWEST_PRECEDENCE;
+                    int priority = c.containsKey("priority") ? (Integer) c.get("priority") : CategoryDescriptor.DEFAULT_PRECEDENCE;
 
                     return new CategoryDescriptor(name, packageName, description, tags, root, priority, false);
                 })

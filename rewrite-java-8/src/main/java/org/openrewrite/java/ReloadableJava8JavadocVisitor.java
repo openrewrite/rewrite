@@ -549,7 +549,6 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             } else {
                 qualifier = null;
             }
-
         }
 
         if (ref.memberName != null) {
@@ -732,6 +731,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     @Override
     public Tree visitSerialField(SerialFieldTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@serialField"));
+
         return new Javadoc.SerialField(randomId(), Markers.EMPTY,
                 visitIdentifier(node.getName(), whitespaceBefore()),
                 visitReference(node.getType(), whitespaceBefore()),
@@ -960,6 +960,11 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
     private List<Javadoc> convertMultiline(List<? extends DocTree> dts) {
         List<Javadoc> js = new ArrayList<>(dts.size());
         Javadoc.LineBreak lineBreak;
+        while ((lineBreak = lineBreaks.remove(cursor + 1)) != null) {
+            cursor++;
+            js.add(lineBreak);
+        }
+
         for (int i = 0; i < dts.size(); i++) {
             DocTree dt = dts.get(i);
             if (i > 0 && dt instanceof DCTree.DCText) {

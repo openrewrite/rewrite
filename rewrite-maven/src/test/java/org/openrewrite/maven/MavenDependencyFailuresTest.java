@@ -45,7 +45,9 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
-            .recipeExecutionContext(new InMemoryExecutionContext()),
+            .recipeExecutionContext(new InMemoryExecutionContext())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           pomXml(
             """
               <project>
@@ -100,7 +102,9 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
-            .recipeExecutionContext(new InMemoryExecutionContext()),
+            .recipeExecutionContext(new InMemoryExecutionContext())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           pomXml(
             """
               <project>
@@ -163,7 +167,9 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setLocalRepository(mavenLocal)
               .setPomCache(new InMemoryMavenPomCache())
-            ),
+            )
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
           pomXml(
             """
               <project>
@@ -240,12 +246,51 @@ public class MavenDependencyFailuresTest implements RewriteTest {
                       <artifactId>guava</artifactId>
                       <version>doesnotexist</version>
                     </dependency>
+                    <dependency>
+                      <groupId>com.google.another</groupId>
+                      <artifactId>${doesnotexist}</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>com.google.yetanother</groupId>
+                      <artifactId>${doesnotexist}</artifactId>
+                      <version>1</version>
+                    </dependency>
                   </dependencies>
                 </project>
                 """
             )
-          )
-        ).isInstanceOf(UncheckedMavenDownloadingException.class);
+          ))
+          .isInstanceOf(UncheckedMavenDownloadingException.class)
+          .satisfies(t -> {
+              Xml.Document pom = ((UncheckedMavenDownloadingException) t).getPomWithWarnings();
+              //language=xml
+              assertThat(pom.printAllTrimmed()).isEqualTo(
+                """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                      <!--~~(Unable to download POM. Tried repositories:
+                  https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>doesnotexist</version>
+                      </dependency>
+                      <!--~~(No version provided)~~>--><dependency>
+                        <groupId>com.google.another</groupId>
+                        <artifactId>${doesnotexist}</artifactId>
+                      </dependency>
+                      <!--~~(Could not resolve property)~~>--><dependency>
+                        <groupId>com.google.yetanother</groupId>
+                        <artifactId>${doesnotexist}</artifactId>
+                        <version>1</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+                  """.trim()
+              );
+          });
     }
 
     @Test

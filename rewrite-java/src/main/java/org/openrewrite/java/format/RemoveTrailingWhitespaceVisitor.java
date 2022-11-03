@@ -37,13 +37,16 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         String eof = cu.getEof().getWhitespace();
-        eof = eof.chars().filter(c -> c == '\n' || c == '\r')
-                .collect(StringBuilder::new, StringBuilder::appendCodePoint, StringBuilder::append)
-                .toString();
-
-        JavaSourceFile c = super.visitJavaSourceFile(cu, p);
+        StringBuilder builder = new StringBuilder();
+        for (char c : eof.toCharArray()) {
+            if (c == '\n' || c == '\r') {
+                builder.appendCodePoint(c);
+            }
+        }
+        eof = builder.toString();
+        J.CompilationUnit c = super.visitCompilationUnit(cu, p);
         return c.withEof(c.getEof().withWhitespace(eof));
     }
 
@@ -52,7 +55,7 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
         Space s = space;
         int lastNewline = s.getWhitespace().lastIndexOf('\n');
         // Skip import prefixes, leave those up to OrderImports which better understands that domain
-        if (lastNewline > 0 && loc != Space.Location.IMPORT_PREFIX ) {
+        if (lastNewline > 0 && loc != Space.Location.IMPORT_PREFIX) {
             StringBuilder ws = new StringBuilder();
             char[] charArray = s.getWhitespace().toCharArray();
             for (int i = 0; i < charArray.length; i++) {

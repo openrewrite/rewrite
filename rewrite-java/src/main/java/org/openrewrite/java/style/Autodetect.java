@@ -230,7 +230,7 @@ public class Autodetect extends NamedStyles {
                     // Compare to the prefix of the first arg.
                     alignTo = method.getParameters().get(0).getPrefix().getLastWhitespace().length() - 1;
                 } else {
-                    String source = method.print(getCursor());
+                    String source = method.print(getCursor().getParentOrThrow());
                     alignTo = source.indexOf(method.getParameters().get(0).print(getCursor())) - 1;
                 }
                 List<Statement> parameters = method.getParameters();
@@ -789,6 +789,7 @@ public class Autodetect extends NamedStyles {
         int beforeForSemiColon = 0;
         int afterForSemiColon = 0;
         int afterTypeCast = 0;
+        int withinMethodCallParentheses = 0;
 
         public SpacesStyle getSpacesStyle() {
             SpacesStyle spaces = IntelliJ.spaces();
@@ -807,6 +808,28 @@ public class Autodetect extends NamedStyles {
                                     false
                             )
                     )
+                    .withWithin(new SpacesStyle.Within(
+                            spaces.getWithin().getCodeBraces(),
+                            spaces.getWithin().getBrackets(),
+                            spaces.getWithin().getArrayInitializerBraces(),
+                            spaces.getWithin().getEmptyArrayInitializerBraces(),
+                            spaces.getWithin().getGroupingParentheses(),
+                            spaces.getWithin().getMethodDeclarationParentheses(),
+                            spaces.getWithin().getEmptyMethodDeclarationParentheses(),
+                            withinMethodCallParentheses > 0,
+                            spaces.getWithin().getEmptyMethodCallParentheses(),
+                            spaces.getWithin().getIfParentheses(),
+                            spaces.getWithin().getForParentheses(),
+                            spaces.getWithin().getWhileParentheses(),
+                            spaces.getWithin().getSwitchParentheses(),
+                            spaces.getWithin().getTryParentheses(),
+                            spaces.getWithin().getCatchParentheses(),
+                            spaces.getWithin().getSynchronizedParentheses(),
+                            spaces.getWithin().getTypeCastParentheses(),
+                            spaces.getWithin().getAnnotationParentheses(),
+                            spaces.getWithin().getAngleBrackets(),
+                            spaces.getWithin().getRecordHeader()
+                    ))
                     .withOther(new SpacesStyle.Other(
                             beforeComma > 0,
                             afterComma >= 1,
@@ -872,6 +895,8 @@ public class Autodetect extends NamedStyles {
             stats.beforeMethodCall += hasSpace(method.getPadding().getArguments().getBefore());
 
             if (method.getArguments().size() > 1) {
+                stats.withinMethodCallParentheses += hasSpace(method.getPadding().getArguments().getPadding().getElements().get(0).getElement().getPrefix());
+                stats.withinMethodCallParentheses += hasSpace(method.getPadding().getArguments().getPadding().getElements().get(method.getArguments().size() - 1).getAfter());
                 for (JRightPadded<Expression> elem : method.getPadding().getArguments().getPadding().getElements()) {
                     stats.beforeComma += hasSpace(elem.getAfter());
                 }

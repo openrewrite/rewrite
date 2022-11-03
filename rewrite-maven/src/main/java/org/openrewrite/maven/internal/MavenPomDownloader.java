@@ -114,14 +114,16 @@ public class MavenPomDownloader {
         this.sendRequest = Retry.decorateCheckedFunction(
                 mavenDownloaderRetry,
                 request -> {
+                    int responseCode;
                     try (HttpSender.Response response = httpSender.send(request)) {
                         if (response.isSuccessful()) {
                             return response.getBodyAsBytes();
                         }
-                        throw new HttpSenderResponseException(null, response.getCode());
+                        responseCode = response.getCode();
                     } catch (Throwable t) {
                         throw new HttpSenderResponseException(t, null);
                     }
+                    throw new HttpSenderResponseException(null, responseCode);
                 });
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
@@ -594,35 +596,41 @@ public class MavenPomDownloader {
                 try {
                     sendRequest.apply(request.build());
                     normalized = repository.withUri(httpsUri);
-                } catch (MavenDownloadingException exception) {
-                    //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                    normalized = repository.withUri(httpsUri);
                 } catch (Throwable t) {
-                    if (!httpsUri.equals(originalUrl)) {
-                        try {
-                            sendRequest.apply(request.url(originalUrl).build());
-                            normalized = new MavenRepository(
-                                    repository.getId(),
-                                    originalUrl,
-                                    repository.isReleases(),
-                                    repository.isSnapshots(),
-                                    repository.getUsername(),
-                                    repository.getPassword());
-                        } catch (MavenDownloadingException exception) {
-                            //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
-                            normalized = new MavenRepository(
-                                    repository.getId(),
-                                    originalUrl,
-                                    repository.isReleases(),
-                                    repository.isSnapshots(),
-                                    repository.getUsername(),
-                                    repository.getPassword());
-                        } catch (HttpSenderResponseException e) {
-                            if (!e.isClientSideException()) {
-                                return originalRepository;
+                    if (t instanceof HttpSenderResponseException) {
+                        HttpSenderResponseException e = (HttpSenderResponseException) t;
+                        // response was returned from the server, but it was not a 200 OK. The server therefore exists.
+                        if (e.getResponseCode() != null) {
+                            normalized = repository.withUri(httpsUri);
+                        }
+                    }
+                    if (normalized == null) {
+                        if (!httpsUri.equals(originalUrl)) {
+                            try {
+                                sendRequest.apply(request.url(originalUrl).build());
+                                normalized = new MavenRepository(
+                                        repository.getId(),
+                                        originalUrl,
+                                        repository.isReleases(),
+                                        repository.isSnapshots(),
+                                        repository.getUsername(),
+                                        repository.getPassword());
+                            } catch (HttpSenderResponseException e) {
+                                //Response was returned from the server, but it was not a 200 OK. The server therefore exists.
+                                if (e.getResponseCode() != null) {
+                                    normalized = new MavenRepository(
+                                            repository.getId(),
+                                            originalUrl,
+                                            repository.isReleases(),
+                                            repository.isSnapshots(),
+                                            repository.getUsername(),
+                                            repository.getPassword());
+                                } else if (!e.isClientSideException()) {
+                                    return originalRepository;
+                                }
+                            } catch (Throwable ignored) {
+                                // ok to fall through here and cache a null
                             }
-                        } catch (Throwable ignored) {
-                            // ok to fall through here and cache a null
                         }
                     }
                 }

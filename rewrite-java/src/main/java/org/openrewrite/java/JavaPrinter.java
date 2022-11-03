@@ -59,7 +59,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
         for (Comment comment : space.getComments()) {
             visitMarkers(comment.getMarkers(), p);
-            comment.printComment(new Cursor(getCursor(), comment), p);
+            comment.printComment(getCursor(), p);
             p.append(comment.getSuffix());
         }
         return space;

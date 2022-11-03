@@ -31,7 +31,7 @@ import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class DateBoundSuppressions extends Recipe {
+public class AddOwaspDateBoundSuppressions extends Recipe {
 
     @Override
     public String getDisplayName() {

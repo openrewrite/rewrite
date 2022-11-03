@@ -21,6 +21,9 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
+/**
+ * @deprecated Use {@link org.openrewrite.java.marker.ImplicitReturn} instead.
+ */
 @Value
 @With
 public class ImplicitReturn implements Marker {
