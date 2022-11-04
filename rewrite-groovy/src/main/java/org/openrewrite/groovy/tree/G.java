@@ -266,9 +266,21 @@ public interface G extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     final class ExpressionStatement implements G, Expression, Statement {
+
+        @With
+        @Getter
+        UUID id;
+
         @With
         @Getter
         Expression expression;
+
+        // For backwards compatibility with older ASTs before there was an id field
+        @SuppressWarnings("unused")
+        public ExpressionStatement(Expression expression) {
+            this.id = Tree.randomId();
+            this.expression = expression;
+        }
 
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
@@ -279,16 +291,6 @@ public interface G extends J {
                 return withExpression((Expression) j);
             }
             return j;
-        }
-
-        @Override
-        public UUID getId() {
-            return expression.getId();
-        }
-
-        @Override
-        public <T extends Tree> T withId(UUID id) {
-            return (T) withExpression(expression.withId(id));
         }
 
         @Override

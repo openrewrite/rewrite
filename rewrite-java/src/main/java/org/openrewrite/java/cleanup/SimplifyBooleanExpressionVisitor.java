@@ -97,7 +97,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
     public J postVisit(J tree, P p) {
         J j = super.postVisit(tree, p);
         if (getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
-            j = new AutoFormatVisitor<>().visit(j, p, getCursor());
+            j = new AutoFormatVisitor<>().visit(j, p, getCursor().getParentOrThrow());
         }
         return j;
     }

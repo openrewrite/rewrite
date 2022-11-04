@@ -79,7 +79,7 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
                 List<Statement> statements = new ArrayList<>(c.getStatements());
                 J.Break breakToAdd = autoFormat(
                         new J.Break(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null),
-                        p, getCursor().getParentOrThrow()
+                        p
                 );
                 statements.add(breakToAdd);
                 c = c.withStatements(ListUtils.map(statements, stmt -> autoFormat(stmt, p)));
@@ -99,7 +99,7 @@ public class FallThroughVisitor<P> extends JavaIsoVisitor<P> {
                 List<Statement> statements = b.getStatements();
                 J.Break breakToAdd = autoFormat(
                         new J.Break(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null),
-                        p, getCursor().getParentOrThrow()
+                        p
                 );
                 statements.add(breakToAdd);
                 b = b.withStatements(ListUtils.map(statements, stmt -> autoFormat(stmt, p)));

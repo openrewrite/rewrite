@@ -28,9 +28,9 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
     private final String fieldName;
     private final String capitalizedFieldName;
     private final JavaTemplate getter = JavaTemplate
-            .builder(this::getCursor, "" + "public #{} #{}() {return #{any()};}").build();
+            .builder(() -> getCursor().getParentOrThrow(), "" + "public #{} #{}() {return #{any()};}").build();
     private final JavaTemplate setter = JavaTemplate
-            .builder(this::getCursor, "" + "public void set#{}(#{} #{}) {this.#{} = #{};}").build();
+            .builder(() -> getCursor().getParentOrThrow(), "" + "public void set#{}(#{} #{}) {this.#{} = #{};}").build();
 
     public GenerateGetterAndSetterVisitor(String fieldName) {
         this.fieldName = fieldName;

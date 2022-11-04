@@ -77,7 +77,7 @@ public class BlockStatementTemplateGenerator {
                             location.equals(Space.Location.BLOCK_PREFIX)) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
-                        before.insert(0, m.printTrimmed(cursor).trim() + '{');
+                        before.insert(0, m.printTrimmed(cursor.getParentOrThrow()).trim() + '{');
                         after.append('}');
                     }
 
@@ -266,7 +266,7 @@ public class BlockStatementTemplateGenerator {
                     }
                 } else {
                     n = n.withBody(null).withPrefix(Space.EMPTY);
-                    before.insert(0, n.printTrimmed(cursor).trim());
+                    before.insert(0, n.printTrimmed(cursor.getParentOrThrow()).trim());
                     if (!(next(cursor).getValue() instanceof MethodCall)) {
                         after.append(';');
                     }
@@ -303,7 +303,7 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0,"return ");
                 after.append(";");
             }
-            before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim() + "{ if(true) {");
+            before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor.getParentOrThrow()).trim() + "{ if(true) {");
 
             after.append("}\n");
             JavaType.Method mt = findSingleAbstractMethod(l.getType());
@@ -345,7 +345,7 @@ public class BlockStatementTemplateGenerator {
             else if (m.getSelect() == prior) {
                 List<Comment> comments = new ArrayList<>(1);
                 comments.add(new TextComment(true, STOP_COMMENT, "", Markers.EMPTY));
-                after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor));
+                after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor.getParentOrThrow()));
             }
         } else if(j instanceof J.Return) {
             before.insert(0, "return ");

@@ -81,6 +81,7 @@ public interface Tree {
     <P> boolean isAcceptable(TreeVisitor<?, P> v, P p);
 
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+
         return cursor.firstEnclosingOrThrow(SourceFile.class).printer(cursor);
     }
 
@@ -112,7 +113,8 @@ public interface Tree {
     }
 
     default boolean isScope(@Nullable Tree tree) {
-        return tree != null && tree.getId().equals(getId());
+        //noinspection ConstantConditions
+        return tree != null && tree.getId() != null && tree.getId().equals(getId());
     }
 
     default <T2 extends Tree> T2 cast() {

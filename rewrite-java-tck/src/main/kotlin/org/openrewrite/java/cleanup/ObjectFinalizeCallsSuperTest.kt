@@ -18,16 +18,19 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface ObjectFinalizeCallsSuperTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = ObjectFinalizeCallsSuper()
+interface ObjectFinalizeCallsSuperTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(ObjectFinalizeCallsSuper())
+    }
 
     @Test
-    fun hasSuperFinalizeInvocation() = assertUnchanged(
-        before = """
+    fun hasSuperFinalizeInvocation() = rewriteRun(
+        java("""
             class F {
                 Object o = new Object();
                 
@@ -37,12 +40,12 @@ interface ObjectFinalizeCallsSuperTest : JavaRecipeTest {
                     super.finalize();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun addsSuperFinalizeInvocation() = assertChanged(
-        before = """
+    fun addsSuperFinalizeInvocation() = rewriteRun(
+        java("""
             class F {
                 Object o = new Object();
                 
@@ -52,7 +55,7 @@ interface ObjectFinalizeCallsSuperTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class F {
                 Object o = new Object();
                 
@@ -62,6 +65,6 @@ interface ObjectFinalizeCallsSuperTest : JavaRecipeTest {
                     super.finalize();
                 }
             }
-        """
+        """)
     )
 }

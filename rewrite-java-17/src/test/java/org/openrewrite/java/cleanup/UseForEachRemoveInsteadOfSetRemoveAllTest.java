@@ -160,7 +160,7 @@ public class UseForEachRemoveInsteadOfSetRemoveAllTest implements RewriteTest {
                     return success;
                 }
                 
-                void returnsResult(Set<String> s, Collection<String> c) {
+                boolean returnsResult(Set<String> s, Collection<String> c) {
                     return s.removeAll(c);
                 }
             }

@@ -77,12 +77,12 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
             mv = maybeAutoFormat(mv,
                     mv.withModifiers(
                             ListUtils.concat(mv.getModifiers(), new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList()))
-                    ), p, getCursor().dropParentUntil(J.class::isInstance));
+                    ), p);
         }
 
         return mv;
     }
-    
+
     private boolean isDeclaredInForLoopControl() {
         return getCursor()
                 .dropParentUntil(J.class::isInstance)

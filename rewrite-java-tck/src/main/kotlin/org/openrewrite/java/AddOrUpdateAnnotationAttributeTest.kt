@@ -19,72 +19,68 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.test.RewriteTest
 
-
-interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
+interface AddOrUpdateAnnotationAttributeTest: RewriteTest {
 
     @Test
-    fun addValueAttribute(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null),
-        dependsOn = arrayOf("""
+    fun addValueAttribute(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null)) },
+        java("""
             package org.example;
             public @interface Foo {
                 String value() default "";
             }
         """),
-        before = """
+        java("""
             import org.example.Foo;
             
             @Foo
             public class A {
             }
         """,
-        after = """
+        """
             import org.example.Foo;
             
             @Foo("hello")
             public class A {
             }
-        """
+        """)
     )
 
     @Test
-    fun updateValueAttribute(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null),
-        dependsOn = arrayOf("""
+    fun updateValueAttribute(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(AddOrUpdateAnnotationAttribute("org.example.Foo", null, "hello", null)) },
+        java("""
             package org.example;
             public @interface Foo {
                 String value() default "";
             }
         """),
-        before = """
+        java("""
             import org.example.Foo;
             
             @Foo("goodbye")
             public class A {
             }
         """,
-        after = """
+        """
             import org.example.Foo;
             
             @Foo("hello")
             public class A {
             }
-        """
+        """)
     )
 
     @Test
-    fun addNamedAttribute(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null),
-        dependsOn = arrayOf("""
+    fun addNamedAttribute(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null)) },
+        java("""
             package org.junit;
             public @interface Test {
                 long timeout() default 0L;
             }
         """),
-        before = """
+        java("""
             import org.junit.Test;
             
             class SomeTestClass {
@@ -94,7 +90,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import org.junit.Test;
             
             class SomeTestClass {
@@ -103,20 +99,19 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
                 void foo() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceAttribute(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null),
-        dependsOn = arrayOf("""
+    fun replaceAttribute(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null)) },
+        java("""
             package org.junit;
             public @interface Test {
                 long timeout() default 0L;
             }
         """),
-        before = """
+        java("""
             import org.junit.Test;
             
             class SomeTestClass {
@@ -126,7 +121,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import org.junit.Test;
             
             class SomeTestClass {
@@ -135,21 +130,20 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
                 void foo() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun preserveExistingAttributes(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null),
-        dependsOn = arrayOf("""
+    fun preserveExistingAttributes(jp: JavaParser) = rewriteRun(
+        { spec -> spec.recipe(AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null)) },
+        java("""
             package org.junit;
             public @interface Test {
                 long timeout() default 0L;
-                long foo() default "";
+                String foo() default "";
             }
         """),
-        before = """
+        java("""
             import org.junit.Test;
             
             class SomeTestClass {
@@ -159,7 +153,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import org.junit.Test;
             
             class SomeTestClass {
@@ -168,41 +162,40 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
                 void foo() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun implicitValueToExplicitValue(jp: JavaParser)  = assertChanged(
-        jp,
-        recipe = AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null),
-        cycles = 3,
-        dependsOn = arrayOf("""
+    fun implicitValueToExplicitValue(jp: JavaParser)  = rewriteRun(
+        { spec -> spec.recipe(AddOrUpdateAnnotationAttribute("org.junit.Test", "other", "1", null))
+            .cycles(3) },
+        java("""
             package org.junit;
             public @interface Test {
                 long other() default 0L;
-                long value() default "";
+                String value() default "";
             }
         """),
-        before = """
+        java("""
             import org.junit.Test;
             
             class SomeTestClass {
-                
+            
                 @Test("foo")
                 void foo() {
                 }
             }
         """,
-        after = """
+        """
             import org.junit.Test;
             
             class SomeTestClass {
-                
+            
                 @Test(other = 1, value = "foo")
                 void foo() {
                 }
             }
-        """
+        """)
     )
 
     @Test
@@ -212,7 +205,7 @@ interface AddOrUpdateAnnotationAttributeTest: JavaRecipeTest, RewriteTest {
             package org.junit;
             public @interface Test {
                 long other() default 0L;
-                long value() default "";
+                String value() default "";
             }
         """),
         java("""

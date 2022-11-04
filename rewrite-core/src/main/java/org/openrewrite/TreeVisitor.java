@@ -54,7 +54,7 @@ import java.util.function.Function;
  * @param <P> An input object that is passed to every visit method.
  */
 public abstract class TreeVisitor<T extends Tree, P> {
-    private static final Cursor ROOT = new Cursor(null, "root");
+    private static final Cursor ROOT = new Cursor(null, Cursor.ROOT_VALUE);
 
     private Cursor cursor = ROOT;
 
@@ -264,7 +264,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
         }
 
         visitCount++;
-
         setCursor(new Cursor(cursor, tree));
 
         T t = null;

@@ -17,13 +17,15 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RewriteTest
 
-interface ChangeMethodAccessLevelTest : JavaRecipeTest {
+interface ChangeMethodAccessLevelTest : RewriteTest, JavaRecipeTest {
 
     @Test
-    fun publicToPrivate() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private", null),
-        before = """
+    fun publicToPrivate() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A aMethod(..)", "private", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -44,7 +46,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -64,13 +66,13 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 private void aMethod(Double i) {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun packagePrivateToProtected() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
-        before = """
+    fun packagePrivateToProtected() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -91,7 +93,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -111,13 +113,13 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 protected void aMethod(Double i) {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun publicToPackagePrivate() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null),
-        before = """
+    fun publicToPackagePrivate() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -138,7 +140,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -159,13 +161,13 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 void aMethod(Double i) {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun publicToPackagePrivateWildcard() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A *(..)", "package", null),
-        before = """
+    fun publicToPackagePrivateWildcard() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A *(..)", "package", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -186,7 +188,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -208,13 +210,13 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 void aMethod(Integer i) {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotChangeExistingAccessLevel() = assertUnchanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public", null),
-        before = """
+    fun doNotChangeExistingAccessLevel() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A aMethod(String)", "public", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -222,13 +224,13 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 public void aMethod(String s) {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun packagePrivateToProtectedWithOtherModifier() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
-        before = """
+    fun packagePrivateToProtectedWithOtherModifier() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -238,7 +240,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -247,13 +249,13 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 protected static void aMethod(Double d) {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun packagePrivateToProtectedWithConstructor() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A <constructor>(..)", "protected", null),
-        before = """
+    fun packagePrivateToProtectedWithConstructor() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A <constructor>(..)", "protected", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -265,7 +267,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -276,15 +278,15 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 protected A() {
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @Suppress("MethodMayBeStatic")
-    fun methodPatternExactMatch() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null),
-        before = """
+    fun methodPatternExactMatch() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", null)) },
+        java("""
             package com.abc;
 
             class A {
@@ -300,7 +302,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -315,15 +317,15 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                     return "example_B";
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1215")
     @Suppress("MethodMayBeStatic")
-    fun matchOverrides() = assertChanged(
-        recipe = ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", true),
-        before = """
+    fun matchOverrides() = rewriteRun(
+        { spec -> spec.recipe(ChangeMethodAccessLevel("com.abc.A aMethod(..)", "protected", true)) },
+        java("""
             package com.abc;
 
             class A {
@@ -339,7 +341,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.abc;
 
             class A {
@@ -354,7 +356,7 @@ interface ChangeMethodAccessLevelTest : JavaRecipeTest {
                     return "example_B";
                 }
             }
-        """
+        """)
     )
 
 }

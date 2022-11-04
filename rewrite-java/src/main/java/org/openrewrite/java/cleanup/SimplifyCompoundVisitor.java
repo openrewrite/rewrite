@@ -42,8 +42,7 @@ public class SimplifyCompoundVisitor<P> extends JavaVisitor<P> {
                                 JLeftPadded.build(cleanedUpAssignment),
                                 assignOp.getType()
                         ),
-                        p,
-                        getCursor().getParentOrThrow()
+                        p
                 );
             }
         } else if (assignOp.getOperator() == J.AssignmentOperation.Type.BitOr) {
@@ -60,8 +59,7 @@ public class SimplifyCompoundVisitor<P> extends JavaVisitor<P> {
                                 JLeftPadded.build(cleanedUpAssignment),
                                 assignOp.getType()
                         ),
-                        p,
-                        getCursor().getParentOrThrow()
+                        p
                 );
             }
         }

@@ -83,7 +83,7 @@ public class MissingOverrideAnnotation extends Recipe {
                     && getCursorToParentScope(getCursor()).getValue() instanceof J.NewClass)) {
 
                 method = method.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@Override").build(),
+                        JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "@Override").build(),
                         method.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
             }
             return super.visitMethodDeclaration(method, ctx);

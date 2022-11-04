@@ -210,7 +210,7 @@ public class MinimumSwitchCases extends Recipe {
                         }
                     }
 
-                    return autoFormat(generatedIf, ctx, getCursor().getParentOrThrow());
+                    return autoFormat(generatedIf, ctx);
                 }
 
                 return super.visitSwitch(switzh, ctx);

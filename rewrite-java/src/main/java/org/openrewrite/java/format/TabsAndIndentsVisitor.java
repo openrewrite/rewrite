@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,13 +67,16 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 }
             }
         }
-        preVisit((J) parent.getPath(J.class::isInstance).next(), p);
+        Iterator<Object> itr = parent.getPath(J.class::isInstance);
+        J next = (itr.hasNext()) ? (J) itr.next() : null;
+        preVisit(next, p);
+
         return visit(tree, p);
     }
 
     @Override
     @Nullable
-    public J preVisit(J tree, P p) {
+    public J preVisit(@Nullable J tree, P p) {
         if (tree instanceof JavaSourceFile ||
                 tree instanceof J.Package ||
                 tree instanceof J.Import ||
@@ -94,7 +98,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
         }
 
-        return super.preVisit(tree, p);
+        return tree;
     }
 
     @Override

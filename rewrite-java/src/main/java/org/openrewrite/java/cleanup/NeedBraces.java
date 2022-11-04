@@ -87,7 +87,7 @@ public class NeedBraces extends Recipe {
             boolean hasAllowableBodyType = elem.getThenPart() instanceof J.Block;
             if (!needBracesStyle.getAllowSingleLineStatement() && !hasAllowableBodyType) {
                 J.Block b = buildBlock(elem.getThenPart());
-                elem = maybeAutoFormat(elem, elem.withThenPart(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withThenPart(b), ctx);
             }
             return elem;
         }
@@ -98,7 +98,7 @@ public class NeedBraces extends Recipe {
             boolean hasAllowableBodyType = elem.getBody() instanceof J.Block || elem.getBody() instanceof J.If;
             if (!needBracesStyle.getAllowSingleLineStatement() && !hasAllowableBodyType) {
                 J.Block b = buildBlock(elem.getBody());
-                elem = maybeAutoFormat(elem, elem.withBody(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withBody(b), ctx);
             }
             return elem;
         }
@@ -111,10 +111,10 @@ public class NeedBraces extends Recipe {
                     elem.getBody() instanceof J.Block;
             if (!needBracesStyle.getAllowEmptyLoopBody() && elem.getBody() instanceof J.Empty) {
                 J.Block b = buildBlock(elem.getBody());
-                elem = maybeAutoFormat(elem, elem.withBody(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withBody(b), ctx);
             } else if (!needBracesStyle.getAllowSingleLineStatement() && !hasAllowableBodyType) {
                 J.Block b = buildBlock(elem.getBody());
-                elem = maybeAutoFormat(elem, elem.withBody(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withBody(b), ctx);
             }
             return elem;
         }
@@ -127,10 +127,10 @@ public class NeedBraces extends Recipe {
                     elem.getBody() instanceof J.Block;
             if (!needBracesStyle.getAllowEmptyLoopBody() && elem.getBody() instanceof J.Empty) {
                 J.Block b = buildBlock(elem.getBody());
-                elem = maybeAutoFormat(elem, elem.withBody(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withBody(b), ctx);
             } else if (!needBracesStyle.getAllowSingleLineStatement() && !hasAllowableBodyType) {
                 J.Block b = buildBlock(elem.getBody());
-                elem = maybeAutoFormat(elem, elem.withBody(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withBody(b), ctx);
             }
             return elem;
         }
@@ -143,10 +143,10 @@ public class NeedBraces extends Recipe {
                     elem.getBody() instanceof J.Block;
             if (!needBracesStyle.getAllowEmptyLoopBody() && elem.getBody() instanceof J.Empty) {
                 J.Block b = buildBlock(elem.getBody());
-                elem = maybeAutoFormat(elem, elem.withBody(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withBody(b), ctx);
             } else if (!needBracesStyle.getAllowSingleLineStatement() && !hasAllowableBodyType) {
                 J.Block b = buildBlock(elem.getBody());
-                elem = maybeAutoFormat(elem, elem.withBody(b), ctx, getCursor().dropParentUntil(J.class::isInstance));
+                elem = maybeAutoFormat(elem, elem.withBody(b), ctx);
             }
             return elem;
         }

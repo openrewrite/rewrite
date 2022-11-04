@@ -104,12 +104,12 @@ public class DefaultComesLastVisitor<P> extends JavaIsoVisitor<P> {
                 List<Statement> statementsOfCaseBeingMoved = new ArrayList<>(lastNotGroupedWithDefault.getStatements());
                 J.Break breakStatement = autoFormat(
                         new J.Break(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null),
-                        p, getCursor().getParentOrThrow()
+                        p
                 );
                 statementsOfCaseBeingMoved.add(breakStatement);
 
                 lastNotGroupedWithDefault = lastNotGroupedWithDefault.withStatements(
-                        ListUtils.map(statementsOfCaseBeingMoved, stmt -> autoFormat(stmt, p))
+                        ListUtils.map(statementsOfCaseBeingMoved, stmt -> autoFormat(stmt, p, getCursor()))
                 );
                 fixedCases.set(fixedCases.size() - 1, lastNotGroupedWithDefault);
             }

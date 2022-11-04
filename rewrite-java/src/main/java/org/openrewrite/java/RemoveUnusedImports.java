@@ -273,7 +273,7 @@ public class RemoveUnusedImports extends Recipe {
 
                 cu = cu.getPadding().withImports(imports);
                 if (cu.getImports().isEmpty() && !cu.getClasses().isEmpty()) {
-                    cu = autoFormat(cu, cu.getClasses().get(0).getName(), ctx, getCursor());
+                    cu = autoFormat(cu, cu.getClasses().get(0).getName(), ctx, getCursor().getParentOrThrow());
                 }
             }
 

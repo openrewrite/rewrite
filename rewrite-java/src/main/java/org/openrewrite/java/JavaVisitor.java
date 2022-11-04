@@ -64,14 +64,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
-        return maybeAutoFormat(before, after, p, getCursor());
+        return maybeAutoFormat(before, after, p, getCursor().dropParentUntil(it -> it instanceof J || it == Cursor.ROOT_VALUE));
     }
 
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
         return maybeAutoFormat(before, after, null, p, cursor);
     }
 
-    @SuppressWarnings({"unchecked", "ConstantConditions"})
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor cursor) {
         if (before != after) {
             return autoFormat(after, stopAfter, p, cursor);
@@ -80,7 +79,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> J2 autoFormat(J2 j, P p) {
-        return autoFormat(j, p, getCursor());
+        return autoFormat(j, p, getCursor().dropParentUntil(it -> it instanceof J || it == Cursor.ROOT_VALUE));
     }
 
     public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor cursor) {
@@ -1304,7 +1303,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
                                                         JContainer.Location loc, P p) {
         if (container == null) {
-            return container;
+            //noinspection ConstantConditions
+            return null;
         }
         setCursor(new Cursor(getCursor(), container));
 

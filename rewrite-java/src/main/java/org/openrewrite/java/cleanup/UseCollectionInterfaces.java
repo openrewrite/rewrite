@@ -29,6 +29,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static org.openrewrite.Tree.randomId;
+
 public class UseCollectionInterfaces extends Recipe {
 
     @Override
@@ -38,7 +40,8 @@ public class UseCollectionInterfaces extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Use `Deque`, `List`, `Map`, `ConcurrentMap`, `Queue`, and `Set` instead of implemented collections. Replaces the return type of public method declarations and the variable type public variable declarations.";
+        return "Use `Deque`, `List`, `Map`, `ConcurrentMap`, `Queue`, and `Set` instead of implemented collections. " +
+                "Replaces the return type of public method declarations and the variable type public variable declarations.";
     }
 
     @Override
@@ -115,7 +118,7 @@ public class UseCollectionInterfaces extends Recipe {
                             TypeTree typeExpression;
                             if (m.getReturnTypeExpression() instanceof J.Identifier) {
                                 typeExpression = new J.Identifier(
-                                        Tree.randomId(),
+                                        randomId(),
                                         m.getReturnTypeExpression().getPrefix(),
                                         Markers.EMPTY,
                                         newType.getClassName(),
@@ -125,7 +128,7 @@ public class UseCollectionInterfaces extends Recipe {
                             } else {
                                 J.ParameterizedType parameterizedType = (J.ParameterizedType) m.getReturnTypeExpression();
                                 J.Identifier returnType = new J.Identifier(
-                                        Tree.randomId(),
+                                        randomId(),
                                         Space.EMPTY,
                                         Markers.EMPTY,
                                         newType.getClassName(),
@@ -161,7 +164,7 @@ public class UseCollectionInterfaces extends Recipe {
                             typeExpression = null;
                         } else if (mv.getTypeExpression() instanceof J.Identifier) {
                             typeExpression = new J.Identifier(
-                                    mv.getTypeExpression().getId(),
+                                    randomId(),
                                     mv.getTypeExpression().getPrefix(),
                                     Markers.EMPTY,
                                     newType.getClassName(),
@@ -171,7 +174,7 @@ public class UseCollectionInterfaces extends Recipe {
                         } else {
                             J.ParameterizedType parameterizedType = (J.ParameterizedType) mv.getTypeExpression();
                             J.Identifier returnType = new J.Identifier(
-                                    mv.getTypeExpression().getId(),
+                                    randomId(),
                                     Space.EMPTY,
                                     Markers.EMPTY,
                                     newType.getClassName(),

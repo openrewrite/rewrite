@@ -191,7 +191,7 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
                     J.Try.Catch parent = parentCursor.getValue();
                     if (parent == scope) {
                         List<JRightPadded<NameTree>> combinedCatches = combineEquivalentCatches();
-                        m = maybeAutoFormat(m, m.getPadding().withAlternatives(combinedCatches), executionContext, getCursor());
+                        m = maybeAutoFormat(m, m.getPadding().withAlternatives(combinedCatches), executionContext);
                     }
                 }
                 return m;
@@ -205,7 +205,8 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
                         List<JRightPadded<NameTree>> combinedCatches = combineEquivalentCatches();
                         c = maybeAutoFormat(c, c.withParameter(c.getParameter()
                                 .withTree(c.getParameter().getTree()
-                                        .withTypeExpression(new J.MultiCatch(Tree.randomId(), Space.EMPTY, Markers.EMPTY, combinedCatches)))), executionContext, getCursor());
+                                        .withTypeExpression(new J.MultiCatch(Tree.randomId(), Space.EMPTY, Markers.EMPTY, combinedCatches)))),
+                                executionContext);
                     }
                 }
                 return c;
@@ -305,7 +306,7 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
                 for (int i = 0; i < space1.getComments().size(); i++) {
                     Comment comment1 = space1.getComments().get(i);
                     Comment comment2 = space2.getComments().get(i);
-                    if (!comment1.printComment(getCursor()).equals(comment2.printComment(getCursor()))) {
+                    if (!comment1.printComment(getCursor().getParentOrThrow()).equals(comment2.printComment(getCursor().getParentOrThrow()))) {
                         return true;
                     }
                 }

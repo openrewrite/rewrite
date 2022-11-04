@@ -110,7 +110,7 @@ public class RemoveImplements extends Recipe {
                 if(md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
                     return super.visitMethodDeclaration(md, context);
                 }
-                md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, context, getCursor());
+                md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, context, getCursor().getParentOrThrow());
                 return super.visitMethodDeclaration(md, context);
             }
         };

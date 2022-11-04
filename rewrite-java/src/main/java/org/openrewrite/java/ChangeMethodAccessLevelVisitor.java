@@ -124,7 +124,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
                 if (!modifierComments.isEmpty()) {
                     m = m.withComments(ListUtils.concatAll(m.getComments(), modifierComments));
                 }
-                m = maybeAutoFormat(m, m.withModifiers(modifiers), p, getCursor().dropParentUntil(J.class::isInstance));
+                m = maybeAutoFormat(m, m.withModifiers(modifiers), p);
             }
         }
         return m;

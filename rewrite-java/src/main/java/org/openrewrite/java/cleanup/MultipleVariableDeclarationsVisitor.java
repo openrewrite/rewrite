@@ -62,7 +62,7 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
                 if (i == 0) {
                     vd = vd.withComments(mv.getComments()).withPrefix(mv.getPrefix());
                 }
-                vd = autoFormat(vd, ctx);
+                vd = autoFormat(vd, ctx, getCursor());
                 newDecls.add(vd);
             }
             return newDecls;

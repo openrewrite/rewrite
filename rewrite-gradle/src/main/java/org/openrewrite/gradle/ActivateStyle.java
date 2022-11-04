@@ -196,7 +196,7 @@ public class ActivateStyle extends Recipe {
                 } else {
                     m = m.withArguments(ListUtils.concat(m.getArguments(), newEntry));
                 }
-                m = autoFormat(m, executionContext, getCursor().getParentOrThrow());
+                m = autoFormat(m, executionContext);
             }
             return m;
         }

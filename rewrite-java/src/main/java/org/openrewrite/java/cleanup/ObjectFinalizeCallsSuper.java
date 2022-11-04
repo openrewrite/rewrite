@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;

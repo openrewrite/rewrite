@@ -91,7 +91,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
 
                 if(b != block) {
                     b = (J.Block) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
-                            .visitNonNull(b, ctx, getCursor());
+                            .visitNonNull(b, ctx, getCursor().getParentOrThrow());
                 }
 
                 return b;

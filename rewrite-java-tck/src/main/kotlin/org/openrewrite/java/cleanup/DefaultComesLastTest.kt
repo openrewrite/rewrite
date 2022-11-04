@@ -13,24 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("ConstantConditions", "SwitchStatementWithTooFewBranches", "DuplicateBranchesInSwitch")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
 import org.openrewrite.Tree
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
 import org.openrewrite.java.style.DefaultComesLastStyle
 import org.openrewrite.style.NamedStyles
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface DefaultComesLastTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = DefaultComesLast()
+interface DefaultComesLastTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(DefaultComesLast())
+    }
 
     @Test
-    fun moveDefaultToLastAlongWithItsStatementsAndAddBreakIfNecessary(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun moveDefaultToLastAlongWithItsStatementsAndAddBreakIfNecessary(jp: JavaParser) = rewriteRun(
+        java(
+            """
             class Test {
                 int n;
                 {
@@ -48,7 +52,7 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+            """
             class Test {
                 int n;
                 {
@@ -66,12 +70,13 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun moveDefaultToLastWhenSharedWithAnotherCaseStatement(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun moveDefaultToLastWhenSharedWithAnotherCaseStatement(jp: JavaParser) = rewriteRun(
+        java(
+            """
             class Test {
                 int n;
                 {
@@ -89,7 +94,7 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+            """
             class Test {
                 int n;
                 {
@@ -107,19 +112,25 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun skipIfLastAndSharedWithCase(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.styles(
-            listOf(
-                NamedStyles(
-                    Tree.randomId(), "test", "test", "test", emptySet(),
-                    listOf(DefaultComesLastStyle(true))
+    fun skipIfLastAndSharedWithCase(jp: JavaParser.Builder<*, *>) = rewriteRun(
+        { spec ->
+            spec.parser(
+                jp.styles(
+                    listOf(
+                        NamedStyles(
+                            Tree.randomId(), "test", "test", "test", emptySet(),
+                            listOf(DefaultComesLastStyle(true))
+                        )
+                    )
                 )
             )
-        ).build(),
-        before = """
+        },
+        java(
+            """
             class Test {
                 int n;
                 {
@@ -135,12 +146,13 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun defaultIsLastAndThrows(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun defaultIsLastAndThrows(jp: JavaParser) = rewriteRun(
+        java(
+            """
             class Test {
                 int n;
                 {
@@ -153,12 +165,13 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun defaultIsLastAndReturnsNonVoid(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun defaultIsLastAndReturnsNonVoid(jp: JavaParser) = rewriteRun(
+        java(
+            """
             class Test {
                 public int foo(int n) {
                     switch (n) {
@@ -170,12 +183,13 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun dontAddBreaksIfCasesArentMoving(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun dontAddBreaksIfCasesArentMoving(jp: JavaParser) = rewriteRun(
+        java(
+            """
             class Test {
                 int n;
                 boolean foo() {
@@ -189,12 +203,13 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun dontRemoveExtraneousDefaultCaseBreaks(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun dontRemoveExtraneousDefaultCaseBreaks(jp: JavaParser) = rewriteRun(
+        java(
+            """
             class Test {
                 int n;
                 void foo() {
@@ -205,12 +220,13 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun allCasesGroupedWithDefault(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun allCasesGroupedWithDefault(jp: JavaParser) = rewriteRun(
+        java(
+            """
             class Test {
                 int n;
                 boolean foo() {
@@ -223,6 +239,7 @@ interface DefaultComesLastTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
 }

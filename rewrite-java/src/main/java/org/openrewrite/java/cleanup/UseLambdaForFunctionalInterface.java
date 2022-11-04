@@ -146,7 +146,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
 
                         doAfterVisit(new RemoveUnusedImports());
 
-                        return autoFormat(lambda, ctx, getCursor().getParentOrThrow());
+                        return autoFormat(lambda, ctx);
                     }
                 }
                 return n;

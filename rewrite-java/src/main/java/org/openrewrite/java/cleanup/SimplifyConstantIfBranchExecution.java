@@ -75,7 +75,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                     (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                             .visitNonNull(expression, context, getCursor().getParentOrThrow());
             ex1 = (E) new SimplifyBooleanExpressionVisitor<>()
-                    .visitNonNull(ex1, context, getCursor().getParentOrThrow());
+                    .visitNonNull(ex1, context, getCursor().dropParentUntil(J.class::isInstance));
             if (expression == ex1 || isLiteralFalse(ex1) || isLiteralTrue(ex1)) {
                 return ex1;
             }
@@ -115,8 +115,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                 return maybeAutoFormat(
                         if__,
                         s,
-                        context,
-                        getCursor().getParentOrThrow()
+                        context
                 );
             } else {
                 // False branch
@@ -127,8 +126,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                     return maybeAutoFormat(
                             if__,
                             s,
-                            context,
-                            getCursor().getParentOrThrow()
+                            context
                     );
                 }
                 /*

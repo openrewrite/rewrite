@@ -278,7 +278,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             public J visitExpression(Expression expression, Integer p) {
                 if (loc.equals(EXPRESSION_PREFIX) && expression.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
-                            .withPrefix(expression.getPrefix()), p, getCursor().getParentOrThrow());
+                            .withPrefix(expression.getPrefix()), p);
                 }
                 return expression;
             }
@@ -287,7 +287,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
-                            .withPrefix(fa.getPrefix()), p, getCursor().getParentOrThrow());
+                            .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);
             }
@@ -297,7 +297,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
-                            .withPrefix(ident.getPrefix()), p, getCursor().getParentOrThrow());
+                            .withPrefix(ident.getPrefix()), p);
                 }
                 return super.visitIdentifier(ident, p);
             }
@@ -441,11 +441,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     J.MethodInvocation m;
                     if (loc.equals(METHOD_INVOCATION_ARGUMENTS)) {
                         m = substitutions.unsubstitute(templateParser.parseMethodArguments(getCursor(), substitutedTemplate, loc));
-                        m = autoFormat(m, 0, getCursor().getParentOrThrow());
+                        m = autoFormat(m, 0);
                         m = method.withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     } else {
                         m = substitutions.unsubstitute(templateParser.parseMethod(getCursor(), substitutedTemplate, loc));
-                        m = autoFormat(m, 0, getCursor().getParentOrThrow());
+                        m = autoFormat(m, 0);
                         m = method.withName(m.getName()).withArguments(m.getArguments()).withMethodType(m.getMethodType());
                     }
 
@@ -496,7 +496,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     "statement to replace one statement, but generated " + gen.size() +
                                     ". Template:\n" + substitutedTemplate);
                         }
-                        return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p, getCursor().getParentOrThrow());
+                        return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
                 }

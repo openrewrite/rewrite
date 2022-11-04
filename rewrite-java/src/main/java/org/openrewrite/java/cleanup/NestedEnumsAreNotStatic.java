@@ -72,7 +72,10 @@ public class NestedEnumsAreNotStatic extends Recipe {
                     if (J.Modifier.hasModifier(cd.getModifiers(), J.Modifier.Type.Static)) {
                         J.Block enumBody = cd.getBody();
                         cd = cd.withBody(null);
-                        cd = maybeAutoFormat(cd,cd.withModifiers(ListUtils.map(cd.getModifiers(), mod -> mod.getType() == J.Modifier.Type.Static ? null : mod)), ctx);
+                        cd = maybeAutoFormat(cd,
+                                cd.withModifiers(ListUtils.map(cd.getModifiers(), mod ->
+                                        mod.getType() == J.Modifier.Type.Static ? null : mod)),
+                                ctx);
                         cd = cd.withBody(enumBody);
                     }
                 }

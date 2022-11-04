@@ -967,24 +967,26 @@ public class GroovyParserVisitor {
             }
 
             J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
-            Space arrow = whitespace();
+            int saveCursor = cursor;
+            Space arrowPrefix = whitespace();
             if (source.startsWith("->", cursor)) {
                 cursor += "->".length();
                 if (params.getParameters().isEmpty()) {
-                    params = params.withParameters(singletonList(new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
+                    params = params.getPadding().withParams(singletonList(JRightPadded
+                            .build((J)new J.Empty(randomId(), EMPTY, Markers.EMPTY))
+                            .withAfter(arrowPrefix)));
+                } else {
+                    params = params.getPadding().withParams(
+                            ListUtils.mapLast(params.getPadding().getParams(), param -> param.withAfter(arrowPrefix))
+                    );
                 }
+            } else {
+                cursor = saveCursor;
             }
 
             J body = visit(expression.getCode());
-            if (body instanceof J.Block) {
-                J.Block block = (J.Block) body;
-                body = block.withStatements(ListUtils.mapFirst(block.getStatements(), s -> s.withPrefix(arrow)));
-            } else {
-                body = body.withPrefix(params.getParameters().isEmpty() ? arrow : EMPTY);
-            }
-
             queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params,
-                    params.getParameters().isEmpty() ? EMPTY : arrow,
+                    EMPTY,
                     body,
                     closureType));
 
@@ -1151,7 +1153,7 @@ public class GroovyParserVisitor {
         public void visitExpressionStatement(ExpressionStatement statement) {
             super.visitExpressionStatement(statement);
             if (queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
-                queue.add(new G.ExpressionStatement((Expression) queue.poll()));
+                queue.add(new G.ExpressionStatement(randomId(), (Expression) queue.poll()));
             }
         }
 

@@ -4180,7 +4180,7 @@ public interface J extends Tree {
 
         public String getPackageName() {
             return expression.withPrefix(Space.EMPTY).print(new Cursor(null,
-                    new J.CompilationUnit(null, null, null, Space.EMPTY, Markers.EMPTY, null,
+                    new J.CompilationUnit(null, null, Tree.randomId(), Space.EMPTY, Markers.EMPTY, null,
                             null, null, false, null, null, null, null, Space.EMPTY)));
         }
 

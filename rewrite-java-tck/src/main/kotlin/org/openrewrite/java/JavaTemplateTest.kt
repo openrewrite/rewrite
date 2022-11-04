@@ -39,7 +39,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     val replaceToStringWithLiteralRecipe: Recipe
         get() = RewriteTest.toRecipe{object : JavaVisitor<ExecutionContext>() {
             private var TO_STRING = MethodMatcher("java.lang.String toString()")
-            private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
+            private val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(java.lang.String)}").build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
                 val mi = super.visitMethodInvocation(method, ctx) as J
@@ -275,7 +275,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "new A()").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new A()").build()
 
                 override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J =
                     when (newClass.arguments[0]) {
@@ -340,7 +340,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "b").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "b").build()
 
                 override fun visitPackage(pkg: J.Package, p: ExecutionContext): J.Package {
                     if (pkg.expression.printTrimmed(cursor) == "a") {
@@ -378,7 +378,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "int test2(int n) { return n; }").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int test2(int n) { return n; }").build()
 
                 override fun visitMethodDeclaration(
                     method: J.MethodDeclaration,
@@ -417,7 +417,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "Object::toString").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Object::toString").build()
 
                 override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J {
                     return lambda.withTemplate(t, lambda.coordinates.replace())
@@ -447,7 +447,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "return n == 1;").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "return n == 1;").build()
 
                 override fun visitReturn(retrn: J.Return, p: ExecutionContext): J {
                     if (retrn.expression is J.Binary) {
@@ -495,7 +495,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "return n == 1;").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "return n == 1;").build()
 
                 override fun visitReturn(retrn: J.Return, p: ExecutionContext): J {
                     if (retrn.expression is J.Binary) {
@@ -541,7 +541,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}.toUpperCase()").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(java.lang.String)}.toUpperCase()").build()
 
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (method.simpleName.equals("toLowerCase")) {
@@ -586,7 +586,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}.toUpperCase()").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(java.lang.String)}.toUpperCase()").build()
 
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (method.simpleName.equals("toLowerCase")) {
@@ -623,7 +623,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val ENUM_EQUALS = MethodMatcher("java.lang.Enum equals(java.lang.Object)")
-                val t = JavaTemplate.builder({ cursor }, "#{any()} == #{any()}").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any()} == #{any()}").build()
 
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (ENUM_EQUALS.matches(method)) {
@@ -661,7 +661,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "acceptString(#{any()}.toString())")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "acceptString(#{any()}.toString())")
                     .javaParser {
                         JavaParser.fromJavaVersion()
                             .dependsOn(
@@ -740,7 +740,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         ),
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "#{anyArray(int)}").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{anyArray(int)}").build()
 
                 override fun visitMethodInvocation(
                     method: J.MethodInvocation,
@@ -785,7 +785,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "Object::toString").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Object::toString").build()
 
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     return method.withTemplate(t, method.coordinates.replace())
@@ -822,7 +822,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "int m, java.util.List<String> n")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m, java.util.List<String> n")
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -890,7 +890,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "Object[]... values")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Object[]... values")
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -948,7 +948,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "int n, #{}")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int n, #{}")
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -998,7 +998,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "int m, int n")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m, int n")
                     .build()
 
                 override fun visitLambda(lambda: J.Lambda, p: ExecutionContext): J.Lambda =
@@ -1031,7 +1031,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder(
-                    { cursor },
+                    { cursor.parentOrThrow },
                     "if(n != 1) {\n" +
                             "  n++;\n" +
                             "}"
@@ -1068,7 +1068,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "n = 2;\nn = 3;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 2;\nn = 3;")
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -1106,7 +1106,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "assert n == 0;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "assert n == 0;")
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -1142,7 +1142,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "n = 1;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 1;")
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -1178,7 +1178,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "int m;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m;")
                     .build()
 
                 override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
@@ -1210,7 +1210,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "int m = 0;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m = 0;")
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -1247,7 +1247,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "int n;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int n;")
                     .build()
 
                 override fun visitClassDeclaration(classDecl: J.ClassDeclaration, p: ExecutionContext): J {
@@ -1274,7 +1274,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "n = 1;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 1;")
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -1309,7 +1309,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "List<String> s = null;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "List<String> s = null;")
                     .imports("java.util.List")
                     .build()
 
@@ -1345,7 +1345,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "m, Integer.valueOf(n), \"foo\"")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "m, Integer.valueOf(n), \"foo\"")
                     .build()
 
                 override fun visitMethodInvocation(
@@ -1388,14 +1388,14 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
 
     val replaceAnnotationRecipe: Recipe
         get() = RewriteTest.toRecipe{object : JavaIsoVisitor<ExecutionContext>() {
-            val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+            val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@Deprecated")
                 .build()
 
             override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
                 if (annotation.simpleName == "SuppressWarnings") {
                     return annotation.withTemplate(t, annotation.coordinates.replace())
                 } else if (annotation.simpleName == "A1") {
-                    return annotation.withTemplate(JavaTemplate.builder({ cursor }, "@A2")
+                    return annotation.withTemplate(JavaTemplate.builder({ cursor.parentOrThrow }, "@A2")
                         .build(), annotation.coordinates.replace())
                 }
                 return super.visitAnnotation(annotation, p)
@@ -1480,7 +1480,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -1532,7 +1532,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
 
                 override fun visitClassDeclaration(
@@ -1570,7 +1570,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
 
                 override fun visitVariableDeclarations(
@@ -1611,7 +1611,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@Deprecated")
                     .build()
 
                 override fun visitVariableDeclarations(
@@ -1671,7 +1671,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"ALL\")")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"ALL\")")
                     .build()
 
                 override fun visitVariableDeclarations(
@@ -1714,7 +1714,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -1759,7 +1759,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@SuppressWarnings(\"other\")")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
 
                 override fun visitClassDeclaration(
@@ -1796,7 +1796,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "@Deprecated")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@Deprecated")
                         .javaParser { jp }
                         .build()
 
@@ -1825,7 +1825,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "Serializable, Closeable")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Serializable, Closeable")
                     .imports("java.io.*")
                     .build()
 
@@ -1860,7 +1860,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "List<String>")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "List<String>")
                     .imports("java.util.*")
                     .build()
 
@@ -1894,7 +1894,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "Exception")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Exception")
                     .build()
 
                 override fun visitMethodDeclaration(
@@ -1931,10 +1931,10 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val typeParamsTemplate = JavaTemplate.builder({ cursor }, "T, U")
+                val typeParamsTemplate = JavaTemplate.builder({ cursor.parentOrThrow }, "T, U")
                     .build()
 
-                val methodArgsTemplate = JavaTemplate.builder({ cursor }, "List<T> t, U u")
+                val methodArgsTemplate = JavaTemplate.builder({ cursor.parentOrThrow }, "List<T> t, U u")
                     .imports("java.util.List")
                     .build()
 
@@ -2000,7 +2000,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "T, U")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "T, U")
                     .build()
 
                 override fun visitClassDeclaration(
@@ -2029,7 +2029,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "n = 1;")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 1;")
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -2064,7 +2064,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp.logCompilationWarningsAndErrors(true).build(),
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor }, "")
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "")
                     .build()
 
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
@@ -2108,7 +2108,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val matcher = MethodMatcher("Integer valueOf(..)")
-                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new Integer(#{any()})").build()
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (matcher.matches(method)) {
                         return method.withTemplate(t, method.coordinates.replace(), method.arguments[0])
@@ -2188,7 +2188,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val matcher = MethodMatcher("Integer valueOf(..)")
-                val t = JavaTemplate.builder({ cursor }, "new Integer(#{any()})").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new Integer(#{any()})").build()
                 override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {
                     if (matcher.matches(method)) {
                         return method.withTemplate(t, method.coordinates.replace(), method.arguments[0])
@@ -2567,7 +2567,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             spec.recipe(toRecipe {
                 object : JavaVisitor<ExecutionContext>() {
                     var BIG_DECIMAL_SET_SCALE = MethodMatcher("java.math.BigDecimal setScale(int, int)")
-                    var twoArgScale = JavaTemplate.builder({ cursor }, "#{any(int)}, #{}")
+                    var twoArgScale = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(int)}, #{}")
                         .imports("java.math.RoundingMode").build()
 
                     override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J {

@@ -197,7 +197,7 @@ public class AnnotationTemplateGenerator {
             J.NewClass n = (J.NewClass) j;
             n = n.withBody(null).withPrefix(Space.EMPTY);
             before.insert(0, '{');
-            before.insert(0, n.printTrimmed(cursor).trim());
+            before.insert(0, n.printTrimmed(cursor.getParentOrThrow()).trim());
             after.append("};");
         }
 
