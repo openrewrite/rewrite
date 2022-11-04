@@ -74,7 +74,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     @SuppressWarnings({"unchecked", "ConstantConditions"})
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor cursor) {
         if (before != after) {
-            return autoFormat(before, after, p, cursor);
+            return autoFormat(after, stopAfter, p, cursor);
         }
         return after;
     }

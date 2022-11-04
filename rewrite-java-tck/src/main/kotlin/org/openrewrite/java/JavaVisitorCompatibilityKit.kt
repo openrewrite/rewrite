@@ -344,7 +344,7 @@ abstract class JavaVisitorCompatibilityKit {
     inner class NoEqualityInForConditionTck : NoEqualityInForConditionTest
 
     @Nested
-    inner class NoBoubleBraceInitializationTck : NoDoubleBraceInitializationTest
+    inner class NoDoubleBraceInitializationTck : NoDoubleBraceInitializationTest
 
     @Nested
     inner class NoFinalizerTck : NoFinalizerTest
