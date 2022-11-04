@@ -18,6 +18,7 @@ package org.openrewrite.hcl.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclVisitor;
+import org.openrewrite.hcl.style.BracketsStyle;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.style.TabsAndIndentsStyle;
 import org.openrewrite.hcl.tree.Hcl;
@@ -43,6 +44,10 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
 
         Hcl t = new NormalizeFormatVisitor<>().visit(tree, p, cursor.fork());
 
+        t = new BracketsVisitor<>(Optional.ofNullable(cf.getStyle(BracketsStyle.class))
+                .orElse(BracketsStyle.DEFAULT), stopAfter)
+                .visit(t, p, cursor.fork());
+
         t = new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
                 .orElse(SpacesStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
@@ -65,6 +70,10 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
     @Override
     public Hcl visitConfigFile(Hcl.ConfigFile cf, P p) {
         Hcl.ConfigFile t = (Hcl.ConfigFile) new RemoveTrailingWhitespaceVisitor<>().visit(cf, p);
+
+        t = (Hcl.ConfigFile) new BracketsVisitor<>(Optional.ofNullable(cf.getStyle(BracketsStyle.class))
+                .orElse(BracketsStyle.DEFAULT), stopAfter)
+                .visit(t, p);
 
         t = (Hcl.ConfigFile) new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
                 .orElse(SpacesStyle.DEFAULT), stopAfter)

@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.EqualsAndHashCode;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -78,6 +79,19 @@ public class Space {
             return comments.get(comments.size() - 1).getSuffix();
         }
         return whitespace == null ? "" : whitespace;
+    }
+
+    public Space withLastWhitespace(String whitespace) {
+        if (!comments.isEmpty()) {
+            return withComments(ListUtils.map(comments, (i, comment) -> {
+                if (i == comments.size() - 1) {
+                    return comment.withSuffix(comment.getSuffix() + whitespace);
+                }
+                return comment;
+            }));
+        } else {
+            return withWhitespace(whitespace);
+        }
     }
 
     private String getWhitespaceIndent(@Nullable String whitespace) {

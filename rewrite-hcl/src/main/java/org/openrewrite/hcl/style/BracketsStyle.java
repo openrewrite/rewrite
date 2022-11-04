@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2020 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,37 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.openrewrite.hcl.style;
 
-package org.openrewrite.hcl.format;
-
+import lombok.AccessLevel;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.FieldDefaults;
 import org.openrewrite.hcl.HclStyle;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
 @With
-public class BlankLinesStyle implements HclStyle {
-    public static final BlankLinesStyle DEFAULT = new BlankLinesStyle(
-            new KeepMaximum(1, 1),
-            new Minimum(0));
-
-    KeepMaximum keepMaximum;
-    Minimum minimum;
-
-    @Value
-    @With
-    public static class KeepMaximum {
-        Integer inBodyContent;
-        Integer beforeEndOfBlock;
-    }
-
-    @Value
-    @With
-    public static class Minimum {
-        Integer beforeBodyContent;
-    }
+public class BracketsStyle implements HclStyle {
+    public static final BracketsStyle DEFAULT = new BracketsStyle();
 
     @Override
     public Style applyDefaults() {
