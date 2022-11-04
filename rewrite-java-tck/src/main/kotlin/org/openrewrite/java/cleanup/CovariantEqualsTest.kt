@@ -17,18 +17,19 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface CovariantEqualsTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = CovariantEquals()
+interface CovariantEqualsTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(CovariantEquals())
+    }
 
     @Test
-    fun replaceWithNonCovariantEquals(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun replaceWithNonCovariantEquals() = rewriteRun(
+        java("""
             class Test {
                 int n;
 
@@ -37,7 +38,7 @@ interface CovariantEqualsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
 
@@ -49,13 +50,12 @@ interface CovariantEqualsTest : JavaRecipeTest {
                     return n == tee.n;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceMultiStatementReturnBody(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun replaceMultiStatementReturnBody() = rewriteRun(
+        java("""
             class A {
                 String id;
 
@@ -65,7 +65,7 @@ interface CovariantEqualsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 String id;
 
@@ -78,13 +78,12 @@ interface CovariantEqualsTest : JavaRecipeTest {
                     return isEqual;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceEqualsBasedOnTypeSignature(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun replaceEqualsBasedOnTypeSignature() = rewriteRun(
+        java("""
             class Test {
                 int n;
                 public void placeholder(Test test) {}
@@ -107,7 +106,7 @@ interface CovariantEqualsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 public void placeholder(Test test) {}
@@ -133,13 +132,12 @@ interface CovariantEqualsTest : JavaRecipeTest {
                     return false;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceEqualsMaintainsExistingAnnotations(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun replaceEqualsMaintainsExistingAnnotations() = rewriteRun(
+        java("""
             class A {
                 String id;
 
@@ -150,7 +148,7 @@ interface CovariantEqualsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 String id;
 
@@ -164,14 +162,13 @@ interface CovariantEqualsTest : JavaRecipeTest {
                     return isEqual;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/653")
     @Test
-    fun replaceWithNonCovariantEqualsWhenNested(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun replaceWithNonCovariantEqualsWhenNested() = rewriteRun(
+        java("""
             class A {
                 class B {
                     int n;
@@ -182,7 +179,7 @@ interface CovariantEqualsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 class B {
                     int n;
@@ -196,13 +193,12 @@ interface CovariantEqualsTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun renameExistingParameterNameWhenParameterNameIsDefaultTemplateName(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renameExistingParameterNameWhenParameterNameIsDefaultTemplateName() = rewriteRun(
+        java("""
             class Test {
                 int n;
 
@@ -211,7 +207,7 @@ interface CovariantEqualsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
 
@@ -223,13 +219,12 @@ interface CovariantEqualsTest : JavaRecipeTest {
                     return n == obj.n;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun ignoreIfAtLeastOneExistingNonCovariantEqualsMethod(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun ignoreIfAtLeastOneExistingNonCovariantEqualsMethod() = rewriteRun(
+        java("""
             class Test {
                 public boolean equals(Test t) {
                     return false;
@@ -243,13 +238,12 @@ interface CovariantEqualsTest : JavaRecipeTest {
                     return false;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun ignoreIfNoExistingEqualsMethod(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun ignoreIfNoExistingEqualsMethod() = rewriteRun(
+        java("""
             class A {}
             
             class B {
@@ -257,7 +251,7 @@ interface CovariantEqualsTest : JavaRecipeTest {
                 public void placeholder(B t) {}
                 public void placeholder(Object t) {}
             }
-        """
+        """)
     )
 
 }

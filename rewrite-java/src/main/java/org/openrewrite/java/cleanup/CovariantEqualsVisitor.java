@@ -74,11 +74,10 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                     JavaType.Primitive.Boolean.equals(m.getReturnTypeExpression().getType())) {
 
                 if (m.getAllAnnotations().stream().noneMatch(OVERRIDE_ANNOTATION::matches)) {
-                    m = maybeAutoFormat(m,
-                            m.withTemplate(
-                                    JavaTemplate.builder(this::getCursor, "@Override").build(),
-                                    m.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
-                            ), p, getCursor().getParentOrThrow());
+                    m = m.withTemplate(
+                            JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "@Override").build(),
+                            m.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
+                    );
                 }
 
                 /*
@@ -88,12 +87,10 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                  */
                 J.VariableDeclarations.NamedVariable oldParamName = ((J.VariableDeclarations) m.getParameters().iterator().next()).getVariables().iterator().next();
                 String paramName = "obj".equals(oldParamName.getSimpleName()) ? "other" : "obj";
-                m = maybeAutoFormat(m,
-                        m.withTemplate(
-                                JavaTemplate.builder(this::getCursor, "Object #{}").build(),
-                                m.getCoordinates().replaceParameters(),
-                                paramName
-                        ), p, getCursor().getParentOrThrow());
+                m = m.withTemplate(
+                        JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "Object #{}").build(),
+                        m.getCoordinates().replaceParameters(),
+                        paramName);
 
                 /*
                  * We'll prepend this type-check and type-cast to the beginning of the existing
@@ -113,12 +110,10 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
                         paramName
                 };
 
-                m = maybeAutoFormat(m,
-                        m.withTemplate(
-                                equalsBodySnippet,
-                                m.getBody().getStatements().get(0).getCoordinates().before(),
-                                params
-                        ), p, getCursor().getParentOrThrow());
+                m = m.withTemplate(
+                        equalsBodySnippet,
+                        m.getBody().getStatements().get(0).getCoordinates().before(),
+                        params);
             }
 
             return m;
