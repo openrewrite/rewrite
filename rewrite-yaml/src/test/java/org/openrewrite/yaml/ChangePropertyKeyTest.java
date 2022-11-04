@@ -762,4 +762,20 @@ class ChangePropertyKeyTest implements RewriteTest {
             );
         }
     }
+
+    @Test
+    void doesNotBreakOnKeysWhichIncludeRegexSpecialCharacters() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("foo", "foo.bar", null, null, null)),
+          yaml(
+            """
+            swagger:
+              paths:
+                /api/v1/business-objects/{id}:
+                  verb: GET
+            """
+          )
+        );
+    }
+
 }

@@ -27,6 +27,7 @@ import org.openrewrite.yaml.search.FindProperty;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
@@ -166,7 +167,7 @@ public class ChangePropertyKey extends Recipe {
 
         private boolean childMatchesNewPropertyKey(Yaml.Mapping.Entry entry, String cursorPropertyKey) {
             String rescopedNewPropertyKey = newPropertyKey.replaceFirst(
-                    cursorPropertyKey.replace(".", "\\."),
+                    Pattern.quote(cursorPropertyKey),
                     entry.getKey().getValue());
             return !FindProperty.find(entry, rescopedNewPropertyKey, relaxedBinding).isEmpty();
         }
