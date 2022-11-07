@@ -1312,8 +1312,18 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMapExpression(MapExpression map) {
-            queue.add(new G.MapLiteral(randomId(), sourceBefore("["), Markers.EMPTY,
-                    JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]")),
+            Space prefix = sourceBefore("[");
+            JContainer<G.MapEntry> entries;
+            if(map.getMapEntryExpressions().isEmpty()) {
+                entries = JContainer.build(Collections.singletonList(JRightPadded.build(
+                        new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
+                                JRightPadded.build(new J.Empty(randomId(), sourceBefore(":"), Markers.EMPTY)),
+                                new J.Empty(randomId(), sourceBefore("]"), Markers.EMPTY), null))));
+            } else {
+                entries = JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]"));
+            }
+            queue.add(new G.MapLiteral(randomId(), prefix, Markers.EMPTY,
+                    entries,
                     typeMapping.type(map.getType())
             ));
         }

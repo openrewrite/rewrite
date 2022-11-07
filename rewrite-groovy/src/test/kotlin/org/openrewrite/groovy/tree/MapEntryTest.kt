@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.groovy.Assertions.groovy
 import org.openrewrite.test.RewriteTest
 
@@ -35,5 +36,11 @@ class MapEntryTest : RewriteTest {
     @Test
     fun mapAccess() = rewriteRun(
         groovy("def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]")
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2071")
+    @Test
+    fun emptyMapLiteral() = rewriteRun(
+        groovy("Map m =  [  :  ]")
     )
 }
