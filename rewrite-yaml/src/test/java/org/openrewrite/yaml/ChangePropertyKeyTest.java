@@ -497,22 +497,6 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2387")
-    @Test
-    void doesNotBreakOnKeysWhichIncludeRegexSpecialCharacters() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("foo", "foo.bar", null, null, null)),
-          yaml(
-            """
-            swagger:
-              paths:
-                /api/v1/business-objects/{id}:
-                  verb: GET
-            """
-          )
-        );
-    }
-
     @Nested
     @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
     static class WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest implements RewriteTest {
