@@ -12,7 +12,7 @@ dependencies {
     api(platform("com.fasterxml.jackson:jackson-bom:2.13.4.20221013"))
 
     implementation("org.jetbrains:annotations:latest.release")
-//    compileOnly("com.google.code.findbugs:jsr305:latest.release")
+    compileOnly("com.google.code.findbugs:jsr305:latest.release")
 
     testImplementation(platform("org.junit:junit-bom:latest.release"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
