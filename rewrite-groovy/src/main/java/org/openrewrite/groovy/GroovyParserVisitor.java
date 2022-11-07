@@ -1151,10 +1151,33 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitExpressionStatement(ExpressionStatement statement) {
+            List<J.Label> labels = null;
+            if(statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
+                labels = new ArrayList<>(statement.getStatementLabels().size());
+                // Labels appear in statement.getStatementLabels() in reverse order of their appearance in source code
+                // Could iterate over those in reverse order, but feels safer to just take the count and go off source code alone
+                for(int i = 0; i < statement.getStatementLabels().size(); i++) {
+                    labels.add(new J.Label(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, name(), null, null)).withAfter(sourceBefore(":")),
+                            new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
+                }
+            }
             super.visitExpressionStatement(statement);
             if (queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
                 queue.add(new G.ExpressionStatement(randomId(), (Expression) queue.poll()));
             }
+            if(labels != null) {
+                //noinspection ConstantConditions
+                Statement result = condenseLabels(labels, (Statement) queue.poll());
+                queue.add(result);
+            }
+        }
+
+        Statement condenseLabels(List<J.Label> labels, Statement s) {
+            if(labels.size() == 0) {
+                return s;
+            }
+            return labels.get(0).withStatement(condenseLabels(labels.subList(1, labels.size()), s));
         }
 
         @SuppressWarnings("unchecked")

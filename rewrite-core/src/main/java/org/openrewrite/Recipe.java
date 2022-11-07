@@ -150,7 +150,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     /**
-     * @return Determines if another cycle is ran when this recipe makes a change. In some cases, like changing method declaration names,
+     * @return Determines if another cycle is run when this recipe makes a change. In some cases, like changing method declaration names,
      * a further cycle is needed to update method invocations of that declaration that were visited prior to the declaration change. But other
      * visitors never need to cause another cycle, such as those that format whitespace or add search markers. Note that even when this is false,
      * the recipe will still run on another cycle if any other recipe causes another cycle to run. But if every recipe reports no need to run
