@@ -215,7 +215,7 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isCaseLabel() {
-            return getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Case;
+            return getCursor().getParentTreeCursor().getValue() instanceof J.Case;
         }
 
         private boolean isLabel() {

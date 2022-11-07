@@ -56,7 +56,7 @@ public class ResultOfMethodCallIgnored extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
                 if (methodMatcher.matches(method)) {
-                    if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) {
+                    if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
                         m = SearchResult.found(m);
                     }
                 }

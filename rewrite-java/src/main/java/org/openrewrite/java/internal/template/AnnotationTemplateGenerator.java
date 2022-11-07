@@ -278,6 +278,6 @@ public class AnnotationTemplateGenerator {
     }
 
     private Cursor next(Cursor c) {
-        return c.dropParentUntil(J.class::isInstance);
+        return c.getParentTreeCursor();
     }
 }

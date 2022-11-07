@@ -233,6 +233,18 @@ public class Cursor {
         return getParentOrThrow(1);
     }
 
+    /**
+     * Return the first parent of the current cursor which points to an AST element, or the root cursor if the current
+     * cursor already points to the root AST element. This skips over non-tree Padding elements.
+     *
+     * If you do want to access Padding elements, use getParent() or getParentOrThrow(), which do not skip over these elements.
+     *
+     * @return a cursor which either points at the first non-padding parent of the current element
+     */
+    public Cursor getParentTreeCursor() {
+        return dropParentUntil(it -> it instanceof Tree || it == Cursor.ROOT_VALUE);
+    }
+
     @SuppressWarnings("unchecked")
     public <T> T getValue() {
         return (T) value;

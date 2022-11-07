@@ -87,7 +87,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             }
         }
         if (asBinary != j) {
-            getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
+            getCursor().getParentTreeCursor().putMessage(MAYBE_AUTO_FORMAT_ME, "");
         }
         return j;
     }
@@ -120,7 +120,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
             }
         }
         if (asUnary != j) {
-            getCursor().dropParentUntil(J.class::isInstance).putMessage(MAYBE_AUTO_FORMAT_ME, "");
+            getCursor().getParentTreeCursor().putMessage(MAYBE_AUTO_FORMAT_ME, "");
         }
         return j;
     }
@@ -134,7 +134,7 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
      * the recipe can perform.
      */
     private void maybeUnwrapParentheses() {
-        Cursor c = getCursor().getParentOrThrow().dropParentUntil(J.class::isInstance);
+        Cursor c = getCursor().getParentOrThrow().getParentTreeCursor();
         if (c.getValue() instanceof J.Parentheses) {
             doAfterVisit(new UnwrapParentheses<>(c.getValue()));
         }

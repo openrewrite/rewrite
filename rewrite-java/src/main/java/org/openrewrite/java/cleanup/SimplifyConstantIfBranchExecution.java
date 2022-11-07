@@ -75,7 +75,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                     (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                             .visitNonNull(expression, context, getCursor().getParentOrThrow());
             ex1 = (E) new SimplifyBooleanExpressionVisitor<>()
-                    .visitNonNull(ex1, context, getCursor().dropParentUntil(J.class::isInstance));
+                    .visitNonNull(ex1, context, getCursor().getParentTreeCursor());
             if (expression == ex1 || isLiteralFalse(ex1) || isLiteralTrue(ex1)) {
                 return ex1;
             }

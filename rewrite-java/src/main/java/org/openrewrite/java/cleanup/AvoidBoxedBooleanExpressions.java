@@ -59,9 +59,9 @@ public class AvoidBoxedBooleanExpressions extends Recipe {
             public Expression visitExpression(Expression expression, ExecutionContext ctx) {
                 Expression e = (Expression) super.visitExpression(expression, ctx);
                 if (TypeUtils.isOfClassType(e.getType(), "java.lang.Boolean")) {
-                    Cursor parentCursor = getCursor().dropParentUntil(J.class::isInstance);
+                    Cursor parentCursor = getCursor().getParentTreeCursor();
                     if (parentCursor.getValue() instanceof J.ControlParentheses &&
-                        parentCursor.dropParentUntil(J.class::isInstance).getValue() instanceof J.If) {
+                        parentCursor.getParentTreeCursor().getValue() instanceof J.If) {
                         return e.withTemplate(
                                 JavaTemplate.builder(this::getCursor,
                                         "Boolean.TRUE.equals(#{any(java.lang.Boolean)})").build(),

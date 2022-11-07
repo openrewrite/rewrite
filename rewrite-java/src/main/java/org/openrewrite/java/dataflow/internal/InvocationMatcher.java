@@ -128,7 +128,7 @@ public interface InvocationMatcher {
         }
 
         private static Optional<MethodCall> nearestMethodCall(Cursor cursor) {
-            J closestJ = cursor.dropParentUntil(J.class::isInstance).getValue();
+            J closestJ = cursor.getParentTreeCursor().getValue();
             if (closestJ instanceof MethodCall) {
                 return Optional.of((MethodCall) closestJ);
             }

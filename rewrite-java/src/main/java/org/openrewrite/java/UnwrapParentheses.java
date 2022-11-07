@@ -41,7 +41,7 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
         if (!(parensScope.getValue() instanceof J.Parentheses)) {
             return false;
         }
-        J parent = parensScope.dropParentUntil(J.class::isInstance).getValue();
+        J parent = parensScope.getParentTreeCursor().getValue();
         if (parent instanceof J.If ||
                 parent instanceof J.Switch ||
                 parent instanceof J.Synchronized ||

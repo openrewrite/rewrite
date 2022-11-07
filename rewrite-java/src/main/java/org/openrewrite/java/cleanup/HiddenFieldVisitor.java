@@ -226,8 +226,8 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
             // skip if we are visiting the original target variable, or else this will consider a variable to be a shadow of itself.
             if (v.getSimpleName().equals(targetVariable.getSimpleName()) && !v.isScope(targetVariable)) {
                 Tree maybeMethodDecl = getCursor()
-                        .dropParentUntil(J.class::isInstance) // J.VariableDeclarations
-                        .dropParentUntil(J.class::isInstance) // maybe J.MethodDeclaration
+                        .getParentTreeCursor() // J.VariableDeclarations
+                        .getParentTreeCursor() // maybe J.MethodDeclaration
                         .getValue();
 
                 boolean isIgnorableConstructorParam = hiddenFieldStyle.getIgnoreConstructorParameter();

@@ -73,7 +73,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         if (mv.getVariables().stream()
-                .noneMatch(v -> FindAssignmentReferencesToVariable.find(getCursor().dropParentUntil(J.class::isInstance).getValue(), v).get())) {
+                .noneMatch(v -> FindAssignmentReferencesToVariable.find(getCursor().getParentTreeCursor().getValue(), v).get())) {
             mv = maybeAutoFormat(mv,
                     mv.withModifiers(
                             ListUtils.concat(mv.getModifiers(), new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList()))
@@ -85,7 +85,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
 
     private boolean isDeclaredInForLoopControl() {
         return getCursor()
-                .dropParentUntil(J.class::isInstance)
+                .getParentTreeCursor()
                 .getValue() instanceof J.ForLoop.Control;
     }
 

@@ -547,7 +547,7 @@ public class BlockStatementTemplateGenerator {
     }
 
     private Cursor next(Cursor c) {
-        return c.dropParentUntil(J.class::isInstance);
+        return c.getParentTreeCursor();
     }
 
     private static boolean referToSameElement(@Nullable Tree t1, @Nullable Tree t2) {

@@ -67,7 +67,7 @@ public class NoRedundantJumpStatements extends Recipe {
 
                 if (getCursor().getParentOrThrow().getParentOrThrow().getValue() instanceof J.Block) {
                     J enclosing = getCursor().dropParentUntil(J.Block.class::isInstance)
-                            .dropParentUntil(J.class::isInstance)
+                            .getParentTreeCursor()
                             .getValue();
 
                     if (enclosing instanceof Loop) {

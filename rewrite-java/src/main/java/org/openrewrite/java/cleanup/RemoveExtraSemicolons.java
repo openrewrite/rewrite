@@ -54,7 +54,7 @@ public class RemoveExtraSemicolons extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Empty visitEmpty(J.Empty empty, ExecutionContext ctx) {
-                if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
                     return null;
                 }
                 return empty;

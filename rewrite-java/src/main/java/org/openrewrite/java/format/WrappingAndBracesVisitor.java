@@ -46,7 +46,7 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
-        J parentTree = getCursor().dropParentUntil(J.class::isInstance).getValue();
+        J parentTree = getCursor().getParentTreeCursor().getValue();
         if (parentTree instanceof J.Block) {
             if (!j.getPrefix().getWhitespace().contains("\n")) {
                 j = j.withPrefix(withNewline(j.getPrefix()));

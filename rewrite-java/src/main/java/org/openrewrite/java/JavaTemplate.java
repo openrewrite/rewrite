@@ -87,7 +87,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Cursor parentScope = parentScopeGetter.get();
         if(!(parentScope.getValue() instanceof J)) {
             // Handle the provided parent cursor pointing to a JRightPadded or similar
-            parentScope = parentScope.dropParentUntil(it -> it instanceof J || it == null);
+            parentScope = parentScope.getParentTreeCursor();
         }
         new JavaIsoVisitor<Integer>() {
             @Nullable
@@ -97,7 +97,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                     // Currently getCursor still points to the parent, because super.visit() has the logic to update it
                     Cursor cursor = getCursor();
                     if(!(cursor.getValue() instanceof J)) {
-                        cursor = cursor.dropParentUntil(it -> it instanceof J || it == null);
+                        cursor = cursor.getParentTreeCursor();
                     }
                     parentCursorRef.set(cursor);
                     return (J) tree;

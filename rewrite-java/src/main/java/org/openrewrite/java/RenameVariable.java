@@ -83,7 +83,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
-            J parent  = getCursor().dropParentUntil(J.class::isInstance).getValue();
+            J parent  = getCursor().getParentTreeCursor().getValue();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
                 if (parent instanceof J.FieldAccess) {
                     if (fieldAccessTargetsVariable((J.FieldAccess)parent)) {

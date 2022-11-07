@@ -64,7 +64,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
-        return maybeAutoFormat(before, after, p, getCursor().dropParentUntil(it -> it instanceof J || it == Cursor.ROOT_VALUE));
+        return maybeAutoFormat(before, after, p, getCursor().getParentTreeCursor());
     }
 
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
@@ -79,7 +79,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <J2 extends J> J2 autoFormat(J2 j, P p) {
-        return autoFormat(j, p, getCursor().dropParentUntil(it -> it instanceof J || it == Cursor.ROOT_VALUE));
+        return autoFormat(j, p, getCursor().getParentTreeCursor());
     }
 
     public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor cursor) {

@@ -44,7 +44,7 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
                 if (m.getMethodType() != null) {
-                    Object enclosing = getCursor().dropParentUntil(J.class::isInstance).getValue();
+                    Object enclosing = getCursor().getParentTreeCursor().getValue();
                     JavaType enclosingType = null;
 
                     if(enclosing instanceof J.MethodInvocation) {

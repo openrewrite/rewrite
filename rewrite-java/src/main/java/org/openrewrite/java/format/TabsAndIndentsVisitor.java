@@ -138,7 +138,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         // block spaces are always aligned to their parent
         boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&
                 // ignore init blocks.
-                (getCursor().getValue() instanceof J.Block && !(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Block));
+                (getCursor().getValue() instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
 
         boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
                 loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||

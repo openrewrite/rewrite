@@ -167,14 +167,14 @@ public final class Guard {
                         Optional.ofNullable(c.getParentOrThrow().firstEnclosing(J.DoWhileLoop.class)).map(J.DoWhileLoop::getWhileCondition).map(condition -> condition == controlParentheses).orElse(false)) {
                     return Optional.of(JavaType.Primitive.Boolean);
                 } else {
-                    Cursor parent = c.dropParentUntil(J.class::isInstance);
+                    Cursor parent = c.getParentTreeCursor();
                     return getTypeSafe(parent, parent.getValue());
                 }
             }
         } else if (firstEnclosing instanceof J.Parentheses) {
             J.Parentheses<?> parentheses = (J.Parentheses<?>) firstEnclosing;
             if (parentheses.getTree() == e) {
-                Cursor parent = c.dropParentUntil(J.class::isInstance);
+                Cursor parent = c.getParentTreeCursor();
                 return getTypeSafe(parent, parent.getValue());
             }
         } else if (firstEnclosing instanceof J.VariableDeclarations.NamedVariable) {

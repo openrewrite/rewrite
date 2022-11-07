@@ -48,7 +48,7 @@ public class RemoveUnneededBlock extends Recipe {
             J.NewClass newClass = getCursor().firstEnclosing(J.NewClass.class);
             J.ClassDeclaration classDeclaration = getCursor().firstEnclosing(J.ClassDeclaration.class);
             // Determine the direct parent
-            J directParent = getCursor().dropParentUntil(J.class::isInstance).getValue();
+            J directParent = getCursor().getParentTreeCursor().getValue();
 
             J.Block bl = super.visitBlock(block, executionContext);
 

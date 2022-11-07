@@ -284,12 +284,12 @@ public class RemoveUnusedLocalVariables extends Recipe {
             if (parent.getValue() instanceof J.AssignmentOperation) {
                 J.AssignmentOperation assignmentOperation = parent.getValue();
                 if (assignmentOperation.getVariable() == tree.getValue()) {
-                    J grandParent = parent.dropParentUntil(J.class::isInstance).getValue();
+                    J grandParent = parent.getParentTreeCursor().getValue();
                     return (grandParent instanceof Expression || grandParent instanceof J.Return);
                 }
             }
 
-            return !(isUnaryIncrementKind.test(parent) && parent.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block);
+            return !(isUnaryIncrementKind.test(parent) && parent.getParentTreeCursor().getValue() instanceof J.Block);
         }
 
         /**

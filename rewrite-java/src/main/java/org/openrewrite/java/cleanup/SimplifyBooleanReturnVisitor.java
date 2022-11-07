@@ -39,7 +39,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
     public J visitIf(J.If iff, P p) {
         J.If i = visitAndCast(iff, p, super::visitIf);
 
-        Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
+        Cursor parent = getCursor().getParentTreeCursor();
 
         if (parent.getValue() instanceof J.Block &&
                 parent.getParentOrThrow().getValue() instanceof J.MethodDeclaration &&
@@ -103,7 +103,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
     }
 
     private List<Statement> followingStatements() {
-        J.Block block = getCursor().dropParentUntil(J.class::isInstance).getValue();
+        J.Block block = getCursor().getParentTreeCursor().getValue();
         AtomicBoolean dropWhile = new AtomicBoolean(false);
         return block.getStatements().stream()
                 .filter(s -> {
