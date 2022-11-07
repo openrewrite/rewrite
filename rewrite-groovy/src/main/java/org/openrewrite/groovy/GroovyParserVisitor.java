@@ -1322,10 +1322,7 @@ public class GroovyParserVisitor {
             } else {
                 entries = JContainer.build(visitRightPadded(map.getMapEntryExpressions().toArray(new ASTNode[0]), "]"));
             }
-            queue.add(new G.MapLiteral(randomId(), prefix, Markers.EMPTY,
-                    entries,
-                    typeMapping.type(map.getType())
-            ));
+            queue.add(new G.MapLiteral(randomId(), prefix, Markers.EMPTY, entries, typeMapping.type(map.getType())));
         }
 
         @Override
