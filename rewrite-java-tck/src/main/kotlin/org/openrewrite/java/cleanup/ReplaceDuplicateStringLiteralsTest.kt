@@ -17,82 +17,72 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.*
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = ReplaceDuplicateStringLiterals(false)
+interface ReplaceDuplicateStringLiteralsTest : RewriteTest {
 
-    override val parser: JavaParser
-        get() {
-            val jp = JavaParser.fromJavaVersion().build()
-            jp.setSourceSet("main")
-            return jp
-        }
-
-    val testParser: JavaParser
-        get() {
-            val jp = JavaParser.fromJavaVersion().build()
-            jp.setSourceSet("test")
-            return jp
-        }
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(ReplaceDuplicateStringLiterals(true))
+    }
 
     @Test
-    fun doesNotMeetCharacterLimit() = assertUnchanged(
-        before = """
+    fun doesNotMeetCharacterLimit() = rewriteRun(
+        java("""
             class A {
                 final String val1 = "val";
                 final String val2 = "val";
                 final String val3 = "val";
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1740")
     @Test
-    fun doesNotApplyToTest() = assertUnchanged(
-        testParser,
-        before = """
-            class A {
-                final String val1 = "value";
-                final String val2 = "value";
-                final String val3 = "value";
-            }
-        """
+    fun doesNotApplyToTest() = rewriteRun(
+        { spec -> spec.recipe(ReplaceDuplicateStringLiterals(false)) },
+        srcTestJava(
+            java("""
+                class A {
+                    final String val1 = "value";
+                    final String val2 = "value";
+                    final String val3 = "value";
+                }
+            """)
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1740")
     @Test
-    fun testSourcesEnabled() = assertChanged(
-        testParser,
-        recipe = ReplaceDuplicateStringLiterals(true),
-        before = """
-            class A {
-                final String val1 = "value";
-                final String val2 = "value";
-                final String val3 = "value";
-            }
-        """,
-        after = """
-            class A {
-                private static final String VALUE = "value";
-                final String val1 = VALUE;
-                final String val2 = VALUE;
-                final String val3 = VALUE;
-            }
-        """
+    fun testSourcesEnabled() = rewriteRun(
+        srcTestJava(
+            java("""
+                class A {
+                    final String val1 = "value";
+                    final String val2 = "value";
+                    final String val3 = "value";
+                }
+            """,
+            """
+                class A {
+                    private static final String VALUE = "value";
+                    final String val1 = VALUE;
+                    final String val2 = VALUE;
+                    final String val3 = VALUE;
+                }
+            """)
+        )
     )
 
     @Test
-    fun doNotChangeLiteralsInAnnotations() = assertUnchanged(
-        dependsOn = arrayOf("""
+    fun doNotChangeLiteralsInAnnotations() = rewriteRun(
+        java("""
             public @interface Example {
                 String value() default "";
             }
         """),
-        before = """
+        java("""
             class A {
                 @Example(value = "value")
                 void method1() {}
@@ -101,12 +91,12 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 @Example(value = "value")
                 void method3() {}
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceRedundantFinalStrings() = assertChanged(
-        before = """
+    fun replaceRedundantFinalStrings() = rewriteRun(
+        java("""
             package org.foo;
             class A {
                 final String val1 = "value";
@@ -114,7 +104,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val3 = "value";
             }
         """,
-        after = """
+        """
             package org.foo;
             class A {
                 private static final String VALUE = "value";
@@ -122,12 +112,12 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val2 = VALUE;
                 final String val3 = VALUE;
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceRedundantLiteralInMethodInvocation() = assertChanged(
-        before = """
+    fun replaceRedundantLiteralInMethodInvocation() = rewriteRun(
+        java("""
             class A {
                 String method(String val) {
                     return null;
@@ -137,7 +127,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 String val3 = method("value");
             }
         """,
-        after = """
+        """
             class A {
                 private static final String VALUE = "value";
                 String method(String val) {
@@ -147,12 +137,12 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 String val2 = method(VALUE);
                 String val3 = method(VALUE);
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceRedundantLiteralsInNewClass() = assertChanged(
-        before = """
+    fun replaceRedundantLiteralsInNewClass() = rewriteRun(
+        java("""
             class A {
                 void method() {
                     B b1 = new B("value");
@@ -165,7 +155,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 private static final String VALUE = "value";
                 void method() {
@@ -178,12 +168,12 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun multipleRedundantValues() = assertChanged(
-        before = """
+    fun multipleRedundantValues() = rewriteRun(
+        java("""
             class A {
                 final String a1 = "value a";
                 final String a2 = "value a";
@@ -193,7 +183,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String b3 = "value b";
             }
         """,
-        after = """
+        """
             class A {
                 private static final String VALUE_A = "value a";
                 private static final String VALUE_B = "value b";
@@ -204,31 +194,31 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String b2 = VALUE_B;
                 final String b3 = VALUE_B;
             }
-        """
+        """)
     )
 
     @Test
-    fun transformStringValue() = assertChanged(
-        before = """
+    fun transformStringValue() = rewriteRun(
+        java("""
             class A {
                 final String val1 = "An example,, of a :: String with `` special __ characters.";
                 final String val2 = "An example,, of a :: String with `` special __ characters.";
                 final String val3 = "An example,, of a :: String with `` special __ characters.";
             }
         """,
-        after = """
+        """
             class A {
                 private static final String AN_EXAMPLE_OF_A_STRING_WITH_SPECIAL_CHARACTERS = "An example,, of a :: String with `` special __ characters.";
                 final String val1 = AN_EXAMPLE_OF_A_STRING_WITH_SPECIAL_CHARACTERS;
                 final String val2 = AN_EXAMPLE_OF_A_STRING_WITH_SPECIAL_CHARACTERS;
                 final String val3 = AN_EXAMPLE_OF_A_STRING_WITH_SPECIAL_CHARACTERS;
             }
-        """
+        """)
     )
 
     @Test
-    fun constantAlreadyExists() = assertChanged(
-        before = """
+    fun constantAlreadyExists() = rewriteRun(
+        java("""
             class A {
                 private static final String CONSTANT = "value";
                 final String val1 = "value";
@@ -236,19 +226,19 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val3 = "value";
             }
         """,
-        after = """
+        """
             class A {
                 private static final String CONSTANT = "value";
                 final String val1 = CONSTANT;
                 final String val2 = CONSTANT;
                 final String val3 = CONSTANT;
             }
-        """
+        """)
     )
 
     @Test
-    fun constantExistsWithInnerClass() = assertChanged(
-        before = """
+    fun constantExistsWithInnerClass() = rewriteRun(
+        java("""
             class A {
                 private static final String CONSTANT = "value";
                 final String val1 = "value";
@@ -261,7 +251,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 private static final String CONSTANT = "value";
                 final String val1 = CONSTANT;
@@ -273,12 +263,12 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                     private static final String CONSTANT = "value";
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun preventNamespaceShadowingWithNonStringConstant() = assertChanged(
-        before = """
+    fun preventNamespaceShadowingWithNonStringConstant() = rewriteRun(
+        java("""
             package org.foo;
             class A {
                 private static final int VALUE = 1;
@@ -287,7 +277,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val3 = "value";
             }
         """,
-        after = """
+        """
             package org.foo;
             class A {
                 private static final String VALUE_1 = "value";
@@ -296,12 +286,12 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val2 = VALUE_1;
                 final String val3 = VALUE_1;
             }
-        """
+        """)
     )
 
     @Test
-    fun preventNamespaceShadowingOnExistingConstant() = assertChanged(
-        before = """
+    fun preventNamespaceShadowingOnExistingConstant() = rewriteRun(
+        java("""
             class A {
                 // Change field name to prevent potential namespace conflicts.
                 private static final String VALUE = "value";
@@ -321,7 +311,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 // Change field name to prevent potential namespace conflicts.
                 private static final String VALUE_1 = "value";
@@ -340,12 +330,12 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                     String innerClass = VALUE_1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun preventNamespaceShadowingOnNewConstant() = assertChanged(
-        before = """
+    fun preventNamespaceShadowingOnNewConstant() = rewriteRun(
+        java("""
             class A {
                 final String val1 = "value";
                 final String val2 = "value";
@@ -353,7 +343,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String VALUE = "name space conflict";
             }
         """,
-        after = """
+        """
             class A {
                 private static final String VALUE_1 = "value";
                 final String val1 = VALUE_1;
@@ -361,31 +351,31 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 final String val3 = VALUE_1;
                 final String VALUE = "name space conflict";
             }
-        """
+        """)
     )
 
     @Test
-    fun multiVariableDeclaration() = assertChanged(
-        before = """
+    fun multiVariableDeclaration() = rewriteRun(
+        java("""
             class A {
                 final String val1 = "value", val2 = "value", diff = "here";
                 final String val3 = "value";
                 final String VALUE = "name space conflict";
             }
         """,
-        after = """
+        """
             class A {
                 private static final String VALUE_1 = "value";
                 final String val1 = VALUE_1, val2 = VALUE_1, diff = "here";
                 final String val3 = VALUE_1;
                 final String VALUE = "name space conflict";
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceMixedRedundantLiterals() = assertChanged(
-        before = """
+    fun replaceMixedRedundantLiterals() = rewriteRun(
+        java("""
             class A {
                 final String val1 = "value";
                 void methodA() {
@@ -400,7 +390,7 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 private static final String VALUE = "value";
                 final String val1 = VALUE;
@@ -415,34 +405,35 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2329")
     @Test
-    fun unicodeCharacterEquivalents() = assertChanged(
-        before = """
+    fun unicodeCharacterEquivalents() = rewriteRun(
+        java("""
             class A {
                 final String val1 = "āăąēîïĩíĝġńñšŝśûůŷ";
                 final String val2 = "āăąēîïĩíĝġńñšŝśûůŷ";
                 final String val3 = "āăąēîïĩíĝġńñšŝśûůŷ";
             }
         """,
-        after = """
+        """
             class A {
                 private static final String AAAEIIIIGGNNSSSUUY = "āăąēîïĩíĝġńñšŝśûůŷ";
                 final String val1 = AAAEIIIIGGNNSSSUUY;
                 final String val2 = AAAEIIIIGGNNSSSUUY;
                 final String val3 = AAAEIIIIGGNNSSSUUY;
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2330")
     @Test
-    fun enum() = assertChanged(
-        before = """
+    fun enum() = rewriteRun(
+        java("""
             enum A {
+                /**/
                 ONE, TWO, THREE;
                 
                 public void example() {
@@ -450,10 +441,13 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                     final String val2 = "value";
                     final String val3 = "value";
                 }
+                
+                public void bar() {}
             }
         """,
-        after = """
+        """
             enum A {
+                /**/
                 ONE, TWO, THREE;
                 private static final String VALUE = "value";
                 
@@ -462,7 +456,22 @@ interface ReplaceDuplicateStringLiteralsTest : JavaRecipeTest {
                     final String val2 = VALUE;
                     final String val3 = VALUE;
                 }
+                
+                public void bar() {}
             }
-        """
+        """)
+    )
+
+    @Test
+    fun enumCannotReplaceConstructorArgument() = rewriteRun(
+        java("""
+            enum Scratch {
+                A("value"),
+                B("value"),
+                C("value");
+                Scratch(String s) {
+                }
+            }
+        """)
     )
 }

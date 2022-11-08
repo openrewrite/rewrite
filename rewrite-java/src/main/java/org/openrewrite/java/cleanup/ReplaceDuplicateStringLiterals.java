@@ -76,7 +76,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
             @Override
             public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-                if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
+                if (Boolean.TRUE.equals(includeTestSources) || (sourceSet.isPresent() && "main".equals(sourceSet.get().getName()))) {
                     return super.visitJavaSourceFile(cu, executionContext);
                 }
                 return cu;
@@ -124,13 +124,12 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
                             if (enumValueSet != null) {
                                 // Temporary work around due to an issue in the JavaTemplate related to BlockStatementTemplateGenerator#enumClassDeclaration.
-                                Space prefix = enumValueSet.getPrefix();
                                 Space singleSpace = Space.build(" ", emptyList());
                                 Expression literal = duplicateLiteralsMap.get(valueOfLiteral).toArray(new J.Literal[0])[0].withId(randomId());
-                                J.Modifier privateModifier = new J.Modifier(randomId(), prefix, Markers.EMPTY, J.Modifier.Type.Private, emptyList());
+                                J.Modifier privateModifier = new J.Modifier(randomId(), Space.build("\n", emptyList()), Markers.EMPTY, J.Modifier.Type.Private, emptyList());
                                 J.Modifier staticModifier = new J.Modifier(randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Static, emptyList());
                                 J.Modifier finalModifier = new J.Modifier(randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Final, emptyList());
-                                J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
+                                J.VariableDeclarations variableDeclarations = autoFormat(new J.VariableDeclarations(
                                         randomId(),
                                         Space.EMPTY,
                                         Markers.EMPTY,
@@ -151,7 +150,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                                                 Markers.EMPTY,
                                                 new J.Identifier(
                                                         randomId(),
-                                                        singleSpace,
+                                                        Space.EMPTY,
                                                         Markers.EMPTY,
                                                         variableName,
                                                         JavaType.ShallowClass.build("java.lang.String"),
@@ -159,16 +158,15 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                                                 emptyList(),
                                                 JLeftPadded.build(literal).withBefore(singleSpace),
                                                 null)))
-                                );
+                                ), executionContext, new Cursor(getCursor(), classDecl.getBody()));
 
                                 // Insert the new statement after the EnumValueSet.
                                 List<Statement> statements = new ArrayList<>(classDecl.getBody().getStatements().size() + 1);
-                                boolean addNewStatement = false;
+                                boolean addedNewStatement = false;
                                 for (Statement statement : classDecl.getBody().getStatements()) {
-                                    if (statement instanceof J.EnumValueSet) {
-                                        addNewStatement = true;
-                                    } else if (addNewStatement) {
+                                    if (!(statement instanceof J.EnumValueSet) && !addedNewStatement) {
                                         statements.add(variableDeclarations);
+                                        addedNewStatement = true;
                                     }
                                     statements.add(statement);
                                 }
@@ -264,6 +262,11 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                         is instanceof J.VariableDeclarations ||
                         is instanceof J.NewClass ||
                         is instanceof J.MethodInvocation);
+                // EnumValue can accept constructor arguments, including string literals
+                // But the static field can't be placed before them, so these literals are ineligible for replacement
+                if(parent.getValue() instanceof J.NewClass && parent.firstEnclosing(J.EnumValueSet.class) != null) {
+                    return literal;
+                }
 
                 if ((parent.getValue() instanceof J.VariableDeclarations &&
                         ((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Final) &&
