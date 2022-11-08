@@ -38,7 +38,7 @@ public class AddGradleEnterpriseTest implements RewriteTest {
               """,
             """
               plugins {
-                  id 'com.gradle.enterprise' version '3.11.3'
+                  id 'com.gradle.enterprise' version '3.11.4'
               }
               
               rootProject.name = 'my-project'
@@ -61,7 +61,7 @@ public class AddGradleEnterpriseTest implements RewriteTest {
               """,
             """
               plugins {
-                  id 'com.gradle.enterprise' version '3.11.3'
+                  id 'com.gradle.enterprise' version '3.11.4'
                   id 'org.openrewrite' version '1'
               }
               
