@@ -34,7 +34,7 @@ public class Assertions {
     }
 
     public static SourceSpecs yaml(@Language("yml") @Nullable String before, Consumer<SourceSpec<Yaml.Documents>> spec) {
-        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, YamlParser.builder(),  before, (String) null);
+        SourceSpec<Yaml.Documents> yaml = new SourceSpec<>(Yaml.Documents.class, null, YamlParser.builder(),  before, null);
         spec.accept(yaml);
         return yaml;
     }
@@ -50,5 +50,7 @@ public class Assertions {
         spec.accept(yaml);
         return yaml;
     }
+
+
 
 }

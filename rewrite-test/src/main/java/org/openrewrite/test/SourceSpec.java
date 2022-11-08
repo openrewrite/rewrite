@@ -49,7 +49,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final String before;
 
     @Nullable
-    final UnaryOperator<String> after;
+    UnaryOperator<String> after;
 
     /**
      * Apply a function to each SourceFile after recipe execution.
@@ -59,6 +59,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     public interface EachResult {
         EachResult noop = (sourceFile, testMethodSpec, testClassSpec) -> sourceFile;
+
         SourceFile accept(SourceFile sourceFile, RecipeSpec testMethodSpec, RecipeSpec testClassSpec);
     }
 
@@ -66,18 +67,14 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
                       Parser.Builder parser, @Nullable String before, @Nullable String after) {
-        this(sourceFileType, dsl, parser, before, after == null ? null : s -> after);
-    }
-
-    public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
-                      Parser.Builder parser, @Nullable String before, @Nullable UnaryOperator<@Nullable String> after) {
         this.sourceFileType = sourceFileType;
         this.dsl = dsl;
         this.parser = parser;
         this.before = before;
-        this.after = after;
+        this.after = s -> after;
         this.eachResult = EachResult.noop;
-        this.customizeExecutionContext = (ctx) -> {};
+        this.customizeExecutionContext = (ctx) -> {
+        };
     }
 
     @Setter
@@ -117,6 +114,19 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     public SourceSpec<T> markers(Marker... markers) {
         Collections.addAll(this.markers, markers);
+        return this;
+    }
+
+    /**
+     * Apply a function to specify what the after text of a recipe run should be.
+     *
+     * @param after A unary operator that takes the actual result and returns the expected result.
+     *              The actual result can be used to pull out things that are dynamic, like timestamps or
+     *              dependency versions that may change between runs.
+     * @return This source spec.
+     */
+    public SourceSpec<T> after(UnaryOperator<String> after) {
+        this.after = after;
         return this;
     }
 

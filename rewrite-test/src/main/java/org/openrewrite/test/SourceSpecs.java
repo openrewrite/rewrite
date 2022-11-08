@@ -15,7 +15,6 @@
  */
 package org.openrewrite.test;
 
-import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
@@ -24,7 +23,6 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextParser;
 
 import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 
 @SuppressWarnings("unused")
 public interface SourceSpecs extends Iterable<SourceSpec<?>> {
@@ -44,12 +42,6 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
 
     static SourceSpecs other(@Nullable String before, Consumer<SourceSpec<Quark>> spec) {
         SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, QuarkParser.builder(), before, (String) null);
-        spec.accept(quark);
-        return quark;
-    }
-
-    static SourceSpecs other(@Nullable String before, @Nullable UnaryOperator<@Nullable String> after, Consumer<SourceSpec<Quark>> spec) {
-        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, QuarkParser.builder(), before, after);
         spec.accept(quark);
         return quark;
     }
@@ -83,14 +75,6 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     static SourceSpecs text(@Nullable String before, String after,
-                            Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, after);
-        spec.accept(text);
-        return text;
-    }
-
-    @Incubating(since = "7.33.0")
-    static SourceSpecs text(@Nullable String before, @Nullable UnaryOperator<@Nullable String> after,
                             Consumer<SourceSpec<PlainText>> spec) {
         SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, after);
         spec.accept(text);

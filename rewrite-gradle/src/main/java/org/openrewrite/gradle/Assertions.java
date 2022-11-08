@@ -40,7 +40,7 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, (String) null);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("build.gradle"));
         spec.accept(gradle);
         return gradle;
@@ -52,7 +52,7 @@ public class Assertions {
     }
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
-                                    Consumer<SourceSpec<G.CompilationUnit>> spec) {
+                                          Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, after);
         gradle.path("build.gradle");
         spec.accept(gradle);
@@ -65,7 +65,7 @@ public class Assertions {
     }
 
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, (String) null);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("settings.gradle"));
         spec.accept(gradle);
         return gradle;
@@ -77,7 +77,7 @@ public class Assertions {
     }
 
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
-                                          Consumer<SourceSpec<G.CompilationUnit>> spec) {
+                                             Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, after);
         gradle.path("settings.gradle");
         spec.accept(gradle);

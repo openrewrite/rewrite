@@ -16,7 +16,6 @@
 package org.openrewrite.json;
 
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.test.SourceSpec;
@@ -35,7 +34,7 @@ public class Assertions {
     }
 
     public static SourceSpecs json(@Language("json") @Nullable String before, Consumer<SourceSpec<Json.Document>> spec) {
-        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, JsonParser.builder(), before, (String) null);
+        SourceSpec<Json.Document> json = new SourceSpec<>(Json.Document.class, null, JsonParser.builder(), before, null);
         spec.accept(json);
         return json;
     }

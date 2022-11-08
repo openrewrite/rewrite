@@ -95,7 +95,7 @@ public class Assertions {
 
     public static SourceSpecs java(@Language("java") @Nullable String before, Consumer<SourceSpec<J.CompilationUnit>> spec) {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(
-                J.CompilationUnit.class, null, javaParser, before, null,
+                J.CompilationUnit.class, null, javaParser, before,
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext
         );
@@ -111,9 +111,8 @@ public class Assertions {
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") @Nullable String after,
                                    Consumer<SourceSpec<J.CompilationUnit>> spec) {
         SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParser, before,
-                s -> after,
                 Assertions::validateTypes,
-                Assertions::customizeExecutionContext);
+                Assertions::customizeExecutionContext).after(s -> after);
         acceptSpec(spec, java);
         return java;
     }

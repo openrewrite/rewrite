@@ -45,8 +45,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
         return actual + "\n";
     };
 
-    private final SourceSpecs gradlew = text("", notEmpty, spec -> spec.path(WRAPPER_SCRIPT_LOCATION));
-    private final SourceSpecs gradlewBat = text("", notEmpty, spec -> spec.path(WRAPPER_BATCH_LOCATION));
+    private final SourceSpecs gradlew = text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty));
+    private final SourceSpecs gradlewBat = text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty));
     private final SourceSpecs gradleWrapperJarQuark = other("", spec -> spec.path(WRAPPER_JAR_LOCATION));
 
     @Override

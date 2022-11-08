@@ -20,6 +20,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 public class AddGradleEnterpriseTest implements RewriteTest {
@@ -36,13 +40,18 @@ public class AddGradleEnterpriseTest implements RewriteTest {
             """
               rootProject.name = 'my-project'
               """,
-            """
-              plugins {
-                  id 'com.gradle.enterprise' version '3.11.4'
-              }
-              
-              rootProject.name = 'my-project'
-              """
+            spec -> spec.after(actual -> {
+                assertThat(actual).isNotNull();
+                Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
+                assertThat(version.find()).isTrue();
+                return """
+                  plugins {
+                      id 'com.gradle.enterprise' version '%s'
+                  }
+
+                  rootProject.name = 'my-project'
+                  """.formatted(version.group(0));
+            })
           )
         );
     }
@@ -56,17 +65,22 @@ public class AddGradleEnterpriseTest implements RewriteTest {
               plugins {
                   id 'org.openrewrite' version '1'
               }
-              
+                            
               rootProject.name = 'my-project'
               """,
-            """
-              plugins {
-                  id 'com.gradle.enterprise' version '3.11.4'
-                  id 'org.openrewrite' version '1'
-              }
-              
-              rootProject.name = 'my-project'
-              """
+            spec -> spec.after(actual -> {
+                assertThat(actual).isNotNull();
+                Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
+                assertThat(version.find()).isTrue();
+                return """
+                      plugins {
+                      id 'com.gradle.enterprise' version '%s'
+                      id 'org.openrewrite' version '1'
+                  }
+                                
+                  rootProject.name = 'my-project'
+                      """.formatted(version.group(0));
+            })
           )
         );
     }
