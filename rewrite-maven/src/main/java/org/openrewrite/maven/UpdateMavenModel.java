@@ -25,6 +25,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 public class UpdateMavenModel<P> extends MavenVisitor<P> {
 
@@ -100,6 +101,20 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             }
         } else if (!requested.getDependencyManagement().isEmpty()) {
             requested = requested.withDependencyManagement(Collections.emptyList());
+        }
+
+        Optional<Xml.Tag> repos = document.getRoot().getChild("repositories");
+        if (repos.isPresent()) {
+            requested = requested.withRepositories(repos.get().getChildren("repository").stream().map(t -> new MavenRepository(
+                    t.getChildValue("id").orElse(null),
+                    t.getChildValue("url").get(),
+                    Boolean.TRUE.equals(t.getChild("releases").flatMap(s -> s.getChildValue("enabled").map(Boolean::valueOf)).orElse(null)),
+                    Boolean.TRUE.equals(t.getChild("snapshots").flatMap(s -> s.getChildValue("enabled").map(Boolean::valueOf)).orElse(null)),
+                    null,
+                    null
+                    )).collect(Collectors.toList()));
+        } else {
+           requested = requested.withRepositories(Collections.emptyList());
         }
 
         try {
