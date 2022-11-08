@@ -248,4 +248,53 @@ public class ChangeParentPomTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void wildcardVersionUpdate() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "*",
+            null,
+            "*",
+            null,
+            "~1.5",
+            null,
+            false
+          )),
+          pomXml(
+            """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>1.5.12.RELEASE</version>
+                      <relativePath/> <!-- lookup parent from repository -->
+                    </parent>
+                    
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </project>
+              """,
+            """
+                  <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>1.5.22.RELEASE</version>
+                      <relativePath/> <!-- lookup parent from repository -->
+                    </parent>
+                    
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </project>
+              """
+          )
+        );
+    }
 }

@@ -96,7 +96,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
     }
 
     @Test
-    void unresolvableParent() {
+    void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
           spec -> spec
             .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null))

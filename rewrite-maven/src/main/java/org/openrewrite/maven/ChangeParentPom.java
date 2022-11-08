@@ -156,13 +156,12 @@ public class ChangeParentPom extends Recipe {
                 if (isParentTag()) {
                     ResolvedPom resolvedPom = getResolutionResult().getPom();
 
-                    String targetGroupId = newGroupId == null ? oldGroupId : newGroupId;
-                    String targetArtifactId = newArtifactId == null ? oldArtifactId : newArtifactId;
                     if (matchesGlob(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null)), oldGroupId) &&
                         matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), oldArtifactId)) {
                         String oldVersion = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
                         assert oldVersion != null;
-
+                        String targetGroupId = newGroupId == null ? tag.getChildValue("groupId").orElse(oldGroupId) : newGroupId;
+                        String targetArtifactId = newArtifactId == null ? tag.getChildValue("artifactId").orElse(oldArtifactId) : newArtifactId;
                         try {
                             Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (targetVersion.isPresent()) {
