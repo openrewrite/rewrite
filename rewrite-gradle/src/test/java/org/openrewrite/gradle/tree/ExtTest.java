@@ -13,22 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.tree
+package org.openrewrite.gradle.tree;
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.gradle.Assertions.buildGradle
-import org.openrewrite.test.RewriteTest
+import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
+import org.openrewrite.test.RewriteTest;
 
-class PluginsTest : RewriteTest {
+import static org.openrewrite.gradle.Assertions.buildGradle;
+
+class ExtTest implements RewriteTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1236")
     @Test
-    fun applySomePlugins() = rewriteRun(
-        buildGradle(
+    void basicExt() {
+        rewriteRun(
+          buildGradle(
             """
-                plugins {
-                    id 'me.champeau.gradle.jmh' version '0.5.2'
-                    id "com.github.spotbugs" version "4.6.0" apply false
-                }
-            """
-        )
-    )
+              ext {
+                  foo = "bar"
+              }
+              """
+          )
+        );
+    }
 }

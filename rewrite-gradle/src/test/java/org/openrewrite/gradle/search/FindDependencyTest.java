@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,38 +16,27 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
-class FindPluginsTest implements RewriteTest {
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindPlugins("com.jfrog.bintray"));
-    }
+class FindDependencyTest implements RewriteTest {
 
     @Test
-    void findPlugin() {
+    void findDependency() {
         rewriteRun(
+          spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api")),
           buildGradle(
             """
-              plugins {
-                  id 'com.jfrog.bintray' version '1.8.5'
+              dependencies {
+                  api 'org.openrewrite:rewrite-core:latest.release'
               }
               """,
             """
-              plugins {
-                  /*~~>*/id 'com.jfrog.bintray' version '1.8.5'
+              dependencies {
+                  /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
               }
-              """,
-            spec -> spec.beforeRecipe(cu -> assertThat(FindPlugins.find(cu, "com.jfrog.bintray"))
-              .isNotEmpty()
-              .anySatisfy(p -> {
-                  assertThat(p.getPluginId()).isEqualTo("com.jfrog.bintray");
-                  assertThat(p.getVersion()).isEqualTo("1.8.5");
-              }))
+              """
           )
         );
     }

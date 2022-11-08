@@ -29,6 +29,7 @@ import org.openrewrite.marker.Marker;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.UnaryOperator;
 
 @RequiredArgsConstructor
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -48,7 +49,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final String before;
 
     @Nullable
-    final String after;
+    final UnaryOperator<String> after;
 
     /**
      * Apply a function to each SourceFile after recipe execution.
@@ -65,6 +66,11 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
                       Parser.Builder parser, @Nullable String before, @Nullable String after) {
+        this(sourceFileType, dsl, parser, before, after == null ? null : s -> after);
+    }
+
+    public SourceSpec(Class<T> sourceFileType, @Nullable String dsl,
+                      Parser.Builder parser, @Nullable String before, @Nullable UnaryOperator<@Nullable String> after) {
         this.sourceFileType = sourceFileType;
         this.dsl = dsl;
         this.parser = parser;

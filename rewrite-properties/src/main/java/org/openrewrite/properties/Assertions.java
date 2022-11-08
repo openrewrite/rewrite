@@ -32,7 +32,7 @@ public class Assertions {
     }
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, Consumer<SourceSpec<Properties.File>> spec) {
-        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, null);
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, (String) null);
         spec.accept(properties);
         return properties;
     }

@@ -34,7 +34,7 @@ public class Assertions {
     }
 
     public static SourceSpecs proto(@Language("protobuf") @Nullable String before, Consumer<SourceSpec<Proto.Document>> spec) {
-        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, ProtoParser.builder(), before, null);
+        SourceSpec<Proto.Document> proto = new SourceSpec<>(Proto.Document.class, null, ProtoParser.builder(), before, (String) null);
         spec.accept(proto);
         return proto;
     }

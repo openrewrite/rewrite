@@ -13,7 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NonNullApi
-package org.openrewrite.gradle.search;
+package org.openrewrite.gradle;
 
-import org.openrewrite.internal.lang.NonNullApi;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.gradle.Assertions.buildGradle;
+
+class RemoveRepositoryTest implements RewriteTest {
+
+    @Test
+    void removeJcenter() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRepository("jcenter")),
+          buildGradle(
+            """
+              repositories {
+                  jcenter()
+              }
+              """,
+            """
+              repositories {
+                 \s
+              }
+              """
+          )
+        );
+    }
+}

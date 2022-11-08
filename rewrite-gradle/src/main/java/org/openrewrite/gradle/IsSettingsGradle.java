@@ -19,12 +19,12 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
-import java.nio.file.Paths;
-
 public class IsSettingsGradle<P> extends JavaIsoVisitor<P> {
+
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        if (cu.getSourcePath().toString().endsWith("settings.gradle")) {
+        if (cu.getSourcePath().toString().endsWith("settings.gradle") ||
+            cu.getSourcePath().toString().endsWith("settings.gradle.kts")) {
             return SearchResult.found(cu);
         }
         return super.visitJavaSourceFile(cu, p);

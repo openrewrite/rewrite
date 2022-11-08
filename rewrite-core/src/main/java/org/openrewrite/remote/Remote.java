@@ -105,6 +105,20 @@ public interface Remote extends SourceFile {
         return new Builder(id, sourcePath, markers, uri);
     }
 
+    @Override
+    default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+        return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
+            @Override
+            public Tree visitSourceFile(SourceFile sourceFile, PrintOutputCapture<P> p) {
+                ExecutionContext ctx = p.getContext() instanceof ExecutionContext ? (ExecutionContext) p.getContext() :
+                        new InMemoryExecutionContext();
+                HttpSender sender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+                p.out.append(StringUtils.readFully(getInputStream(sender), StandardCharsets.UTF_8));
+                return sourceFile;
+            }
+        };
+    }
+
     class Builder {
         protected final UUID id;
         protected final Path sourcePath;

@@ -51,8 +51,8 @@ public class FindGradleProjectTest implements RewriteTest {
     @Test
     void isGradleKotlinProject() {
         rewriteRun(
-          //language=kotlin
           text(
+            //language=kotlin
             """
               plugins {
                   id("java")

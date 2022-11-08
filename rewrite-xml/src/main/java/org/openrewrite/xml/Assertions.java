@@ -33,7 +33,7 @@ public class Assertions {
     }
 
     public static SourceSpecs xml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
-        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, XmlParser.builder(), before, null);
+        SourceSpec<Xml.Document> xml = new SourceSpec<>(Xml.Document.class, null, XmlParser.builder(), before, (String) null);
         spec.accept(xml);
         return xml;
     }

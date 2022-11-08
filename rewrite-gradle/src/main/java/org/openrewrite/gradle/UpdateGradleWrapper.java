@@ -33,9 +33,11 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
 
+import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
 
@@ -102,7 +104,7 @@ public class UpdateGradleWrapper extends Recipe {
                     return entry;
                 }
 
-                GradleWrapper gradleWrapper = validate(context).getValue();
+                GradleWrapper gradleWrapper = requireNonNull(validate(context).getValue());
 
                 // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                 String currentDistributionUrl = entry.getValue().getText();
@@ -122,7 +124,8 @@ public class UpdateGradleWrapper extends Recipe {
         List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                 PlainText gradlew = (PlainText) setExecutable(sourceFile);
-                String gradlewText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"), sourceFile.getCharset());
+                String gradlewText = StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")),
+                        sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset());
                 if (!gradlewText.equals(gradlew.getText())) {
                     gradlew = gradlew.withText(gradlewText);
                 }
@@ -130,7 +133,8 @@ public class UpdateGradleWrapper extends Recipe {
             }
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
                 PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
-                String gradlewBatText = StringUtils.readFully(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"), sourceFile.getCharset());
+                String gradlewBatText = StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")),
+                        sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset());
                 if (!gradlewBatText.equals(gradlewBat.getText())) {
                     gradlewBat = gradlewBat.withText(gradlewBatText);
                 }

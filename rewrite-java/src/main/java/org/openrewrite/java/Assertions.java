@@ -110,7 +110,8 @@ public class Assertions {
 
     public static SourceSpecs java(@Language("java") @Nullable String before, @Language("java") @Nullable String after,
                                    Consumer<SourceSpec<J.CompilationUnit>> spec) {
-        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParser, before, after,
+        SourceSpec<J.CompilationUnit> java = new SourceSpec<>(J.CompilationUnit.class, null, javaParser, before,
+                s -> after,
                 Assertions::validateTypes,
                 Assertions::customizeExecutionContext);
         acceptSpec(spec, java);

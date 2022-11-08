@@ -84,7 +84,7 @@ public class RecipeSpec {
     };
 
     // The before and after here don't mean anything
-    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser.builder(), "", null);
+    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser.builder(), "", (String) null);
 
     /**
      * Configuration that applies to all source file inputs.

@@ -36,7 +36,7 @@ public class Assertions {
     }
 
     public static SourceSpecs groovy(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, null);
+        SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, (String) null);
         spec.accept(groovy);
         return groovy;
     }

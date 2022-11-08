@@ -90,7 +90,7 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new HasSourcePath<>("regex", ".+\\.gradle(\\.kts)?$");
+        return new IsBuildGradle<>();
     }
 
     @Override

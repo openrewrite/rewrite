@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.search
+package org.openrewrite.gradle.tree;
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.gradle.GradleRecipeTest
+import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RewriteTest;
 
-class FindDependencyTest : GradleRecipeTest {
+import static org.openrewrite.gradle.Assertions.buildGradle;
+
+class PluginsTest implements RewriteTest {
 
     @Test
-    fun findDependency() = assertChanged(
-        recipe = FindDependency("org.openrewrite", "rewrite-core", "api"),
-        before = """
-            dependencies {
-                api 'org.openrewrite:rewrite-core:latest.release'
-            }
-        """,
-        after = """
-            dependencies {
-                /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
-            }
-        """
-    )
+    void applySomePlugins() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'me.champeau.gradle.jmh' version '0.5.2'
+                  id "com.github.spotbugs" version "4.6.0" apply false
+              }
+              """
+          )
+        );
+    }
 }

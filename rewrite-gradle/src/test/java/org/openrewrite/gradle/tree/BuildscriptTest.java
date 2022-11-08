@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,29 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle;
+package org.openrewrite.gradle.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.buildGradle;
 
-public class GradleParserTest implements RewriteTest {
+class BuildscriptTest implements RewriteTest {
 
     @Test
-    void buildGradleAndSettingsGradle() {
+    void buildscriptWithDependencies() {
         rewriteRun(
-          settingsGradle(
+          buildGradle(
             """
-              plugins {
-                  id 'com.gradle.enterprise' version '3.11.3'
-              }
-                                          
-              gradleEnterprise {
-                  server = 'https://enterprise-samples.gradle.com'
-                                          
-                  buildScan {
-                      publishAlways()
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath 'com.netflix.nebula:nebula-dependency-recommender:9.1.1'
+                      classpath 'com.netflix.nebula:gradle-netflixoss-project-plugin:9.1.0'
                   }
               }
               """

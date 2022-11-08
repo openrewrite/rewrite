@@ -1,0 +1,104 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.gradle;
+
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.PathUtils;
+import org.openrewrite.RecipeRun;
+import org.openrewrite.Result;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.remote.Remote;
+import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.text.PlainText;
+
+import java.net.URI;
+import java.util.Objects;
+import java.util.function.UnaryOperator;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.other;
+import static org.openrewrite.test.SourceSpecs.text;
+
+@SuppressWarnings("UnusedProperty")
+class UpdateGradleWrapperTest implements RewriteTest {
+    private final UnaryOperator<@Nullable String> notEmpty = actual -> {
+        assertThat(actual).isNotNull();
+        return actual + "\n";
+    };
+
+    private final SourceSpecs gradlew = text("", notEmpty, spec -> spec.path(WRAPPER_SCRIPT_LOCATION));
+    private final SourceSpecs gradlewBat = text("", notEmpty, spec -> spec.path(WRAPPER_BATCH_LOCATION));
+    private final SourceSpecs gradleWrapperJarQuark = other("", spec -> spec.path(WRAPPER_JAR_LOCATION));
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new UpdateGradleWrapper("7.4.2", null));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"gradle\\wrapper\\gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.properties"})
+    void updateVersionAndDistribution(String osPath) {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> {
+              var gradleSh = result(run, PlainText.class, "gradlew");
+              assertThat(gradleSh.getText()).isNotBlank();
+
+              var gradleBat = result(run, PlainText.class, "gradlew.bat");
+              assertThat(gradleBat.getText()).isNotBlank();
+
+              var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+              assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+              assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+          }),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path(osPath)
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
+    private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
+        return run.getResults().stream()
+          .map(Result::getAfter)
+          .filter(Objects::nonNull)
+          .filter(r -> r.getSourcePath().endsWith(endsWith))
+          .findFirst()
+          .map(clazz::cast)
+          .orElseThrow();
+    }
+}

@@ -288,7 +288,7 @@ public interface RewriteTest extends SourceSpecs {
                                     sourceSpec.getSourcePath())
                                 .isNull();
                         String actual = result.getAfter().printAll(out.clone()).trim();
-                        String expected = trimIndentPreserveCRLF(sourceSpec.after);
+                        String expected = trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).isEqualTo(expected);
                         continue nextSourceSpec;
                     }
@@ -302,7 +302,7 @@ public interface RewriteTest extends SourceSpecs {
                 if (result.getAfter() != null && !(result.getAfter() instanceof Remote)) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll(out.clone()).trim();
-                    String expected = trimIndentPreserveCRLF(sourceSpec.after);
+                    String expected = trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                     if (actual.equals(expected)) {
                         expectedNewSources.remove(sourceSpec);
                         //noinspection unchecked
@@ -321,7 +321,7 @@ public interface RewriteTest extends SourceSpecs {
                 if (result.getAfter() instanceof Remote) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll(out.clone());
-                    String expected = trimIndentPreserveCRLF(sourceSpec.after);
+                    String expected = trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                     if (actual.equals(expected)) {
                         expectedNewSources.remove(sourceSpec);
                         //noinspection unchecked
@@ -338,24 +338,27 @@ public interface RewriteTest extends SourceSpecs {
 
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
-            String expectedAfter = specForSourceFile.getValue().after;
             for (Result result : recipeRun.getResults()) {
                 if (result.getBefore() == specForSourceFile.getKey()) {
-                    if (expectedAfter != null && result.getAfter() != null) {
-                        String actual = result.getAfter().printAll(out.clone());
-                        String expected = trimIndentPreserveCRLF(expectedAfter);
-                        assertThat(actual).isEqualTo(expected);
-                        specForSourceFile.getValue().eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
-                    } else if (expectedAfter == null && result.getAfter() != null) {
-                        if (result.diff().isEmpty()) {
-                            fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
-                        }
+                    if(result.getAfter() != null) {
+                        String expectedAfter = specForSourceFile.getValue().after == null ? null :
+                                specForSourceFile.getValue().after.apply(result.getAfter().printAll(out.clone()));
+                        if (expectedAfter != null) {
+                            String actual = result.getAfter().printAll(out.clone());
+                            String expected = trimIndentPreserveCRLF(expectedAfter);
+                            assertThat(actual).isEqualTo(expected);
+                            specForSourceFile.getValue().eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
+                        } else {
+                            if (result.diff().isEmpty() && !(result.getAfter() instanceof Remote)) {
+                                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
+                            }
 
-                        assert result.getBefore() != null;
-                        assertThat(result.getAfter().printAll(out.clone()))
-                                .as("The recipe must not make changes")
-                                .isEqualTo(result.getBefore().printAll(out.clone()));
-                    } else if (expectedAfter != null && result.getAfter() == null) {
+                            assert result.getBefore() != null;
+                            assertThat(result.getAfter().printAll(out.clone()))
+                                    .as("The recipe must not make changes")
+                                    .isEqualTo(result.getBefore().printAll(out.clone()));
+                        }
+                    } else if (result.getAfter() == null) {
                         assert result.getBefore() != null;
                         fail("The recipe deleted a source file [" + result.getBefore().getSourcePath() + "] that was not expected to change");
                     }
@@ -368,9 +371,9 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             // if we get here, there was no result.
-            if (expectedAfter != null) {
+            if (specForSourceFile.getValue().after != null) {
                 String before = trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
-                String expected = trimIndentPreserveCRLF(expectedAfter);
+                String expected = trimIndentPreserveCRLF(specForSourceFile.getValue().after.apply(null));
 
                 assertThat(before)
                         .as("The recipe should have made the following change.")
@@ -382,7 +385,9 @@ public interface RewriteTest extends SourceSpecs {
         }
         SoftAssertions newFilesGenerated = new SoftAssertions();
         for (SourceSpec<?> expectedNewSource : expectedNewSources) {
-            newFilesGenerated.assertThat(expectedNewSource.after).as("No new source file was generated that matched.").isEmpty();
+            newFilesGenerated.assertThat(expectedNewSource.after == null ? null : expectedNewSource.after.apply(null))
+                    .as("No new source file was generated that matched.")
+                    .isEmpty();
         }
         newFilesGenerated.assertAll();
 

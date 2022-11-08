@@ -31,7 +31,7 @@ public class Assertions {
     }
 
     public static SourceSpecs hcl(@Nullable String before, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
-        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(), before, null);
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(), before, (String) null);
         spec.accept(hcl);
         return hcl;
     }
