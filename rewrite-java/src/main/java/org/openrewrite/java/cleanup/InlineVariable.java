@@ -68,11 +68,13 @@ public class InlineVariable extends Recipe {
                                         if (statement instanceof J.Return) {
                                             J.Return retrn = (J.Return) statement;
                                             return retrn.withExpression(requireNonNull(identDefinition.getInitializer())
-                                                    .withPrefix(requireNonNull(retrn.getExpression()).getPrefix()));
+                                                            .withPrefix(requireNonNull(retrn.getExpression()).getPrefix()))
+                                                    .withPrefix(retrn.getPrefix().withComments(varDec.getComments()));
                                         } else if (statement instanceof J.Throw) {
                                             J.Throw thrown = (J.Throw) statement;
                                             return thrown.withException(requireNonNull(identDefinition.getInitializer())
-                                                    .withPrefix(requireNonNull(thrown.getException()).getPrefix()));
+                                                            .withPrefix(requireNonNull(thrown.getException()).getPrefix()))
+                                                    .withPrefix(thrown.getPrefix().withComments(varDec.getComments()));
                                         }
                                     }
                                     return statement;

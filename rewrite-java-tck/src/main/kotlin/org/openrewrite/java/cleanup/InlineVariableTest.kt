@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("UnnecessaryLocalVariable")
+@file:Suppress("UnnecessaryLocalVariable", "CodeBlock2Expr", "Convert2MethodRef")
 
 package org.openrewrite.java.cleanup
 
@@ -96,6 +96,45 @@ interface InlineVariableTest : RewriteTest {
             """
         )
     )
+
+    @Test
+    fun preserveComments() {
+        rewriteRun(
+            java("""
+                class Test {
+                    String getGreeting() {
+                        // sometimes there are comments
+                        // keep them
+                        String s = "hello";
+                        return s;
+                    }
+                    
+                    void test4(String arg) throws IllegalArgumentException {
+                        if (arg == null || arg.isEmpty()) {
+                            // some comment for the illegal argument
+                            IllegalArgumentException e = new IllegalArgumentException("arg should not be empty or null");
+                            throw e;
+                        }
+                    }
+                }
+            ""","""
+                class Test {
+                    String getGreeting() {
+                        // sometimes there are comments
+                        // keep them
+                        return "hello";
+                    }
+                    
+                    void test4(String arg) throws IllegalArgumentException {
+                        if (arg == null || arg.isEmpty()) {
+                            // some comment for the illegal argument
+                            throw new IllegalArgumentException("arg should not be empty or null");
+                        }
+                    }
+                }
+            """)
+        )
+    }
 
     @Test
     fun annotatedReturnIdentifier() = rewriteRun(
