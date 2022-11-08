@@ -21,8 +21,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.List;
 import java.util.Optional;
 
 @Value
@@ -66,17 +68,19 @@ public class RemoveExclusion extends Recipe {
                 if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
-                        return tag.withContent(ListUtils.map(tag.getChildren(), child -> {
-                            if("exclusions".equals(child.getName())) {
-                                Xml.Tag e = child;
+                        return tag.withContent(ListUtils.map((List<Content>) tag.getContent(), child -> {
+                            if (child instanceof Xml.Tag && "exclusions".equals(((Xml.Tag) child).getName())) {
+                                Xml.Tag e = (Xml.Tag) child;
                                 if (e.getContent() != null) {
-                                    e = e.withContent(ListUtils.map(e.getChildren(), exclusion -> {
-                                        if ("exclusion".equals(exclusion.getName()) &&
-                                                exclusion.getChildValue("groupId").map(g -> g.equals(exclusionGroupId)).orElse(false) &&
+                                    e = e.withContent(ListUtils.map(e.getContent(), child2 -> {
+                                        if (child2 instanceof Xml.Tag && "exclusion".equals(((Xml.Tag) child2).getName())) {
+                                            Xml.Tag exclusion = (Xml.Tag) child2;
+                                            if (exclusion.getChildValue("groupId").map(g -> g.equals(exclusionGroupId)).orElse(false) &&
                                                 exclusion.getChildValue("artifactId").map(g -> g.equals(exclusionArtifactId)).orElse(false)) {
-                                            return null;
+                                                return null;
+                                            }
                                         }
-                                        return exclusion;
+                                        return child2;
                                     }));
 
                                     if (e.getContent() == null || e.getContent().isEmpty()) {
