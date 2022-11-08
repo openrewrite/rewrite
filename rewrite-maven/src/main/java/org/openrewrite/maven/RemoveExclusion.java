@@ -68,6 +68,7 @@ public class RemoveExclusion extends Recipe {
                 if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
+                        //noinspection unchecked
                         return tag.withContent(ListUtils.map((List<Content>) tag.getContent(), child -> {
                             if (child instanceof Xml.Tag && "exclusions".equals(((Xml.Tag) child).getName())) {
                                 Xml.Tag e = (Xml.Tag) child;
@@ -84,6 +85,8 @@ public class RemoveExclusion extends Recipe {
                                     }));
 
                                     if (e.getContent() == null || e.getContent().isEmpty()) {
+                                        return null;
+                                    } else if (e.getContent().stream().noneMatch(Xml.Tag.class::isInstance)) {
                                         return null;
                                     }
                                 }

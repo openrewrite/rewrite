@@ -129,6 +129,49 @@ class RemoveExclusionTest implements RewriteTest {
     }
 
     @Test
+    void removeExclusionsTagWhenOnlyCommentsAreLeft() {
+        rewriteRun(
+          pomXml(
+            """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                        <exclusions>
+                          <!-- comment -->
+                          <exclusion>
+                            <groupId>commons-lang</groupId>
+                            <artifactId>commons-lang</artifactId>
+                          </exclusion>
+                        </exclusions>
+                      </dependency>
+                    </dependencies>
+                  </project>
+              """,
+            """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void removeUnusedExclusionsFromDependencyManagement() {
         rewriteRun(
           pomXml("""
