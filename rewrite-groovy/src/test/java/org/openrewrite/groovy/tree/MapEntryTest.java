@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,18 +22,34 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-public class LambdaTest implements RewriteTest {
+class MapEntryTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2168")
     @Test
-    void lambdaWithNoArguments() {
+    void mapEntryMethodArguments() {
         rewriteRun(
-          groovy(
-            """
-                def f1 = { -> 1 }
-                def f2 = { 1 }
-              """
-          )
+          groovy("apply plugin: 'java'")
+        );
+    }
+
+    @Test
+    void multipleEntries() {
+        rewriteRun(
+          groovy("exclude(group: 'g', module: 'm')")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2071")
+    @Test
+    void emptyMapLiteral() {
+        rewriteRun(
+          groovy("Map m =  [  :  ]")
+        );
+    }
+
+    @Test
+    void mapAccess() {
+        rewriteRun(
+          groovy("def a = someMap /*[*/ [ /*'*/ 'someKey' /*]*/ ]")
         );
     }
 }

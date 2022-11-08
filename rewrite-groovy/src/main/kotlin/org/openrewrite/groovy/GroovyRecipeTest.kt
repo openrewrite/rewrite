@@ -24,6 +24,8 @@ import org.openrewrite.groovy.tree.G
 import java.io.File
 import java.nio.file.Path
 
+
+@Deprecated("Use RewriteTest instead")
 @Suppress("unused")
 interface GroovyRecipeTest : RecipeTest<G.CompilationUnit> {
     override val parser: Parser<G.CompilationUnit>

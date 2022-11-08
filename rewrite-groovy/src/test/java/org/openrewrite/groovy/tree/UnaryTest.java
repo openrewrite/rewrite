@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,17 +21,51 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings("GroovyUnusedAssignment")
-public class LambdaTest implements RewriteTest {
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/2168")
+@SuppressWarnings({"GroovyUnusedAssignment", "GroovyUnusedIncOrDec", "GrUnnecessarySemicolon"})
+class UnaryTest implements RewriteTest {
     @Test
-    void lambdaWithNoArguments() {
+    void format() {
         rewriteRun(
           groovy(
             """
-                def f1 = { -> 1 }
-                def f2 = { 1 }
+              int i = 0;
+              int j = ++i;
+              int k = i ++;
+              """
+          )
+        );
+    }
+
+    @Test
+    void postfix() {
+        rewriteRun(
+          groovy(
+            """
+              int k = i ++;
+              """
+          )
+        );
+    }
+
+    @Test
+    void prefix() {
+        rewriteRun(
+          groovy(
+            """
+              int k = ++i;
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("GroovyPointlessBoolean")
+    @Issue("https://github.com/openrewrite/rewrite/issues/1524")
+    @Test
+    void negation() {
+        rewriteRun(
+          groovy(
+            """
+              def a = !true
               """
           )
         );

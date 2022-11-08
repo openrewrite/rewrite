@@ -23,6 +23,7 @@ import org.openrewrite.hcl.tree.Hcl
 import java.io.File
 import java.nio.file.Path
 
+@Deprecated("Use RewriteTest instead")
 @Suppress("unused")
 interface HclRecipeTest : RecipeTest<Hcl.ConfigFile> {
     override val parser: HclParser

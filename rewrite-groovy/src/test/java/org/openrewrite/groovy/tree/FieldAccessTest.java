@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2021 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,22 +16,47 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings("GroovyUnusedAssignment")
-public class LambdaTest implements RewriteTest {
+class FieldAccessTest implements RewriteTest {
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/2168")
     @Test
-    void lambdaWithNoArguments() {
+    void starAccess() {
         rewriteRun(
           groovy(
             """
-                def f1 = { -> 1 }
-                def f2 = { 1 }
+              all*.exclude group: 'com.netflix.archaius', module: 'archaius-core'
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldAccess() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                  public Test field = new Test()
+                  Test b = new Test() . field . field
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nullSafeDereference() {
+        rewriteRun(
+          groovy(
+            """
+              class Test {
+                  Integer n
+              }
+              Test t = new Test()
+              t?.n
               """
           )
         );
