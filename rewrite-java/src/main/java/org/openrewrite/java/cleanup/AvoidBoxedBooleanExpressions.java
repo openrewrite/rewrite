@@ -26,6 +26,8 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 
 import static java.util.Collections.singleton;
@@ -50,6 +52,11 @@ public class AvoidBoxedBooleanExpressions extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return new UsesType<>("java.lang.Boolean");
+    }
+
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return Duration.of(5, ChronoUnit.MINUTES);
     }
 
     @Override
