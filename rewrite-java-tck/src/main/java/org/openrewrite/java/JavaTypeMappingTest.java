@@ -211,7 +211,7 @@ public interface JavaTypeMappingTest {
                 .filter(m -> m.getName().equals("<constructor>"))
                 .findFirst()
                 .get();
-        assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat$EnumTypeB{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat$EnumTypeB,parameters=[org.openrewrite.java.JavaTypeGoat${'$'}TypeA]}");
+        assertThat(type.toString()).isEqualTo("org.openrewrite.java.JavaTypeGoat$EnumTypeB{name=<constructor>,return=org.openrewrite.java.JavaTypeGoat$EnumTypeB,parameters=[org.openrewrite.java.JavaTypeGoat$TypeA]}");
 
         JavaType.FullyQualified supertype = clazz.getSupertype();
         assertThat(supertype).isNotNull();
