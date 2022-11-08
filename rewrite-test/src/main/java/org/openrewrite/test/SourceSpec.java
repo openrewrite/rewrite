@@ -71,7 +71,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         this.dsl = dsl;
         this.parser = parser;
         this.before = before;
-        this.after = s -> after;
+        this.after = after == null ? null : s -> after;
         this.eachResult = EachResult.noop;
         this.customizeExecutionContext = (ctx) -> {
         };
