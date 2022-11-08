@@ -121,6 +121,7 @@ public class AddRepository extends Recipe {
                             } else {
                                 repositories = (Xml.Tag) new ChangeTagValueVisitor<>(repo.getChild("layout").get(), repoName).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             }
+                            maybeUpdateModel();
                         }
                         if (!isReleasesEqual(repo)) {
                             Xml.Tag releases = repo.getChild("releases").orElse(null);
@@ -132,6 +133,7 @@ public class AddRepository extends Recipe {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 }
                             }
+                            maybeUpdateModel();
                         }
                         if (!isSnapshotsEqual(repo)) {
                             Xml.Tag snapshots = repo.getChild("snapshots").orElse(null);
@@ -143,6 +145,7 @@ public class AddRepository extends Recipe {
                                     repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleSnapshots())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 }
                             }
+                            maybeUpdateModel();
                         }
                     } else {
                         StringBuilder sb = new StringBuilder();
@@ -157,6 +160,7 @@ public class AddRepository extends Recipe {
 
                         Xml.Tag repoTag = Xml.Tag.build(sb.toString());
                         repositories = (Xml.Tag) new AddToTagVisitor<>(repositories, repoTag).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
+                        maybeUpdateModel();
                     }
                 }
                 return repositories;

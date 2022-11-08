@@ -262,4 +262,51 @@ public class AddRepositoryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void updateToSpringBoot30Snapshot() {
+
+        rewriteRun(
+          spec -> spec.recipe(new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
+            true, null, null,
+            null, null, null).doNext(new UpgradeParentVersion("org.springframework.boot", "*", "3.0.0-SNAPSHOT", null))),
+          pomXml(
+            """
+                  <project>
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>2.7.3</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                  </project>
+              """,
+            """
+                  <project>
+                    <parent>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-parent</artifactId>
+                      <version>3.0.0-SNAPSHOT</version>
+                    </parent>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <repositories>
+                      <repository>
+                        <id>boot-snapshots</id>
+                        <url>https://repo.spring.io/snapshot</url>
+                        <snapshots>
+                          <enabled>true</enabled>
+                        </snapshots>
+                      </repository>
+                    </repositories>
+                  </project>
+              """
+          )
+        );
+    }
+
+
 }
