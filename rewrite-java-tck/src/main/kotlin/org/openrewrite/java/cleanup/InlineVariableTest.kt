@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("UnnecessaryLocalVariable")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.java.JavaParser
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
@@ -28,10 +29,12 @@ interface InlineVariableTest : RewriteTest {
 
     @Suppress("rawtypes")
     @Test
-    fun inlineVariable(jp: JavaParser.Builder<*, *>) = rewriteRun(
+    fun inlineVariable() = rewriteRun(
         java(
             """
-                import org.openrewrite.java.JavaParser;
+                import java.util.List;
+                import java.util.stream.Collectors;
+                
                 class Test {
                     int test() {
                         int n = 0;
@@ -45,10 +48,26 @@ interface InlineVariableTest : RewriteTest {
                     }
                     
                     void test3() {}
+                    
+                    void test4(String arg) throws IllegalArgumentException {
+                        if (arg == null || arg.isEmpty()) {
+                            IllegalArgumentException e = new IllegalArgumentException("arg should not be empty or null");
+                            throw e;
+                        }
+                    }
+                    
+                    List<String> testLambda(List<String> names) {
+                        return names.stream().map(n -> {
+                            String un = n.toLowerCase();
+                            return un;
+                        }).collect(Collectors.toList());
+                    }
                 }
             """,
             """
-                import org.openrewrite.java.JavaParser;
+                import java.util.List;
+                import java.util.stream.Collectors;
+                
                 class Test {
                     int test() {
                         return 0;
@@ -61,8 +80,36 @@ interface InlineVariableTest : RewriteTest {
                     }
                     
                     void test3() {}
+                    
+                    void test4(String arg) throws IllegalArgumentException {
+                        if (arg == null || arg.isEmpty()) {
+                            throw new IllegalArgumentException("arg should not be empty or null");
+                        }
+                    }
+                    
+                    List<String> testLambda(List<String> names) {
+                        return names.stream().map(n -> {
+                            return n.toLowerCase();
+                        }).collect(Collectors.toList());
+                    }
                 }
             """
         )
+    )
+
+    @Test
+    fun annotatedReturnIdentifier() = rewriteRun(
+        java(
+            """
+                class Test {
+                    String test() {
+                        @SuppressWarnings("unchecked")
+                        String someString = (String)getSomething();
+                        return someString;
+                    }
+                    
+                    Object getSomething() {return null;}
+                }
+            """)
     )
 }

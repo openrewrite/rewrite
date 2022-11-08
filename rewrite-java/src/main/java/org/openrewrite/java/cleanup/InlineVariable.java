@@ -24,7 +24,9 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
@@ -37,41 +39,49 @@ public class InlineVariable extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Inline variables when they are immediately used to return.";
+        return "Inline variables when they are immediately used to return or throw.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("RSPEC-1488");
     }
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                J.Block body = m.getBody();
-                if (body != null) {
-                    List<Statement> stats = body.getStatements();
-                    if (stats.size() > 1) {
-                        String identReturned = identReturned(stats);
-                        if (identReturned != null) {
-                            if (stats.get(stats.size() - 2) instanceof J.VariableDeclarations) {
-                                J.VariableDeclarations varDec = (J.VariableDeclarations) stats.get(stats.size() - 2);
-                                J.VariableDeclarations.NamedVariable identDefinition = varDec.getVariables().get(0);
-                                if (identDefinition.getSimpleName().equals(identReturned)) {
-                                    m = m.withBody(body.withStatements(ListUtils.map(stats, (i, stat) -> {
-                                        if (i == stats.size() - 2) {
-                                            return null;
-                                        } else if (i == stats.size() - 1) {
-                                            J.Return retrn = (J.Return) stat;
+            public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
+                J.Block bl = super.visitBlock(block, executionContext);
+                List<Statement> statements = bl.getStatements();
+                if (statements.size() > 1) {
+                    String identReturned = identReturned(statements);
+                    if (identReturned != null) {
+                        if (statements.get(statements.size() - 2) instanceof J.VariableDeclarations) {
+                            J.VariableDeclarations varDec = (J.VariableDeclarations) statements.get(statements.size() - 2);
+                            J.VariableDeclarations.NamedVariable identDefinition = varDec.getVariables().get(0);
+                            if (varDec.getLeadingAnnotations().isEmpty() && identDefinition.getSimpleName().equals(identReturned)) {
+                                bl = bl.withStatements(ListUtils.map(statements, (i, statement) -> {
+                                    if (i == statements.size() - 2) {
+                                        return null;
+                                    } else if (i == statements.size() - 1) {
+                                        if (statement instanceof J.Return) {
+                                            J.Return retrn = (J.Return) statement;
                                             return retrn.withExpression(requireNonNull(identDefinition.getInitializer())
                                                     .withPrefix(requireNonNull(retrn.getExpression()).getPrefix()));
+                                        } else if (statement instanceof J.Throw) {
+                                            J.Throw thrown = (J.Throw) statement;
+                                            return thrown.withException(requireNonNull(identDefinition.getInitializer())
+                                                    .withPrefix(requireNonNull(thrown.getException()).getPrefix()));
                                         }
-                                        return stat;
-                                    })));
-                                }
+                                    }
+                                    return statement;
+                                }));
                             }
                         }
                     }
                 }
-                return m;
+                return bl;
             }
 
             @Nullable
@@ -80,6 +90,11 @@ public class InlineVariable extends Recipe {
                     J.Return retrn = (J.Return) stats.get(stats.size() - 1);
                     if (retrn.getExpression() instanceof J.Identifier) {
                         return ((J.Identifier) retrn.getExpression()).getSimpleName();
+                    }
+                } else if (stats.get(stats.size() - 1) instanceof J.Throw) {
+                    J.Throw thr = (J.Throw) stats.get(stats.size() - 1);
+                    if (thr.getException() instanceof J.Identifier) {
+                        return ((J.Identifier) thr.getException()).getSimpleName();
                     }
                 }
                 return null;
