@@ -119,6 +119,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class ChangeTypeTck : ChangeTypeTest
 
     @Nested
+    inner class CountLinesTck : CountLinesTest
+
+    @Nested
     inner class ControlFlowTck : ControlFlowTest
 
     @Nested
