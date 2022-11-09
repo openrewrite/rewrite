@@ -284,6 +284,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
 
             @Override
+            public J visitTernary(J.Ternary ternary, Integer p) {
+                if (loc.equals(STATEMENT_PREFIX) && ternary.isScope(insertionPoint)) {
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseTernary(substitutedTemplate))
+                            .withPrefix(ternary.getPrefix()), p, getCursor().getParentOrThrow());
+                }
+                return ternary;
+            }
+
+            @Override
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))

@@ -2648,4 +2648,46 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         )
     )
 
+    @Test
+    fun ternaryExpressionReplacement() = rewriteRun(
+        { spec ->
+            spec.recipe(toRecipe {
+                object : JavaIsoVisitor<ExecutionContext>() {
+                    override fun visitTernary(ternary: J.Ternary, p: ExecutionContext): J.Ternary {
+                        var tn: J.Ternary = super.visitTernary(ternary, p) as J.Ternary
+                        if (TypeUtils.isOfClassType(tn.condition.type, "java.lang.Boolean")) {
+                            tn = tn.withTemplate(JavaTemplate.builder({cursor.parentOrThrow},
+                                "Boolean.TRUE.equals(#{any(java.lang.Boolean)}) ? #{any()} : #{any()}").build(),
+                                tn.coordinates.replace(), tn.condition, tn.truePart, tn.falsePart);
+                        }
+                        return tn
+                    }
+                }
+            })
+        },
+        java(
+            //language=java
+            """
+                class Test {
+                    int a(Boolean b) {
+                        return b ? 1 : 0;
+                    }
+                    void b(Boolean b) {
+                        int i = b ? 1 : 0;
+                    }
+                }
+            """,
+            """
+                class Test {
+                    int a(Boolean b) {
+                        return Boolean.TRUE.equals(b) ? 1 : 0;
+                    }
+                    void b(Boolean b) {
+                        int i = Boolean.TRUE.equals(b) ? 1 : 0;
+                    }
+                }
+            """
+        )
+    )
+
 }

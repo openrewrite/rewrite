@@ -109,6 +109,17 @@ public class JavaTemplateParser {
         }).get(0);
     }
 
+    public J parseTernary(String template) {
+        String stub = addImports(substitute(EXPRESSION_STUB, template));
+
+        return cache(stub, () -> {
+            JavaSourceFile cu = compileTemplate(stub + EXPR_STATEMENT_PARAM);
+            J.Block b = (J.Block) cu.getClasses().get(0).getBody().getStatements().get(0);
+            J.VariableDeclarations v = (J.VariableDeclarations) b.getStatements().get(0);
+            return singletonList(v.getVariables().get(0).getInitializer());
+        }).get(0);
+    }
+
     public TypeTree parseExtends(String template) {
         @Language("java") String stub = addImports(substitute(EXTENDS_STUB, template));
         onBeforeParseTemplate.accept(stub);
