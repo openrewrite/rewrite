@@ -95,4 +95,23 @@ public class AvoidBoxedBooleanExpressionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void boxedBooleansInTernaryExpressions() {
+        rewriteRun(
+          java("""
+            class Test {
+                String whatToGet(Boolean forThing1) {
+                    return forThing1 ? "a fish" : "a bowl";
+                }
+            }
+            ""","""
+            class Test {
+                String whatToGet(Boolean forThing1) {
+                    return Boolean.TRUE.equals(forThing1) ? "a fish" : "a bowl";
+                }
+            }
+            """)
+        );
+    }
 }
