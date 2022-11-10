@@ -1559,6 +1559,7 @@ class MavenParserTest implements RewriteTest {
                 <project>
                   <groupId>com.example</groupId>
                   <artifactId>demo</artifactId>
+                  <version>1.0.0</version>
                   <dependencyManagement>
                     <dependencies>
                       <dependency>
@@ -1595,6 +1596,7 @@ class MavenParserTest implements RewriteTest {
                     <project>
                       <groupId>com.example</groupId>
                       <artifactId>demo</artifactId>
+                      <version>1.0.0</version>
                       <dependencyManagement>
                         <dependencies>
                           <dependency>
@@ -1631,6 +1633,7 @@ class MavenParserTest implements RewriteTest {
                 <project>
                   <groupId>com.example</groupId>
                   <artifactId>demo</artifactId>
+                  <version>1.0.0</version>
                   <dependencyManagement>
                     <dependencies>
                       <dependency>
@@ -1656,6 +1659,180 @@ class MavenParserTest implements RewriteTest {
                 assertThat(foundDependencies).hasSize(0);
             })
           )
+        );
+    }
+
+    @Test
+    public void ciFriendlyVersionWithoutExplicitProperty() {
+        rewriteRun(pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>net.sample</groupId>
+            <artifactId>sample</artifactId>
+            <version>${revision}</version>
+            <packaging>pom</packaging>
+          </project>
+          """)
+        );
+    }
+
+    @Test
+    public void ciFriendlyVersionWithParent() {
+        rewriteRun(pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>net.sample</groupId>
+            <artifactId>sample</artifactId>
+            <version>${revision}</version>
+            <packaging>pom</packaging>
+          
+            <modules>
+              <module>sample-rest</module>
+            </modules>
+          
+          </project>
+          """, spec -> spec.path("pom.xml")),
+          pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+          
+            <modelVersion>4.0.0</modelVersion>
+            <artifactId>sample-rest</artifactId>
+            <packaging>jar</packaging>
+          
+            <parent>
+              <groupId>net.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>${revision}</version>
+              <relativePath>../pom.xml</relativePath>
+            </parent>
+          </project>
+          """, spec -> spec.path("rest/pom.xml"))
+        );
+    }
+
+    @Test
+    public void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
+        rewriteRun(pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>net.sample</groupId>
+            <artifactId>sample</artifactId>
+            <version>${revision}</version>
+            <packaging>pom</packaging>
+          
+            <modules>
+              <module>sample-parent</module>
+              <module>sample-app</module>
+              <module>sample-rest</module>
+              <module>sample-web</module>
+            </modules>
+          
+            <properties>
+              <revision>0.0.0-SNAPSHOT</revision>
+            </properties>
+          </project>
+          """, spec -> spec.path("pom.xml")),
+          pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+            <modelVersion>4.0.0</modelVersion>
+            <artifactId>sample-parent</artifactId>
+            <groupId>net.sample</groupId>
+            <version>${revision}</version>
+            <packaging>pom</packaging>
+          
+            <properties>
+              <revision>0.0.0-SNAPSHOT</revision>
+            </properties>
+          
+            <dependencyManagement>
+              <dependencies>
+                <dependency>
+                  <groupId>net.sample</groupId>
+                  <artifactId>sample-web</artifactId>
+                  <version>${project.version}</version>
+                </dependency>
+                <dependency>
+                  <groupId>net.sample</groupId>
+                  <artifactId>sample-rest</artifactId>
+                  <version>${project.version}</version>
+                </dependency>
+              </dependencies>
+            </dependencyManagement>
+          </project>
+          """, spec -> spec.path("parent/pom.xml")),
+          pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+          
+            <modelVersion>4.0.0</modelVersion>
+            <artifactId>sample-app</artifactId>
+            <packaging>jar</packaging>
+          
+            <parent>
+              <groupId>net.sample</groupId>
+              <artifactId>sample-parent</artifactId>
+              <version>${revision}</version>
+              <relativePath>../parent/pom.xml</relativePath>
+            </parent>
+          
+            <dependencies>
+              <dependency>
+                <groupId>net.sample</groupId>
+                <artifactId>sample-rest</artifactId>
+              </dependency>
+          
+              <dependency>
+                <groupId>net.sample</groupId>
+                <artifactId>sample-web</artifactId>
+              </dependency>
+            </dependencies>
+          </project>
+          """, spec -> spec.path("app/pom.xml")),
+          pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+          
+            <modelVersion>4.0.0</modelVersion>
+            <artifactId>sample-rest</artifactId>
+            <packaging>jar</packaging>
+          
+            <parent>
+              <groupId>net.sample</groupId>
+              <artifactId>sample-parent</artifactId>
+              <version>${revision}</version>
+              <relativePath>../parent/pom.xml</relativePath>
+            </parent>
+          </project>
+          """, spec -> spec.path("rest/pom.xml")),
+          pomXml("""
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+          
+            <modelVersion>4.0.0</modelVersion>
+            <artifactId>sample-web</artifactId>
+            <packaging>jar</packaging>
+          
+            <parent>
+              <groupId>net.sample</groupId>
+              <artifactId>sample-parent</artifactId>
+              <version>${revision}</version>
+              <relativePath>../parent/pom.xml</relativePath>
+            </parent>
+          </project>
+          """, spec -> spec.path("web/pom.xml"))
         );
     }
 }

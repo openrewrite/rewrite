@@ -897,7 +897,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           pomXml(
             """
                   <project>
+                    <groupId>org.openrewrite</groupId>
                     <artifactId>my-app-server</artifactId>
+                    <version>1.0.0</version>
                     <properties>
                       <micronaut.version>2.5.11</micronaut.version>
                     </properties>
@@ -916,7 +918,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """,
             """
                   <project>
+                    <groupId>org.openrewrite</groupId>
                     <artifactId>my-app-server</artifactId>
+                    <version>1.0.0</version>
                     <properties>
                       <micronaut.version>3.0.0-M5</micronaut.version>
                     </properties>
