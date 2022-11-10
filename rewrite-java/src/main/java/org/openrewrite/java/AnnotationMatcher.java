@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureLexer;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.tree.Expression;
@@ -25,6 +26,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -51,29 +54,51 @@ import java.util.regex.Pattern;
 public class AnnotationMatcher {
     private final AnnotationSignatureParser.AnnotationContext match;
     private final Pattern matcher;
+    private final boolean matchMetaAnnotations;
 
-    public AnnotationMatcher(String signature) {
+    public AnnotationMatcher(String signature, @Nullable Boolean matchesMetaAnnotations) {
         this.match = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))))
                 .annotation();
-        this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(getAnnotationName()));
+        this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(match.annotationName().getText()));
+        this.matchMetaAnnotations = Boolean.TRUE.equals(matchesMetaAnnotations);
+    }
+
+    public AnnotationMatcher(String signature) {
+        this(signature, false);
     }
 
     public boolean matches(J.Annotation annotation) {
         return matchesAnnotationName(annotation) &&
-                matchesSingleParameter(annotation) &&
-                matchesNamedParameters(annotation);
+               matchesSingleParameter(annotation) &&
+               matchesNamedParameters(annotation);
     }
 
     private boolean matchesAnnotationName(J.Annotation annotation) {
-        JavaType.FullyQualified typeAsClass = TypeUtils.asFullyQualified(annotation.getType());
-        if (typeAsClass == null) {
-            return false;
-        }
-        return matcher.matcher(typeAsClass.getFullyQualifiedName()).matches();
+        return matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(annotation.getType()), null);
     }
 
-    public String getAnnotationName() {
-        return match.annotationName().getText();
+    public boolean matchesAnnotationOrMetaAnnotation(@Nullable JavaType.FullyQualified fqn) {
+        return matchesAnnotationOrMetaAnnotation(fqn, null);
+    }
+
+    private boolean matchesAnnotationOrMetaAnnotation(@Nullable JavaType.FullyQualified fqn,
+                                                      @Nullable Set<String> seenAnnotations) {
+        if (fqn != null) {
+            if (matcher.matcher(fqn.getFullyQualifiedName()).matches()) {
+                return true;
+            } else if (matchMetaAnnotations) {
+                for (JavaType.FullyQualified annotation : fqn.getAnnotations()) {
+                    if(seenAnnotations == null) {
+                        seenAnnotations = new HashSet<>();
+                    }
+                    if (seenAnnotations.add(annotation.getFullyQualifiedName()) &&
+                        matchesAnnotationOrMetaAnnotation(annotation, seenAnnotations)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private boolean matchesNamedParameters(J.Annotation annotation) {

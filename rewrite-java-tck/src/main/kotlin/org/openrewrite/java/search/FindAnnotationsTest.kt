@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RewriteTest
 
 interface FindAnnotationsTest : JavaRecipeTest {
     companion object {
@@ -32,11 +33,30 @@ interface FindAnnotationsTest : JavaRecipeTest {
         """
     }
 
+    @Test
+    fun matchMetaAnnotation(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.classpath(JavaParser.runtimeClasspath()).logCompilationWarningsAndErrors(true).build(),
+        recipe = FindAnnotations("@javax.annotation.Nonnull", true),
+        before = """
+            import org.openrewrite.internal.lang.Nullable;
+            public class Test {
+                @Nullable String name;
+            }
+        """,
+        after = """
+            import org.openrewrite.internal.lang.Nullable;
+            public class Test {
+                /*~~>*/@Nullable String name;
+            }
+        """
+    )
+
+    @Suppress("NewClassNamingConvention")
     @Issue("https://github.com/openrewrite/rewrite/issues/357")
     @Test
     fun matchesClassArgument(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.classpath("junit-jupiter-api").build(),
-        recipe = FindAnnotations("@org.junit.jupiter.api.extension.ExtendWith(org.openrewrite.MyExtension.class)"),
+        recipe = FindAnnotations("@org.junit.jupiter.api.extension.ExtendWith(org.openrewrite.MyExtension.class)", null),
         before = """
             import org.junit.jupiter.api.extension.ExtendWith;
             import org.openrewrite.MyExtension;
@@ -65,7 +85,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun matchesSimpleFullyQualifiedAnnotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("@java.lang.Deprecated"),
+        recipe = FindAnnotations("@java.lang.Deprecated", null),
         before = "@Deprecated public class A {}",
         after = "/*~~>*/@Deprecated public class A {}"
     )
@@ -73,7 +93,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun matchesWildcard(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("@java.lang.*"),
+        recipe = FindAnnotations("@java.lang.*", null),
         before = "@Deprecated public class A {}",
         after = "/*~~>*/@Deprecated public class A {}"
     )
@@ -81,7 +101,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun matchesSubpackageWildcard(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("@java..*"),
+        recipe = FindAnnotations("@java..*", null),
         before = "@Deprecated public class A {}",
         after = "/*~~>*/@Deprecated public class A {}"
     )
@@ -89,7 +109,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun matchesAnnotationOnMethod(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("@java.lang.Deprecated"),
+        recipe = FindAnnotations("@java.lang.Deprecated", null),
         before = """
             public class A {
                 @Deprecated
@@ -107,7 +127,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun matchesAnnotationOnField(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("@java.lang.Deprecated"),
+        recipe = FindAnnotations("@java.lang.Deprecated", null),
         before = """
             public class A {
                 @Deprecated String s;
@@ -123,14 +143,14 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun doesNotMatchNotFullyQualifiedAnnotations(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotations("@Deprecated"),
+        recipe = FindAnnotations("@Deprecated", null),
         before = "@Deprecated public class A {}"
     )
 
     @Test
     fun matchesSingleAnnotationParameter(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("""@java.lang.SuppressWarnings("deprecation")"""),
+        recipe = FindAnnotations("""@java.lang.SuppressWarnings("deprecation")""", null),
         before = "@SuppressWarnings(\"deprecation\") public class A {}",
         after = "/*~~>*/@SuppressWarnings(\"deprecation\") public class A {}"
     )
@@ -138,14 +158,14 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun doesNotMatchDifferentSingleAnnotationParameter(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotations("""@java.lang.SuppressWarnings("foo")"""),
+        recipe = FindAnnotations("""@java.lang.SuppressWarnings("foo")""", null),
         before = "@SuppressWarnings(\"deprecation\") public class A {}"
     )
 
     @Test
     fun matchesNamedParameters(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("""@com.netflix.foo.Foo(bar="quux",baz="bar")"""),
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(bar="quux",baz="bar")""", null),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -162,7 +182,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun doesNotMatchDifferentNamedParameters(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotations("""@com.netflix.foo.Foo(bar="qux",baz="baz")"""),
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(bar="qux",baz="baz")""", null),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -174,7 +194,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun matchesPartialNamedParameters(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("""@com.netflix.foo.Foo(baz="bar")"""),
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(baz="bar")""", null),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -192,7 +212,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun matchesNamedParametersRegardlessOfOrder(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotations("""@com.netflix.foo.Foo(baz="bar",bar="quux")"""),
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(baz="bar",bar="quux")""", null),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -209,13 +229,13 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindAnnotations(null)
+        var recipe = FindAnnotations(null, null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("annotationPattern")
 
-        recipe = FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")")
+        recipe = FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }
@@ -253,7 +273,7 @@ interface FindAnnotationsTest : JavaRecipeTest {
     @Test
     fun enumArgument(jp: JavaParser.Builder<*, *>) = assertChanged(
         parser = jp.classpath("jackson-annotations").build(),
-        recipe = FindAnnotations("@com.fasterxml.jackson.annotation.JsonTypeInfo(use=com.fasterxml.jackson.annotation.JsonTypeInfo${'$'}Id.CLASS)"),
+        recipe = FindAnnotations("@com.fasterxml.jackson.annotation.JsonTypeInfo(use=com.fasterxml.jackson.annotation.JsonTypeInfo${'$'}Id.CLASS)", null),
         before = """
             import com.fasterxml.jackson.annotation.JsonTypeInfo;
             import com.fasterxml.jackson.annotation.JsonTypeInfo.Id;

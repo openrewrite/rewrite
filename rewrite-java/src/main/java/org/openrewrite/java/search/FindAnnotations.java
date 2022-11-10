@@ -21,14 +21,20 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
+
+import static java.util.stream.Collectors.toSet;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -42,6 +48,12 @@ public class FindAnnotations extends Recipe {
             example = "@java.lang.SuppressWarnings(\"deprecation\")")
     String annotationPattern;
 
+    @Option(displayName = "Match on meta annotations",
+            description = "When enabled, matches on meta annotations of the annotation pattern.",
+            required = false)
+    @Nullable
+    Boolean matchMetaAnnotations;
+
     @Override
     public String getDisplayName() {
         return "Find annotations";
@@ -54,13 +66,23 @@ public class FindAnnotations extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
-        return new UsesType<>(annotationMatcher.getAnnotationName());
+        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern, matchMetaAnnotations);
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext o) {
+                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                    if(annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
+                        return SearchResult.found(cu);
+                    }
+                }
+                return cu;
+            }
+        };
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
+        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern, matchMetaAnnotations);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
@@ -74,19 +96,18 @@ public class FindAnnotations extends Recipe {
     }
 
     public static Set<J.Annotation> find(J j, String annotationPattern) {
-        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern);
-        JavaIsoVisitor<Set<J.Annotation>> findVisitor = new JavaIsoVisitor<Set<J.Annotation>>() {
-            @Override
-            public J.Annotation visitAnnotation(J.Annotation annotation, Set<J.Annotation> as) {
-                if (annotationMatcher.matches(annotation)) {
-                    as.add(annotation);
-                }
-                return super.visitAnnotation(annotation, as);
-            }
-        };
+        return find(j, annotationPattern, false);
+    }
 
-        Set<J.Annotation> as = new HashSet<>();
-        findVisitor.visit(j, as);
-        return as;
+    public static Set<J.Annotation> find(J j, String annotationPattern, boolean matchMetaAnnotations) {
+        return TreeVisitor.collect(
+                        new FindAnnotations(annotationPattern, matchMetaAnnotations).getVisitor(),
+                        j,
+                        new HashSet<>()
+                )
+                .stream()
+                .filter(a -> a instanceof J.Annotation)
+                .map(a -> (J.Annotation) a)
+                .collect(toSet());
     }
 }
