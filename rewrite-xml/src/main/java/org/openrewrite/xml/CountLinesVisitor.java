@@ -23,6 +23,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
+    public Xml visitDocument(Xml.Document document, AtomicInteger count) {
+        count.incrementAndGet();
+        return super.visitDocument(document, count);
+    }
+
+    @Override
     public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, AtomicInteger count) {
         if(xmlDecl.getPrefix().contains("\n")) {
             count.incrementAndGet();
@@ -60,6 +66,10 @@ public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
         if(tag.getPrefix().contains("\n")) {
             count.incrementAndGet();
         }
+        if (tag.getClosing() != null && tag.getClosing().getPrefix().contains("\n")) {
+            count.incrementAndGet();
+        }
+
         return super.visitTag(tag, count);
     }
 
