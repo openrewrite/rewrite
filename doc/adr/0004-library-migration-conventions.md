@@ -65,7 +65,7 @@ Migrate to Spring Boot 3.0 from Spring Boot 2.0 through 2.7.x
 **Description**
 ```
 Migrate applications built with previous versions of Spring Boot to Spring Boot 3.0. This recipe will modify an
-application's build files to update the dependencies, makechanges to deprecated APIs, and migrate configuration
+application's build files to update the dependencies, make changes to deprecated APIs, and migrate configuration
 setting that have changed across Spring Boot versions. This recipe will include the migration of both Java 17
 and J2EE 9 as they are prerequisites for migration to Spring Boot 3.0. 
 ```
