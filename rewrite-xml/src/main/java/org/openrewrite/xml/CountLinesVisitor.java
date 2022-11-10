@@ -16,6 +16,7 @@
 package org.openrewrite.xml;
 
 import org.openrewrite.Tree;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -23,79 +24,79 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CountLinesVisitor extends XmlVisitor<AtomicInteger> {
 
     @Override
+    public Xml visitDocument(Xml.Document document, AtomicInteger count) {
+        count.incrementAndGet();
+        countLines(document.getPrefix(), count);
+        return super.visitDocument(document, count);
+    }
+
+    @Override
     public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, AtomicInteger count) {
-        if(xmlDecl.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(xmlDecl.getPrefix(), count);
         return super.visitXmlDecl(xmlDecl, count);
     }
 
     @Override
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction processingInstruction, AtomicInteger count) {
-        if(processingInstruction.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(processingInstruction.getPrefix(), count);
         return super.visitProcessingInstruction(processingInstruction, count);
     }
 
 
     @Override
     public Xml visitElement(Xml.Element element, AtomicInteger count) {
-        if(element.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(element.getPrefix(), count);
         return super.visitElement(element, count);
     }
 
     @Override
     public Xml visitAttribute(Xml.Attribute attribute, AtomicInteger count) {
-        if(attribute.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(attribute.getPrefix(), count);
         return super.visitAttribute(attribute, count);
     }
 
     @Override
     public Xml visitTag(Xml.Tag tag, AtomicInteger count) {
-        if(tag.getPrefix().contains("\n")) {
-            count.incrementAndGet();
+        countLines(tag.getPrefix(), count);
+        if (tag.getClosing() != null) {
+            countLines(tag.getClosing().getPrefix(), count);
         }
         return super.visitTag(tag, count);
     }
 
     @Override
     public Xml visitComment(Xml.Comment comment, AtomicInteger count) {
-        if(comment.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(comment.getPrefix(), count);
         return super.visitComment(comment, count);
     }
 
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, AtomicInteger count) {
-        if(docTypeDecl.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(docTypeDecl.getPrefix(), count);
         return super.visitDocTypeDecl(docTypeDecl, count);
     }
 
     @Override
     public Xml visitProlog(Xml.Prolog prolog, AtomicInteger count) {
-        if(prolog.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(prolog.getPrefix(), count);
         return super.visitProlog(prolog, count);
     }
 
     @Override
     public Xml visitIdent(Xml.Ident ident, AtomicInteger count) {
-        if(ident.getPrefix().contains("\n")) {
-            count.incrementAndGet();
-        }
+        countLines(ident.getPrefix(), count);
         return super.visitIdent(ident, count);
     }
 
     public static int countLines(Tree tree) {
         return new CountLinesVisitor().reduce(tree, new AtomicInteger()).get();
     }
+
+    private void countLines(String whitespace, AtomicInteger count) {
+        int lines = StringUtils.countOccurrences(whitespace, "\n");
+        if(lines > 0) {
+            count.addAndGet(lines);
+        }
+    }
+
 }
