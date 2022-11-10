@@ -15,19 +15,15 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * A recipe that exists only to wrap other recipes.
  * Anonymous recipe classes aren't serializable/deserializable so use this, or another named type, instead
  */
-class CompositeRecipe extends Recipe {
+public class CompositeRecipe extends Recipe {
 
     @Override
     public String getDisplayName() {
@@ -48,23 +44,5 @@ class CompositeRecipe extends Recipe {
         }
 
         return total;
-    }
-
-    @Override
-    public List<TreeVisitor<?, ExecutionContext>> getSingleSourceApplicableTests() {
-        List<TreeVisitor<?, ExecutionContext>> tests = new ArrayList<>(super.getSingleSourceApplicableTests());
-        for (Recipe recipe : getRecipeList()) {
-            tests.addAll(recipe.getSingleSourceApplicableTests());
-        }
-        return tests;
-    }
-
-    @Override
-    public List<TreeVisitor<?, ExecutionContext>> getApplicableTests() {
-        List<TreeVisitor<?, ExecutionContext>> tests = new ArrayList<>(super.getApplicableTests());
-        for (Recipe recipe : getRecipeList()) {
-            tests.addAll(recipe.getApplicableTests());
-        }
-        return tests;
     }
 }
