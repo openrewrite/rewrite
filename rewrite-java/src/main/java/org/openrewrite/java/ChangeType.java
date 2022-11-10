@@ -17,10 +17,12 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -133,7 +135,6 @@ public class ChangeType extends Recipe {
         @SuppressWarnings({"unchecked", "rawtypes", "ConstantConditions"})
         @Override
         public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-
             J.CompilationUnit c = visitAndCast(cu, ctx, super::visitCompilationUnit);
             c = (J.CompilationUnit) new RemoveImport<>(originalType.getFullyQualifiedName()).visit(c, ctx);
             if (originalType.getOwningClass() != null) {

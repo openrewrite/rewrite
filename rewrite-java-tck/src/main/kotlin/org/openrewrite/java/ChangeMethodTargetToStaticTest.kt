@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.config.CompositeRecipe
 
 interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
 
@@ -37,7 +38,8 @@ interface ChangeMethodTargetToStaticTest : JavaRecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null)
+        recipe = CompositeRecipe()
+            .doNext(ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null))
             .doNext(ChangeMethodName("b.B nonStatic()", "foo", null, null)),
         before = """
             import a.*;

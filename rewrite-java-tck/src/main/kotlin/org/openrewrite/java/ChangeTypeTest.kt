@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.config.CompositeRecipe
 import org.openrewrite.java.tree.TypeUtils
 import java.nio.file.Path
 
@@ -55,7 +56,6 @@ interface ChangeTypeTest : JavaRecipeTest {
     )
 
     @Test
-    @Suppress("deprecation")
     fun allowJavaLangSubpackages(jp: JavaParser) = assertChanged(
         jp,
         recipe = ChangeType("java.util.logging.LoggingMXBean","java.lang.management.PlatformLoggingMXBean", true),
@@ -307,9 +307,9 @@ interface ChangeTypeTest : JavaRecipeTest {
             "public interface I1 {}",
             "public interface I2 {}"
         ),
-        recipe = recipe.doNext(
-            ChangeType("I1", "I2", true)
-        ),
+        recipe = CompositeRecipe()
+                .doNext(recipe)
+                .doNext(ChangeType("I1", "I2", true)),
         before = """
             import a.A1;
             
