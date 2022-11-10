@@ -11,7 +11,7 @@ Accepted
 Provide standards and conventions for framework/library migration recipes such that they show up in user-facing
 experiences in a consistent manner. OpenRewrite's `Recipe` class contains methods for providing a display name and
 description text. The conventions outlined  within this document should be applied to all new and existing
-"migration" recipes. 
+"migration" recipes. All conventions outlined in the [Naming recipes ADR](0002-recipe-naming.md) shall also apply.  
 
 ## Decision
 
