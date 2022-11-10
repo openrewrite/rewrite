@@ -73,28 +73,32 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      * matching jars can be found.
      */
     static List<Path> dependenciesFromClasspath(String... artifactNames) {
-        Map<String, Pattern> artifactNamePatterns = Arrays.stream(artifactNames)
-                .collect(toMap(Function.identity(), name -> Pattern.compile(name + "-.*?\\.jar$")));
-
-        Set<String> foundArtifacts = new HashSet<>();
-        List<Path> artifacts = new ArrayList<>();
         List<URI> runtimeClasspath = new ClassGraph().getClasspathURIs();
-        for (URI cpEntry : runtimeClasspath) {
-            for (Map.Entry<String, Pattern> artifactNamePattern : artifactNamePatterns.entrySet()) {
-                if (artifactNamePattern.getValue().matcher(cpEntry.toString()).find()) {
+        List<Path> artifacts = new ArrayList<>(artifactNames.length);
+        List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
+        for (String artifactName : artifactNames) {
+            Pattern jarPattern = Pattern.compile(artifactName + "-.*?\\.jar$");
+            // In a multiproject IDE classpath, some classpath entries aren't jars
+            Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
+            boolean lacking = true;
+            for (URI cpEntry : runtimeClasspath) {
+                String cpEntryString = cpEntry.toString();
+                if (jarPattern.matcher(cpEntryString).find()
+                        || (explodedPattern.matcher(cpEntryString).find())
+                        && Paths.get(cpEntry).toFile().isDirectory()) {
                     artifacts.add(Paths.get(cpEntry));
-                    foundArtifacts.add(artifactNamePattern.getKey());
+                    lacking = false;
+                    break;
                 }
+            }
+            if (lacking) {
+                missingArtifactNames.add(artifactName);
             }
         }
 
-        for (String foundArtifact : foundArtifacts) {
-            artifactNamePatterns.remove(foundArtifact);
-        }
-
-        if (!artifactNamePatterns.isEmpty()) {
+        if (!missingArtifactNames.isEmpty()) {
             throw new IllegalArgumentException("Unable to find runtime dependencies beginning with: " +
-                    artifactNamePatterns.keySet().stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
+                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
         }
 
         return artifacts;
