@@ -62,7 +62,7 @@ public class CountLinesTest {
         ).get(0);
 
         int lines = CountLinesVisitor.countLines(ast);
-        assertThat(lines).isEqualTo(31);
+        assertThat(lines).isEqualTo(28);
 
     }
 }
