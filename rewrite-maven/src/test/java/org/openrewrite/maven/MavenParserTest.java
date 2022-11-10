@@ -1663,6 +1663,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2049")
     public void ciFriendlyVersionWithoutExplicitProperty() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
@@ -1679,6 +1680,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2049")
     public void ciFriendlyVersionWithParent() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
@@ -1717,6 +1719,7 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2049")
     public void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
@@ -1833,6 +1836,47 @@ class MavenParserTest implements RewriteTest {
             </parent>
           </project>
           """, spec -> spec.path("web/pom.xml"))
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2373")
+    void multipleCiFriendlyVersionPlaceholders() {
+        rewriteRun(
+          pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                
+                  <groupId>bogus.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>${revision}${changelist}</version>
+                  <packaging>pom</packaging>
+                
+                  <modules>
+                    <module>sub</module>
+                  </modules>
+                
+                  <properties>
+                    <revision>99999.0</revision>
+                    <changelist>-SNAPSHOT</changelist>
+                  </properties>
+                </project>
+                """),
+          pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                
+                  <parent>
+                    <groupId>bogus.example</groupId>
+                    <artifactId>parent</artifactId>
+                    <version>${revision}${changelist}</version>
+                  </parent>
+                
+                  <artifactId>sub</artifactId>
+                </project>
+                """, spec -> spec.path("sub/pom.xml"))
         );
     }
 }
