@@ -15,7 +15,6 @@
  */
 package org.openrewrite.config;
 
-import com.fasterxml.jackson.databind.introspect.POJOPropertyBuilder;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
@@ -26,7 +25,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -207,34 +205,6 @@ public class Environment {
 
         public Environment build() {
             return new Environment(resourceLoaders, dependencyResourceLoaders);
-        }
-    }
-
-    /**
-     * A recipe that exists only to wrap other recipes.
-     * Anonymous recipe classes aren't serializable/deserializable so use this, or another named type, instead
-     */
-    private static class CompositeRecipe extends Recipe {
-
-        @Override
-        public String getDisplayName() {
-            return getName();
-        }
-
-        @Override
-        public Duration getEstimatedEffortPerOccurrence() {
-            Duration total = Duration.ofMinutes(0);
-            for (Recipe recipe : getRecipeList()) {
-                if (recipe.getEstimatedEffortPerOccurrence() != null) {
-                    total = total.plus(recipe.getEstimatedEffortPerOccurrence());
-                }
-            }
-
-            if (total.getSeconds() == 0) {
-                return Duration.ofMinutes(5);
-            }
-
-            return total;
         }
     }
 }

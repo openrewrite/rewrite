@@ -16,6 +16,7 @@
 package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
 import org.openrewrite.internal.lang.Nullable
@@ -235,6 +236,7 @@ class RecipeLifecycleTest {
         assertThat(bDescriptor?.name).isEqualTo("B")
         assertThat(bDescriptor?.recipeList?.size).isEqualTo(4)
     }
+
     private fun testRecipe(name: String): Recipe {
         return object : Recipe() {
             override fun getDisplayName() = name

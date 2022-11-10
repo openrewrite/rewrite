@@ -16,6 +16,7 @@
 package org.openrewrite.test;
 
 import lombok.Getter;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;

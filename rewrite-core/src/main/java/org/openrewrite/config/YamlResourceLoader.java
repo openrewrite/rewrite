@@ -179,81 +179,114 @@ public class YamlResourceLoader implements ResourceLoader {
     @SuppressWarnings("unchecked")
     @Override
     public Collection<Recipe> listRecipes() {
-        return loadResources(ResourceType.Recipe).stream()
-                .filter(r -> r.containsKey("name"))
-                .map(r -> {
-                    @Language("markdown") String name = (String) r.get("name");
+        Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
+        List<Recipe> recipes = new ArrayList<>(resources.size());
+        for (Map<String, Object> r : resources) {
+            if (!r.containsKey("name")) {
+                continue;
+            }
 
-                    @Language("markdown")
-                    String displayName = (String) r.get("displayName");
-                    if (displayName == null) {
-                        displayName = name;
-                    }
+            @Language("markdown") String name = (String) r.get("name");
 
-                    @Language("markdown")
-                    String description = (String) r.get("description");
+            @Language("markdown")
+            String displayName = (String) r.get("displayName");
+            if (displayName == null) {
+                displayName = name;
+            }
 
-                    Set<String> tags = Collections.emptySet();
-                    List<String> rawTags = (List<String>) r.get("tags");
-                    if (rawTags != null) {
-                        tags = new HashSet<>(rawTags);
-                    }
+            @Language("markdown")
+            String description = (String) r.get("description");
 
-                    String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
-                    Duration estimatedEffortPerOccurrence = null;
-                    if (estimatedEffortPerOccurrenceStr != null) {
-                        estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
+            Set<String> tags = Collections.emptySet();
+            List<String> rawTags = (List<String>) r.get("tags");
+            if (rawTags != null) {
+                tags = new HashSet<>(rawTags);
+            }
+
+            String estimatedEffortPerOccurrenceStr = (String) r.get("estimatedEffortPerOccurrence");
+            Duration estimatedEffortPerOccurrence = null;
+            if (estimatedEffortPerOccurrenceStr != null) {
+                estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
+            }
+
+            DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
+                    estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false));
+
+            List<Object> recipeList = (List<Object>) r.get("recipeList");
+            if (recipeList == null) {
+                throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
+            }
+            for (int i = 0; i < recipeList.size(); i++) {
+                loadRecipe(name, recipe, i, recipeList.get(i), DeclarativeRecipe.RecipeUse.Recipe);
+            }
+
+            Map<String, Object> applicability = (Map<String, Object>) r.get("applicability");
+            if (applicability != null) {
+                List<Object> singleSource = (List<Object>) applicability.get("singleSource");
+                if (singleSource != null) {
+                    for (int i = 0; i < singleSource.size(); i++) {
+                        loadRecipe(name, recipe, i, singleSource.get(i), DeclarativeRecipe.RecipeUse.SingleSourceApplicability);
                     }
-                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
-                            estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false));
-                    List<Object> recipeList = (List<Object>) r.get("recipeList");
-                    if (recipeList == null) {
-                        throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
+                }
+
+                List<Object> anySource = (List<Object>) applicability.get("anySource");
+                if (anySource != null) {
+                    for (int i = 0; i < anySource.size(); i++) {
+                        loadRecipe(name, recipe, i, anySource.get(i), DeclarativeRecipe.RecipeUse.AnySourceApplicability);
                     }
-                    for (int i = 0; i < recipeList.size(); i++) {
-                        Object next = recipeList.get(i);
-                        if (next instanceof String) {
-                            recipe.addUninitialized((String) next, classLoader);
-                        } else if (next instanceof Map) {
-                            Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
-                            try {
-                                if (nameAndConfig.getValue() instanceof Map) {
-                                    Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
-                                    withJsonType.put("@c", nameAndConfig.getKey());
-                                    try {
-                                        recipe.addUninitialized(mapper.convertValue(withJsonType, Recipe.class));
-                                    } catch (IllegalArgumentException e) {
-                                        if (e.getCause() instanceof InvalidTypeIdException) {
-                                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
-                                                    nameAndConfig.getValue(), "Recipe class " +
-                                                                              nameAndConfig.getKey() + " cannot be found"));
-                                        } else {
-                                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
-                                                    "Unable to load Recipe: " + e));
-                                        }
-                                    }
-                                } else {
-                                    recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
-                                            nameAndConfig.getValue(),
-                                            "Declarative recipeList entries are expected to be strings or mappings"));
-                                }
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                                recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
-                                        "Unexpected declarative recipe parsing exception " +
-                                        e.getClass().getName()));
-                            }
+                }
+            }
+
+            recipes.add(recipe);
+        }
+
+        return recipes;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadRecipe(@Language("markdown") String name,
+                            DeclarativeRecipe recipe,
+                            int i,
+                            Object recipeData,
+                            DeclarativeRecipe.RecipeUse use) {
+        if (recipeData instanceof String) {
+            recipe.addUninitialized(use, (String) recipeData, classLoader);
+        } else if (recipeData instanceof Map) {
+            Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
+            try {
+                if (nameAndConfig.getValue() instanceof Map) {
+                    Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
+                    withJsonType.put("@c", nameAndConfig.getKey());
+                    try {
+                        recipe.addUninitialized(use, mapper.convertValue(withJsonType, Recipe.class));
+                    } catch (IllegalArgumentException e) {
+                        if (e.getCause() instanceof InvalidTypeIdException) {
+                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
+                                    nameAndConfig.getValue(), "Recipe class " +
+                                                              nameAndConfig.getKey() + " cannot be found"));
                         } else {
-                            recipe.addValidation(invalid(
-                                    name + ".recipeList[" + i + "] (in " + source + ")",
-                                    next,
-                                    "is an object type that isn't recognized as a recipe.",
-                                    null));
+                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                                    "Unable to load Recipe: " + e));
                         }
                     }
-                    return recipe;
-                })
-                .collect(toList());
+                } else {
+                    recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
+                            nameAndConfig.getValue(),
+                            "Declarative recipeList entries are expected to be strings or mappings"));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                        "Unexpected declarative recipe parsing exception " +
+                        e.getClass().getName()));
+            }
+        } else {
+            recipe.addValidation(invalid(
+                    name + ".recipeList[" + i + "] (in " + source + ")",
+                    recipeData,
+                    "is an object type that isn't recognized as a recipe.",
+                    null));
+        }
     }
 
     @Override

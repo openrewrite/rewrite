@@ -159,18 +159,17 @@ public interface RecipeScheduler {
             ((WatchableExecutionContext) ctx).resetHasNewMessages();
         }
         try {
-            if (recipe.getApplicableTest() != null) {
+            if (!recipe.getApplicableTests().isEmpty()) {
                 boolean applicable = false;
-                for (S s : before) {
-                    if (recipe.getApplicableTest().visit(s, ctx) != s) {
-                        applicable = true;
-                        break;
-                    }
 
-                    for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
-                        if (applicableTest.visit(s, ctx) != s) {
-                            applicable = true;
-                            break;
+                stopChecking:
+                for (S s : before) {
+                    for (Recipe r : recipeStack) {
+                        for (TreeVisitor<?, ExecutionContext> applicableTest : r.getApplicableTests()) {
+                            if (applicableTest.visit(s, ctx) != s) {
+                                applicable = true;
+                                break stopChecking;
+                            }
                         }
                     }
                 }
@@ -196,17 +195,12 @@ public interface RecipeScheduler {
                 S afterFile = s;
 
                 try {
-                    if (recipe.getSingleSourceApplicableTest() != null) {
-                        if (recipe.getSingleSourceApplicableTest().visit(s, ctx) == s) {
-                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
-                            return s;
-                        }
-                    }
-
-                    for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
-                        if (singleSourceApplicableTest.visit(s, ctx) == s) {
-                            sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
-                            return s;
+                    for (Recipe r : recipeStack) {
+                        for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : r.getSingleSourceApplicableTests()) {
+                            if (singleSourceApplicableTest.visit(s, ctx) == s) {
+                                sample.stop(MetricsHelper.successTags(timer, "skipped").register(Metrics.globalRegistry));
+                                return s;
+                            }
                         }
                     }
 

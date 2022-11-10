@@ -15,10 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -66,13 +63,29 @@ public class RecipeIntrospectionUtils {
 
     public static TreeVisitor<?, ExecutionContext> recipeVisitor(Recipe recipe) {
         try {
-            Method getVisitor = recipe.getClass().getDeclaredMethod("getVisitor");
+            Method getVisitor = ReflectionUtils.findMethod(recipe.getClass(), "getVisitor");
+            if(getVisitor == null) {
+                throw new RecipeIntrospectionException("Recipe " + recipe.getName() + " does not implement getVisitor()");
+            }
             getVisitor.setAccessible(true);
             //noinspection unchecked
             return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ignored) {
-            // not every recipe will implement getVisitor() directly, e.g. CompositeRecipe.
-            return Recipe.NOOP;
+        } catch (InvocationTargetException | IllegalAccessException t) {
+            throw new RecipeIntrospectionException("Unable to invoke getVisitor() on " + recipe.getClass().getName(), t);
+        }
+    }
+
+    public static List<SourceFile> recipeVisit(Recipe recipe, List<SourceFile> before, ExecutionContext ctx) {
+        try {
+            Method visit = ReflectionUtils.findMethod(recipe.getClass(), "visit", List.class, ExecutionContext.class);
+            if(visit == null) {
+                throw new RecipeIntrospectionException("Recipe " + recipe.getClass().getName() + " does not implement visit(List<SourceFile>, ExecutionContext)");
+            }
+            visit.setAccessible(true);
+            //noinspection unchecked
+            return (List<SourceFile>) visit.invoke(recipe, before, ctx);
+        } catch (InvocationTargetException | IllegalAccessException t) {
+            throw new RecipeIntrospectionException("Unable to invoke visit(List<SourceFile>, ExecutionContext) on " + recipe.getClass().getName(), t);
         }
     }
 

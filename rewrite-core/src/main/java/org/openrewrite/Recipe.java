@@ -18,9 +18,9 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -67,11 +67,8 @@ public abstract class Recipe implements Cloneable {
         }
     };
 
-    @Getter
-    private final transient List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests = new ArrayList<>();
-
-    @Getter
-    private final transient List<TreeVisitor<?, ExecutionContext>> applicableTests = new ArrayList<>();
+    private transient List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests;
+    private transient List<TreeVisitor<?, ExecutionContext>> applicableTests;
 
     public static Recipe noop() {
         return new Noop();
@@ -216,8 +213,16 @@ public abstract class Recipe implements Cloneable {
      */
     @SuppressWarnings("unused")
     public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        this.applicableTests.add(test);
+        if(applicableTests == null) {
+            applicableTests = new ArrayList<>(1);
+        }
+        applicableTests.add(test);
         return this;
+    }
+
+    public List<TreeVisitor<?, ExecutionContext>> getApplicableTests() {
+        List<TreeVisitor<?, ExecutionContext>> tests = ListUtils.concat(getApplicableTest(), applicableTests);
+        return tests == null ? emptyList() : tests;
     }
 
     /**
@@ -250,8 +255,16 @@ public abstract class Recipe implements Cloneable {
      * @return A tree visitor that performs an applicability test.
      */
     public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        this.singleSourceApplicableTests.add(test);
+        if(singleSourceApplicableTests == null) {
+            singleSourceApplicableTests = new ArrayList<>(1);
+        }
+        singleSourceApplicableTests.add(test);
         return this;
+    }
+
+    public List<TreeVisitor<?, ExecutionContext>> getSingleSourceApplicableTests() {
+        List<TreeVisitor<?, ExecutionContext>> tests = ListUtils.concat(getSingleSourceApplicableTest(), singleSourceApplicableTests);
+        return tests == null ? emptyList() : tests;
     }
 
     /**
