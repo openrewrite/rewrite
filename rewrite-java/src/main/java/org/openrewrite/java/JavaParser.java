@@ -88,7 +88,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                         && Paths.get(cpEntry).toFile().isDirectory()) {
                     artifacts.add(Paths.get(cpEntry));
                     lacking = false;
-                    break;
+                    // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
                 }
             }
             if (lacking) {
