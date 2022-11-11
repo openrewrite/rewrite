@@ -84,8 +84,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             for (URI cpEntry : runtimeClasspath) {
                 String cpEntryString = cpEntry.toString();
                 if (jarPattern.matcher(cpEntryString).find()
-                        || (explodedPattern.matcher(cpEntryString).find())
-                        && Paths.get(cpEntry).toFile().isDirectory()) {
+                        || (explodedPattern.matcher(cpEntryString).find()
+                        && Paths.get(cpEntry).toFile().isDirectory())) {
                     artifacts.add(Paths.get(cpEntry));
                     lacking = false;
                     // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
