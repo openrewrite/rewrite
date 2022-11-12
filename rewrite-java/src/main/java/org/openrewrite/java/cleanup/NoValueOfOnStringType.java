@@ -47,7 +47,7 @@ public class NoValueOfOnStringType extends Recipe {
 
     @Override
     protected UsesMethod<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(VALUE_OF);
+        return new UsesMethod<>(new MethodMatcher("java.lang.String valueOf(..)"));
     }
 
     @Override
@@ -67,6 +67,10 @@ public class NoValueOfOnStringType extends Recipe {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                if (VALUE_OF.matches(method.getSelect())) {
+                    return method;
+                }
+
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (VALUE_OF.matches(mi) && mi.getArguments().size() == 1) {
                     Expression argument = mi.getArguments().get(0);
