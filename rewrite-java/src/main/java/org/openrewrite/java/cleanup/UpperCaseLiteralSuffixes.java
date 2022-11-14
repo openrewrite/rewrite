@@ -15,11 +15,13 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -47,6 +49,13 @@ public class UpperCaseLiteralSuffixes extends Recipe {
     @Override
     public @Nullable Duration getEstimatedEffortPerOccurrence() {
         return Duration.of(2, ChronoUnit.MINUTES);
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return Applicability.or(new UsesType<>("java.lang.Long"),
+                new UsesType<>("java.lang.Double"),
+                new UsesType<>("java.lang.Float"));
     }
 
     @Override
