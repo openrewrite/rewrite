@@ -134,9 +134,9 @@ public class RemoveUnusedImports extends Recipe {
                     anImport.used = false;
                     changed = true;
                 } else if (elem.isStatic()) {
-                    SortedSet<String> methodsAndFields = methodsAndFieldsByTypeName.get(elem.getTypeName());
-
                     String outerType = elem.getTypeName();
+                    SortedSet<String> methodsAndFields = methodsAndFieldsByTypeName.get(outerType);
+
                     Set<JavaType.FullyQualified> staticClasses = null;
                     for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(elem.getPackageName(), emptySet())) {
                         if(maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {

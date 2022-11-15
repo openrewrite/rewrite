@@ -2542,9 +2542,9 @@ public interface J extends Tree {
                 // the compiler doesn't type attribute static imports of classes
                 if (fq == null) {
                     String possibleInnerClassFqn = getTypeName(qualid);
-                    String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.indexOf('$') + 1);
+                    String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.lastIndexOf('$') + 1);
                     if ("*".equals(possibleInnerClassName)) {
-                        return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.indexOf('$'));
+                        return possibleInnerClassFqn.substring(0, possibleInnerClassFqn.lastIndexOf('$'));
                     }
                     while (possibleInnerClassName.indexOf('$') >= 0) {
                         possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
