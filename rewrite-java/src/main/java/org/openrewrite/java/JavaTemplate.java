@@ -85,7 +85,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         //            c.getBody().withTemplate(template, c.getBody().coordinates.lastStatement());
         //      }
         Cursor parentScope = parentScopeGetter.get();
-        if(!(parentScope.getValue() instanceof J)) {
+        if (!(parentScope.getValue() instanceof J)) {
             // Handle the provided parent cursor pointing to a JRightPadded or similar
             parentScope = parentScope.getParentTreeCursor();
         }
@@ -96,7 +96,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                 if (tree != null && tree.isScope(changing)) {
                     // Currently getCursor still points to the parent, because super.visit() has the logic to update it
                     Cursor cursor = getCursor();
-                    if(!(cursor.getValue() instanceof J)) {
+                    if (!(cursor.getValue() instanceof J)) {
                         cursor = cursor.getParentTreeCursor();
                     }
                     parentCursorRef.set(cursor);
@@ -113,11 +113,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
                 if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
-                        annotation.isScope(insertionPoint)) {
+                    annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     return gen.get(0).withPrefix(annotation.getPrefix());
                 } else if (loc.equals(ANNOTATION_ARGUMENTS) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
-                        annotation.isScope(insertionPoint)) {
+                           annotation.isScope(insertionPoint)) {
                     List<J.Annotation> gen = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), "@Example(" + substitutedTemplate + ")"));
                     return annotation.withArguments(gen.get(0).getArguments());
                 }
@@ -358,13 +358,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                                     if (!(parameter instanceof J.VariableDeclarations)) {
                                         throw new IllegalArgumentException(
                                                 "Only variable declarations may be part of a method declaration's parameter " +
-                                                        "list:" + parameter.print(getCursor()));
+                                                "list:" + parameter.print(getCursor()));
                                     }
                                     J.VariableDeclarations decl = (J.VariableDeclarations) parameter;
                                     if (decl.getVariables().size() != 1) {
                                         throw new IllegalArgumentException(
                                                 "Multi-variable declarations may not be used in a method declaration's " +
-                                                        "parameter list: " + parameter.print(getCursor()));
+                                                "parameter list: " + parameter.print(getCursor()));
                                     }
                                     J.VariableDeclarations.NamedVariable namedVariable = decl.getVariables().get(0);
                                     paramNames.add(namedVariable.getSimpleName());
@@ -492,9 +492,20 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
                         List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(),
                                 expected, substitutedTemplate, loc));
                         if (gen.size() != 1) {
+                            // for some languages with optional semicolons, templates may generate a statement
+                            // and an empty, e.g. for a statement replacement in Groovy for the last statement
+                            // of a method that has an implicit return
+                            if (gen.size() == 2) {
+                                if (gen.get(0) instanceof J.Empty) {
+                                    return autoFormat(gen.get(1).withPrefix(statement.getPrefix()), p);
+                                }
+                                if (gen.get(1) instanceof J.Empty) {
+                                    return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
+                                }
+                            }
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
-                                    "statement to replace one statement, but generated " + gen.size() +
-                                    ". Template:\n" + substitutedTemplate);
+                                                               "statement to replace one statement, but generated " + gen.size() +
+                                                               ". Template:\n" + substitutedTemplate);
                         }
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
                     }
