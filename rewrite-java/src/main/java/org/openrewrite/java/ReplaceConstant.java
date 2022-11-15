@@ -18,11 +18,12 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.java.tree.JavaType.Primitive;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -55,6 +56,9 @@ public class ReplaceConstant extends Recipe {
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
+            @Nullable
+            J.Literal literal;
+
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
                 if (isConstant(fieldAccess.getName().getFieldType())) {
@@ -96,26 +100,14 @@ public class ReplaceConstant extends Recipe {
             }
 
             private J.Literal buildLiteral() {
-                Object value = literalValue;
-                Primitive type;
-                if (literalValue.startsWith("\"")) {
-                    value = literalValue.substring(0, literalValue.length() - 1);
-                    type = Primitive.String;
-                } else if (literalValue.startsWith("'")) {
-                    value = literalValue.substring(0, literalValue.length() - 1);
-                    type = Primitive.Char;
-                } else if (StringUtils.isNumeric(literalValue)) {
-                    value = Integer.parseInt(literalValue);
-                    type = Primitive.Int;
-                } else if (StringUtils.isNumeric(literalValue.replace(".", ""))) {
-                    value = Double.parseDouble(literalValue);
-                    type = Primitive.Double;
-                } else {
-                    throw new IllegalArgumentException("Unknown literal type for literal value: " + literalValue);
-                }
+                if (literal == null) {
+                    JavaParser parser = JavaParser.fromJavaVersion().build();
+                    List<J.CompilationUnit> result = parser.parse("class $ { Object o = " + literalValue + "; }");
 
-                return new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY,
-                        value, literalValue, null, type);
+                    J.Literal parsedLiteral = (J.Literal) ((J.VariableDeclarations) result.get(0).getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0).getInitializer();
+                    literal = parsedLiteral.withId(Tree.randomId());
+                }
+                return literal;
             }
         };
     }
