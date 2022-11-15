@@ -48,6 +48,7 @@ import java.util.function.Consumer;
 import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 @SuppressWarnings({"NullableProblems", "HttpUrlsUsage"})
 class MavenPomDownloaderTest {
@@ -144,6 +145,82 @@ class MavenPomDownloaderTest {
                 .hasMessageContaining("http://%s:%d/maven".formatted(repo2.getHostName(), repo2.getPort()));
           })
         );
+    }
+
+    @Test
+    void usesAnonymousRequestIfRepositoryRejectsCredentials() {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    return recordedRequest.getHeaders().get("Authorization") != null ?
+                      new MockResponse().setResponseCode(401).setBody("") :
+                      new MockResponse().setResponseCode(200).setBody(
+                        //language=xml
+                        """
+                        <project>
+                            <groupId>org.springframework.cloud</groupId>
+                            <artifactId>spring-cloud-dataflow-build</artifactId>
+                            <version>2.10.0-SNAPSHOT</version>
+                        </project>
+                        """);
+                }
+            });
+            mockRepo.start();
+            var repositories = List.of(
+              new MavenRepository("id",
+                "http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()),
+                true,
+                true,
+                false,
+                "user",
+                "pass",
+                false));
+
+            assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void usesAuthenticationIfRepositoryHasCredentials() {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    return recordedRequest.getHeaders().get("Authorization") != null ?
+                      new MockResponse().setResponseCode(200).setBody(
+                        //language=xml
+                        """
+                        <project>
+                            <groupId>org.springframework.cloud</groupId>
+                            <artifactId>spring-cloud-dataflow-build</artifactId>
+                            <version>2.10.0-SNAPSHOT</version>
+                        </project>
+                        """) :
+                      new MockResponse().setResponseCode(401).setBody("");
+                }
+            });
+            mockRepo.start();
+            var repositories = List.of(
+              new MavenRepository("id",
+                "http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()),
+                true,
+                true,
+                false,
+                "user",
+                "pass",
+                false));
+
+            assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test

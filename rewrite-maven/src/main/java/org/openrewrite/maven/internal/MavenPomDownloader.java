@@ -650,7 +650,15 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException {
         try {
-            return sendRequest.apply(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
+            try {
+                return sendRequest.apply(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
+            } catch (HttpSenderResponseException e) {
+                if (hasCredentials(repo) && e.isClientSideException()) {
+                    return sendRequest.apply(httpSender.get(uriString).build());
+                } else {
+                    throw e;
+                }
+            }
         } catch (HttpSenderResponseException e) {
             throw e;
         } catch (Throwable t) {
@@ -669,10 +677,14 @@ public class MavenPomDownloader {
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
-        if (repository.getUsername() != null && repository.getPassword() != null) {
+        if (hasCredentials(repository)) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
         return request;
+    }
+
+    private static boolean hasCredentials(MavenRepository repository) {
+        return repository.getUsername() != null && repository.getPassword() != null;
     }
 
     private MavenRepository applyMirrors(MavenRepository repository) {
