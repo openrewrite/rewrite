@@ -115,7 +115,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
             ctx.getOnError().accept(new HclParsingException(sourcePath,
-                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e));
+                    String.format("Syntax error in %s at line %d:%d %s.", sourcePath, line, charPositionInLine, msg), e));
         }
     }
 
