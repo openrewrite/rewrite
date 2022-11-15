@@ -31,6 +31,26 @@ interface RemoveUnusedImportsTest : RewriteTest {
     }
 
     @Test
+    fun enumsFromInnerClass() = rewriteRun(
+        java("""
+        package org.openrewrite;
+        public class Outer {
+            public enum E {
+                A, B, C, D
+            }
+        }
+    """),
+        java("""
+        import static org.openrewrite.Outer.E.*;
+        public class Test {
+            Object a = A;
+            Object b = B;
+            Object c = C;
+        }
+    """)
+    )
+
+    @Test
     fun enums() = rewriteRun(
         java("""
             package org.openrewrite;
