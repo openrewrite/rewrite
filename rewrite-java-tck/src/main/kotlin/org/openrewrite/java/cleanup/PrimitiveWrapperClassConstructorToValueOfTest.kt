@@ -17,32 +17,32 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-@Suppress("UnnecessaryBoxing", "deprecation", "BooleanConstructorCall", "ConstantConditions",
+@Suppress("UnnecessaryBoxing", "BooleanConstructorCall", "ConstantConditions",
     "StringOperationCanBeSimplified", "CachedNumberConstructorCall"
 )
-interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = PrimitiveWrapperClassConstructorToValueOf()
-
+interface PrimitiveWrapperClassConstructorToValueOfTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(PrimitiveWrapperClassConstructorToValueOf())
+    }
 
     @Test
-    fun integerValueOf(jp: JavaParser) = assertUnchanged(
-        before = """
+    fun integerValueOf() = rewriteRun(
+        java("""
             class A {
                 Integer i = Integer.valueOf(1);
                 String hello = new String("Hello" + " world " + i);
                 Long l = 11L;
             }
-        """
+        """)
     )
 
     @Test
-    fun newClassToValueOf(jp: JavaParser) = assertChanged(
-        before = """
+    fun newClassToValueOf() = rewriteRun(
+        java("""
             class A {
                 Boolean bool = new Boolean(true);
                 Byte b = new Byte("1");
@@ -56,7 +56,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 Integer i = new Integer(1);
             }
         """,
-        after = """
+        """
             class A {
                 Boolean bool = Boolean.valueOf(true);
                 Byte b = Byte.valueOf("1");
@@ -69,12 +69,12 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 Short sh3 = Short.valueOf(s3);
                 Integer i = Integer.valueOf(1);
             }
-        """
+        """)
     )
 
     @Test
-    fun newIntegerToValueOfValueRef(jp: JavaParser) = assertChanged(
-        before = """
+    fun newIntegerToValueOfValueRef() = rewriteRun(
+        java("""
             class A {
                 boolean fls = true;
                 Boolean b2 = new Boolean(fls);
@@ -86,7 +86,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 Integer k2 = new Integer(k);
             }
         """,
-        after = """
+        """
             class A {
                 boolean fls = true;
                 Boolean b2 = Boolean.valueOf(fls);
@@ -97,13 +97,13 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 int k = 1;
                 Integer k2 = Integer.valueOf(k);
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/901")
     @Test
-    fun templateIsNewClassArgumentForNewClass() = assertChanged(
-        before = """
+    fun templateIsNewClassArgumentForNewClass() = rewriteRun(
+        java("""
             import java.util.Date;
             public class A {
                 public static void main(String[] args) {
@@ -112,7 +112,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.Date;
             public class A {
                 public static void main(String[] args) {
@@ -120,12 +120,12 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                     Long l = Long.valueOf(Integer.valueOf(0));
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun doubleToFloat(jp: JavaParser) = assertChanged(
-        before = """
+    fun doubleToFloat() = rewriteRun(
+        java("""
             class T {
                 Double d1 = Double.valueOf(1.0);
                 void makeFloats() {
@@ -138,7 +138,7 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class T {
                 Double d1 = Double.valueOf(1.0);
                 void makeFloats() {
@@ -150,6 +150,6 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : JavaRecipeTest {
                     return Double.valueOf(2.0d);
                 }
             }
-        """
+        """)
     )
 }

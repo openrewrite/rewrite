@@ -15,10 +15,10 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
@@ -51,21 +51,15 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesType<>("java.lang.Boolean"));
-                doAfterVisit(new UsesType<>("java.lang.Byte"));
-                doAfterVisit(new UsesType<>("java.lang.Character"));
-                doAfterVisit(new UsesType<>("java.lang.Double"));
-                doAfterVisit(new UsesType<>("java.lang.Float"));
-                doAfterVisit(new UsesType<>("java.lang.Integer"));
-                doAfterVisit(new UsesType<>("java.lang.Long"));
-                doAfterVisit(new UsesType<>("java.lang.Short"));
-                return cu;
-            }
-        };
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return Applicability.or(new UsesType<>("java.lang.Boolean"),
+                new UsesType<>("java.lang.Byte"),
+                new UsesType<>("java.lang.Character"),
+                new UsesType<>("java.lang.Double"),
+                new UsesType<>("java.lang.Float"),
+                new UsesType<>("java.lang.Integer"),
+                new UsesType<>("java.lang.Long"),
+                new UsesType<>("java.lang.Short"));
     }
 
     @Override
