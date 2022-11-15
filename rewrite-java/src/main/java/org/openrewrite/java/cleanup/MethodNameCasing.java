@@ -50,6 +50,13 @@ public class MethodNameCasing extends Recipe {
     @Nullable
     Boolean includeTestSources;
 
+    @Option(displayName = "Rename public methods",
+            description = "Changes are not applied to public methods unless specified.",
+            required = false,
+            example = "false")
+    @Nullable
+    Boolean renamePublicMethods;
+
     @Override
     public String getDisplayName() {
         return "Method name casing";
@@ -91,7 +98,8 @@ public class MethodNameCasing extends Recipe {
                 if(enclosingClass == null) {
                     return method;
                 }
-                if (method.getMethodType() != null &&
+                if (isOkToRenamePublicMethod(method) &&
+                        method.getMethodType() != null &&
                         enclosingClass.getType() != null &&
                         !method.isConstructor() &&
                         !TypeUtils.isOverride(method.getMethodType()) &&
@@ -100,7 +108,7 @@ public class MethodNameCasing extends Recipe {
                     char[] name = method.getSimpleName().toCharArray();
 
                     if (snakeCase.matcher(method.getSimpleName()).matches()) {
-                        standardized.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL,method.getSimpleName().toLowerCase()));
+                        standardized.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL,method.getSimpleName()));
                     } else {
                         for (int i = 0; i < name.length; i++) {
                             char c = name[i];
@@ -131,6 +139,10 @@ public class MethodNameCasing extends Recipe {
                 }
 
                 return super.visitMethodDeclaration(method, executionContext);
+            }
+
+            private boolean isOkToRenamePublicMethod(J.MethodDeclaration method) {
+                return !Boolean.FALSE.equals(renamePublicMethods) || !method.hasModifier(J.Modifier.Type.Public);
             }
 
             private boolean methodExists(JavaType.Method method, String newName) {

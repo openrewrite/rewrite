@@ -15,206 +15,239 @@
  */
 package org.openrewrite.java.cleanup
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.java.Assertions
 import org.openrewrite.java.Assertions.java
+import org.openrewrite.java.Assertions.srcTestJava
 import org.openrewrite.java.JavaIsoVisitor
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
-import org.openrewrite.test.TypeValidation
 import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
+import org.openrewrite.test.TypeValidation
 
 @Issue("https://github.com/openrewrite/rewrite/issues/466")
-interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
-    override val recipe: Recipe?
-        get() = MethodNameCasing(false)
-
-    override val parser: JavaParser
-        get() {
-            val jp = JavaParser.fromJavaVersion().build()
-            jp.setSourceSet("main")
-            return jp
-        }
-
-    val testParser: JavaParser
-        get() {
-            val jp = JavaParser.fromJavaVersion().build()
-            jp.setSourceSet("test")
-            return jp
-        }
-
+interface MethodNameCasingTest: RewriteTest {
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(MethodNameCasing(true))
+        spec.recipe(MethodNameCasing(false, false))
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1741")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2424")
     @Test
-    fun doNotApplyToTest() = assertUnchanged(
-        testParser,
-        before = """
+    fun correctMethodNameCasing() = rewriteRun(
+        java("""
             class Test {
-                void MyMethod_with_über() {
+                private String getFoo_bar() {
+                    return "foobar";
                 }
             }
-        """
+        ""","""
+            class Test {
+                private String getFooBar() {
+                    return "foobar";
+                }
+            }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2424")
+    @Test
+    fun doNotRenamePublicMethods() = rewriteRun(
+        java("""
+            class Test {
+                public void getFoo_bar(){}
+            }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2424")
+    @Test
+    fun okToRenamePublicMethods() = rewriteRun(
+        {spec -> spec.recipe(MethodNameCasing(true, true))},
+        java("""
+            class Test {
+                public void getFoo_bar(){}
+            }
+        ""","""
+            class Test {
+                public void getFooBar(){}
+            }
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1741")
     @Test
-    fun applyChangeToTest() = assertChanged(
-        testParser,
-        recipe = MethodNameCasing(true),
-        before = """
+    fun doNotApplyToTest() = rewriteRun(
+        srcTestJava(
+            java("""
+                class Test {
+                    void MyMethod_with_über() {
+                    }
+                }
+            """)
+        )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1741")
+    @Test
+    fun applyChangeToTest() = rewriteRun(
+        {spec -> spec.recipe(MethodNameCasing(true, false))},
+        srcTestJava(
+            java("""
+                class Test {
+                    void MyMethod_with_über() {
+                    }
+                }
+            """,
+            """
+                class Test {
+                    void myMethodWithBer() {
+                    }
+                }
+            """)
+        )
+    )
+
+    @Test
+    fun changeMethodDeclaration() = rewriteRun(
+        java("""
             class Test {
                 void MyMethod_with_über() {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void myMethodWithBer() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun changeMethodDeclaration() = assertChanged(
-        before = """
-            class Test {
-                void MyMethod_with_über() {
-                }
-            }
-        """,
-        after = """
-            class Test {
-                void myMethodWithBer() {
-                }
-            }
-        """
-    )
-
-    @Test
-    fun changeCamelCaseMethodWithFirstLetterUpperCase() = assertChanged(
-        before = """
+    fun changeCamelCaseMethodWithFirstLetterUpperCase() = rewriteRun(
+        java("""
             class Test {
                 void MyMethod() {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void myMethod() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun changeMethodInvocations() = assertChanged(
-        dependsOn = arrayOf("""
+    fun changeMethodInvocations() = rewriteRun(
+        java("""
             class Test {
                 void MyMethod_with_über() {
                 }
             }
+        ""","""
+            class Test {
+                void myMethodWithBer() {
+                }
+            }
         """),
-        before = """
+        java("""
             class A {
                 void test() {
                     new Test().MyMethod_with_über();
                 }
             }
         """,
-        after = """
+        """
             class A {
                 void test() {
                     new Test().myMethodWithBer();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun dontChangeCorrectlyCasedMethods() = assertUnchanged(
-        before = """
+    fun dontChangeCorrectlyCasedMethods() = rewriteRun(
+        java("""
             class Test {
                 void dontChange() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun changeMethodNameWhenOverride() = assertChanged(
-        dependsOn = arrayOf(
-            """
+    fun changeMethodNameWhenOverride() = rewriteRun(
+        java("""
             class ParentClass {
                 void _method() {
                 }
             }
-        """
-        ),
-        before = """
+        ""","""
+            class ParentClass {
+                void method() {
+                }
+            }
+        """),
+        java("""
             class Test extends ParentClass {
                 @Override
                 void _method() {
                 }
             }
         """,
-        after = """
+        """
             class Test extends ParentClass {
                 @Override
                 void method() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun newNameExists() = assertUnchanged(
-        before = """
+    fun newNameExists() = rewriteRun(
+        java("""
             class Test {
                 void _method() {
                 }
                 void method() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun nameExistsInInnerClass() = assertChanged(
-        before = """
+    fun nameExistsInInnerClass() = rewriteRun(
+        java("""
             class T {
-                public void _method(){}
+                void _method(){}
                 
                 private static class M {
-                    public void _method(){}
+                    void _method(){}
                 }
             }
         """,
-        after = """
+        """
             class T {
-                public void method(){}
+                void method(){}
                 
                 private static class M {
-                    public void method(){}
+                    void method(){}
                 }
             }
-        """
+        """)
     )
 
     @Suppress("UnusedAssignment")
     @Issue("https://github.com/openrewrite/rewrite/issues/2103")
     @Test
-    fun `rename snake_case to camelCase`() = assertChanged(
-        before = """
+    fun snakeCaseToCamelCase() = rewriteRun(
+        {spec -> spec.expectedCyclesThatMakeChanges(2)},
+        java("""
             class T {
                 private static int SOME_METHOD() {
                   return 1;
@@ -232,7 +265,7 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+            """
             class T {
                 private static int someMethod() {
                   return 1;
@@ -249,14 +282,14 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                   i = someBerMethod();
                 }
             }
-        """
+        """)
     )
 
     // This test uses a recipe remove ClassDeclaration types information prior to running the MethodNameCasing recipe.
     // This results in a change with an empty diff, thus before and after sources are identical
     @Issue("https://github.com/openrewrite/rewrite/issues/2103")
     @Test
-    fun `does not rename method invocations when the method declarations class type is null`() = rewriteRun(
+    fun doesNotRenameMethodInvocationsWhenTheMethodDeclarationsClassTypeIsNull() = rewriteRun(
         { spec ->
             spec.typeValidationOptions(TypeValidation.none()).recipe(
                 RewriteTest.toRecipe {
@@ -265,14 +298,14 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                             return super.visitClassDeclaration(classDecl, p).withType(null)
                         }
                     }
-                }.doNext(MethodNameCasing(true))
+                }.doNext(MethodNameCasing(true, false))
             )
         },
         java(
             """
             package abc;
             class T {
-                public static int MyMethod() {return null;}
+                public static int MyMethod() {return -1;}
                 public static void anotherMethod() {
                     int i = MyMethod();
                 }
@@ -281,7 +314,7 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
             """
             package abc;
             class T {
-                public static int MyMethod() {return null;}
+                public static int MyMethod() {return -1;}
                 public static void anotherMethod() {
                     int i = MyMethod();
                 }
@@ -291,26 +324,26 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
-    fun `keep camel case when removing leading underscore`() = assertChanged(
-        before = """
+    fun keepCamelCaseWhenRemovingLeadingUnderscore() = rewriteRun(
+        java("""
             class Test {
                 private void _theMethod() {
                 
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 private void theMethod() {
                 
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun `keep camel case when removing leading underscore 2`() = assertChanged(
-        before = """
+    fun keepCamelCaseWhenRemovingLeadingUnderscore2() = rewriteRun(
+        java("""
             import java.util.*;
             
             class Test {
@@ -329,7 +362,7 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.*;
             
             class Test {
@@ -347,11 +380,11 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                     }
                 }
             }
-        """
+        """)
     )
     @Test
-    fun `change name of method with array argument`() = assertChanged(
-        before = """
+    fun changeNameOfMethodWithArrayArgument() = rewriteRun(
+        java("""
             import java.util.*;
             
             class Test {
@@ -361,7 +394,7 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.*;
             
             class Test {
@@ -370,7 +403,7 @@ interface MethodNameCasingTest: JavaRecipeTest, RewriteTest {
                     return result;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2261")
