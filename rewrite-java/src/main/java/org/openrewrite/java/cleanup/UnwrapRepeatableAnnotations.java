@@ -30,7 +30,7 @@ import java.util.List;
 public class UnwrapRepeatableAnnotations extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Unwrap `@Repeatable` annotations.";
+        return "Unwrap `@Repeatable` annotations";
     }
 
     @Override

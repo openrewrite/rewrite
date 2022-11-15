@@ -28,10 +28,6 @@ import org.openrewrite.java.dataflow.LocalTaintFlowSpec;
 import org.openrewrite.java.dataflow.internal.InvocationMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Finds either Taint or Data flow between specified start and end methods.
@@ -64,7 +60,7 @@ public class FindFlowBetweenMethods extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Finds flow between two methods.";
+        return "Finds flow between two methods";
     }
 
     @Override

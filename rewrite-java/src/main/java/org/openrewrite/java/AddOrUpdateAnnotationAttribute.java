@@ -43,7 +43,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public String getDescription() {
         return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
-                "or adds the argument if it is not already set. ";
+                "or adds the argument if it is not already set.";
     }
 
     @Option(displayName = "Annotation Type",

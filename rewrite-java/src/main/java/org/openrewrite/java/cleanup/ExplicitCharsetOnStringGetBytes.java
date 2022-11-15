@@ -35,7 +35,7 @@ public class ExplicitCharsetOnStringGetBytes extends Recipe {
     private static final MethodMatcher GET_BYTES = new MethodMatcher("java.lang.String getBytes()");
 
     @Option(displayName = "Default encoding",
-            description = "The default encoding to supply to the `getBytes` call.",
+            description = "The default encoding to supply to the `getBytes` call",
             example = "UTF_8",
             required = false)
     @Nullable
@@ -43,13 +43,13 @@ public class ExplicitCharsetOnStringGetBytes extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Set charset encoding explicitly when calling `String#getBytes`. This will not override any " +
-                "existing explicit encodings, even if they don't match the default encoding option.";
+        return "Set charset encoding explicitly when calling `String#getBytes`";
     }
 
     @Override
     public String getDescription() {
-        return "This makes the behavior of the code platform neutral.";
+        return "This makes the behavior of the code platform neutral. It will not override any " +
+                "existing explicit encodings, even if they don't match the default encoding option.";
     }
 
     @Override

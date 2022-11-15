@@ -40,8 +40,8 @@ recipeList:
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.cleanup.ReplaceThreadRunWithThreadStart
-displayName: Replace calls to `Thread.run()` with `Thread.start()`
-description: '`Thread.run()` should not be called directly.'
+displayName: "Replace calls to `Thread.run()` with `Thread.start()`"
+description: "`Thread.run()` should not be called directly."
 recipeList:
   - org.openrewrite.java.ChangeMethodName:
       methodPattern: java.lang.Thread run()

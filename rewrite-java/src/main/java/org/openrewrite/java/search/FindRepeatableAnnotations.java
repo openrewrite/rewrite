@@ -29,7 +29,7 @@ public class FindRepeatableAnnotations extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find uses of `@Repeatable` annotations.";
+        return "Find uses of `@Repeatable` annotations";
     }
 
     @Override

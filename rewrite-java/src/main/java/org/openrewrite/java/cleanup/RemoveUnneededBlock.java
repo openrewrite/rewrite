@@ -32,7 +32,7 @@ public class RemoveUnneededBlock extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Flatten blocks into inline statements when possible";
+        return "Flatten blocks into inline statements when possible.";
     }
 
     @Override

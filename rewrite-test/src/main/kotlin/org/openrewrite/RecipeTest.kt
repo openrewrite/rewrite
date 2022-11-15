@@ -17,7 +17,9 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
+import org.openrewrite.config.CompositeRecipe
 import org.openrewrite.config.Environment
+import org.openrewrite.internal.StringUtils
 import org.openrewrite.scheduling.DirectScheduler
 import org.openrewrite.test.AdHocRecipe
 import java.io.File
@@ -101,6 +103,7 @@ interface RecipeTest<T : SourceFile> {
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                 .`as`("Recipe must be serializable/deserializable")
                 .isEqualTo(recipe)
+            validateRecipeNameAndDescription(recipe)
         }
 
         val recipeSchedulerCheckingExpectedCycles =
@@ -244,4 +247,23 @@ interface RecipeTest<T : SourceFile> {
         .scanRuntimeClasspath()
         .build()
         .activateRecipes(recipe)
+
+    private fun validateRecipeNameAndDescription(recipe: Recipe) {
+        if (recipe is CompositeRecipe) {
+            for (childRecipe in recipe.getRecipeList()) {
+                validateRecipeNameAndDescription(childRecipe)
+            }
+        } else {
+            assertThat(recipe.displayName.endsWith(".")).`as`(
+                "%s Display Name should not end with a period",
+                recipe.name
+            ).isFalse
+            if (!StringUtils.isNullOrEmpty(recipe.description)) {
+                assertThat(recipe.description.endsWith(".")).`as`(
+                    "%s Description should end with a period",
+                    recipe.name
+                ).isTrue
+            }
+        }
+    }
 }

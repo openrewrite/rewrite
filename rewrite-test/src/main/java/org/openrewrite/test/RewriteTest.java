@@ -18,6 +18,7 @@ package org.openrewrite.test;
 import org.assertj.core.api.SoftAssertions;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -111,6 +112,7 @@ public interface RewriteTest extends SourceSpecs {
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
+            validateRecipeNameAndDescription(recipe);
         }
 
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
@@ -417,6 +419,19 @@ public interface RewriteTest extends SourceSpecs {
                 throw new UnsupportedOperationException("RewriteTest is not intended to be iterated.");
             }
         };
+    }
+
+    default void validateRecipeNameAndDescription(Recipe recipe) {
+        if (recipe instanceof CompositeRecipe) {
+            for (Recipe childRecipe : recipe.getRecipeList()) {
+                validateRecipeNameAndDescription(childRecipe);
+            }
+        } else {
+            assertThat(recipe.getDisplayName().endsWith(".")).as("%s Display Name should not end with a period", recipe.getName()).isFalse();
+            if (!StringUtils.isNullOrEmpty(recipe.getDescription())) {
+                assertThat(recipe.getDescription().endsWith(".")).as("%s Description should end with a period", recipe.getName()).isTrue();
+            }
+        }
     }
 }
 

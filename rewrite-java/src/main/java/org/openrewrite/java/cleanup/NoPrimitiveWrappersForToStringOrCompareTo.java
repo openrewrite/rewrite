@@ -42,7 +42,7 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Primitive wrappers should not be instantiated only for `#toString()` or `#compareTo(..)` invocations";
+        return "Primitive wrappers should not be instantiated only for `#toString()` or `#compareTo(..)` invocations.";
     }
 
     @Override

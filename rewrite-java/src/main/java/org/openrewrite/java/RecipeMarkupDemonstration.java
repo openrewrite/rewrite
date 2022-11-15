@@ -37,7 +37,7 @@ public class RecipeMarkupDemonstration extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Demonstrate rendering of `Markup` markers.";
+        return "Demonstrate rendering of `Markup` markers";
     }
 
     @Override

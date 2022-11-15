@@ -37,7 +37,7 @@ public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Rename methods named `hashcode`, `equal`, or `tostring`.";
+        return "Rename methods named `hashcode`, `equal`, or `tostring`";
     }
 
     @Override
