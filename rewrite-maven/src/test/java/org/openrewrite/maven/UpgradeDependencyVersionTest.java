@@ -858,7 +858,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       <version>1</version>
                       <properties>
                           <guava.version>28.0-jre</guava.version>
-                          <spring.version>5.3.23</spring.version>
+                          <spring.version>5.3.24</spring.version>
                           <spring.artifact-id>spring-jdbc</spring.artifact-id>
                       </properties>
                       <dependencies>
