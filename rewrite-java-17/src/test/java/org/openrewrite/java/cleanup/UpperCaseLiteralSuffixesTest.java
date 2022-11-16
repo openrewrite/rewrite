@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,27 @@ public class UpperCaseLiteralSuffixesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UpperCaseLiteralSuffixes());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2429")
+    @Test
+    void usesPrimitive() {
+        rewriteRun(
+          java("""
+            class Test {
+                long lp = 1l;
+                double dp = 1d;
+                float df = 1f;
+            }
+            """,
+            """
+            class Test {
+                long lp = 1L;
+                double dp = 1D;
+                float df = 1F;
+            }
+          """)
+        );
     }
 
     @Test
