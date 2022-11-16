@@ -17,19 +17,36 @@ package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RewriteTest
 
-interface UsesTypeTest : JavaRecipeTest {
+interface UsesTypeTest : RewriteTest {
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2427")
+    @Test
+    fun primitiveTypes() = rewriteRun(
+        { spec ->
+            spec.recipe(RewriteTest.toRecipe { UsesType("double") })
+        },
+        java("""
+            class Test {
+                double d = 1d;
+            }
+            """,
+            """
+            /*~~>*/class Test {
+                double d = 1d;
+            }
+            """)
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1169")
     @Test
-    fun emptyConstructor(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
-            UsesType("java.util.ArrayList")
+    fun emptyConstructor() = rewriteRun(
+        { spec ->
+            spec.recipe(RewriteTest.toRecipe{ UsesType("java.util.ArrayList") })
         },
-        before = """
+        java("""
             import java.util.ArrayList;
             import java.util.List;
             
@@ -37,70 +54,67 @@ interface UsesTypeTest : JavaRecipeTest {
                 List<String> l = new ArrayList<>();
             }
         """,
-        after = """
+        """
             /*~~>*/import java.util.ArrayList;
             import java.util.List;
             
             class Test {
                 List<String> l = new ArrayList<>();
             }
-        """
+        """)
     )
 
     @Test
-    fun usesTypeFindsImports(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
-            UsesType("java.util.Collections")
+    fun usesTypeFindsImports() = rewriteRun(
+        { spec ->
+            spec.recipe(RewriteTest.toRecipe{ UsesType("java.util.Collections") })
         },
-        before = """
+        java("""
             import java.io.File;
             import java.util.Collections;
             
             class Test {
             }
         """,
-        after = """
+        """
             /*~~>*/import java.io.File;
             import java.util.Collections;
             
             class Test {
             }
-        """
+        """)
     )
 
     /**
      * Type wildcards are greedy.
      */
     @Test
-    fun usesTypeWildcardFindsImports(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
-            UsesType("java.util.*")
+    fun usesTypeWildcardFindsImports() = rewriteRun(
+        { spec ->
+            spec.recipe(RewriteTest.toRecipe{ UsesType("java.util.*") })
         },
-        before = """
+        java("""
             import java.io.File;
             import static java.util.Collections.singleton;
             
             class Test {
             }
         """,
-        after = """
+        """
             /*~~>*/import java.io.File;
             import static java.util.Collections.singleton;
             
             class Test {
             }
-        """
+        """)
     )
 
     @Test
-    fun usesFullyQualifiedReference(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
-            UsesType("java.util.*")
+    fun usesFullyQualifiedReference() = rewriteRun(
+        { spec ->
+            spec.recipe(RewriteTest.toRecipe{ UsesType("java.util.*") })
         },
-        before = """
+        java("""
             import java.util.Set;
             class Test {
                 void test() {
@@ -108,33 +122,32 @@ interface UsesTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             /*~~>*/import java.util.Set;
             class Test {
                 void test() {
                     Set<String> s = java.util.Collections.singleton("test");
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun usesTypeFindsInheritedTypes(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
-            UsesType("java.util.Collection")
+    fun usesTypeFindsInheritedTypes() = rewriteRun(
+        { spec ->
+            spec.recipe(RewriteTest.toRecipe{ UsesType("java.util.Collection") })
         },
-        before = """
+        java("""
             import java.util.List;
             
             class Test {
             }
         """,
-        after = """
+        """
             /*~~>*/import java.util.List;
             
             class Test {
             }
-        """
+        """)
     )
 }

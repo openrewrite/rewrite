@@ -230,6 +230,9 @@ public class TypeUtils {
                 return isAssignableTo(to, ((JavaType.Variable) from).getType());
             } else if (from instanceof JavaType.Method) {
                 return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+            } else if (from instanceof JavaType.Primitive) {
+                JavaType.Primitive primitive = (JavaType.Primitive) from;
+                return to.toString().equals(primitive.getKeyword());
             }
         } catch (Exception e) {
             return false;
