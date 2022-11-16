@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+@file:Suppress("PointlessBooleanExpression", "RedundantStreamOptionalCall", "ConstantConditions",
+    "ResultOfMethodCallIgnored"
+)
+
 package org.openrewrite.java.style
 
 import org.assertj.core.api.Assertions.assertThat
@@ -22,7 +26,6 @@ import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 import org.openrewrite.style.GeneralFormatStyle
 import org.openrewrite.style.NamedStyles
-import java.util.*
 
 @Suppress("JUnitMalformedDeclaration")
 interface AutodetectTest {
@@ -30,7 +33,8 @@ interface AutodetectTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")
     @Test
     fun springDemoApp(jp: JavaParser) {
-        val cus = jp.parse("""
+        val cus = jp.parse(
+            """
             package com.kmccarpenter.demospring;
 
             import org.springframework.boot.SpringApplication;
@@ -44,7 +48,8 @@ interface AutodetectTest {
             	}
 
             }
-        """.trimIndent())
+        """.trimIndent()
+        )
         val styles = Autodetect.detect(cus)
         val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
         assertThat(tabsAndIndents.useTabCharacter).isTrue
@@ -134,13 +139,13 @@ interface AutodetectTest {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                     J.Identifier i = super.visitIdentifier(ident, ctx);
-             
+            
                     if (TypeUtils.isOfClassType(i.getType(), oldPackageName)
                             && i.getSimpleName().equals(oldPackageType.getClassName())) {
                         i = i.withName((newPackageType).getClassName())
                                 .withType(newPackageType);
                     }
-                    
+            
                     return i;
                 }
             
@@ -361,6 +366,7 @@ interface AutodetectTest {
 
         assertThat(spacesStyle.other.afterTypeCast).isTrue
     }
+
     @Suppress("StatementWithEmptyBody")
     @Test
     fun detectBeforeForSemicolon(jp: JavaParser) {
@@ -371,13 +377,15 @@ interface AutodetectTest {
                     for (int i = 0; i < x; i++) {}
                 }
             }
-            """)
+            """
+        )
         val styles = Autodetect.detect(cu)
         val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
 
         assertThat(spacesStyle.other.beforeForSemicolon).isFalse
         assertThat(spacesStyle.other.afterForSemicolon).isTrue
     }
+
     @Test
     fun detectMethodArgsNoArgs(jp: JavaParser) {
         val cus = jp.parse(
@@ -438,7 +446,7 @@ interface AutodetectTest {
             """
                 class T {
                     static {
-                        new int[]{1,2,3,4};
+                        int[] i = new int[]{1, 2, 3, 4};
                     }
                 }
             """
@@ -456,6 +464,8 @@ interface AutodetectTest {
         val cus = jp.parse(
             """
                 class Test {
+                    void a(String a, String b, String c) {
+                    }
                     void i() {
                         a("a","b","c");
                     }
@@ -492,11 +502,11 @@ interface AutodetectTest {
     fun detectClrfLineFormat(jp: JavaParser) {
         val cus = jp.parse(
             "class Test {\r\n" +
-                    "    // some comment\r\n" +
-                    "    public void test() {\n" +
-                    "        System.out.println();\n" +
-                    "    }\r\n" +
-                    "}\r\n"
+                "    // some comment\r\n" +
+                "    public void test() {\n" +
+                "        System.out.println();\n" +
+                "    }\r\n" +
+                "}\r\n"
         )
 
         val styles = Autodetect.detect(cus)
@@ -509,16 +519,96 @@ interface AutodetectTest {
     fun detectLfLineFormat(jp: JavaParser) {
         val cus = jp.parse(
             "class Test {\n" +
-                    "    // some comment\r\n" +
-                    "    public void test() {\n" +
-                    "        System.out.println();\n" +
-                    "    }\n" +
-                    "}\r\n"
+                "    // some comment\r\n" +
+                "    public void test() {\n" +
+                "        System.out.println();\n" +
+                "    }\n" +
+                "}\r\n"
         )
 
         val styles = Autodetect.detect(cus)
         val lineFormatStyle = NamedStyles.merge(GeneralFormatStyle::class.java, listOf(styles))
 
         assertThat(lineFormatStyle!!.isUseCRLFNewLines).isFalse
+    }
+
+    @Test
+    fun mostCommonIndentTakesPrecedence(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+            package com.test;
+            
+            public class Foo {
+               private static final int underIndented;
+                     int overIndented;
+                  public void setOrder(int order) {
+                        this.order = order;
+                        System.out.print("One two-space indent shouldn't override predominant 4-space indent");
+                        Object o = new Object() {
+                              void fooBar() {
+                                    System.out.print("fooBar");
+                              }
+                        };
+                  }
+            }
+        """.trimIndent()
+        )
+
+        val styles = Autodetect.detect(cus)
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
+
+        assertThat(tabsAndIndents.useTabCharacter).isFalse
+        assertThat(tabsAndIndents.tabSize).isEqualTo(6)
+        assertThat(tabsAndIndents.indentSize)
+            .`as`("While there are outlier 3 and 9 space indents, the most prevalent indentation is 6")
+            .isEqualTo(6)
+        assertThat(tabsAndIndents.continuationIndent)
+            .`as`("With no actual continuation indents to go off of, assume IntelliJ default of 2x the normal indent")
+            .isEqualTo(12)
+    }
+
+    @Test
+    fun continuationIndents(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                import java.util.stream.Stream;
+                
+                class Continuations {
+                    public void cont() {
+                        Stream.of("foo",
+                                                "continuation")
+                                    .map(it ->
+                                                Stream.of(it)
+                                                            .map(it2 ->
+                                                                        Stream.of(it2)
+                                                                                    .map(it3 ->
+                                                                                                it3))
+                                                            .flatMap(it4 ->
+                                                                        it4));
+                        int higherContIndent = 1 +
+                                                        2;
+                        int lowerContIndent = 1 +
+                                2;
+                        int sum = 1 +
+                                    (2 +
+                                    3) +
+                                    Stream.of(
+                                                2 + 4,
+                                                4
+                                    ).reduce(0,
+                                                Integer::sum);
+                    }
+                }
+        """.trimIndent()
+        )
+
+        val styles = Autodetect.detect(cus)
+        val tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle::class.java, listOf(styles))!!
+
+        assertThat(tabsAndIndents.useTabCharacter).isFalse
+        assertThat(tabsAndIndents.tabSize).isEqualTo(4)
+        assertThat(tabsAndIndents.indentSize).isEqualTo(4)
+        assertThat(tabsAndIndents.continuationIndent)
+            .isEqualTo(12)
     }
 }

@@ -16,21 +16,21 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
+import lombok.Value;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 
@@ -77,42 +77,11 @@ public class Autodetect extends NamedStyles {
             importLayoutStatistics.mapBlockPatterns(importedPackages);
         }
 
-        public JavaSourceFile phase2(JavaSourceFile cu) {
-            cu = (JavaSourceFile) new FindIndentJavaVisitor().visitNonNull(cu, indentStatistics);
-            cu = (JavaSourceFile) new FindImportLayout().visitNonNull(cu, importLayoutStatistics);
-            cu = (JavaSourceFile) new FindSpacesStyle().visitNonNull(cu, spacesStatistics);
-            cu = (JavaSourceFile) new FindLineFormatJavaVisitor().visitNonNull(cu, generalFormatStatistics);
-            return cu;
-        }
-
-        public Recipe asRecipe() {
-            return new Recipe() {
-                @Override
-                public String getDisplayName() {
-                    return "Autodetect";
-                }
-
-                @Override
-                protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-                    for (SourceFile sourceFile : before) {
-                        if(sourceFile instanceof J.CompilationUnit) {
-                            phase1((JavaSourceFile) sourceFile);
-                        }
-                    }
-
-                    return before;
-                }
-
-                @Override
-                protected JavaVisitor<ExecutionContext> getVisitor() {
-                    return new JavaVisitor<ExecutionContext>() {
-                        @Override
-                        public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                            return phase2(cu);
-                        }
-                    };
-                }
-            };
+        public void phase2(JavaSourceFile cu) {
+            new FindIndentJavaVisitor().visitNonNull(cu, indentStatistics);
+            new FindImportLayout().visitNonNull(cu, importLayoutStatistics);
+            new FindSpacesStyle().visitNonNull(cu, spacesStatistics);
+            new FindLineFormatJavaVisitor().visitNonNull(cu, generalFormatStatistics);
         }
 
         public Autodetect build() {
@@ -139,14 +108,121 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    @Data
+    private static class IndentStatistic {
+        @Value
+        private static class DepthCoordinate {
+            int indentDepth;
+            int continuationDepth;
+        }
+        // depth -> count of whitespace char (4 spaces, 2 tabs, etc) -> count of occurrences
+        Map<DepthCoordinate, Map<Integer, Long>> depthToSpaceIndentFrequencies = new HashMap<>();
+
+        public void record(int indentDepth, int continuationDepth, int charCount) {
+            record(new DepthCoordinate(indentDepth, continuationDepth), charCount);
+        }
+
+        public void record(DepthCoordinate depth, int charCount) {
+            if(charCount <= 0) {
+                return;
+            }
+            depthToSpaceIndentFrequencies.compute(depth, (n, map) -> {
+                if(map == null) {
+                    map = new HashMap<>();
+                }
+                map.compute(charCount, (m, count) -> {
+                    if(count == null) {
+                        count = 0L;
+                    }
+                    return count + 1;
+                });
+                return map;
+            });
+        }
+
+        /**
+         * Determines the most frequent indentation. Assumes that indentation is a multiple of depth, which is true for
+         * normal indentation but not usually true for continuation indents.
+         */
+        public int commonIndent() {
+            Map<Integer, Long> map = depthToSpaceIndentFrequencies.entrySet().stream()
+                    .flatMap(it -> {
+                        int depth = it.getKey().getIndentDepth();
+                        return it.getValue().entrySet()
+                                .stream()
+                                .map(charsToOccurrence -> new AbstractMap.SimpleEntry<>(
+                                        charsToOccurrence.getKey() / depth,
+                                        charsToOccurrence.getValue()));
+                    })
+                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
+
+            return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
+                    .map(Map.Entry::getKey)
+                    .orElse(4); // IntelliJ default
+        }
+
+        /**
+         * Use the provided common indentation to interpret this IndentStatistic's contents as continuation indents.
+         * Continuation indents are assumed to be offset by some constant number of characters from what their depth
+         * would normally indicate.
+         */
+        public int continuationIndent(int commonIndent) {
+            Map<Integer, Long> map = depthToSpaceIndentFrequencies.entrySet().stream()
+                    .flatMap(it -> {
+                        int depth = it.getKey().getIndentDepth();
+                        int continuationDepth = it.getKey().getContinuationDepth();
+                        return it.getValue().entrySet()
+                                .stream()
+                                .map(charsToOccurrence -> new AbstractMap.SimpleEntry<>(
+                                            (charsToOccurrence.getKey() - (depth * commonIndent)) / continuationDepth,
+                                        charsToOccurrence.getValue()));
+                    })
+                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
+
+            return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
+                    .map(Map.Entry::getKey)
+                    .orElse(commonIndent * 2);
+        }
+    }
+
     private static class IndentStatistics {
-        private final Map<Integer, Long> spaceIndentFrequencies = new HashMap<>();
-        private final Map<Integer, Long> tabIndentFrequencies = new HashMap<>();
+        private final IndentStatistic spaceIndentFrequencies = new IndentStatistic();
+        private final IndentStatistic spaceContinuationIndentFrequencies = new IndentStatistic();
+        private final IndentStatistic tabIndentFrequencies = new IndentStatistic();
+        private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
         private int linesWithSpaceIndents = 0;
         private int linesWithTabIndents = 0;
 
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
+
+        private int depth = 0;
+        private int continuationDepth = 1;
+        public int getDepth() {
+            return depth;
+        }
+        public int getContinuationDepth() {
+            return continuationDepth;
+        }
+
+        public void incrementDepth() {
+            depth++;
+        }
+
+        public void decrementDepth() {
+            depth--;
+        }
+
+        // Leave these unused methods in case we want to extend autodetection to method invocation argument lists
+        @SuppressWarnings("unused")
+        public void incrementContinuationDepth() {
+            continuationDepth++;
+        }
+
+        @SuppressWarnings("unused")
+        public void decrementContinuationDepth() {
+            continuationDepth--;
+        }
 
         public boolean isIndentedWithSpaces() {
             return linesWithSpaceIndents >= linesWithTabIndents;
@@ -155,38 +231,11 @@ public class Autodetect extends NamedStyles {
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             boolean useTabs = !isIndentedWithSpaces();
 
-            int indent = 0;
-            int continuationIndent = 0;
-            long indentCount = 0;
-            long continuationIndentCount = 0;
+            IndentStatistic indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
+            IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
 
-            Map<Integer, Long> indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
-            for (Map.Entry<Integer, Long> current : indentFrequencies.entrySet()) {
-                if (current.getKey() <= 0) {
-                    continue;
-                }
-                long currentCount = 0;
-                for (Map.Entry<Integer, Long> candidate : indentFrequencies.entrySet()) {
-                    if (candidate.getKey() <= 0) {
-                        continue;
-                    }
-                    if (candidate.getKey() % current.getKey() == 0) {
-                        currentCount += candidate.getValue();
-                    }
-                }
-                if (currentCount > indentCount) {
-                    indent = current.getKey();
-                    indentCount = currentCount;
-                } else if (currentCount == indentCount) {
-                    indent = Math.min(indent, current.getKey());
-                } else if (currentCount > continuationIndentCount) {
-                    continuationIndent = current.getKey();
-                    continuationIndentCount = currentCount;
-                } else if (currentCount == continuationIndentCount) {
-                    continuationIndent = Math.min(continuationIndent, current.getKey());
-                }
-            }
-
+            int indent = indentFrequencies.commonIndent();
+            int continuationIndent = continuationFrequencies.continuationIndent(indent);
             return new TabsAndIndentsStyle(
                     useTabs,
                     indent,
@@ -222,6 +271,15 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindIndentJavaVisitor extends JavaIsoVisitor<IndentStatistics> {
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, IndentStatistics stats) {
+            // Only visit things we're interested in getting indentation from
+            visitStatement(cd, stats);
+            visit(cd.getBody(), stats);
+            return cd;
+        }
+
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, IndentStatistics stats) {
             if (method.getParameters().size() > 1) {
@@ -244,55 +302,138 @@ public class Autodetect extends NamedStyles {
                     }
                 }
             }
-            return super.visitMethodDeclaration(method, stats);
+            // Visit only those parts of the declaration we're interested in getting indentation info from
+            visitStatement(method, stats);
+            ListUtils.map(method.getLeadingAnnotations(), a -> visitAndCast(a, stats));
+            visitContainer(method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, stats);
+            visit(method.getBody(), stats);
+            return method;
         }
 
         @Override
-        public Space visitSpace(Space space, Space.Location loc, IndentStatistics stats) {
-            String prefix = space.getWhitespace();
-            if(!prefix.contains("\n")) {
-                return space;
-            }
-            char[] chars = prefix.toCharArray();
-
-            int spaceIndent = 0;
-            int tabIndent = 0;
-            boolean mixed = false;
-            // Note: new lines in multiline comments will not be counted.
-            for (char c : chars) {
-                if (c == '\n' || c == '\r') {
-                    spaceIndent = 0;
-                    tabIndent = 0;
-                    mixed = false;
-                    continue;
+        public J.Block visitBlock(J.Block block, IndentStatistics stats) {
+            stats.incrementDepth();
+            for (Statement s : block.getStatements()) {
+                if (s instanceof Expression) {
+                    // Some statement types, like method invocations, are also expressions
+                    // If an expression appears in a context where statements are expected, its indent is not a continuation
+                    Set<Expression> statementExpressions = getCursor()
+                                .getMessage("STATEMENT_EXPRESSION", Collections.newSetFromMap(
+                                            new IdentityHashMap<>(block.getStatements().size())));
+                    statementExpressions.add((Expression) s);
+                    getCursor().putMessage("STATEMENT_EXPRESSION", statementExpressions);
                 }
-                if (c == ' ') {
-                    if (tabIndent > 0) {
-                        mixed = true;
+                visit(s, stats);
+            }
+            stats.decrementDepth();
+            return block;
+        }
+
+        @Override
+        public J.AnnotatedType visitAnnotatedType(J.AnnotatedType annotatedType, IndentStatistics indentStatistics) {
+            return annotatedType;
+        }
+
+        @Override
+        public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations vd, IndentStatistics stats) {
+            visitStatement(vd, stats);
+            ListUtils.map(vd.getPadding().getVariables(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, stats));
+            return vd;
+        }
+
+        @Override
+        public J.NewArray visitNewArray(J.NewArray na, IndentStatistics stats) {
+            visitExpression(na, stats);
+            return na;
+        }
+
+        @Override
+        public Statement visitStatement(Statement statement, IndentStatistics stats) {
+            countIndents(statement.getPrefix().getWhitespace(), false, stats);
+            return statement;
+        }
+
+        @Override
+        public Expression visitExpression(Expression expression, IndentStatistics stats) {
+            super.visitExpression(expression, stats);
+            Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
+            if(statementExpressions.contains(expression)) {
+                return expression;
+            }
+            countIndents(expression.getPrefix().getWhitespace(), true, stats);
+
+            return expression;
+        }
+
+        @SuppressWarnings("CommentedOutCode")
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
+            Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
+            if(statementExpressions.contains(m)) {
+                visitStatement(m, stats);
+            } else {
+                visitExpression(m, stats);
+            }
+            if(m.getPadding().getSelect() != null) {
+                countIndents(m.getPadding().getSelect().getAfter().getWhitespace(), true, stats);
+            }
+            visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, stats);
+
+            /*
+             * The treatment of continuations in method argument lists is particularly head-hurting.
+             * Some IDEs will do things like indent arguments differently if the current invocation is another invocation's select
+             * For now avoid this source of confusion and inconsistency.
+             */
+//            stats.incrementContinuationDepth();
+//            visitContainer(m.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, stats);
+//            stats.decrementContinuationDepth();
+            return m;
+        }
+
+        @Override
+        public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, IndentStatistics indentStatistics) {
+            return super.visitRightPadded(right, loc, indentStatistics);
+        }
+
+        private void countIndents(String space, boolean isContinuation, IndentStatistics stats) {
+            int ni = space.lastIndexOf('\n');
+            int depth = stats.getDepth();
+            if (ni >= 0 && depth > 0) {
+                int spaceIndent = 0;
+                int tabIndent = 0;
+                boolean mixed = false;
+                char[] chars = space.substring(ni).toCharArray();
+                for (char c : chars) {
+                    if (c == ' ') {
+                        if (tabIndent > 0) {
+                            mixed = true;
+                        }
+                        spaceIndent++;
+                    } else if (c == '\t') {
+                        if (spaceIndent > 0) {
+                            mixed = true;
+                        }
+                        tabIndent++;
                     }
-                    spaceIndent++;
-                } else if (Character.isWhitespace(c)) {
-                    if (spaceIndent > 0) {
-                        mixed = true;
+                }
+                if (spaceIndent > 0 || tabIndent > 0) {
+                    if (!mixed) {
+                        if(isContinuation) {
+                            stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
+                            stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
+                        } else {
+                            stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
+                            stats.tabIndentFrequencies.record(depth, 0, tabIndent);
+                        }
                     }
-                    tabIndent++;
+
+                    if (spaceIndent > tabIndent) {
+                        stats.linesWithSpaceIndents++;
+                    } else {
+                        stats.linesWithTabIndents++;
+                    }
                 }
             }
-
-            if (spaceIndent > 0 || tabIndent > 0) {
-                if (!mixed) {
-                    stats.spaceIndentFrequencies.merge(spaceIndent, 1L, Long::sum);
-                    stats.tabIndentFrequencies.merge(tabIndent, 1L, Long::sum);
-                }
-
-                if (spaceIndent > tabIndent) {
-                    stats.linesWithSpaceIndents++;
-                } else {
-                    stats.linesWithTabIndents++;
-                }
-            }
-
-            return space;
         }
     }
 
@@ -319,6 +460,7 @@ public class Autodetect extends NamedStyles {
             ImportStatic
         }
 
+        @SuppressWarnings("DuplicatedCode")
         public ImportLayoutStyle getImportLayoutStyle() {
             // the simplest heuristic is just to take the single longest block sequence and
             // assume that represents the most variation in the project
