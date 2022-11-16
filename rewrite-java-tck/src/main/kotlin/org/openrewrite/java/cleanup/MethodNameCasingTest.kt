@@ -101,7 +101,7 @@ interface MethodNameCasingTest: RewriteTest {
             """,
             """
                 class Test {
-                    void myMethodWithBer() {
+                    void myMethodWithUber() {
                     }
                 }
             """)
@@ -118,7 +118,7 @@ interface MethodNameCasingTest: RewriteTest {
         """,
         """
             class Test {
-                void myMethodWithBer() {
+                void myMethodWithUber() {
                 }
             }
         """)
@@ -149,7 +149,7 @@ interface MethodNameCasingTest: RewriteTest {
             }
         ""","""
             class Test {
-                void myMethodWithBer() {
+                void myMethodWithUber() {
                 }
             }
         """),
@@ -163,7 +163,7 @@ interface MethodNameCasingTest: RewriteTest {
         """
             class A {
                 void test() {
-                    new Test().myMethodWithBer();
+                    new Test().myMethodWithUber();
                 }
             }
         """)
@@ -273,13 +273,13 @@ interface MethodNameCasingTest: RewriteTest {
                 private static int someMethod2() {
                   return 1;
                 }
-                private static int someBerMethod() {
+                private static int someUberMethod() {
                   return 1;
                 }
                 public static void anotherMethod() {
                   int i = someMethod();
                   i = someMethod2();
-                  i = someBerMethod();
+                  i = someUberMethod();
                 }
             }
         """)
@@ -382,6 +382,7 @@ interface MethodNameCasingTest: RewriteTest {
             }
         """)
     )
+    @Suppress("UnnecessaryLocalVariable")
     @Test
     fun changeNameOfMethodWithArrayArgument() = rewriteRun(
         java("""

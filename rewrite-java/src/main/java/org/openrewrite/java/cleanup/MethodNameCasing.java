@@ -27,6 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.VariableNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -105,10 +106,11 @@ public class MethodNameCasing extends Recipe {
                         !TypeUtils.isOverride(method.getMethodType()) &&
                         !standardMethodName.matcher(method.getSimpleName()).matches()) {
                     StringBuilder standardized = new StringBuilder();
-                    char[] name = method.getSimpleName().toCharArray();
+                    String normalized = VariableNameUtils.normalizeName(method.getSimpleName());
+                    char[] name = normalized.toCharArray();
 
-                    if (snakeCase.matcher(method.getSimpleName()).matches()) {
-                        standardized.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL,method.getSimpleName()));
+                    if (snakeCase.matcher(normalized).matches()) {
+                        standardized.append(NameCaseConvention.format(NameCaseConvention.LOWER_CAMEL, normalized));
                     } else {
                         for (int i = 0; i < name.length; i++) {
                             char c = name[i];
