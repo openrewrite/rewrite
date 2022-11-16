@@ -43,8 +43,8 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         }
 
         for (JavaType type : c.getTypesInUse().getTypesInUse()) {
-            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
-            if ((c = maybeMark(c, fq)) != cu) {
+            JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
+            if ((c = maybeMark(c, checkType)) != cu) {
                 return c;
             }
         }
@@ -62,12 +62,12 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         return c;
     }
 
-    private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType.FullyQualified fq) {
-        if (fq == null) {
+    private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType type) {
+        if (type == null) {
             return c;
         }
 
-        if (TypeUtils.isAssignableTo(typePattern, fq)) {
+        if (TypeUtils.isAssignableTo(typePattern, type)) {
             return SearchResult.found(c);
         }
 
