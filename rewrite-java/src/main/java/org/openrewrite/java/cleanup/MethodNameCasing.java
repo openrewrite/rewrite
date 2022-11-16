@@ -99,7 +99,7 @@ public class MethodNameCasing extends Recipe {
                 if(enclosingClass == null) {
                     return method;
                 }
-                if (isOkToRenamePublicMethod(method) &&
+                if (containsValidModifiers(method) &&
                         method.getMethodType() != null &&
                         enclosingClass.getType() != null &&
                         !method.isConstructor() &&
@@ -143,8 +143,8 @@ public class MethodNameCasing extends Recipe {
                 return super.visitMethodDeclaration(method, executionContext);
             }
 
-            private boolean isOkToRenamePublicMethod(J.MethodDeclaration method) {
-                return !Boolean.FALSE.equals(renamePublicMethods) || !method.hasModifier(J.Modifier.Type.Public);
+            private boolean containsValidModifiers(J.MethodDeclaration method) {
+                return !method.hasModifier(J.Modifier.Type.Public) || !Boolean.FALSE.equals(renamePublicMethods);
             }
 
             private boolean methodExists(JavaType.Method method, String newName) {
