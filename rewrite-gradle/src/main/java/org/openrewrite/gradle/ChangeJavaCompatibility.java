@@ -57,7 +57,7 @@ public class ChangeJavaCompatibility extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find and updates the Java compatibility for the Gradle project";
+        return "Find and updates the Java compatibility for the Gradle project.";
     }
 
     @Override

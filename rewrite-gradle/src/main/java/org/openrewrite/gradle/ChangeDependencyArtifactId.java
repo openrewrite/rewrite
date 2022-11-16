@@ -48,7 +48,7 @@ public class ChangeDependencyArtifactId extends Recipe {
     String artifactId;
 
     @Option(displayName = "New artifactId",
-            description = "The new artifactId to use.",
+            description = "The new artifactId to use",
             example = "jackson-custom")
     String newArtifactId;
 

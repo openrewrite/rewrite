@@ -40,7 +40,7 @@ public class UseHttpsForRepositories extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Use HTTPS for repository urls";
+        return "Use HTTPS for repository urls.";
     }
 
     @Override

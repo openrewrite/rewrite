@@ -43,7 +43,7 @@ public class RemoveOwaspSuppressions extends Recipe {
     public String getDescription() {
         return "Remove all OWASP suppressions with a suppression end date in the past, as these are no longer valid. " +
                 "For use with the OWASP `dependency-check` tool. " +
-                "More details on OWASP suppression files: https://jeremylong.github.io/DependencyCheck/general/suppression.html";
+                "More details on OWASP suppression files: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
     }
 
     @Override

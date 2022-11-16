@@ -34,7 +34,7 @@ public class RemoveRepository extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Removes a repository from Gradle build scripts. Named repositories include \"jcenter\", \"mavenCentral\", \"mavenLocal\", and \"google\"";
+        return "Removes a repository from Gradle build scripts. Named repositories include \"jcenter\", \"mavenCentral\", \"mavenLocal\", and \"google\".";
     }
 
     @Option(displayName = "Repository",
