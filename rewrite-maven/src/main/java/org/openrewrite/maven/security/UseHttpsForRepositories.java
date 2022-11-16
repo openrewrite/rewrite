@@ -19,7 +19,6 @@ import lombok.AllArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -43,7 +42,7 @@ public class UseHttpsForRepositories extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Use HTTPS for repository urls";
+        return "Use HTTPS for repository urls.";
     }
 
     @Override

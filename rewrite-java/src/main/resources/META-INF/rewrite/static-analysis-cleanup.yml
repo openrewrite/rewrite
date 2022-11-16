@@ -17,7 +17,7 @@
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.cleanup.CommonStaticAnalysis
 displayName: Common static analysis issues
-description: Resolve common static analysis issues discovered through 3rd party tools
+description: Resolve common static analysis issues discovered through 3rd party tools.
 recipeList:
   - org.openrewrite.java.cleanup.AddSerialVersionUidToSerializable
   - org.openrewrite.java.cleanup.AtomicPrimitiveEqualsUsesGet

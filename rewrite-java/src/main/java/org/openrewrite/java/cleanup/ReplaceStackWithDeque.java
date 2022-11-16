@@ -30,7 +30,7 @@ import org.openrewrite.java.tree.J;
 public class ReplaceStackWithDeque extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Replace `java.util.Stack` with `java.util.Deque`.";
+        return "Replace `java.util.Stack` with `java.util.Deque`";
     }
 
     @Override

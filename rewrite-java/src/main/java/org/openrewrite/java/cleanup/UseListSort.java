@@ -29,7 +29,7 @@ public class UseListSort extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replace invocations of `Collections#sort(List, Comparator)` with `List#sort(Comparator)`.";
+        return "Replace invocations of `Collections#sort(List, Comparator)` with `List#sort(Comparator)`";
     }
 
     @Override

@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 public class PrintMavenAsDot extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Print Maven dependency hierarchy in DOT format.";
+        return "Print Maven dependency hierarchy in DOT format";
     }
 
     @Override

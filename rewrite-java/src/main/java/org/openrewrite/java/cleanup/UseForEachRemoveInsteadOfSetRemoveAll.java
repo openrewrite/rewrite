@@ -29,7 +29,7 @@ import java.util.Iterator;
 public class UseForEachRemoveInsteadOfSetRemoveAll extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Replace `java.util.Set#removeAll(java.util.Collection)` with `java.util.Collection#forEach(Set::remove)`.";
+        return "Replace `java.util.Set#removeAll(java.util.Collection)` with `java.util.Collection#forEach(Set::remove)`";
     }
 
     @Override

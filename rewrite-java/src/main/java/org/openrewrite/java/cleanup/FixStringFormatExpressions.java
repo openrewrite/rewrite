@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
 public class FixStringFormatExpressions extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Fix `String#format` and `String#formatted` expressions.";
+        return "Fix `String#format` and `String#formatted` expressions";
     }
 
     @Override
