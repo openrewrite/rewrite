@@ -25,6 +25,7 @@ import io.vavr.CheckedFunction1;
 import lombok.Getter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
@@ -64,6 +65,7 @@ public class MavenPomDownloader {
 
     private final MavenPomCache mavenCache;
     private final Map<Path, Pom> projectPoms;
+    private final Map<GroupArtifactVersion, Pom> projectPomsByGav;
     private final MavenExecutionContextView ctx;
     private final HttpSender httpSender;
 
@@ -110,6 +112,7 @@ public class MavenPomDownloader {
     @Deprecated
     public MavenPomDownloader(Map<Path, Pom> projectPoms, HttpSender httpSender, ExecutionContext ctx) {
         this.projectPoms = projectPoms;
+        this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
         this.sendRequest = Retry.decorateCheckedFunction(
                 mavenDownloaderRetry,
@@ -127,6 +130,57 @@ public class MavenPomDownloader {
                 });
         this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
+    }
+
+    private Map<GroupArtifactVersion, Pom> projectPomsByGav(Map<Path, Pom> projectPoms) {
+        Map<GroupArtifactVersion, Pom> result = new HashMap<>();
+        for (final Pom projectPom : projectPoms.values()) {
+            final List<Pom> ancestryWithinProject = getAncestryWithinProject(projectPom, projectPoms);
+            final Map<String, String> mergedProperties = mergeProperties(ancestryWithinProject);
+            final GroupArtifactVersion gav = new GroupArtifactVersion(
+                    projectPom.getGroupId(),
+                    projectPom.getArtifactId(),
+                    ResolvedPom.placeholderHelper.replacePlaceholders(projectPom.getVersion(), mergedProperties::get)
+            );
+            result.put(gav, projectPom);
+        }
+        return result;
+    }
+
+    private Map<String, String> mergeProperties(final List<Pom> pomAncestry) {
+        Map<String, String> mergedProperties = new HashMap<>();
+        for (final Pom pom : pomAncestry) {
+            for (final Map.Entry<String, String> property : pom.getProperties().entrySet()) {
+                mergedProperties.putIfAbsent(property.getKey(), property.getValue());
+            }
+        }
+        return mergedProperties;
+    }
+
+    private List<Pom> getAncestryWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+        Pom parentPom = getParentWithinProject(projectPom, projectPoms);
+        if (parentPom == null) {
+            return Collections.singletonList(projectPom);
+        } else {
+            return ListUtils.concat(projectPom, getAncestryWithinProject(parentPom, projectPoms));
+        }
+    }
+
+    @Nullable
+    private Pom getParentWithinProject(Pom projectPom, Map<Path, Pom> projectPoms) {
+        final Parent parent = projectPom.getParent();
+        if (parent == null || projectPom.getSourcePath() == null) {
+            return null;
+        }
+        String relativePath = parent.getRelativePath();
+        if (StringUtils.isBlank(relativePath)) {
+            relativePath = "../pom.xml";
+        }
+        Path parentPath = projectPom.getSourcePath()
+                .resolve("..")
+                .resolve(Paths.get(relativePath))
+                .normalize();
+        return projectPoms.get(parentPath);
     }
 
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {
@@ -383,10 +437,16 @@ public class MavenPomDownloader {
 
         // The pom being examined might be from a remote repository or a local filesystem.
         // First try to match the requested download with one of the project POMs.
+        final Pom projectPomWithResolvedVersion = projectPomsByGav.get(gav);
+        if (projectPomWithResolvedVersion != null) {
+            return projectPomWithResolvedVersion;
+        }
+
+        // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                Objects.equals(projectPom.getValue(projectPom.getVersion()), projectPom.getValue(gav.getVersion()))) {
+                    gav.getArtifactId().equals(projectPom.getArtifactId()) &&
+                    gav.getVersion().equals(projectPom.getVersion())) {
                 return projectPom;
             }
         }
