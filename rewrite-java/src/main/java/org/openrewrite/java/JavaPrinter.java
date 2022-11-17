@@ -945,14 +945,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visitSpace(tryable.getPadding().getResources().getBefore(), Space.Location.TRY_RESOURCES, p);
             p.append('(');
             List<JRightPadded<Try.Resource>> resources = tryable.getPadding().getResources().getPadding().getElements();
-            for (int i = 0; i < resources.size(); i++) {
-                JRightPadded<Try.Resource> resource = resources.get(i);
-
+            for (JRightPadded<Try.Resource> resource : resources) {
                 visitSpace(resource.getElement().getPrefix(), Space.Location.TRY_RESOURCE, p);
                 visitMarkers(resource.getElement().getMarkers(), p);
                 visit(resource.getElement().getVariableDeclarations(), p);
 
-                if (i < resources.size() - 1 || resource.getElement().isTerminatedWithSemicolon()) {
+                if (resource.getElement().isTerminatedWithSemicolon()) {
                     p.append(';');
                 }
 
