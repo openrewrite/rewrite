@@ -68,28 +68,11 @@ public class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                    <!--~~(Unable to download metadata. Tried repositories:
-                https://repo.maven.apache.org/maven2: Did not attempt to download because of a previous failure to retrieve from this repository.)~~>--><dependency>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>credentials</artifactId>
-                      <version>2.3.0</version>
-                    </dependency>
-                    <!--~~(Unable to download metadata. Tried repositories:
-                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><!--~~(Unable to download POM. Tried repositories:
-                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>appio</artifactId>
-                      <version>1.3</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-              """
+            spec -> spec.after(after -> {
+                //There should be two errors (one for each failed metadata download)
+                assertThat(after.split("Unable to download metadata")).hasSize(3);
+                return after;
+                })
           )
         );
     }
