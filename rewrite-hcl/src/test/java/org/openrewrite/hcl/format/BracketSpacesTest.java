@@ -73,7 +73,6 @@ class BracketSpacesTest implements RewriteTest {
     @Test
     void objectValueBracesMulti() {
         rewriteRun(
-          spec -> spec.cycles(3),
           hcl(
             """
               resource "aws_ebs_volume" {
@@ -114,7 +113,6 @@ class BracketSpacesTest implements RewriteTest {
     @Test
     void objectValueBracesComplex() {
         rewriteRun(
-          spec -> spec.cycles(3),
           hcl(
             """
               resource "aws_ebs_volume" {

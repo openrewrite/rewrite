@@ -79,4 +79,18 @@ class HclCommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentAtEnd() {
+        rewriteRun(
+          hcl(
+            """
+              resource {
+                  a = 1
+              }
+             // end of file
+              """
+          )
+        );
+    }
 }

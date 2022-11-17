@@ -42,9 +42,9 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.named<Test>("test").configure {
-    retry {
-        maxRetries.set(4)
-    }
+//    retry {
+//        maxRetries.set(4)
+//    }
     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).takeIf { it > 0 } ?: 1
     useJUnitPlatform {
         excludeTags("debug")
