@@ -62,6 +62,12 @@ public class RemoveExtraSemicolons extends Recipe {
 
             @Override
             public J.Try.Resource visitTryResource(J.Try.Resource tr, ExecutionContext executionContext) {
+                J.Try _try = getCursor().dropParentUntil(is -> is instanceof J.Try).getValue();
+                if (_try.getResources().isEmpty() ||
+                        _try.getResources().get(_try.getResources().size() - 1) != tr ||
+                        !_try.getResources().get(_try.getResources().size() - 1).isTerminatedWithSemicolon()) {
+                    return tr;
+                }
                 return tr.withTerminatedWithSemicolon(false);
             }
 

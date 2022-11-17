@@ -15,10 +15,12 @@
  */
 package org.openrewrite.java.cleanup
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.tree.J
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
@@ -98,6 +100,12 @@ interface RemoveExtraSemicolonsTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        """)
+        """) { s -> s.afterRecipe { cu ->
+                val jTry = (((cu as J.CompilationUnit).classes[0].body.statements[0] as J.MethodDeclaration)
+                    .body!!.statements[0] as J.Try)
+                assertThat(jTry.resources!![0].isTerminatedWithSemicolon).isTrue
+                assertThat(jTry.resources!![1].isTerminatedWithSemicolon).isFalse()
+            }
+        }
     )
 }
