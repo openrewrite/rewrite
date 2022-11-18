@@ -89,6 +89,31 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
         """
     )
 
+    @Suppress("JavadocDeclaration")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2437")
+    @Test
+    fun renameJavaDocParam(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                /**
+                 * @param rename_one
+                 */
+                public void addTen(int rename_one) {
+                }
+            }
+        """,
+        after = """
+            class Test {
+                /**
+                 * @param renameOne
+                 */
+                public void addTen(int renameOne) {
+                }
+            }
+        """
+    )
+
     @Test
     fun doNotChangeStaticImports(jp: JavaParser) = assertUnchanged(
         jp,

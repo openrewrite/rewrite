@@ -21,6 +21,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.cleanup.RenameJavaDocParamNameVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.util.Arrays;
@@ -83,13 +84,25 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
-            J parent  = getCursor().getParentTreeCursor().getValue();
+            Cursor parent  = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
-                if (parent instanceof J.FieldAccess) {
-                    if (fieldAccessTargetsVariable((J.FieldAccess)parent)) {
+                if (parent.getValue() instanceof J.FieldAccess) {
+                    if (fieldAccessTargetsVariable(parent.getValue())) {
                         return ident.withSimpleName(newName);
                     }
                 } else if (currentNameScope.size() == 1) {
+                    if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
+                        J variableDeclaration = parent.getParentTreeCursor().getValue();
+                        J maybeParameter = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
+                        if (maybeParameter instanceof J.MethodDeclaration) {
+                            J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
+                            if (methodDeclaration.getParameters().contains((Statement) variableDeclaration) &&
+                                    methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment)) {
+                                doAfterVisit(new RenameJavaDocParamNameVisitor<>((J.MethodDeclaration) maybeParameter, renameVariable.getSimpleName(), newName));
+                            }
+                        }
+                    }
+
                     // The size of the stack will be 1 if the identifier is in the right scope.
                     return ident.withSimpleName(newName);
                 }
