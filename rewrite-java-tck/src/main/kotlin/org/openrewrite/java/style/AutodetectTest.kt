@@ -476,7 +476,6 @@ interface AutodetectTest {
         val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
 
         assertThat(spacesStyle.within.methodCallParentheses).isFalse
-        assertThat(spacesStyle.within.methodCallParentheses).isFalse
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2098")
@@ -495,7 +494,50 @@ interface AutodetectTest {
         val spacesStyle = NamedStyles.merge(SpacesStyle::class.java, listOf(styles))!!
 
         assertThat(spacesStyle.within.methodCallParentheses).isTrue
-        assertThat(spacesStyle.within.methodCallParentheses).isTrue
+    }
+
+    @Suppress("StatementWithEmptyBody")
+    @Test
+    fun detectElseWithNoNewLine(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void method(int n) {
+                        if (n == 0) {
+                        } else if (n == 1) {
+                        } else {
+                        }
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle::class.java, listOf(styles))!!
+
+        assertThat(wrappingAndBracesStyle.ifStatement.elseOnNewLine).isFalse
+    }
+
+    @Suppress("StatementWithEmptyBody")
+    @Test
+    fun detectElseOnNewLine(jp: JavaParser) {
+        val cus = jp.parse(
+            """
+                class Test {
+                    void method(int n) {
+                        if (n == 0) {
+                        }
+                        else if (n == 1) {
+                        }
+                        else {
+                        }
+                    }
+                }
+            """.trimIndent()
+        )
+        val styles = Autodetect.detect(cus)
+        val wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle::class.java, listOf(styles))!!
+
+        assertThat(wrappingAndBracesStyle.ifStatement.elseOnNewLine).isTrue
     }
 
     @Test

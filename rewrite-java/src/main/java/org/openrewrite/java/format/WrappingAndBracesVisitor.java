@@ -116,6 +116,18 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.If.Else visitElse(J.If.Else elze, P p) {
+        J.If.Else e = super.visitElse(elze, p);
+        if (style.getIfStatement().getElseOnNewLine() && !e.getPrefix().getWhitespace().contains("\n")) {
+            e = e.withPrefix(e.getPrefix().withWhitespace("\n" + e.getPrefix().getWhitespace()));
+        } else if (!style.getIfStatement().getElseOnNewLine() && e.getPrefix().getWhitespace().contains("\n")) {
+            e = e.withPrefix(Space.EMPTY);
+        }
+
+        return e;
+    }
+
+    @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
         // TODO make annotation wrapping configurable
