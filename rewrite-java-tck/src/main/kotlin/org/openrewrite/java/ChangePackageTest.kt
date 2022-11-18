@@ -881,6 +881,62 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
+    fun staticImport2(jp: JavaParser) = assertChanged(
+        jp,
+        dependsOn = arrayOf("""
+            package org.openrewrite.enuma;
+            public enum EnumA {
+                A1,
+                A2
+            }
+        """.trimIndent(), """
+            package org.openrewrite.enumb;
+            public enum EnumB {
+                B1,
+                B2
+            }
+        """.trimIndent()),
+        before = """
+            package org.openrewrite.app;
+            import static org.openrewrite.enuma.EnumA.A1;
+            import static org.openrewrite.enuma.EnumA.A2;
+            import static org.openrewrite.enuma.EnumB.B1;
+            import static org.openrewrite.enuma.EnumB.B2;
+
+            public class App {
+                public void test(String s) {
+                    if (s.equals(" " + A1 + A2 + B1 + B2)) {
+
+                    }
+                }
+            }
+        """,
+        after = """
+            package org.openrewrite.test.app;
+            import static org.openrewrite.test.enuma.EnumA.A1;
+            import static org.openrewrite.test.enuma.EnumA.A2;
+            import static org.openrewrite.test.enuma.EnumB.B1;
+            import static org.openrewrite.test.enuma.EnumB.B2;
+
+            public class App {
+                public void test(String s) {
+                    if (s.equals(" " + A1 + A2 + B1 + B2)) {
+
+                    }
+                }
+            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.enuma.EnumA")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.enuma.EnumA")).isNotEmpty()
+            assertThat(cu.findType("org.openrewrite.enuma.EnumB")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.enuma.EnumB")).isNotEmpty()
+            assertThat(cu.findType("org.openrewrite.app.App")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.app.App")).isNotEmpty()
+        }
+    )
+
+    @Test
     fun changeTypeWithInnerClass(jp: JavaParser) = assertChanged(
         recipe = ChangePackage("com.acme.product", "com.acme.product.v2", null),
         dependsOn = arrayOf(
