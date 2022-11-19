@@ -95,7 +95,7 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
-        return new WrappingAndBracesStyle();
+        return new WrappingAndBracesStyle(new WrappingAndBracesStyle.IfStatement(false));
     }
 
 }

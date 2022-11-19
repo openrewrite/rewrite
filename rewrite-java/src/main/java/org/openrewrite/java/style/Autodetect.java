@@ -63,6 +63,7 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistics indentStatistics = new IndentStatistics();
         private final ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
         private final SpacesStatistics spacesStatistics = new SpacesStatistics();
+        private final WrappingAndBracesStatistics wrappingAndBracesStatistics = new WrappingAndBracesStatistics();
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
         private final NavigableSet<String> importedPackages = new TreeSet<>();
 
@@ -81,6 +82,7 @@ public class Autodetect extends NamedStyles {
             new FindIndentJavaVisitor().visitNonNull(cu, indentStatistics);
             new FindImportLayout().visitNonNull(cu, importLayoutStatistics);
             new FindSpacesStyle().visitNonNull(cu, spacesStatistics);
+            new FindWrappingAndBracesStyle().visitNonNull(cu, wrappingAndBracesStatistics);
             new FindLineFormatJavaVisitor().visitNonNull(cu, generalFormatStatistics);
         }
 
@@ -89,6 +91,7 @@ public class Autodetect extends NamedStyles {
                     indentStatistics.getTabsAndIndentsStyle(),
                     importLayoutStatistics.getImportLayoutStyle(),
                     spacesStatistics.getSpacesStyle(),
+                    wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
                     generalFormatStatistics.getFormatStyle()));
         }
     }
@@ -1091,6 +1094,30 @@ public class Autodetect extends NamedStyles {
 
         private int hasSpace(Space space) {
             return space.getWhitespace().contains(" ") ? 1 : -1;
+        }
+    }
+
+    private static class WrappingAndBracesStatistics {
+        int elseOnNewLine = 0;
+
+        public WrappingAndBracesStyle getWrappingAndBracesStyle() {
+            WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
+            return wrappingAndBracesStyle
+                    .withIfStatement(new WrappingAndBracesStyle.IfStatement(
+                            elseOnNewLine > 0)
+                    );
+        }
+    }
+
+    private static class FindWrappingAndBracesStyle extends JavaIsoVisitor<WrappingAndBracesStatistics> {
+        @Override
+        public J.If.Else visitElse(J.If.Else elze, WrappingAndBracesStatistics stats) {
+            stats.elseOnNewLine += hasNewLine(elze.getPrefix());
+            return super.visitElse(elze, stats);
+        }
+
+        private int hasNewLine(Space space) {
+            return space.getWhitespace().contains("\n") ? 1 : -1;
         }
     }
 }

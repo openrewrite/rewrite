@@ -106,8 +106,7 @@ interface NeedBracesTest : JavaRecipeTest {
                 static void addToIfElse(int n) {
                     if (n == 1) {
                         return;
-                    }
-                    else {
+                    } else {
                         return;
                     }
                 }
@@ -115,11 +114,9 @@ interface NeedBracesTest : JavaRecipeTest {
                 static void addToIfElseIfElse(int n) {
                     if (n == 1) {
                         return;
-                    }
-                    else if (n == 2) {
+                    } else if (n == 2) {
                         return;
-                    }
-                    else {
+                    } else {
                         return;
                     }
                 }

@@ -22,4 +22,12 @@ import org.openrewrite.java.JavaStyle;
 @Value
 @With
 public class WrappingAndBracesStyle implements JavaStyle {
+
+    IfStatement ifStatement;
+
+    @Value
+    @With
+    public static class IfStatement {
+        Boolean elseOnNewLine;
+    }
 }

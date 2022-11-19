@@ -55,16 +55,16 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
                 .orElse(IntelliJ.blankLines()), stopAfter)
                 .visit(t, p, cursor.fork());
 
+        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
+                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+                .visit(t, p, cursor.fork());
+
         t = new SpacesVisitor<>(
                 Optional.ofNullable(((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
                 ((SourceFile) cu).getStyle(EmptyForInitializerPadStyle.class),
                 ((SourceFile) cu).getStyle(EmptyForIteratorPadStyle.class),
                 stopAfter
         ).visit(t, p, cursor.fork());
-
-        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
-                .visit(t, p, cursor.fork());
 
         t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
