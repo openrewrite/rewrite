@@ -46,9 +46,12 @@ interface FinalizeLocalVariablesTest : RewriteTest {
                             sb.append(line);
                         }
                     } catch (Exception e) {
-                        logger.error("Exception", e);
+                        error("Exception", e);
                     }
                 }
+                private static void error(String s, Exception e) {
+                
+                } 
             }
         """)
     )
