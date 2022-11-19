@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
@@ -51,7 +53,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
-        J.VariableDeclarations mv = visitAndCast(multiVariable, p, super::visitVariableDeclarations);
+        J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, p);
 
         // if this already has "final", we don't need to bother going any further; we're done
         if (mv.hasModifier(J.Modifier.Type.Final)) {
@@ -74,7 +76,7 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
 
         if (mv.getVariables().stream()
                 .noneMatch(v -> FindAssignmentReferencesToVariable.find(getCursor().getParentTreeCursor().getValue(), v).get())) {
-            mv = maybeAutoFormat(mv,
+            mv = autoFormat(
                     mv.withModifiers(
                             ListUtils.concat(mv.getModifiers(), new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList()))
                     ), p);
@@ -90,80 +92,72 @@ public class FinalizeLocalVariablesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private boolean isField(Cursor cursor) {
-        return cursor
-                // .getParentOrThrow() // JRightPadded
-                // .getParentOrThrow() // J.VariableDeclarations
-                .getParentOrThrow() // JRightPadded
-                .getParentOrThrow() // J.Block
-                .getParentOrThrow() // maybe J.ClassDeclaration
+        return cursor.dropParentUntil(parent -> parent instanceof J.ClassDeclaration || parent instanceof J.MethodDeclaration)
                 .getValue() instanceof J.ClassDeclaration;
     }
 
 
-    private static class FindAssignmentReferencesToVariable {
-        private FindAssignmentReferencesToVariable() {
-        }
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private static class FindAssignmentReferencesToVariable extends JavaIsoVisitor<AtomicBoolean> {
+
+        J.VariableDeclarations.NamedVariable variable;
 
         /**
          * @param j        The subtree to search.
          * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for any reassignment calls.
          * @return A set of {@link NameTree} locations of reassignment calls to this variable.
          */
-        private static AtomicBoolean find(J j, J.VariableDeclarations.NamedVariable variable) {
-            JavaIsoVisitor<AtomicBoolean> findVisitor = new JavaIsoVisitor<AtomicBoolean>() {
+        static AtomicBoolean find(J j, J.VariableDeclarations.NamedVariable variable) {
+            return new FindAssignmentReferencesToVariable(variable)
+                    .reduce(j, new AtomicBoolean());
+        }
 
-                @Override
-                public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean hasAssignment) {
-                    if (hasAssignment.get()) {
-                        return assignment;
-                    }
-                    J.Assignment a = super.visitAssignment(assignment, hasAssignment);
-                    if (a.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = (J.Identifier) a.getVariable();
-                        if (i.getSimpleName().equals(variable.getSimpleName())) {
-                            hasAssignment.set(true);
-                        }
-                    }
-                    return a;
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, AtomicBoolean hasAssignment) {
+            if (hasAssignment.get()) {
+                return assignment;
+            }
+            J.Assignment a = super.visitAssignment(assignment, hasAssignment);
+            if (a.getVariable() instanceof J.Identifier) {
+                J.Identifier i = (J.Identifier) a.getVariable();
+                if (i.getSimpleName().equals(variable.getSimpleName())) {
+                    hasAssignment.set(true);
                 }
+            }
+            return a;
+        }
 
-                @Override
-                public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, AtomicBoolean hasAssignment) {
-                    if (hasAssignment.get()) {
-                        return assignOp;
-                    }
+        @Override
+        public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, AtomicBoolean hasAssignment) {
+            if (hasAssignment.get()) {
+                return assignOp;
+            }
 
-                    J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, hasAssignment);
-                    if (a.getVariable() instanceof J.Identifier) {
-                        J.Identifier i = (J.Identifier) a.getVariable();
-                        if (i.getSimpleName().equals(variable.getSimpleName())) {
-                            hasAssignment.set(true);
-                        }
-                    }
-                    return a;
+            J.AssignmentOperation a = super.visitAssignmentOperation(assignOp, hasAssignment);
+            if (a.getVariable() instanceof J.Identifier) {
+                J.Identifier i = (J.Identifier) a.getVariable();
+                if (i.getSimpleName().equals(variable.getSimpleName())) {
+                    hasAssignment.set(true);
                 }
+            }
+            return a;
+        }
 
-                @Override
-                public J.Unary visitUnary(J.Unary unary, AtomicBoolean hasAssignment) {
-                    if (hasAssignment.get()) {
-                        return unary;
-                    }
+        @Override
+        public J.Unary visitUnary(J.Unary unary, AtomicBoolean hasAssignment) {
+            if (hasAssignment.get()) {
+                return unary;
+            }
 
-                    J.Unary u = super.visitUnary(unary, hasAssignment);
-                    if (u.getExpression() instanceof J.Identifier) {
-                        J.Identifier i = (J.Identifier) u.getExpression();
-                        if (i.getSimpleName().equals(variable.getSimpleName())) {
-                            hasAssignment.set(true);
-                        }
-                    }
-                    return u;
+            J.Unary u = super.visitUnary(unary, hasAssignment);
+            if (u.getExpression() instanceof J.Identifier) {
+                J.Identifier i = (J.Identifier) u.getExpression();
+                if (i.getSimpleName().equals(variable.getSimpleName())) {
+                    hasAssignment.set(true);
                 }
-
-            };
-
-            AtomicBoolean hasAssignment = new AtomicBoolean(false);
-            findVisitor.visit(j, hasAssignment);
-            return hasAssignment;
+            }
+            return u;
         }
     }
 }

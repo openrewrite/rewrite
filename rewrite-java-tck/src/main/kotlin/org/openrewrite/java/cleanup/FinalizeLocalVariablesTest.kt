@@ -21,17 +21,22 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface FinalizeLocalVariablesTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = FinalizeLocalVariables()
+interface FinalizeLocalVariablesTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(FinalizeLocalVariables())
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1478")
     @Test
-    fun initializedInWhileLoop(jp: JavaParser) = assertUnchanged(
-        before = """
+    fun initializedInWhileLoop() = rewriteRun(
+        java("""
             import java.io.BufferedReader;
             class T {
                 public void doSomething(StringBuilder sb, BufferedReader br) {
@@ -45,13 +50,12 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun localVariablesAreMadeFinal(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun localVariablesAreMadeFinal() = rewriteRun(
+        java("""
             class A {
                 public void test() {
                     int n = 1;
@@ -60,7 +64,7 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 public void test() {
                     final int n = 1;
@@ -68,13 +72,12 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun identifyReassignedLocalVariables(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun identifyReassignedLocalVariables() = rewriteRun(
+        java("""
             class A {
                 public void test() {
                     int a = 0;
@@ -87,7 +90,7 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 public void test() {
                     int a = 0;
@@ -99,14 +102,13 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Disabled("consider uninitialized local variables non final")
     @Test
-    fun multipleVariablesDeclarationOnSingleLine(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun multipleVariablesDeclarationOnSingleLine() = rewriteRun(
+        java("""
             class A {
                 public void multiVariables() {
                     int a, b = 1;
@@ -115,21 +117,20 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
             }
         """,
         // the final only applies to any initialized variables (b in this case)
-        after = """
+        """
             class A {
                 public void multiVariables() {
                     final int a, b = 1;
                     a = 0;
                 }
             }
-        """
+        """)
     )
 
     @Disabled("consider uninitialized local variables non final")
     @Test
-    fun calculateLocalVariablesInitializerOffset(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun calculateLocalVariablesInitializerOffset() = rewriteRun(
+        java("""
             class A {
                 public void testOne() {
                     int a;
@@ -152,7 +153,7 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 public void testOne() {
                     final int a;
@@ -174,14 +175,13 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     System.out.println(a);
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Disabled
-    fun calculateLocalVariablesInitializerBranching(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun calculateLocalVariablesInitializerBranching() = rewriteRun(
+        java("""
             class A {
                 public void test(boolean hasThing) {
                     int a;
@@ -194,7 +194,7 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 public void test(boolean hasThing) {
                     final int a;
@@ -206,14 +206,13 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     System.out.println(a);
                 }
             }
-        """
+        """)
     )
 
     @Disabled("consider uninitialized local variables non final")
     @Test
-    fun forEachLoopAssignmentMadeFinal(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun forEachLoopAssignmentMadeFinal() = rewriteRun(
+        java("""
             class Test {
                 public static void testForEach(String[] args) {
                     for (String a : args) {
@@ -227,7 +226,7 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 public static void testForEach(String[] args) {
                     for (final String a : args) {
@@ -240,13 +239,12 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun localVariableScopeAwareness(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun localVariableScopeAwareness() = rewriteRun(
+        java("""
             class Test {
                 public static void testA() {
                     int a = 0;
@@ -258,7 +256,7 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 public static void testA() {
                     int a = 0;
@@ -269,14 +267,13 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     final int a = 0;
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Disabled("consider uninitialized local variables non final")
-    fun forEachLoopScopeAwareness(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun forEachLoopScopeAwareness() = rewriteRun(
+        java("""
             class Test {
                 public static void testForEach(String[] args) {
                     for (String i : args) {
@@ -290,7 +287,7 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 public static void testForEach(String[] args) {
                     for (final String i : args) {
@@ -303,53 +300,49 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/549")
-    fun catchBlocksIgnored(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun catchBlocksIgnored() = rewriteRun(
+        java("""
             import java.io.IOException;
             
             class Test {
                 static {
                     try {
-                        null;
+                        throw new IOException();
                     } catch (RuntimeException | IOException e) {
-                        null;
+                        System.out.println("oops");
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test // aka "non-static-fields"
-    fun instanceVariablesIgnored(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun instanceVariablesIgnored() = rewriteRun(
+        java("""
             class Test {
                 int instanceVariableUninitialized;
                 int instanceVariableInitialized = 0;
             }
-        """
+        """)
     )
 
     @Test // aka "static fields"
-    fun classVariablesIgnored(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun classVariablesIgnored() = rewriteRun(
+        java("""
             class Test {
                 static int classVariableInitialized = 0;
             }
-        """
+        """)
     )
 
     @Test
-    fun classInitializersIgnored(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun classInitializersIgnored() = rewriteRun(
+        java("""
             class Test {
                 static {
                     int n = 1;
@@ -357,13 +350,12 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun methodParameterVariablesIgnored(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun methodParameterVariablesIgnored() = rewriteRun(
+        java("""
             class Test {
                 private static int testMath(int x, int y) {
                     y = y + y;
@@ -373,27 +365,25 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                 public static void main(String[] args) {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun lambdaVariablesIgnored(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun lambdaVariablesIgnored() = rewriteRun(
+        java("""
             import java.util.stream.Stream;
             class A {
                 public boolean hasFoo(Stream<String> input) {
                     return input.anyMatch(word -> word.equalsIgnoreCase("foo"));
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1357")
     @Test
-    fun forLoopVariablesIgnored(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun forLoopVariablesIgnored() = rewriteRun(
+        java("""
             import java.util.concurrent.FutureTask;
             
             class A {
@@ -401,6 +391,6 @@ interface FinalizeLocalVariablesTest : JavaRecipeTest {
                     for(FutureTask<?> future; (future = new FutureTask<>(() -> "hello world")) != null;) { }
                 }
             }
-        """
+        """)
     )
 }
