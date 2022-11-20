@@ -900,8 +900,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             package org.openrewrite.app;
             import static org.openrewrite.enuma.EnumA.A1;
             import static org.openrewrite.enuma.EnumA.A2;
-            import static org.openrewrite.enuma.EnumB.B1;
-            import static org.openrewrite.enuma.EnumB.B2;
+            import static org.openrewrite.enumb.EnumB.B1;
+            import static org.openrewrite.enumb.EnumB.B2;
 
             public class App {
                 public void test(String s) {
@@ -915,8 +915,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             package org.openrewrite.test.app;
             import static org.openrewrite.test.enuma.EnumA.A1;
             import static org.openrewrite.test.enuma.EnumA.A2;
-            import static org.openrewrite.test.enuma.EnumB.B1;
-            import static org.openrewrite.test.enuma.EnumB.B2;
+            import static org.openrewrite.test.enumb.EnumB.B1;
+            import static org.openrewrite.test.enumb.EnumB.B2;
 
             public class App {
                 public void test(String s) {
@@ -929,8 +929,8 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
         afterConditions = { cu ->
             assertThat(cu.findType("org.openrewrite.enuma.EnumA")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.enuma.EnumA")).isNotEmpty()
-            assertThat(cu.findType("org.openrewrite.enuma.EnumB")).isEmpty()
-            assertThat(cu.findType("org.openrewrite.test.enuma.EnumB")).isNotEmpty()
+            assertThat(cu.findType("org.openrewrite.enumb.EnumB")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.enumb.EnumB")).isNotEmpty()
             assertThat(cu.findType("org.openrewrite.app.App")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.app.App")).isNotEmpty()
         }
