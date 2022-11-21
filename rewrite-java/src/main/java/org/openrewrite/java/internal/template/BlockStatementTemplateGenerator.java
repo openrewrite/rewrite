@@ -407,8 +407,7 @@ public class BlockStatementTemplateGenerator {
             } else if (statement instanceof J.VariableDeclarations) {
                 String vd = variable((J.VariableDeclarations) statement, false, cursor);
                 if (isNestedClass) {
-                    enumClass.append(vd);
-                    enumClass.append(";\n");
+                    enumClass.append(vd).append(";\n");
                 } else {
                     after.append(vd).append(";\n");
                 }
