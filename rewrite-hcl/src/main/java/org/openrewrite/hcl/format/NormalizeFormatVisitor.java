@@ -101,42 +101,6 @@ public class NormalizeFormatVisitor<P> extends HclIsoVisitor<P> {
     }
 
     @Override
-    public Hcl.ForIntro visitForIntro(Hcl.ForIntro forIntro, P p) {
-        Hcl.ForIntro f = super.visitForIntro(forIntro, p);
-
-        if (Space.firstPrefix(f.getVariables()) != Space.EMPTY) {
-            f = concatenateSpace(f, Space.firstPrefix(f.getVariables()));
-            f = f.withVariables(Space.formatFirstPrefix(f.getVariables(), Space.EMPTY));
-        }
-
-        return f;
-    }
-
-    @Override
-    public Hcl.ForObject visitForObject(Hcl.ForObject forObject, P p) {
-        Hcl.ForObject f = super.visitForObject(forObject, p);
-
-        if (f.getIntro().getPrefix() != Space.EMPTY) {
-            f = concatenateSpace(f, f.getIntro().getPrefix());
-            f = f.withIntro(f.getIntro().withPrefix(Space.EMPTY));
-        }
-
-        return f;
-    }
-
-    @Override
-    public Hcl.ForTuple visitForTuple(Hcl.ForTuple forTuple, P p) {
-        Hcl.ForTuple f = super.visitForTuple(forTuple, p);
-
-        if (f.getIntro().getPrefix() != Space.EMPTY) {
-            f = concatenateSpace(f, f.getIntro().getPrefix());
-            f = f.withIntro(f.getIntro().withPrefix(Space.EMPTY));
-        }
-
-        return f;
-    }
-
-    @Override
     public Hcl.FunctionCall visitFunctionCall(Hcl.FunctionCall functionCall, P p) {
         Hcl.FunctionCall f = super.visitFunctionCall(functionCall, p);
 

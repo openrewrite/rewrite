@@ -30,6 +30,19 @@ class AutoFormatTest implements RewriteTest {
     }
 
     @Test
+    void forLoops() {
+        rewriteRun(
+          hcl(
+          """
+              a = [for v in ["a", "b"] : v]
+              b = [for i, v in ["a", "b"] : i]
+              c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
+          """
+          )
+        );
+    }
+
+    @Test
     void objectValues() {
         rewriteRun(
           hcl(

@@ -48,16 +48,16 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
                 .orElse(BracketsStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
+        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
+                .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
+                .visit(t, p, cursor.fork());
+
         t = new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
                 .orElse(SpacesStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
         t = new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
                 .orElse(BlankLinesStyle.DEFAULT), stopAfter)
-                .visit(t, p, cursor.fork());
-
-        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
-                .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
                 .visit(t, p, cursor.fork());
 
         if (t instanceof Hcl.ConfigFile) {
@@ -71,8 +71,14 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
     public Hcl visitConfigFile(Hcl.ConfigFile cf, P p) {
         Hcl.ConfigFile t = (Hcl.ConfigFile) new RemoveTrailingWhitespaceVisitor<>().visit(cf, p);
 
+        t = (Hcl.ConfigFile) new NormalizeFormatVisitor<>().visit(t, p);
+
         t = (Hcl.ConfigFile) new BracketsVisitor<>(Optional.ofNullable(cf.getStyle(BracketsStyle.class))
                 .orElse(BracketsStyle.DEFAULT), stopAfter)
+                .visit(t, p);
+
+        t = (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
+                .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
                 .visit(t, p);
 
         t = (Hcl.ConfigFile) new SpacesVisitor<>(Optional.ofNullable(cf.getStyle(SpacesStyle.class))
@@ -81,10 +87,6 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
 
         t = (Hcl.ConfigFile) new BlankLinesVisitor<>(Optional.ofNullable(cf.getStyle(BlankLinesStyle.class))
                 .orElse(BlankLinesStyle.DEFAULT), stopAfter)
-                .visit(t, p);
-
-        t = (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(cf.getStyle(TabsAndIndentsStyle.class))
-                .orElse(TabsAndIndentsStyle.DEFAULT), stopAfter)
                 .visit(t, p);
 
         assert t != null;
