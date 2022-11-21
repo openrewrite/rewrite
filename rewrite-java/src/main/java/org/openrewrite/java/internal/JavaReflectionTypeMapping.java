@@ -339,7 +339,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 "<constructor>",
                 null,
                 paramNames,
-                null, null, null
+                null, null, null, null
         );
         typeCache.put(signature, mappedMethod);
 
@@ -399,7 +399,8 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 method.getName(),
                 null,
                 paramNames,
-                null, null, null
+                null, null, null,
+                method.getDefaultValue()
         );
         typeCache.put(signature, mappedMethod);
 

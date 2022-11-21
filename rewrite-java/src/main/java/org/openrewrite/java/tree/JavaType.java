@@ -17,11 +17,11 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
@@ -68,7 +68,7 @@ public interface JavaType {
     }
 
     default boolean isAssignableFrom(Pattern pattern) {
-         if (this instanceof FullyQualified) {
+        if (this instanceof FullyQualified) {
             FullyQualified fq = (FullyQualified) this;
             if (pattern.matcher(fq.getFullyQualifiedName()).matches()) {
                 return true;
@@ -101,7 +101,7 @@ public interface JavaType {
         private List<JavaType> throwableTypes;
 
         public List<JavaType> getThrowableTypes() {
-            if(throwableTypes == null) {
+            if (throwableTypes == null) {
                 return Collections.emptyList();
             }
             return throwableTypes;
@@ -109,7 +109,7 @@ public interface JavaType {
 
         public MultiCatch withThrowableTypes(@Nullable List<JavaType> throwableTypes) {
             throwableTypes = nullIfEmpty(throwableTypes);
-            if(this.throwableTypes == throwableTypes) {
+            if (this.throwableTypes == throwableTypes) {
                 return this;
             }
             return new MultiCatch(throwableTypes);
@@ -264,16 +264,16 @@ public interface JavaType {
 
         public boolean isAssignableTo(String fullyQualifiedName) {
             return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), fullyQualifiedName) ||
-                    getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName))
-                    || (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
+                   getInterfaces().stream().anyMatch(anInterface -> anInterface.isAssignableTo(fullyQualifiedName))
+                   || (getSupertype() != null && getSupertype().isAssignableTo(fullyQualifiedName));
         }
 
         public boolean isAssignableFrom(@Nullable JavaType type) {
             if (type instanceof FullyQualified) {
                 FullyQualified clazz = (FullyQualified) type;
                 return TypeUtils.fullyQualifiedNamesAreEqual(getFullyQualifiedName(), clazz.getFullyQualifiedName()) ||
-                        isAssignableFrom(clazz.getSupertype()) ||
-                        clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
+                       isAssignableFrom(clazz.getSupertype()) ||
+                       clazz.getInterfaces().stream().anyMatch(this::isAssignableFrom);
             } else if (type instanceof GenericTypeVariable) {
                 GenericTypeVariable generic = (GenericTypeVariable) type;
                 for (JavaType bound : generic.getBounds()) {
@@ -469,7 +469,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Class aClass = (Class) o;
             return TypeUtils.fullyQualifiedNamesAreEqual(fullyQualifiedName, aClass.fullyQualifiedName) &&
-                    (typeParameters == null && aClass.typeParameters == null || typeParameters != null && typeParameters.equals(aClass.typeParameters));
+                   (typeParameters == null && aClass.typeParameters == null || typeParameters != null && typeParameters.equals(aClass.typeParameters));
         }
 
         @Override
@@ -697,7 +697,7 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             GenericTypeVariable that = (GenericTypeVariable) o;
             return name.equals(that.name) && variance == that.variance &&
-                    (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && bounds.equals(that.bounds));
+                   (variance == Variance.INVARIANT && bounds == null && that.bounds == null || bounds != null && bounds.equals(that.bounds));
         }
 
         @Override
@@ -909,10 +909,14 @@ public interface JavaType {
         @Nullable
         List<FullyQualified> annotations;
 
+        @Incubating(since = "7.34.0")
+        @Nullable
+        Object defaultValue;
+
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
                       @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations) {
+                      @Nullable List<FullyQualified> annotations, @Nullable Object defaultValue) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = unknownIfNull(declaringType);
@@ -922,6 +926,7 @@ public interface JavaType {
             this.parameterTypes = nullIfEmpty(parameterTypes);
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
+            this.defaultValue = defaultValue;
         }
 
         @Override
@@ -996,7 +1001,7 @@ public interface JavaType {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    parameterNames, this.parameterTypes, this.thrownExceptions, this.annotations);
+                    parameterNames, this.parameterTypes, this.thrownExceptions, this.annotations, this.defaultValue);
         }
 
         public List<JavaType> getParameterTypes() {
@@ -1009,7 +1014,7 @@ public interface JavaType {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    this.parameterNames, parameterTypes, this.thrownExceptions, this.annotations);
+                    this.parameterNames, parameterTypes, this.thrownExceptions, this.annotations, this.defaultValue);
         }
 
         public List<FullyQualified> getThrownExceptions() {
@@ -1022,7 +1027,7 @@ public interface JavaType {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    this.parameterNames, this.parameterTypes, thrownExceptions, this.annotations);
+                    this.parameterNames, this.parameterTypes, thrownExceptions, this.annotations, this.defaultValue);
         }
 
         public List<FullyQualified> getAnnotations() {
@@ -1035,7 +1040,7 @@ public interface JavaType {
                 return this;
             }
             return new Method(this.managedReference, this.flagsBitMap, this.declaringType, this.name, this.returnType,
-                    this.parameterNames, this.parameterTypes, this.thrownExceptions, annotations);
+                    this.parameterNames, this.parameterTypes, this.thrownExceptions, annotations, this.defaultValue);
         }
 
         public boolean hasFlags(Flag... test) {
@@ -1056,9 +1061,9 @@ public interface JavaType {
             if (o == null || getClass() != o.getClass()) return false;
             Method method = (Method) o;
             return Objects.equals(declaringType, method.declaringType) &&
-                    name.equals(method.name) &&
-                    Objects.equals(returnType, method.returnType) &&
-                    Objects.equals(parameterTypes, method.parameterTypes);
+                   name.equals(method.name) &&
+                   Objects.equals(returnType, method.returnType) &&
+                   Objects.equals(parameterTypes, method.parameterTypes);
         }
 
         @Override

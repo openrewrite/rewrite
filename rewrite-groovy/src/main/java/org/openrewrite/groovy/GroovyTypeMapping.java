@@ -229,7 +229,8 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
                 node instanceof ConstructorNode ? "<constructor>" : node.getName(),
                 null,
                 paramNames,
-                null, null, null
+                null, null, null,
+                null
         );
         typeCache.put(signature, method);
 

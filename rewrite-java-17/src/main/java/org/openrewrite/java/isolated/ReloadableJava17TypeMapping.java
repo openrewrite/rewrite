@@ -402,7 +402,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                 null,
                 paramNames,
-                null, null, null
+                null, null, null, null
         );
         typeCache.put(signature, method);
 
@@ -496,7 +496,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                     null,
                     paramNames,
-                    null, null, null
+                    null, null, null,
+                    methodSymbol.getDefaultValue() != null ? methodSymbol.defaultValue.getValue() : null
             );
             typeCache.put(signature, method);
 

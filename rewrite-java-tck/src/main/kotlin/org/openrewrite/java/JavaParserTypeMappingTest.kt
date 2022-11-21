@@ -23,6 +23,7 @@ import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.TypeUtils
 
 interface JavaParserTypeMappingTest : JavaTypeMappingTest {
 
@@ -35,6 +36,20 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
     @BeforeEach
     fun beforeRecipe() {
         parser.reset()
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2445")
+    @Test
+    fun annotationParameterDefaults() {
+        val source = """
+            @Deprecated
+            class Test {
+            }
+        """
+
+        val cu = parser.parse(source)[0]
+        val t = TypeUtils.asClass(cu.classes[0].allAnnotations[0].type)!!
+        assertThat(t.methods.map { it.defaultValue }).allMatch { it != null }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1782")

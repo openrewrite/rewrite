@@ -91,7 +91,7 @@ public class StringLiteralEquality extends Recipe {
                             JavaType.Primitive.Boolean,
                             singletonList("o"),
                             singletonList(TYPE_OBJECT),
-                            null, null
+                            null, null, null
                     )
             );
         }
