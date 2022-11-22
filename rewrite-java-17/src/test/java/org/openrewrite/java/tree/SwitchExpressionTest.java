@@ -16,9 +16,13 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 public class SwitchExpressionTest implements RewriteTest {
@@ -99,6 +103,38 @@ public class SwitchExpressionTest implements RewriteTest {
                 }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2357")
+    @Test
+    void visitSwitchExpressionAndGetType() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(JavaIsoVisitor::new)),
+          java(
+            """
+              class Test {
+                int test(int i) {
+                    return switch (i) {
+                        case 1 -> 1;
+                        case 2 -> 2;
+                        default -> 3;
+                    };
+                }
+              }
+              """,
+              spec -> spec.afterRecipe(cu -> {
+                  J.MethodDeclaration md = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+                  assert md.getBody() != null;
+
+                  J.SwitchExpression s = ((J.SwitchExpression) ((J.Return) md.getBody().getStatements().get(0)).getExpression());
+                  assert s != null;
+
+                  JavaType type = s.getType();
+                  assertThat(type).isEqualTo(JavaType.Primitive.Int);
+              }
+            )
           )
         );
     }

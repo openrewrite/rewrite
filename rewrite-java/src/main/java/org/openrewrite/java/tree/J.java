@@ -4644,11 +4644,12 @@ public interface J extends Tree {
         public JavaType getType() {
             return new JavaVisitor<AtomicReference<JavaType>>() {
                 @Override
-                public J visitCase(Case caze, AtomicReference<JavaType> javaType) {
-                    if (!caze.getExpressions().isEmpty()) {
+                public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
+                    if (!block.getStatements().isEmpty()) {
+                        Case caze = (Case) block.getStatements().get(0);
                         javaType.set(caze.getExpressions().get(0).getType());
                     }
-                    return caze;
+                    return block;
                 }
             }.reduce(this, new AtomicReference<>()).get();
         }
