@@ -139,15 +139,6 @@ public class ChangeParentPom extends Recipe {
             @Nullable
             private Collection<String> availableVersions;
 
-            @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Xml.Document m = super.visitDocument(document, executionContext);
-                if (m != document) {
-                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
-                }
-                return m;
-            }
-
             @SuppressWarnings("OptionalGetWithoutIsPresent")
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -182,6 +173,7 @@ public class ChangeParentPom extends Recipe {
                         }
 
                         if (t != tag) {
+                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                             maybeUpdateModel();
                             doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
                         }

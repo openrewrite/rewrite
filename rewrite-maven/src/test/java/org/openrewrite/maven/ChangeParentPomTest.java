@@ -297,4 +297,132 @@ public class ChangeParentPomTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removesRedundantExplicitVersionsMatchingOldParent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "org.junit",
+            null,
+            "junit-bom",
+            null,
+            "5.9.1",
+            null,
+            false
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>org.junit</groupId>
+                  <artifactId>junit-bom</artifactId>
+                  <version>5.9.0</version>
+                  <relativePath/>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                    <version>5.9.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>org.junit</groupId>
+                  <artifactId>junit-bom</artifactId>
+                  <version>5.9.1</version>
+                  <relativePath/>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesRedundantExplicitVersionsMatchingNewParent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "org.junit",
+            null,
+            "junit-bom",
+            null,
+            "5.9.1",
+            null,
+            false
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>org.junit</groupId>
+                  <artifactId>junit-bom</artifactId>
+                  <version>5.9.0</version>
+                  <relativePath/>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                    <version>5.9.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>org.junit</groupId>
+                  <artifactId>junit-bom</artifactId>
+                  <version>5.9.1</version>
+                  <relativePath/>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
