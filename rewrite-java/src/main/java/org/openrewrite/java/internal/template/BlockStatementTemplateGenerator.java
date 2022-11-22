@@ -238,6 +238,10 @@ public class BlockStatementTemplateGenerator {
             }
 
             after.append('}');
+        } else if (j instanceof J.NewArray) {
+            J.NewArray n = (J.NewArray)j;
+            before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
+            after.append("\n}");
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
             String newClassString;
@@ -528,7 +532,12 @@ public class BlockStatementTemplateGenerator {
                     varBuilder.append(variable.getTypeExpression().withPrefix(Space.EMPTY).printTrimmed(cursor));
                 }
                 if (nv.getType() instanceof JavaType.Array) {
-                    varBuilder.append("[]");
+                    if (nv.getInitializer() instanceof J.NewArray && !((J.NewArray) nv.getInitializer()).getDimensions().isEmpty()) {
+                        J.NewArray na = (J.NewArray)nv.getInitializer();
+                        na.getDimensions().forEach(d -> varBuilder.append("[]"));
+                    } else {
+                        varBuilder.append("[]");
+                    }
                 }
                 varBuilder.append(" ");
             }
