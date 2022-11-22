@@ -26,11 +26,9 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.Assertions.java
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
-import org.openrewrite.java.tree.Space
-import org.openrewrite.java.tree.TypeUtils
+import org.openrewrite.java.tree.*
 import org.openrewrite.test.RewriteTest
+import java.util.*
 import java.util.Comparator.comparing
 
 @Suppress("Convert2MethodRef", "UnnecessaryBoxing")
@@ -2771,4 +2769,75 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         """)
     )
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2375")
+    fun arrayInitializer() = rewriteRun(
+        {spec -> spec.recipe(toRecipe {object : JavaIsoVisitor<ExecutionContext>() {
+            val mm = MethodMatcher("abc.ArrayHelper of(..)")
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                var mi = super.visitMethodInvocation(method, p)
+                if (mm.matches(mi)) {
+                    mi = mi.withTemplate(
+                        JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any(java.lang.Integer)}, #{any(java.lang.Integer)}, #{any(java.lang.Integer)})")
+                            .imports("java.util.Arrays").build(),
+                        mi.getCoordinates().replace(), mi.arguments[0], mi.arguments[1], mi.arguments[2]);
+                }
+                return mi
+            }
+        }})},
+        java("""
+            package abc;
+            
+            public class ArrayHelper {
+                public static Object[] of(Object... objects){ return null;}
+            }
+        """),
+        java("""
+            import abc.ArrayHelper;
+            import java.util.Arrays;
+            
+            class A {
+                Object[] o = new Object[] {
+                    ArrayHelper.of(1, 2, 3)
+                };
+            }
+        """,
+            """
+            import abc.ArrayHelper;
+            import java.util.Arrays;
+            
+            class A {
+                Object[] o = new Object[] {
+                        Arrays.asList(1, 2, 3)
+                };
+            }
+        """
+        )
+    )
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2375")
+    fun multiDimentionalArrayInitializer() = rewriteRun(
+        {spec -> spec.recipe(toRecipe {object : JavaVisitor<ExecutionContext>() {
+            val mm = MethodMatcher("java.util.stream.IntStream sum()")
+            override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J {
+                val nc = super.visitNewClass(newClass, p) as J.NewClass
+                return nc.withTemplate(
+                    JavaTemplate.builder(this::getCursor, "Integer.valueOf(#{any(java.lang.Integer)})")
+                        .build(), nc.coordinates.replace(), nc.arguments[0]
+                ) as J
+            }
+        }})},
+        java(
+            """
+            class A {
+                Integer[][] num2 = new Integer[][]{ {new Integer(1), new Integer(2)}, {new Integer(1), new Integer(2)} };
+            }
+        """,
+            """
+            class A {
+                Integer[][] num2 = new Integer[][]{ {Integer.valueOf(1), Integer.valueOf(2)}, {Integer.valueOf(1), Integer.valueOf(2)} };
+            }
+        """)
+    )
 }
