@@ -39,6 +39,27 @@ class ResultTest {
     }
 
     @Test
+    fun ignoreWhitespace() {
+        val diff = Result.InMemoryDiffEntry(
+            Paths.get("com/netflix/MyJavaClass.java"),
+            Paths.get("com/netflix/MyJavaClass.java"),
+            null,
+            "public class A {} ",
+            "public class A {}",
+            emptySet()
+        )
+
+        val diffNoWs = diff.getDiff(true);
+        assertThat(
+            """
+            diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
+            index 9bfeb36..efd7fa3 100644
+            --- a/com/netflix/MyJavaClass.java
+            +++ b/com/netflix/MyJavaClass.java
+            """.trimIndent()
+        ).isEqualTo(diffNoWs.trimIndent());
+    }
+    @Test
     fun singleLineChange() {
         val diff = Result.InMemoryDiffEntry(
             filePath, filePath, null,
