@@ -152,4 +152,70 @@ interface PrimitiveWrapperClassConstructorToValueOfTest : RewriteTest {
             }
         """)
     )
+
+    @Test
+    fun withinEnum() = rewriteRun(
+        java("""
+            public enum Options {
+            
+                JAR("instance.jar.file"),
+                JVM_ARGUMENTS("instance.vm.args"),
+                QUICKSTART_OPTIONS("instance.options"),
+                INSTALLATIONS("instance.installations"),
+                START_TIMEOUT("instance.timeout");
+            
+                private String name;
+            
+                Options(String name) {
+                    this.name = name;
+                }
+            
+                public String asString() {
+                    return System.getProperty(name);
+                }
+                
+                public Integer asInteger(int defaultValue) {
+                    String string  = asString();
+            
+                    if (string == null) {
+                        return defaultValue;
+                    }
+            
+                    return new Integer(asString());
+                }
+            
+            }
+        """,
+            """
+            public enum Options {
+            
+                JAR("instance.jar.file"),
+                JVM_ARGUMENTS("instance.vm.args"),
+                QUICKSTART_OPTIONS("instance.options"),
+                INSTALLATIONS("instance.installations"),
+                START_TIMEOUT("instance.timeout");
+            
+                private String name;
+            
+                Options(String name) {
+                    this.name = name;
+                }
+            
+                public String asString() {
+                    return System.getProperty(name);
+                }
+                
+                public Integer asInteger(int defaultValue) {
+                    String string  = asString();
+            
+                    if (string == null) {
+                        return defaultValue;
+                    }
+            
+                    return Integer.valueOf(asString());
+                }
+            
+            }
+        """)
+    )
 }

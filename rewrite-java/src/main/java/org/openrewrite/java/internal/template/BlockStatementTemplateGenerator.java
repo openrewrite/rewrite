@@ -184,9 +184,9 @@ public class BlockStatementTemplateGenerator {
             if (parent instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = (J.ClassDeclaration)parent;
                 if (c.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
-                    enumClassDeclaration(prior, c, before, after, templated, cursor);
+                    enumClassDeclaration(prior, c, before, after, templated, cursor, false);
                 } else {
-                    classDeclaration(prior, before, after, (J.ClassDeclaration) parent, templated, cursor, false);
+                    classDeclaration(prior, before, after, c, templated, cursor, false);
                 }
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
@@ -240,36 +240,46 @@ public class BlockStatementTemplateGenerator {
             after.append('}');
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
-            // enum definitions with anonymous class initializers have a null clazz and will be templated next
+            String newClassString;
+            JavaType.Class constructorTypeClass = n.getConstructorType() != null ? TypeUtils.asClass(n.getConstructorType().getReturnType()) : null;
             if (n.getClazz() != null) {
-                if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
-                    StringBuilder beforeSegments = new StringBuilder();
-                    StringBuilder afterSegments = new StringBuilder();
-                    beforeSegments.append("new ").append(n.getClazz().printTrimmed(cursor)).append("(");
-                    boolean priorFound = false;
-                    for(Expression arg : n.getArguments()) {
-                        if(!priorFound) {
-                            if (referToSameElement(prior, arg)) {
-                                priorFound = true;
-                                continue;
-                            }
-                            beforeSegments.append(valueOfType(arg.getType())).append(",");
-                        } else {
-                            afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
+                newClassString = "new " + n.getClazz().printTrimmed(cursor);
+            } else if (constructorTypeClass != null) {
+                // enum definitions with anonymous class initializers or a J.NewClass with a null clazz and valid constructor type.
+                newClassString = JavaType.FullyQualified.Kind.Enum == constructorTypeClass.getKind() ? "" : "new " + constructorTypeClass.getFullyQualifiedName();
+            } else {
+                throw new IllegalStateException("Unable to template a J.NewClass instance having a null clazz and constructor type.");
+            }
+            if (n.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+                StringBuilder beforeSegments = new StringBuilder();
+                StringBuilder afterSegments = new StringBuilder();
+                beforeSegments.append(newClassString).append("(");
+                boolean priorFound = false;
+                for(Expression arg : n.getArguments()) {
+                    if(!priorFound) {
+                        if (referToSameElement(prior, arg)) {
+                            priorFound = true;
+                            continue;
                         }
+                        beforeSegments.append(valueOfType(arg.getType())).append(",");
+                    } else {
+                        afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
                     }
-                    afterSegments.append(")");
-                    before.insert(0, beforeSegments);
-                    after.append(afterSegments);
-                    if(next(cursor).getValue() instanceof J.Block) {
-                        after.append(";");
-                    }
-                } else {
-                    n = n.withBody(null).withPrefix(Space.EMPTY);
-                    before.insert(0, n.printTrimmed(cursor.getParentOrThrow()).trim());
-                    if (!(next(cursor).getValue() instanceof MethodCall)) {
-                        after.append(';');
-                    }
+                }
+                afterSegments.append(")");
+                if (priorFound && !afterSegments.toString().contains(STOP_COMMENT)) {
+                    afterSegments.append(";/*" + STOP_COMMENT + "*/");
+                }
+                before.insert(0, beforeSegments);
+                after.append(afterSegments);
+                if(next(cursor).getValue() instanceof J.Block) {
+                    after.append(";");
+                }
+            } else {
+                n = n.withBody(null).withPrefix(Space.EMPTY);
+                before.insert(0, n.printTrimmed(cursor.getParentOrThrow()).trim());
+                if (!(next(cursor).getValue() instanceof MethodCall)) {
+                    after.append(';');
                 }
             }
         } else if (j instanceof J.ForLoop) {
@@ -368,12 +378,9 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, as.getVariable() + " = ");
                 after.append(";");
             }
-        } else if (j instanceof J.EnumValue) {
+        }
+        else if (j instanceof J.EnumValue) {
             J.EnumValue ev = (J.EnumValue)j;
-            if (ev.getInitializer() != null) {
-                before.insert(0,"(");
-                after.append(")");
-            }
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
@@ -382,29 +389,45 @@ public class BlockStatementTemplateGenerator {
     }
 
     // Enum class declarations are unique in that their EnumValue set must be the first statement
-    private void enumClassDeclaration(@Nullable J prior, J.ClassDeclaration c, StringBuilder before, StringBuilder after, Set<J> templated, Cursor cursor) {
-        before.insert(0, "\nenum " + c.getSimpleName() + "{\n");
+    private void enumClassDeclaration(@Nullable J prior, J.ClassDeclaration c, StringBuilder before, StringBuilder after, Set<J> templated, Cursor cursor, boolean isNestedClass) {
+        StringBuilder enumClass = new StringBuilder("\nenum " + c.getSimpleName() + "{\n");
         List<Statement> statements = c.getBody().getStatements();
-        for (int i = 1; i < statements.size(); i++) {
-            Statement statement = statements.get(i);
+        for (Statement statement : statements) {
             if (templated.contains(statement)) {
                 continue;
             }
-
-            if (statement instanceof J.VariableDeclarations) {
-                after.append(variable((J.VariableDeclarations) statement, false, cursor)).append(";\n");
+            if (statement instanceof J.EnumValueSet) {
+                J.EnumValueSet enumValues = (J.EnumValueSet) statements.get(0);
+                StringJoiner enumStr = new StringJoiner(",");
+                for (J.EnumValue anEnum : enumValues.getEnums()) {
+                    String en = anEnum.getName().getSimpleName();
+                    enumStr.add(en);
+                }
+                enumClass.append(enumStr).append(";\n");
+            } else if (statement instanceof J.VariableDeclarations) {
+                String vd = variable((J.VariableDeclarations) statement, false, cursor);
+                if (isNestedClass) {
+                    enumClass.append(vd).append(";\n");
+                } else {
+                    after.append(vd).append(";\n");
+                }
             } else if (statement instanceof J.MethodDeclaration) {
                 if (!referToSameElement(statement, prior)) {
-                    after.append(method((J.MethodDeclaration) statement, cursor));
+                    String md = method((J.MethodDeclaration) statement, cursor);
+                    if (isNestedClass) {
+                        enumClass.append(md);
+                    } else {
+                        after.append(md);
+                    }
                 }
             } else if (statement instanceof J.ClassDeclaration) {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
-                classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, true);
+                classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, !isNestedClass);
             }
         }
+        before.insert(0, enumClass);
         after.append("\n");
-
     }
 
     private void classDeclaration(@Nullable J prior, StringBuilder before, StringBuilder after, J.ClassDeclaration parent, Set<J> templated, Cursor cursor, boolean appendToAfter) {
@@ -441,7 +464,13 @@ public class BlockStatementTemplateGenerator {
                 } else {
                     before.insert(0, '}');
                 }
-                classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, appendToAfter);
+                J.ClassDeclaration cd = (J.ClassDeclaration)statement;
+                if (cd.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
+                    enumClassDeclaration(prior, cd, before, after, templated, cursor, true);
+                } else {
+                    classDeclaration(prior, before, after, cd, templated, cursor, appendToAfter);
+                }
+                //classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, appendToAfter);
             } else if (statement instanceof J.EnumValueSet) {
                 J.EnumValueSet enumValues = (J.EnumValueSet) statement;
                 if (appendToAfter) {

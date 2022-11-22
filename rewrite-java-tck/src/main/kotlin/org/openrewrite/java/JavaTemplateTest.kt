@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 @file:Suppress("DuplicatedCode", "ConstantConditions", "JUnitMalformedDeclaration", "UnusedAssignment",
-    "InstantiationOfUtilityClass", "StatementWithEmptyBody", "StringOperationCanBeSimplified"
+    "InstantiationOfUtilityClass", "StatementWithEmptyBody", "StringOperationCanBeSimplified", "deprecation"
 )
 
 package org.openrewrite.java
@@ -39,7 +39,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     val replaceToStringWithLiteralRecipe: Recipe
         get() = RewriteTest.toRecipe{object : JavaVisitor<ExecutionContext>() {
             private var TO_STRING = MethodMatcher("java.lang.String toString()")
-            private val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(java.lang.String)}").build()
+            private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}")
+                .build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
                 val mi = super.visitMethodInvocation(method, ctx) as J
@@ -275,7 +276,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         jp,
         recipe = toRecipe {
             object : JavaVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new A()").build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new A()")
+                    .build()
 
                 override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J =
                     when (newClass.arguments[0]) {
@@ -2560,7 +2562,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         """)
     )
 
-    @Suppress("BigDecimalLegacyMethod")
+    @Suppress("BigDecimalLegacyMethod", "deprecation")
     @Test
     fun javaTemplateControlsSemiColons() = rewriteRun(
         { spec ->
@@ -2646,6 +2648,127 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             }
             """
         )
+    )
+
+    @Test
+    fun replacingMethodInvocationWithinEnum() = rewriteRun(
+        { spec -> spec.recipe(replaceToStringWithLiteralRecipe)},
+        java("""
+            public enum Options {
+            
+                JAR("instance.jar.file"),
+                JVM_ARGUMENTS("instance.vm.args");
+            
+                private String name;
+            
+                Options(String name) {
+                    this.name = name;
+                }
+            
+                public String asString() {
+                    return System.getProperty(name);
+                }
+                
+                public Integer asInteger(int defaultValue) {
+                    String string  = asString();
+                    return new Integer(string.toString());
+                }
+            
+            }
+        """,
+            """
+            public enum Options {
+            
+                JAR("instance.jar.file"),
+                JVM_ARGUMENTS("instance.vm.args");
+            
+                private String name;
+            
+                Options(String name) {
+                    this.name = name;
+                }
+            
+                public String asString() {
+                    return System.getProperty(name);
+                }
+                
+                public Integer asInteger(int defaultValue) {
+                    String string  = asString();
+                    return new Integer(string);
+                }
+            
+            }
+        """)
+    )
+
+    @Test
+    fun replacingMethodInvocationWithinInnerEnum() = rewriteRun(
+        { spec -> spec.recipe(replaceToStringWithLiteralRecipe)},
+        java(
+            """
+            public class Test {
+                void doSomething(Options options) {
+                    switch (options) {
+                        case JAR:
+                        case JVM_ARGUMENTS:
+                            System.out.println("");
+                    }
+                }
+                enum Options {
+                    JAR(0, "instance.jar.file".toString()),
+                    JVM_ARGUMENTS(1, "instance.vm.args");
+                
+                    private final String name;
+                    private final int id;
+                
+                    Options(int id,String name) {
+                        this.id = id;
+                        this.name = name;
+                    }
+                
+                    public String asString() {
+                        return System.getProperty(name);
+                    }
+                    
+                    public Integer asInteger(int defaultValue) {
+                        String string  = asString();
+                        return new Integer(string);
+                    }
+                }
+            }
+        """,
+            """
+            public class Test {
+                void doSomething(Options options) {
+                    switch (options) {
+                        case JAR:
+                        case JVM_ARGUMENTS:
+                            System.out.println("");
+                    }
+                }
+                enum Options {
+                    JAR(0, "instance.jar.file"),
+                    JVM_ARGUMENTS(1, "instance.vm.args");
+                
+                    private final String name;
+                    private final int id;
+                
+                    Options(int id,String name) {
+                        this.id = id;
+                        this.name = name;
+                    }
+                
+                    public String asString() {
+                        return System.getProperty(name);
+                    }
+                    
+                    public Integer asInteger(int defaultValue) {
+                        String string  = asString();
+                        return new Integer(string);
+                    }
+                }
+            }
+        """)
     )
 
 }
