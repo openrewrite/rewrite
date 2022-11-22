@@ -284,7 +284,7 @@ public class AddRepositoryTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new AddRepository("boot-snapshots", "https://repo.spring.io/snapshot", null, null,
             true, null, null,
-            null, null, null).doNext(new UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0-SNAPSHOT", null))),
+            null, null, null).doNext(new UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0-SNAPSHOT", null, null))),
           pomXml(
             """
                   <project>

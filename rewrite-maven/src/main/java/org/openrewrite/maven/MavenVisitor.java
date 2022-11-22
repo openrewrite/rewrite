@@ -161,6 +161,15 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return false;
     }
 
+    public boolean isManagedDependencyImportTag(String groupId, String artifactId) {
+        if (!isManagedDependencyTag(groupId, artifactId)) {
+            return false;
+        }
+        Xml.Tag tag = getCursor().getValue();
+        return tag.getChildValue("type").map("pom"::equalsIgnoreCase).orElse(false)
+                && tag.getChildValue("scope").map("import"::equalsIgnoreCase).orElse(false);
+    }
+
     public void maybeUpdateModel() {
         for (TreeVisitor<Xml, P> afterVisit : getAfterVisit()) {
             if(afterVisit instanceof UpdateMavenModel) {
@@ -238,10 +247,16 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         String groupId = getResolutionResult().getPom().getValue(tag.getChildValue("groupId").orElse(getResolutionResult().getPom().getGroupId()));
         String artifactId = getResolutionResult().getPom().getValue(tag.getChildValue("artifactId").orElse(""));
         if (groupId != null && artifactId != null) {
-            for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
-                if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                    return d;
-                }
+            return findManagedDependency(groupId, artifactId);
+        }
+        return null;
+    }
+
+    @Nullable
+    public ResolvedManagedDependency findManagedDependency(String groupId, String artifactId) {
+        for (ResolvedManagedDependency d : getResolutionResult().getPom().getDependencyManagement()) {
+            if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                return d;
             }
         }
         return null;

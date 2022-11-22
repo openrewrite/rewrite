@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
@@ -79,5 +80,20 @@ public class FindTags extends Recipe {
         Set<Xml.Tag> ts = new HashSet<>();
         findVisitor.visit(x, ts);
         return ts;
+    }
+
+    /**
+     * Returns null if there is not exactly one tag matching this xPath
+     */
+    @Nullable
+    public static Xml.Tag findSingle(Xml x, String xPath) {
+        final Set<Xml.Tag> tags = find(x, xPath);
+        if (tags.size() != 1) {
+            return null;
+        }
+        for (final Xml.Tag tag : tags) {
+            return tag;
+        }
+        return null;
     }
 }

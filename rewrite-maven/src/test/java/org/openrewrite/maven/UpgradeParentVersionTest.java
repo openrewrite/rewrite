@@ -35,6 +35,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "org.springframework.boot",
             "spring-boot-starter-parent",
             "~1.5",
+            null,
             null
           )),
           pomXml(
@@ -59,7 +60,7 @@ class UpgradeParentVersionTest implements RewriteTest {
     void nonMavenCentralRepository() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("org.jenkins-ci.plugins", "plugin", "4.40", null))
+            .recipe(new UpgradeParentVersion("org.jenkins-ci.plugins", "plugin", "4.40", null, null))
             .executionContext(
               MavenExecutionContextView
                 .view(new InMemoryExecutionContext())
@@ -101,6 +102,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "org.springframework.boot",
             "spring-boot-starter-parent",
             "~1.5",
+            null,
             null
           )),
           pomXml(
@@ -141,6 +143,7 @@ class UpgradeParentVersionTest implements RewriteTest {
             "org.springframework.boot",
             "spring-boot-starter-parent",
             "1.5.22.RELEASE",
+            null,
             null
           )),
           pomXml(

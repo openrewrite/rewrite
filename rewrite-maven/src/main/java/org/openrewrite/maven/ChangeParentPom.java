@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -24,12 +25,16 @@ import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.utilities.RetainVersions;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -94,7 +99,21 @@ public class ChangeParentPom extends Recipe {
     @Nullable
     boolean allowVersionDowngrades;
 
+    @Option(displayName = "Retain versions",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
+                    + "from dependency management in the new parent pom, then it will be retained with an explicit version. "
+                    + "The version can be omitted from the GAV to use the old value from dependency management",
+            example = "- com.jcraft:jsch",
+            required = false)
+    List<String> retainVersions;
+
+    @Deprecated
     public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId, @Nullable String newArtifactId, String newVersion, @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades) {
+        this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, versionPattern, allowVersionDowngrades, null);
+    }
+
+    @JsonCreator
+    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId, @Nullable String newArtifactId, String newVersion, @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades, @Nullable List<String> retainVersions) {
         this.oldGroupId = oldGroupId;
         this.newGroupId = newGroupId;
         this.oldArtifactId = oldArtifactId;
@@ -102,6 +121,7 @@ public class ChangeParentPom extends Recipe {
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
         this.allowVersionDowngrades = allowVersionDowngrades != null && allowVersionDowngrades;
+        this.retainVersions = retainVersions == null ? new ArrayList<>() : retainVersions;
     }
 
     @Override
@@ -126,6 +146,17 @@ public class ChangeParentPom extends Recipe {
         //noinspection ConstantConditions
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
+        }
+        for (int i = 0; i < retainVersions.size(); i++) {
+            String retainVersion = retainVersions.get(i);
+            validated = validated.and(Validated.test(
+                    String.format("retainVersions[%d]", i),
+                    "did not look like a two-or-three-part GAV",
+                    retainVersion,
+                    maybeGav -> {
+                        int gavParts = maybeGav.split(":").length;
+                        return gavParts == 2 || gavParts == 3;
+                    }));
         }
         return validated;
     }
@@ -156,30 +187,41 @@ public class ChangeParentPom extends Recipe {
                         try {
                             Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (targetVersion.isPresent()) {
+                                List<XmlVisitor<ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
                                 if (!oldGroupId.equals(targetGroupId)) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId));
                                 }
 
                                 if (!oldArtifactId.equals(targetArtifactId)) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId));
                                 }
 
                                 if (!oldVersion.equals(targetVersion.get())) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()));
+                                }
+
+                                if (changeParentTagVisitors.size() > 0) {
+                                    retainVersions();
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions));
+                                    for (XmlVisitor<ExecutionContext> visitor : changeParentTagVisitors) {
+                                        doAfterVisit(visitor);
+                                    }
+                                    maybeUpdateModel();
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
                                 }
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }
-
-                        if (t != tag) {
-                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
-                            maybeUpdateModel();
-                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
-                        }
                     }
                 }
                 return t;
+            }
+
+            private void retainVersions() {
+                for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions)) {
+                    doAfterVisit(retainVersionRecipe);
+                }
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
