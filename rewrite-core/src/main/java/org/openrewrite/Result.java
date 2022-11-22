@@ -18,6 +18,7 @@ package org.openrewrite;
 import lombok.Getter;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.*;
@@ -170,14 +171,19 @@ public class Result {
 
     @Incubating(since = "7.31.0")
     public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
+        return diff(relativeTo, markerPrinter, false);
+    }
+
+    @Incubating(since = "7.34.0")
+    public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
         String d;
         if (this.diff == null) {
-            d = computeDiff(relativeTo, markerPrinter);
+            d = computeDiff(relativeTo, markerPrinter, ignoreAllWhitespace);
             this.diff = new WeakReference<>(d);
         } else {
             d = this.diff.get();
             if (d == null || !Objects.equals(this.relativeTo, relativeTo)) {
-                d = computeDiff(relativeTo, markerPrinter);
+                d = computeDiff(relativeTo, markerPrinter, ignoreAllWhitespace);
                 this.diff = new WeakReference<>(d);
             }
         }
@@ -185,7 +191,8 @@ public class Result {
     }
 
     private String computeDiff(@Nullable Path relativeTo,
-                               @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
+                               @Nullable PrintOutputCapture.MarkerPrinter markerPrinter,
+                               @Nullable Boolean ignoreAllWhitespace) {
 
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
@@ -208,7 +215,7 @@ public class Result {
                 recipes.stream().map(Stack::peek).collect(Collectors.toSet())
         )) {
             this.relativeTo = relativeTo;
-            return diffEntry.getDiff();
+            return diffEntry.getDiff(ignoreAllWhitespace);
         }
     }
 
@@ -274,12 +281,21 @@ public class Result {
         }
 
         String getDiff() {
+            return getDiff(false);
+        }
+
+        String getDiff(@Nullable Boolean ignoreAllWhitespace) {
+            if (ignoreAllWhitespace == null) {
+                ignoreAllWhitespace = false;
+            }
+
             if (oldId.equals(newId) && oldPath.equals(newPath)) {
                 return "";
             }
 
             ByteArrayOutputStream patch = new ByteArrayOutputStream();
             try (DiffFormatter formatter = new DiffFormatter(patch)) {
+                formatter.setDiffComparator(ignoreAllWhitespace ? RawTextComparator.WS_IGNORE_ALL : RawTextComparator.DEFAULT);
                 formatter.setRepository(repo);
                 formatter.format(this);
             } catch (IOException e) {
