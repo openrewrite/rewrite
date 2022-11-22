@@ -1039,7 +1039,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
         s = s.withSelector(visitAndCast(s.getSelector(), p));
         s = s.withCases(visitAndCast(s.getCases(), p));
-        visitType(s.getType(), p);
         return s;
     }
 
