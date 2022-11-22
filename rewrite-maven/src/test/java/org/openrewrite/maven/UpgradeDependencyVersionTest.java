@@ -15,11 +15,15 @@
  */
 package org.openrewrite.maven;
 
+import com.google.common.collect.Lists;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Collections;
 
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -29,10 +33,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void doNotOverrideImplicitProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "io.dropwizard.metrics",
-            "metrics-annotation",
-            "4.2.9", null, true)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.dropwizard.metrics", "metrics-annotation", "4.2.9", null,
+            true, null)),
           pomXml(
             """
                 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -125,10 +127,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void updateManagedDependencyVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "org.junit.jupiter",
-            "junit-jupiter-api",
-            "5.7.2", null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit.jupiter", "junit-jupiter-api", "5.7.2", null,
+            null, null)),
           pomXml(
             """
                   <project>
@@ -172,13 +172,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @CsvSource(value = {"com.google.guava:guava", "*:*"}, delimiter = ':')
     void upgradeVersion(String groupId, String artifactId) {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            groupId,
-            artifactId,
-            "latest.patch",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion(groupId, artifactId, "latest.patch", null, null, null)),
           pomXml(
             """
                   <project>
@@ -215,13 +209,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void overrideManagedDependency() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "com.google.guava",
-            "guava",
-            "14.0",
-            "",
-            true
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", "", true, null)),
           pomXml(
             """
                   <project>
@@ -304,13 +292,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/739")
     void upgradeVersionWithGroupIdAndArtifactIdDefinedAsProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "io.quarkus",
-            "quarkus-universe-bom",
-            "1.13.7.Final",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.quarkus", "quarkus-universe-bom", "1.13.7.Final", null,
+            null, null)),
           pomXml(
             """
                   <project>
@@ -365,20 +348,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeVersionSuccessively() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "com.google.guava",
-            "*",
-            "28.x",
-            "-jre",
-            null
-          ).doNext(
-            new UpgradeDependencyVersion(
-              "com.google.guava",
-              "*",
-              "29.x",
-              "-jre",
-              null
-            )
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "28.x", "-jre", null, null).doNext(
+            new UpgradeDependencyVersion("com.google.guava", "*", "29.x", "-jre", null, null)
           )),
           pomXml(
             """
@@ -417,13 +388,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/565")
     void propertiesInDependencyGroupIdAndArtifactId() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "com.google.guava",
-            "*",
-            "latest.patch",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.patch", null, null, null)),
           pomXml(
             """
                   <project>
@@ -470,13 +435,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeGuava() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "com.google.guava",
-            "*",
-            "25-28",
-            "-android",
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-android", null, null)),
           pomXml(
             """
                   <project>
@@ -514,13 +473,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1334")
     void upgradeGuavaWithExplicitBlankVersionPattern() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "com.google.guava",
-            "*",
-            "latest.release",
-            "",
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.release", "", null, null)),
           pomXml(
             """
                   <project>
@@ -557,13 +510,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeManagedInParent() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "com.google.guava",
-            "*",
-            "25-28",
-            "-jre",
-            false
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", false, null)),
           pomXml(
             """
                   <project>
@@ -633,13 +580,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/891")
     void upgradeDependencyOnlyTargetsSpecificDependencyProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "com.google.guava",
-            "*",
-            "25-28",
-            "-jre",
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", null, null)),
           pomXml(
             """
                   <project>
@@ -696,13 +637,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeBomImport() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "io.micronaut",
-            "micronaut-bom",
-            "3.0.0-M5",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
           pomXml(
             """
                   <project>
@@ -747,13 +682,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeAllManagedDependenciesToPatchReleases() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "*",
-            "*",
-            "latest.patch",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
                   <project>
@@ -814,13 +743,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeAllDependenciesToPatchReleases() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "*",
-            "*",
-            "latest.patch",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
                   <project>
@@ -887,13 +810,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void dependencyManagementResolvedFromProperty() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "io.micronaut",
-            "micronaut-bom",
-            "3.0.0-M5",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
           pomXml(
             """
                   <project>
@@ -944,13 +861,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradeToExactVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "org.thymeleaf",
-            "thymeleaf-spring5",
-            "3.0.12.RELEASE",
-            null,
-            null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.thymeleaf", "thymeleaf-spring5", "3.0.12.RELEASE", null,
+            null, null)),
           pomXml(
             """
                   <project>
@@ -988,13 +900,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void updateWithExactVersionRange() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "junit",
-            "junit",
-            "4.13",
-            null,
-            false
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.13", null, false, null)),
           pomXml(
             """
                   <project>
@@ -1031,11 +937,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void deriveFromNexus() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "*",
-            "*",
-            "latest.patch", null, null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
                   <project>
@@ -1060,11 +962,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void deriveFromNexusUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "*",
-            "*",
-            "latest.patch", null, null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
                   <project>
@@ -1105,11 +1003,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void noManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion(
-            "*",
-            "*",
-            "latest.patch", null, null
-          )),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
                   <project>
@@ -1128,5 +1022,465 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void removesRedundantExplicitVersionsMatchingOldImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                    <version>5.9.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.1</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removesRedundantExplicitVersionsMatchingNewImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                    <version>5.9.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.1</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepsRedundantExplicitVersionsNotMatchingOldOrNewImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.junit", "junit-bom", "5.9.1", null, true, null)),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                    <version>5.8.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.1</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>org.junit.jupiter</groupId>
+                    <artifactId>junit-jupiter-api</artifactId>
+                    <version>5.8.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Nested
+    @Issue("https://github.com/openrewrite/rewrite/issues/2418")
+    class RetainVersions {
+        @Test
+        void dependencyWithExplicitVersionRemovedFromDepMgmt() {
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
+              pomXml("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>1.0.0</version>
+              
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.2</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.jcraft</groupId>
+                  <artifactId>jsch</artifactId>
+                  <version>0.1.55</version>
+                </dependency>
+              </dependencies>
+            </project>
+            """, """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>1.0.0</version>
+              
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.4</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.jcraft</groupId>
+                  <artifactId>jsch</artifactId>
+                  <version>0.1.55</version>
+                </dependency>
+              </dependencies>
+            </project>
+            """));
+        }
+
+        @Test
+        void dependencyWithoutExplicitVersionRemovedFromDepMgmt() {
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),
+              pomXml("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>1.0.0</version>
+              
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.2</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.jcraft</groupId>
+                  <artifactId>jsch</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+            """, """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>1.0.0</version>
+              
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.4</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.jcraft</groupId>
+                  <artifactId>jsch</artifactId>
+                  <version>0.1.55</version>
+                </dependency>
+              </dependencies>
+            </project>
+            """));
+        }
+
+        @Test
+        void dependencyWithoutExplicitVersionRemovedFromDepMgmtRetainSpecificVersion() {
+            rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch:0.1.50"))),
+              pomXml("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>1.0.0</version>
+              
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.2</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.jcraft</groupId>
+                  <artifactId>jsch</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+            """, """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+              <groupId>org.sample</groupId>
+              <artifactId>sample</artifactId>
+              <version>1.0.0</version>
+              
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.4</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.jcraft</groupId>
+                  <artifactId>jsch</artifactId>
+                  <version>0.1.50</version>
+                </dependency>
+              </dependencies>
+            </project>
+            """));
+        }
+
+        @Test
+        void multipleRetainVersions() {
+            rewriteRun(spec -> spec.recipe(
+                new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2021.0.5", null,
+                  true,
+                  Lists.newArrayList("com.jcraft:jsch", "org.springframework.cloud:spring-cloud-schema-registry-*:1.1.1"))),
+              pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-dependencies</artifactId>
+                        <version>2020.0.1</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework.cloud</groupId>
+                      <artifactId>spring-cloud-schema-registry-core</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-dependencies</artifactId>
+                        <version>2021.0.5</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                      <version>0.1.55</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework.cloud</groupId>
+                      <artifactId>spring-cloud-schema-registry-core</artifactId>
+                      <version>1.1.1</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """));
+        }
     }
 }

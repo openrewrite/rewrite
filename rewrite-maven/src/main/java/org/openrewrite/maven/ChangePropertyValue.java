@@ -86,7 +86,7 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<Xml, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             final String propertyName = key.replace("${", "").replace("}", "");
 

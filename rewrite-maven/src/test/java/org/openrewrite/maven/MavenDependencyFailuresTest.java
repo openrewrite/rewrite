@@ -42,7 +42,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
     void unresolvableMavenMetadata() {
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null))
+            .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
             .recipeExecutionContext(new InMemoryExecutionContext())
@@ -81,7 +81,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
     void unresolvableParent() { // Dad said he was heading to the corner store for cigarettes, and hasn't been resolvable for the past 20 years :'(
         rewriteRun(
           spec -> spec
-            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null))
+            .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
             .recipeExecutionContext(new InMemoryExecutionContext())

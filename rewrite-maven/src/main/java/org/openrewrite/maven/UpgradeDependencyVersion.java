@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -26,6 +27,7 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
@@ -81,6 +83,32 @@ public class UpgradeDependencyVersion extends Recipe {
     @Nullable
     Boolean overrideManagedVersion;
 
+    @Option(displayName = "Retain versions",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
+                    + "from dependency management after the changes from this recipe, then it will be retained with an explicit version. "
+                    + "The version can be omitted from the GAV to use the old value from dependency management",
+            example = "- com.jcraft:jsch",
+            required = false)
+    List<String> retainVersions;
+
+    @Deprecated
+    public UpgradeDependencyVersion(final String groupId, final String artifactId, final String newVersion,
+            @Nullable final String versionPattern, @Nullable final Boolean overrideManagedVersion) {
+        this(groupId, artifactId, newVersion, versionPattern, overrideManagedVersion, null);
+    }
+
+    @JsonCreator
+    public UpgradeDependencyVersion(final String groupId, final String artifactId, final String newVersion,
+            @Nullable final String versionPattern, @Nullable final Boolean overrideManagedVersion,
+            @Nullable final List<String> retainVersions) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.newVersion = newVersion;
+        this.versionPattern = versionPattern;
+        this.overrideManagedVersion = overrideManagedVersion;
+        this.retainVersions = retainVersions == null ? new ArrayList<>() : retainVersions;
+    }
+
     @SuppressWarnings("ConstantConditions")
     @Override
     public Validated validate() {
@@ -119,6 +147,9 @@ public class UpgradeDependencyVersion extends Recipe {
         return ListUtils.map(before, s -> (SourceFile) new UpgradeDependencyVersionVisitor(projectArtifacts).visit(s, ctx));
     }
 
+    private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+    private static final String DEPENDENCIES_XPATH = "/project/dependencies";
+    private static final String DEPENDENCY_MANAGEMENT_XPATH = "/project/dependencyManagement";
     private class UpgradeDependencyVersionVisitor extends MavenIsoVisitor<ExecutionContext> {
         private final VersionComparator versionComparator;
         private final Set<GroupArtifact> projectArtifacts;
@@ -137,18 +168,54 @@ public class UpgradeDependencyVersion extends Recipe {
                 if (isDependencyTag(groupId, artifactId)) {
                     t = upgradeDependency(ctx, t);
                 } else if (isManagedDependencyTag(groupId, artifactId)) {
-                    t = upgradeManagedDependency(tag, ctx, t);
+                    if (isManagedDependencyImportTag(groupId, artifactId)) {
+                        doAfterVisit(new UpgradeDependencyManagementImportVisitor());
+                    } else {
+                        final TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
+                        if (upgradeManagedDependency != null) {
+                            doAfterVisit(upgradeManagedDependency);
+                            maybeUpdateModel();
+                        }
+                    }
                 }
             } catch (MavenDownloadingException e) {
                 return e.warn(t);
             }
 
-            if (t != tag) {
+            if (t != tag && PROJECT_MATCHER.matches(getCursor())) {
                 maybeUpdateModel();
                 doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, true, null));
             }
 
             return t;
+        }
+
+        private class UpgradeDependencyManagementImportVisitor extends MavenIsoVisitor<ExecutionContext> {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                try {
+                    if (isManagedDependencyImportTag(groupId, artifactId)) {
+                        final TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
+                        if (upgradeManagedDependency != null) {
+                            retainVersions();
+                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions));
+                            doAfterVisit(upgradeManagedDependency);
+                            maybeUpdateModel();
+                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
+                        }
+                    }
+                } catch (MavenDownloadingException e) {
+                    return e.warn(t);
+                }
+                return t;
+            }
+
+            private void retainVersions() {
+                for (final Recipe retainVersionRecipe : ChangeParentPom.retainVersions(this, retainVersions)) {
+                    doAfterVisit(retainVersionRecipe);
+                }
+            }
         }
 
         private Xml.Tag upgradeDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
@@ -191,7 +258,8 @@ public class UpgradeDependencyVersion extends Recipe {
             return t;
         }
 
-        private Xml.Tag upgradeManagedDependency(Xml.Tag tag, ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
+        @Nullable
+        private TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency(Xml.Tag tag, ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
             ResolvedManagedDependency managedDependency = findManagedDependency(t);
             if (managedDependency != null) {
                 String groupId = managedDependency.getGroupId();
@@ -201,7 +269,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     !projectArtifacts.contains(new GroupArtifact(groupId, artifactId)) &&
                     matchesGlob(groupId, UpgradeDependencyVersion.this.groupId) &&
                     matchesGlob(artifactId, UpgradeDependencyVersion.this.artifactId)) {
-                    t = upgradeVersion(ctx, t, managedDependency.getRequested().getVersion(), groupId, artifactId, version);
+                    return upgradeVersion(ctx, t, managedDependency.getRequested().getVersion(), groupId, artifactId, version);
                 }
             } else {
                 for (ResolvedManagedDependency dm : getResolutionResult().getPom().getDependencyManagement()) {
@@ -212,31 +280,30 @@ public class UpgradeDependencyVersion extends Recipe {
                             ResolvedGroupArtifactVersion bom = dm.getBomGav();
                             if (Objects.equals(group, bom.getGroupId()) &&
                                 Objects.equals(artifactId, bom.getArtifactId())) {
-                                t = upgradeVersion(ctx, t, requireNonNull(dm.getRequestedBom()).getVersion(), bom.getGroupId(), bom.getArtifactId(), bom.getVersion());
-                                break;
+                                return upgradeVersion(ctx, t, requireNonNull(dm.getRequestedBom()).getVersion(), bom.getGroupId(), bom.getArtifactId(), bom.getVersion());
                             }
                         }
                     }
                 }
             }
-            return t;
+            return null;
         }
 
-        public Xml.Tag upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {
-            Xml.Tag t = tag;
+        @Nullable
+        public TreeVisitor<Xml, ExecutionContext> upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {
             String newerVersion = findNewerVersion(groupId, artifactId, version2, ctx);
             if (newerVersion == null) {
-                return t;
+                return null;
             } else if (requestedVersion != null && requestedVersion.startsWith("${")) {
-                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
+
+                return new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false).getVisitor();
             } else {
-                Xml.Tag childVersionTag = t.getChild("version").orElse(null);
+                Xml.Tag childVersionTag = tag.getChild("version").orElse(null);
                 if (childVersionTag != null) {
-                    t = (Xml.Tag) new ChangeTagValueVisitor<Integer>(childVersionTag, newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
+                    return new ChangeTagValueVisitor<>(childVersionTag, newerVersion);
                 }
             }
-
-            return t;
+            return null;
         }
 
         @Nullable

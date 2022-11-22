@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.openrewrite.ExecutionContext;
@@ -24,15 +25,25 @@ import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeParentVersion extends Recipe {
 
+    @Deprecated
     public UpgradeParentVersion(String groupId, String artifactId, String newVersion, @Nullable String versionPattern) {
+        this(groupId, artifactId, newVersion, versionPattern, null);
+    }
+
+    @JsonCreator
+    public UpgradeParentVersion(String groupId, String artifactId, String newVersion, @Nullable String versionPattern, @Nullable List<String> retainVersions) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
-        changeParentPom = new ChangeParentPom(groupId, null, artifactId, null, newVersion, versionPattern, false);
+        this.retainVersions = retainVersions == null ? new ArrayList<>() : retainVersions;
+        changeParentPom = new ChangeParentPom(groupId, null, artifactId, null, newVersion, versionPattern, false, this.retainVersions);
     }
 
     @Option(displayName = "Group",
@@ -61,6 +72,15 @@ public class UpgradeParentVersion extends Recipe {
     @Getter
     @Nullable
     private final String versionPattern;
+
+    @Option(displayName = "Retain versions",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
+                    + "from dependency management in the new parent pom, then it will be retained with an explicit version. "
+                    + "The version can be omitted from the GAV to use the old value from dependency management",
+            example = "- com.jcraft:jsch",
+            required = false)
+    @Getter
+    List<String> retainVersions;
 
     @EqualsAndHashCode.Exclude
     private final ChangeParentPom changeParentPom;

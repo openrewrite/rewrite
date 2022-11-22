@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -23,14 +24,21 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.search.FindDependency;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -94,7 +102,21 @@ public class ChangeParentPom extends Recipe {
     @Nullable
     boolean allowVersionDowngrades;
 
+    @Option(displayName = "Retain versions",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
+                    + "from dependency management in the new parent pom, then it will be retained with an explicit version. "
+                    + "The version can be omitted from the GAV to use the old value from dependency management",
+            example = "- com.jcraft:jsch",
+            required = false)
+    List<String> retainVersions;
+
+    @Deprecated
     public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId, @Nullable String newArtifactId, String newVersion, @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades) {
+        this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, versionPattern, allowVersionDowngrades, null);
+    }
+
+    @JsonCreator
+    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId, @Nullable String newArtifactId, String newVersion, @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades, @Nullable List<String> retainVersions) {
         this.oldGroupId = oldGroupId;
         this.newGroupId = newGroupId;
         this.oldArtifactId = oldArtifactId;
@@ -102,6 +124,7 @@ public class ChangeParentPom extends Recipe {
         this.newVersion = newVersion;
         this.versionPattern = versionPattern;
         this.allowVersionDowngrades = allowVersionDowngrades != null && allowVersionDowngrades;
+        this.retainVersions = retainVersions == null ? new ArrayList<>() : retainVersions;
     }
 
     @Override
@@ -126,6 +149,17 @@ public class ChangeParentPom extends Recipe {
         //noinspection ConstantConditions
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
+        }
+        for (int i = 0; i < retainVersions.size(); i++) {
+            final String retainVersion = retainVersions.get(i);
+            validated = validated.and(Validated.test(
+                    String.format("retainVersions[%d]", i),
+                    "did not look like a two-or-three-part GAV",
+                    retainVersion,
+                    maybeGav -> {
+                        final int gavParts = maybeGav.split(":").length;
+                        return gavParts == 2 || gavParts == 3;
+                    }));
         }
         return validated;
     }
@@ -156,30 +190,41 @@ public class ChangeParentPom extends Recipe {
                         try {
                             Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (targetVersion.isPresent()) {
+                                final ArrayList<XmlVisitor<ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
                                 if (!oldGroupId.equals(targetGroupId)) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId));
                                 }
 
                                 if (!oldArtifactId.equals(targetArtifactId)) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("artifactId").get(), targetArtifactId));
                                 }
 
                                 if (!oldVersion.equals(targetVersion.get())) {
-                                    t = (Xml.Tag) new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                                    changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("version").get(), targetVersion.get()));
+                                }
+
+                                if (changeParentTagVisitors.size() > 0) {
+                                    retainVersions();
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions));
+                                    for (XmlVisitor<ExecutionContext> visitor : changeParentTagVisitors) {
+                                        doAfterVisit(visitor);
+                                    }
+                                    maybeUpdateModel();
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
                                 }
                             }
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }
-
-                        if (t != tag) {
-                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
-                            maybeUpdateModel();
-                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
-                        }
                     }
                 }
                 return t;
+            }
+
+            private void retainVersions() {
+                for (final Recipe retainVersionRecipe : ChangeParentPom.retainVersions(this, retainVersions)) {
+                    doAfterVisit(retainVersionRecipe);
+                }
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
@@ -194,6 +239,63 @@ public class ChangeParentPom extends Recipe {
                 return allowVersionDowngrades ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2)) : versionComparator.upgrade(currentVersion, availableVersions);
             }
         };
+    }
+
+    /**
+     * Returns a list of recipes which can be applied to add explicit versions
+     * for dependencies matching the GAVs in param `retainVersions`
+     */
+    public static ArrayList<Recipe> retainVersions(MavenVisitor<?> currentVisitor, List<String> retainVersions) {
+        final ArrayList<Recipe> recipes = new ArrayList<>();
+        for (final String gav : retainVersions) {
+            final String[] split = gav.split(":");
+            final String requestedRetainedGroupId = split[0];
+            final String requestedRetainedArtifactId = split[1];
+            final String requestedRetainedVersion = split.length == 3 ? split[2] : null;
+            final Set<Xml.Tag> existingDependencies = FindDependency.find(
+                    currentVisitor.getCursor().firstEnclosingOrThrow(Xml.Document.class),
+                    requestedRetainedGroupId, requestedRetainedArtifactId);
+
+            // optimization for glob GAVs: more efficient to use one CDGIAAI recipe if they all will have the same version anyway
+            if (requestedRetainedVersion != null && noneMatch(existingDependencies, it -> it.getChild("version").isPresent())) {
+                recipes.add(new ChangeDependencyGroupIdAndArtifactId(requestedRetainedGroupId, requestedRetainedArtifactId, null, null,
+                        requestedRetainedVersion, null, true));
+                continue;
+            }
+
+            for (final Xml.Tag existingDependency : existingDependencies) {
+                final String retainedGroupId = existingDependency.getChildValue("groupId")
+                        .orElseThrow(() -> new IllegalStateException("Dependency tag must have groupId"));
+                final String retainedArtifactId = existingDependency.getChildValue("artifactId")
+                        .orElseThrow(() -> new IllegalStateException("Dependency tag must have artifactId"));
+                String retainedVersion = requestedRetainedVersion;
+
+                if (retainedVersion == null) {
+                    if (existingDependency.getChildValue("version").isPresent()) {
+                        continue;
+                    } else {
+                        final ResolvedManagedDependency managedDependency = currentVisitor.findManagedDependency(
+                                retainedGroupId, retainedArtifactId);
+                        retainedVersion = Objects.requireNonNull(managedDependency, String.format(
+                                "'%s' from 'retainVersions' did not have a version specified and was not in the project's dependency management",
+                                gav)).getVersion();
+
+                    }
+                }
+                recipes.add(new ChangeDependencyGroupIdAndArtifactId(retainedGroupId, retainedArtifactId, null, null,
+                        retainedVersion, null, true));
+            }
+        }
+        return recipes;
+    }
+
+    private static <T> boolean noneMatch(Set<T> existingDependencies, Predicate<T> predicate) {
+        for (T existingDependency : existingDependencies) {
+            if (predicate.test(existingDependency)) {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
