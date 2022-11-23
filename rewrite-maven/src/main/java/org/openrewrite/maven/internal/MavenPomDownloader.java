@@ -47,6 +47,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
@@ -623,7 +624,12 @@ public class MavenPomDownloader {
     }
 
     @Nullable
-    protected MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom) {
+    public MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom) {
+        return normalizeRepository(originalRepository, containingPom, null);
+    }
+
+    @Nullable
+    public MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom, @Nullable Consumer<String> nullReasonConsumer) {
         Optional<MavenRepository> result = null;
         MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
         if (containingPom != null) {
@@ -641,6 +647,9 @@ public class MavenPomDownloader {
             if (result == null) {
                 if (!repository.getUri().toLowerCase().startsWith("http")) {
                     // can be s3 among potentially other types for which there is a maven wagon implementation
+                    if (nullReasonConsumer != null) {
+                        nullReasonConsumer.accept("Repository " + repository.getUri() + " is not HTTP(S).");
+                    }
                     return null;
                 }
 
@@ -688,8 +697,11 @@ public class MavenPomDownloader {
                                 } else if (!e.isClientSideException()) {
                                     return originalRepository;
                                 }
-                            } catch (Throwable ignored) {
+                            } catch (Throwable e) {
                                 // ok to fall through here and cache a null
+                                if (nullReasonConsumer != null) {
+                                    nullReasonConsumer.accept(t.getMessage());
+                                }
                             }
                         }
                     }
