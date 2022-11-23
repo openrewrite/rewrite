@@ -629,7 +629,7 @@ public class MavenPomDownloader {
     }
 
     @Nullable
-    public MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom, @Nullable Consumer<String> nullReasonConsumer) {
+    public MavenRepository normalizeRepository(MavenRepository originalRepository, @Nullable ResolvedPom containingPom, @Nullable Consumer<Throwable> nullReasonConsumer) {
         Optional<MavenRepository> result = null;
         MavenRepository repository = applyAuthenticationToRepository(applyMirrors(originalRepository));
         if (containingPom != null) {
@@ -648,7 +648,7 @@ public class MavenPomDownloader {
                 if (!repository.getUri().toLowerCase().startsWith("http")) {
                     // can be s3 among potentially other types for which there is a maven wagon implementation
                     if (nullReasonConsumer != null) {
-                        nullReasonConsumer.accept("Repository " + repository.getUri() + " is not HTTP(S).");
+                        nullReasonConsumer.accept(new RuntimeException("Repository " + repository.getUri() + " is not HTTP(S)."));
                     }
                     return null;
                 }
@@ -700,7 +700,7 @@ public class MavenPomDownloader {
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
                                 if (nullReasonConsumer != null) {
-                                    nullReasonConsumer.accept(t.getMessage());
+                                    nullReasonConsumer.accept(t);
                                 }
                             }
                         }
