@@ -24,13 +24,19 @@ public class UncheckedMavenDownloadingException extends RuntimeException {
 
     public UncheckedMavenDownloadingException(Xml.Document pom, MavenDownloadingExceptions e) {
         super("Failed to download dependencies for " + pom.getSourcePath() + ":\n" +
-              e.warn(pom).printAllTrimmed(), e);
-        this.pomWithWarnings = e.warn(pom);
+              warn(pom, e).printAllTrimmed(), e);
+        this.pomWithWarnings = warn(pom, e);
     }
 
     public UncheckedMavenDownloadingException(Xml.Document pom, MavenDownloadingException e) {
-        super("Failed to download dependencies for " + pom.getSourcePath() + ":\n" +
-              MavenDownloadingExceptions.append(null, e).warn(pom).printAllTrimmed(), e);
-        this.pomWithWarnings = MavenDownloadingExceptions.append(null, e).warn(pom);
+        this(pom, MavenDownloadingExceptions.append(null, e));
+    }
+
+    private static Xml.Document warn(Xml.Document pom, MavenDownloadingExceptions mde) {
+        try {
+            return mde.warn(pom);
+        } catch (Exception e) {
+            return pom;
+        }
     }
 }
