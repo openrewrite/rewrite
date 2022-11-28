@@ -50,7 +50,7 @@ public class ReplaceConstant extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace a named constant with a literal value when you wish to remove the old constant.";
+        return "Replace a named constant with a literal value when you wish to remove the old constant. A `String` literal must include escaped quotes.";
     }
 
     @Override
@@ -104,10 +104,13 @@ public class ReplaceConstant extends Recipe {
                     JavaParser parser = JavaParser.fromJavaVersion().build();
                     List<J.CompilationUnit> result = parser.parse("class $ { Object o = " + literalValue + "; }");
 
-                    J.Literal parsedLiteral = (J.Literal) ((J.VariableDeclarations) result.get(0).getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0).getInitializer();
-                    if (parsedLiteral != null) {
-                        literal = parsedLiteral.withId(Tree.randomId());
+                    J j = ((J.VariableDeclarations) result.get(0).getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0).getInitializer();
+                    if (!(j instanceof J.Literal)) {
+                        throw new IllegalArgumentException("Unknown literal type for literal value: " + literalValue);
                     }
+
+                    J.Literal parsedLiteral = (J.Literal) j;
+                    literal = parsedLiteral.withId(Tree.randomId());
                 }
                 return literal;
             }
