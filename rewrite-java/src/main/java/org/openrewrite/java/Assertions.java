@@ -48,7 +48,9 @@ public class Assertions {
     }
 
     static void customizeExecutionContext(ExecutionContext ctx) {
-        ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        if (ctx.getMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION) == null) {
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
     }
 
     // validateTypes and assertValidTypes can be merged into a single function once JavaRecipeTest is removed
