@@ -18,7 +18,7 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
-import org.openrewrite.remote.RemoteArchive;
+import org.openrewrite.remote.Remote;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,7 +26,27 @@ public class RemoteGradleWrapperJarTest {
 
     @Test
     void gradleWrapper() {
-        RemoteArchive remoteArchive = new GradleWrapper("7.4.2", GradleWrapper.DistributionType.Bin).asRemote();
+        Remote remoteArchive = new GradleWrapper("7.4.2", GradleWrapper.DistributionType.Bin).asRemote();
+        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
+                .isNotEmpty();
+    }
+
+    @Test
+    void gradleWrapper69() {
+        Remote remoteArchive = new GradleWrapper("6.9.3", GradleWrapper.DistributionType.Bin).asRemote();
+        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
+                .isNotEmpty();
+    }
+    @Test
+    void gradleWrapper75() {
+        Remote remoteArchive = new GradleWrapper("7.5-rc-1", GradleWrapper.DistributionType.Bin).asRemote();
+        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
+                .isNotEmpty();
+    }
+
+    @Test
+    void gradleWrapper76() {
+        Remote remoteArchive = new GradleWrapper("7.6", GradleWrapper.DistributionType.Bin).asRemote();
         assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
                 .isNotEmpty();
     }
