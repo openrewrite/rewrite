@@ -95,7 +95,7 @@ public class AddRepositoryTest implements RewriteTest {
     }
 
     @Test
-    void removeRepoName() {
+    void doNotRemoveRepoName() {
 
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
@@ -112,19 +112,6 @@ public class AddRepositoryTest implements RewriteTest {
                         <id>myRepo</id>
                         <url>http://myrepo.maven.com/repo</url>
                         <name>qq</name>
-                      </repository>
-                    </repositories>
-                  </project>
-              """,
-            """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
                       </repository>
                     </repositories>
                   </project>
@@ -254,6 +241,34 @@ public class AddRepositoryTest implements RewriteTest {
                         <url>http://myrepo.maven.com/repo</url>
                         <snapshots>
                           <checksumPolicy>whatever</checksumPolicy>
+                        </snapshots>
+                      </repository>
+                    </repositories>
+                  </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void noIdMatch1SameSnapshots() {
+
+        rewriteRun(
+          spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+            true, null, null,
+            null, null, null)),
+          pomXml(
+            """
+                  <project>
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <repositories>
+                      <repository>
+                        <id>myRepo-X</id>
+                        <url>http://myrepo.maven.com/repo</url>
+                        <snapshots>
+                          <enabled>true</enabled>
                         </snapshots>
                       </repository>
                     </repositories>

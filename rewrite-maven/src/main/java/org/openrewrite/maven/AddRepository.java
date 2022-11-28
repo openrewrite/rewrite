@@ -101,21 +101,21 @@ public class AddRepository extends Recipe {
                     Optional<Xml.Tag> maybeRepo = repositories.getChildren().stream()
                             .filter(repo ->
                                     "repository".equals(repo.getName()) &&
-                                            id.equals(repo.getChildValue("id").orElse(null)) &&
+                                            (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
                                             url.equals(repo.getChildValue("url").orElse(null))
                             )
                             .findAny();
 
                     if (maybeRepo.isPresent()) {
                         Xml.Tag repo = maybeRepo.get();
-                        if (!Objects.equals(repoName, repo.getChildValue("name").orElse(null))) {
+                        if (repoName != null && !Objects.equals(repoName, repo.getChildValue("name").orElse(null))) {
                             if (repoName == null) {
                                 repositories = (Xml.Tag) new RemoveContentVisitor<>(repo.getChild("name").get(), true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
                                 repositories = (Xml.Tag) new ChangeTagValueVisitor<>(repo.getChild("name").get(), repoName).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             }
                         }
-                        if (!Objects.equals(layout, repo.getChildValue("layout").orElse(null))) {
+                        if (layout != null && !Objects.equals(layout, repo.getChildValue("layout").orElse(null))) {
                             if (layout == null) {
                                 repositories = (Xml.Tag) new RemoveContentVisitor<>(repo.getChild("layout").get(), true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
