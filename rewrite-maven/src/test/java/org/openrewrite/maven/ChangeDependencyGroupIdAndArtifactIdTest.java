@@ -299,6 +299,135 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     }
 
     @Test
+    void unmanagedToManagedWithOverrideManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
+            null,
+            true
+          )),
+          pomXml(
+            """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.1</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+              """,
+            """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.2</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.1</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void unmanagedToManagedWithOverrideManagedVersionNull() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+            "javax.activation",
+            "javax.activation-api",
+            "jakarta.activation",
+            "jakarta.activation-api",
+            "1.2.2",
+            null,
+            null
+          )),
+          pomXml(
+            """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.1</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+              """,
+            """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                          </dependency>
+                      </dependencies>
+                      <dependencyManagement>
+                          <dependencies>
+                              <dependency>
+                                  <groupId>jakarta.activation</groupId>
+                                  <artifactId>jakarta.activation-api</artifactId>
+                                  <version>1.2.1</version>
+                              </dependency>
+                          </dependencies>
+                      </dependencyManagement>
+                  </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void changeOnlyArtifactId() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(

@@ -161,7 +161,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                                 //noinspection ConstantConditions
                                 t = (Xml.Tag) new AddToTagVisitor<ExecutionContext>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())).visitNonNull(t, ctx, getCursor().getParent());
                             } else if (versionTag.isPresent()) {
-                                if (isDependencyManaged(scope, groupId, artifactId)) {
+                                if (isDependencyManaged(scope, groupId, artifactId) && !Boolean.TRUE.equals(overrideManagedVersion)) {
                                     //If the previous dependency had a version but the new artifact is managed, removed the
                                     //version tag.
                                     t = (Xml.Tag) new RemoveContentVisitor<>(versionTag.get(), false).visit(t, ctx);
