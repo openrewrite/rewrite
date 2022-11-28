@@ -16,38 +16,40 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Tree.randomId
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.style.ImportLayoutStyle
 import org.openrewrite.style.NamedStyles
 import org.openrewrite.style.Style
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface OrderImportsTest : JavaRecipeTest {
-    override val recipe: OrderImports
-        get() = OrderImports(false)
-
+interface OrderImportsTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(OrderImports(false))
+    }
+    
     @Test
-    fun sortInnerAndOuterClassesInTheSamePackage(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = "class Test {}"
+    fun sortInnerAndOuterClassesInTheSamePackage() = rewriteRun(
+        java("class Test {}")
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/259")
     @Test
-    fun multipleClassesWithTheSameNameButDifferentPackages(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun multipleClassesWithTheSameNameButDifferentPackages() = rewriteRun(
+        java("""
             import java.awt.List;
             import java.util.List;
             
             class Test {}
-        """
+        """)
     )
 
     @Test
-    fun foldIntoStar(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun foldIntoStar() = rewriteRun(
+     java("""
             import java.util.List;
             import java.util.ArrayList;
             import java.util.regex.Pattern;
@@ -55,53 +57,49 @@ interface OrderImportsTest : JavaRecipeTest {
             import java.util.Set;
             import java.util.Map;
         """,
-        after = """
+        """
             import java.util.*;
             import java.util.regex.Pattern;
-        """
+        """)
     )
 
     @Test
-    fun blankLinesNotFollowedByBlockArentAdded(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun blankLinesNotFollowedByBlockArentAdded() = rewriteRun(
+        java("""
             import java.util.List;
             
             import static java.util.Collections.*;
             
             class A {}
-        """
+        """)
     )
 
     @Test
-    fun foldIntoExistingStar(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun foldIntoExistingStar() = rewriteRun(
+        java("""
             import java.util.*;
             import java.util.ArrayList;
             import java.util.regex.Pattern;
             import java.util.Objects;
         """,
-        after = """
+        """
             import java.util.*;
             import java.util.regex.Pattern;
-        """
+        """)
     )
 
     @Test
-    fun idempotence(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun idempotence() = rewriteRun(
+        java("""
             import java.util.*;
             import java.util.regex.Pattern;
-        """
+        """)
     )
 
     @Test
-    fun unfoldStar(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = OrderImports(true),
-        before = """
+    fun unfoldStar() = rewriteRun(
+        {spec -> spec.recipe(OrderImports(true))},
+        java("""
             import java.util.*;
             
             class A {
@@ -109,56 +107,50 @@ interface OrderImportsTest : JavaRecipeTest {
                 List<Integer> list2;
             }
         """,
-        after = """
+        """
             import java.util.List;
             
             class A {
                 List<Integer> list;
                 List<Integer> list2;
             }
-        """
+        """)
     )
 
     @Test
-    fun unfoldStarMultiple(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = OrderImports(true),
-        before = """
+    fun unfoldStarMultiple() = rewriteRun(
+        {spec -> spec.recipe(OrderImports(true))},
+        java("""
             import java.util.*;
             
             class A {
                 List<Integer> list;
-                List<Integer> list2;
                 Map<Integer, Integer> map;
             }
         """,
-        after = """
+        """
             import java.util.List;
             import java.util.Map;
             
             class A {
                 List<Integer> list;
-                List<Integer> list2;
                 Map<Integer, Integer> map;
             }
-        """
+        """)
     )
 
     @Test
-    fun removeUnused(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = OrderImports(true),
-        before = """
+    fun removeUnused() = rewriteRun(
+        {spec -> spec.recipe(OrderImports(true))},
+        java("""
             import java.util.*;
-        """,
-        after = ""
+        ""","")
     )
 
     @Test
-    fun unfoldStaticStar(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = OrderImports(true),
-        before = """
+    fun unfoldStaticStar() = rewriteRun(
+        {spec -> spec.recipe(OrderImports(true))},
+        java("""
             import java.util.List;
             
             import static java.util.Collections.*;
@@ -167,7 +159,7 @@ interface OrderImportsTest : JavaRecipeTest {
                 List<Integer> list = emptyList();
             }
         """,
-        after = """
+        """
             import java.util.List;
             
             import static java.util.Collections.emptyList;
@@ -175,30 +167,28 @@ interface OrderImportsTest : JavaRecipeTest {
             class A {
                 List<Integer> list = emptyList();
             }
-        """
+        """)
     )
 
     @Test
-    fun packagePatternEscapesDots(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun packagePatternEscapesDots() = rewriteRun(
+        java("""
             import javax.annotation.Nonnull;
-        """
+        """)
     )
 
     @Test
-    fun twoImportsFollowedByStar(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun twoImportsFollowedByStar() = rewriteRun(
+        java("""
             import java.io.IOException;
             import java.io.UncheckedIOException;
             import java.nio.files.*;
-        """
+        """)
     )
 
     @Test
-    fun springCloudFormat() = assertUnchanged(
-        JavaParser.fromJavaVersion().styles(
+    fun springCloudFormat() = rewriteRun(
+        {spec -> spec.parser(JavaParser.fromJavaVersion().styles(
             listOf(
                 NamedStyles(
                     randomId(), "spring", "spring", "spring", emptySet(), listOf(
@@ -218,8 +208,8 @@ interface OrderImportsTest : JavaRecipeTest {
                     )
                 )
             )
-        ).build(),
-        before = """
+        ))},
+        java("""
             import java.io.ByteArrayOutputStream;
             import java.nio.charset.StandardCharsets;
             import java.util.Collections;
@@ -244,96 +234,92 @@ interface OrderImportsTest : JavaRecipeTest {
             import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
             
             class A {}
-        """
+        """)
     )
 
     @Test
-    fun importSorting(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun importSorting() = rewriteRun(
+        java("""
             import r.core.Flux;
             import s.core.Flux;
             import com.fasterxml.jackson.databind.ObjectMapper;
             import org.apache.commons.logging.Log;
             import reactor.core.publisher.Mono;
         """,
-        after = """
+        """
             import com.fasterxml.jackson.databind.ObjectMapper;
             import org.apache.commons.logging.Log;
             import r.core.Flux;
             import reactor.core.publisher.Mono;
             import s.core.Flux;
-        """
+        """)
     )
 
     @Test
-    fun foldGroupOfStaticImportsThatAppearLast(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun foldGroupOfStaticImportsThatAppearLast() = rewriteRun(
+        java("""
             import static java.util.stream.Collectors.toList;
             import static java.util.stream.Collectors.toMap;
             import static java.util.stream.Collectors.toSet;
         """,
-        after = """
-            import static java.util.stream.Collectors.*;
         """
+            import static java.util.stream.Collectors.*;
+        """)
     )
 
     @Test
-    fun preservesStaticStarImportWhenRemovingUnused(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = OrderImports(true),
-        before = """
+    fun preservesStaticStarImportWhenRemovingUnused() = rewriteRun(
+        {spec -> spec.recipe(OrderImports(true))},
+        java("""
             import static java.util.Collections.*;
             
             class Test {
                 Object[] o = new Object[] { emptyList(), emptyMap(), emptySet() };
             }
-        """
+        """)
     )
 
     @Test
-    fun preservesStaticInheritanceImport(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = OrderImports(true),
-        dependsOn = arrayOf("package my; public class MyCollections extends java.util.Collections {}"),
-        before = """
+    fun preservesStaticInheritanceImport() = rewriteRun(
+        {spec -> spec.recipe(OrderImports(true)) },
+        java("""
+            package my;
+            public class MyCollections extends java.util.Collections {}
+        """),
+        java("""
             import static my.MyCollections.*;
             
             class Test {
                 Object[] o = new Object[] { emptyList(), emptyMap(), emptySet() };
             }
-        """
+        """)
     )
 
     @Test
-    fun preservesStaticMethodArguments(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = OrderImports(true),
-        before = """
+    fun preservesStaticMethodArguments() = rewriteRun(
+        {spec -> spec.recipe(OrderImports(true))},
+        java("""
             import static java.util.Collections.*;
             
             class Test {
                 Object[] o = new Object[] { emptyList(), emptyMap(), emptySet() };
             }
-        """
+        """)
     )
 
     @Test
-    fun preservesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun preservesDifferentStaticImportsFromSamePackage() = rewriteRun(
+        java("""
             import static java.util.Collections.emptyList;
             import static java.util.Collections.emptyMap;
             import static java.util.GregorianCalendar.getAvailableCalendarTypes;
             import static java.util.GregorianCalendar.getAvailableLocales;
-        """
+        """)
     )
 
     @Test
-    fun collapsesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun collapsesDifferentStaticImportsFromSamePackage() = rewriteRun(
+        java("""
             import static java.util.Collections.emptyList;
             import static java.util.Collections.emptyMap;
             import static java.util.Collections.emptySet;
@@ -341,28 +327,27 @@ interface OrderImportsTest : JavaRecipeTest {
             import static java.util.GregorianCalendar.getAvailableLocales;
             import static java.util.GregorianCalendar.getInstance;
         """,
-        after = """
+        """
             import static java.util.Collections.*;
             import static java.util.GregorianCalendar.*;
-        """
+        """)
     )
 
     @Test
-    fun removesRedundantImports(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun removesRedundantImports() = rewriteRun(
+        java("""
             import java.util.List;
             import java.util.List;
         """,
-        after = """
-            import java.util.List;
         """
+            import java.util.List;
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/474")
     @Test
-    fun blankLinesBetweenImports(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(
+    fun blankLinesBetweenImports() = rewriteRun(
+        {spec -> spec.parser(JavaParser.fromJavaVersion().styles(
             listOf(
                 NamedStyles(
                     randomId(),
@@ -381,29 +366,27 @@ interface OrderImportsTest : JavaRecipeTest {
                             .build() as Style
                     )
                 )
-            )
-        ).build(),
-        before = """
+            )))},
+        java("""
             import java.util.List;
             import static java.util.Collections.singletonList;
             class Test {
             }
         """,
-        after = """
+        """
             import static java.util.Collections.singletonList;
             
             import java.util.List;
             
             class Test {
             }
-        """
+        """)
     )
 
     @Issue("#352")
     @Test
-    fun groupImportsIsAwareOfNestedClasses(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun groupImportsIsAwareOfNestedClasses() = rewriteRun(
+        java("""
             import org.openrewrite.java.J.CompilationUnit;
             import org.openrewrite.java.J;
             import org.openrewrite.java.JavaVisitor;
@@ -411,17 +394,16 @@ interface OrderImportsTest : JavaRecipeTest {
             import org.openrewrite.java.ChangeMethodName;
             import org.openrewrite.java.ChangeType;
         """,
-        after = """
+        """
             import org.openrewrite.java.*;
             import org.openrewrite.java.J.CompilationUnit;
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/733")
     @Test
-    fun detectBlockPattern(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun detectBlockPattern() = rewriteRun(
+        java("""
             // org.slf4j should be detected as a block pattern, and not be moved to all other imports.
             import org.slf4j.Logger;
             import org.slf4j.LoggerFactory;
@@ -431,12 +413,12 @@ interface OrderImportsTest : JavaRecipeTest {
             
             public class C {
             }
-        """
+        """)
     )
 
     @Test
-    fun doNotFoldImports(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.styles(
+    fun doNotFoldImports() = rewriteRun(
+        {spec -> spec.parser(JavaParser.fromJavaVersion().styles(
             listOf(
                 NamedStyles(
                     randomId(),
@@ -458,9 +440,8 @@ interface OrderImportsTest : JavaRecipeTest {
                             .build() as Style
                     )
                 )
-            )
-        ).build(),
-        before = """
+            )))},
+        java("""
             import java.util.ArrayList;
             import java.util.Collections;
             import java.util.HashSet;
@@ -476,35 +457,32 @@ interface OrderImportsTest : JavaRecipeTest {
             
             public class C {
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/860")
     @Test
-    fun orderAndDoNotFoldStaticClasses(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = OrderImports(false),
-        before = """
+    fun orderAndDoNotFoldStaticClasses() = rewriteRun(
+        java("""
             import static org.openrewrite.java.J.CompilationUnit.*;
             import static org.openrewrite.java.J.ClassDeclaration.*;
             import static org.openrewrite.java.J.MethodInvocation.*;
             import static org.openrewrite.java.J.MethodDeclaration.*;
             import static org.openrewrite.java.J.If.*;
         """,
-        after = """
+        """
             import static org.openrewrite.java.J.ClassDeclaration.*;
             import static org.openrewrite.java.J.CompilationUnit.*;
             import static org.openrewrite.java.J.If.*;
             import static org.openrewrite.java.J.MethodDeclaration.*;
             import static org.openrewrite.java.J.MethodInvocation.*;
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/860")
     @Test
-    fun orderAndDoNotFoldImports(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun orderAndDoNotFoldImports() = rewriteRun(
+        java("""
             import java.aws.List;
             import java.awt.Panel;
             import java.util.Collection;
@@ -516,7 +494,7 @@ interface OrderImportsTest : JavaRecipeTest {
             import java.util.Set;
             import java.awt.Polygon;
         """,
-        after = """
+        """
             import java.aws.List;
             import java.awt.Panel;
             import java.awt.Point;
@@ -527,27 +505,28 @@ interface OrderImportsTest : JavaRecipeTest {
             import java.util.Map;
             import java.util.Set;
             import java.util.TreeMap;
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/859")
     @Test
-    fun doNotFoldPackageWithJavaLangClassNames(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = OrderImports(false),
-        executionContext = executionContext.apply {putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false)},
-        before = """
+    fun doNotFoldPackageWithJavaLangClassNames() = rewriteRun(
+        {spec -> spec
+            .executionContext(InMemoryExecutionContext().apply { putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false) })
+            .recipe(OrderImports(false))
+        },
+        java("""
             import kotlin.DeepRecursiveFunction;
             import kotlin.Function;
             import kotlin.Lazy;
             import kotlin.Pair;
             import kotlin.String;
-        """
+        """)
     )
 
     @Test
-    fun foldPackageWithExistingImports() = assertChanged(
-        JavaParser.fromJavaVersion().styles(
+    fun foldPackageWithExistingImports() = rewriteRun(
+        {spec -> spec.parser(JavaParser.fromJavaVersion().styles(
             listOf(
                 NamedStyles(
                     randomId(), "test", "test", "test", emptySet(), listOf(
@@ -558,14 +537,12 @@ interface OrderImportsTest : JavaRecipeTest {
                             .build()
                     )
                 )
-            )
-        ).build(),
-        recipe = OrderImports(false),
-        before = """
+            )))},
+        java("""
             import java.util.List;
         """,
-        after = """
-            import java.util.*;
         """
+            import java.util.*;
+        """)
     )
 }
