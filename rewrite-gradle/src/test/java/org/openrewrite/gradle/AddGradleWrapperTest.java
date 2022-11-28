@@ -47,6 +47,7 @@ class AddGradleWrapperTest implements RewriteTest {
           distributionBase=GRADLE_USER_HOME
           distributionPath=wrapper/dists
           distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+          distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
           zipStoreBase=GRADLE_USER_HOME
           zipStorePath=wrapper/dists
       """;
