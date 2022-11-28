@@ -17,15 +17,17 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.charset.UnsupportedCharsetException;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
 
 public class UseStandardCharset extends Recipe {
 
@@ -56,26 +58,42 @@ public class UseStandardCharset extends Recipe {
 
     private static class UseStandardCharsetVisitor extends JavaVisitor<ExecutionContext> {
         MethodMatcher CHARSET_FOR_NAME = new MethodMatcher("java.nio.charset.Charset forName(java.lang.String)");
-        Map<String, String> charsetValueToCode = new HashMap<>();
-
-        public UseStandardCharsetVisitor() {
-            charsetValueToCode.put("US-ASCII", "StandardCharsets.US_ASCII");
-            charsetValueToCode.put("ISO-8859-1", "StandardCharsets.ISO_8859_1");
-            charsetValueToCode.put("UTF-8", "StandardCharsets.UTF_8");
-            charsetValueToCode.put("UTF-16", "StandardCharsets.UTF_16");
-            charsetValueToCode.put("UTF-16BE", "StandardCharsets.UTF_16BE");
-            charsetValueToCode.put("UTF-16LE", "StandardCharsets.UTF_16LE");
-        }
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
             if (CHARSET_FOR_NAME.matches(m)) {
                 String maybeReplace = (String) ((J.Literal) m.getArguments().get(0)).getValue();
-                if (charsetValueToCode.containsKey(maybeReplace)) {
+                if (maybeReplace != null) {
                     maybeAddImport("java.nio.charset.StandardCharsets");
-                    return m.withTemplate(JavaTemplate.builder(this::getCursor, charsetValueToCode.get(maybeReplace))
-                            .imports("java.nio.charset.StandardCharsets").build(), m.getCoordinates().replace());
+
+                    Charset charset;
+                    try {
+                        charset = Charset.forName(maybeReplace);
+                    } catch (UnsupportedCharsetException ex) {
+                        // This should never happen in practice.
+                        return method;
+                    }
+
+                    String standardName = "";
+                    if (charset == StandardCharsets.ISO_8859_1) {
+                        standardName = "ISO_8859_1";
+                    } else if (charset == StandardCharsets.US_ASCII) {
+                        standardName = "US_ASCII";
+                    } else if (charset == StandardCharsets.UTF_8) {
+                        standardName = "UTF_8";
+                    } else if (charset == StandardCharsets.UTF_16) {
+                        standardName = "UTF_16";
+                    } else if (charset == StandardCharsets.UTF_16BE) {
+                        standardName = "UTF_16BE";
+                    } else if (charset == StandardCharsets.UTF_16LE) {
+                        standardName = "UTF_16LE";
+                    }
+
+                    if (!StringUtils.isBlank(standardName)) {
+                        return m.withTemplate(JavaTemplate.builder(this::getCursor, "StandardCharsets." + standardName)
+                                .imports("java.nio.charset.StandardCharsets").build(), m.getCoordinates().replace());
+                    }
                 }
             }
             return m;

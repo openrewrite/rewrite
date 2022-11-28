@@ -16,29 +16,31 @@
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.Issue
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
 @Suppress("CharsetObjectCanBeUsed")
-interface UseStandardCharsetTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = UseStandardCharset()
-
+interface UseStandardCharsetTest : RewriteTest {
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(UseStandardCharset())
+    }
 
     @Test
-    fun notAStandardCharset() = assertUnchanged(
-        before = """
+    fun notAStandardCharset() = rewriteRun(
+        java("""
             import java.nio.charset.Charset;
 
             class Test {
                 Charset WINDOWS_1252 = Charset.forName("Windows-1252");
             }
-        """
+        """)
     )
 
     @Test
-    fun changeCharsetForName() = assertChanged(
-        before = """
+    fun changeCharsetForName() = rewriteRun(
+        java("""
             import java.nio.charset.Charset;
 
             class Test {
@@ -49,8 +51,8 @@ interface UseStandardCharsetTest : JavaRecipeTest {
                 Charset UTF_16BE = Charset.forName("UTF-16BE");
                 Charset UTF_16LE = Charset.forName("UTF-16LE");
             }
-        """,
-        after = """
+            """,
+        """
             import java.nio.charset.Charset;
             import java.nio.charset.StandardCharsets;
 
@@ -62,6 +64,32 @@ interface UseStandardCharsetTest : JavaRecipeTest {
                 Charset UTF_16BE = StandardCharsets.UTF_16BE;
                 Charset UTF_16LE = StandardCharsets.UTF_16LE;
             }
+            """
+        )
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2450")
+    @Test
+    fun convertAnyValidName() = rewriteRun(
+        java("""
+            import java.nio.charset.Charset;
+
+            class Test {
+                Charset UTF_8_A = Charset.forName("utf-8");
+                Charset UTF_8_B = Charset.forName("utf8");
+                Charset UTF_8_C = Charset.forName("UTF8");
+            }
+            """,
         """
+            import java.nio.charset.Charset;
+            import java.nio.charset.StandardCharsets;
+
+            class Test {
+                Charset UTF_8_A = StandardCharsets.UTF_8;
+                Charset UTF_8_B = StandardCharsets.UTF_8;
+                Charset UTF_8_C = StandardCharsets.UTF_8;
+            }
+            """
+        )
     )
 }
