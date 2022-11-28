@@ -150,7 +150,7 @@ public enum NameCaseConvention {
             }
         }
         if(allUpperCase) {
-            return str.toLowerCase();
+            str = str.toLowerCase();
         }
 
         StringBuilder sb = new StringBuilder(str.length());

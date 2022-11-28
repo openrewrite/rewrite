@@ -85,6 +85,7 @@ class NameCaseConventionTest {
             "foo-bar:fooBar",
             "foo bar:fooBar",
             " foo  bar :fooBar",
+            "FOO_BAR:fooBar",
         ], delimiter = ':'
     )
     fun lowerCamel(input: String, expected: String) {

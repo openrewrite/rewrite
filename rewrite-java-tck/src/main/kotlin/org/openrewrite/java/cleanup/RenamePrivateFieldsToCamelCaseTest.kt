@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("ConstantConditions", "AnonymousHasLambdaAlternative", "ResultOfMethodCallIgnored")
+
 package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
@@ -25,6 +27,21 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(RenamePrivateFieldsToCamelCase())
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2461")
+    @Test
+    fun upperSnakeToLowerCamel() = rewriteRun(
+        java("""
+            class Test {
+                private String D_TYPE_CONNECT = "";
+            }
+        """,
+            """
+            class Test {
+                private String dTypeConnect = "";
+            }
+        """)
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2294")
     @Test
