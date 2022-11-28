@@ -105,7 +105,9 @@ public class ReplaceConstant extends Recipe {
                     List<J.CompilationUnit> result = parser.parse("class $ { Object o = " + literalValue + "; }");
 
                     J.Literal parsedLiteral = (J.Literal) ((J.VariableDeclarations) result.get(0).getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0).getInitializer();
-                    literal = parsedLiteral.withId(Tree.randomId());
+                    if (parsedLiteral != null) {
+                        literal = parsedLiteral.withId(Tree.randomId());
+                    }
                 }
                 return literal;
             }

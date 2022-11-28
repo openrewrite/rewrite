@@ -17,48 +17,56 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface ReplaceConstantTest : JavaRecipeTest {
-    override val recipe: Recipe
-        get() = ReplaceConstant("com.google.common.base.Charsets", "UTF_8", "\"UTF_8\"")
+interface ReplaceConstantTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(ReplaceConstant("com.google.common.base.Charsets", "UTF_8", "\"UTF_8\""))
+    }
+
 
     @Test
-    fun replaceConstant(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.classpath("guava").build(),
-        before = """ 
+    fun replaceConstant() = rewriteRun(
+        { spec: RecipeSpec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")) },
+        java("""
             import com.google.common.base.Charsets;
             class Test {
                 Object o = Charsets.UTF_8;
             }
-        """,
-        after = """
+            """,
+        """
             class Test {
                 Object o = "UTF_8";
             }
-        """
+            """
+        )
     )
 
     @Test
-    fun replaceStaticallyImportedConstant(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.classpath("guava").build(),
-        before = """ 
+    fun replaceStaticallyImportedConstant() = rewriteRun(
+        { spec: RecipeSpec -> spec.parser(JavaParser.fromJavaVersion().classpath("guava")) },
+        java("""
             import static com.google.common.base.Charsets.UTF_8;
             class Test {
                 Object o = UTF_8;
             }
-        """,
-        after = """
+            """,
+        """
             class Test {
                 Object o = "UTF_8";
             }
-        """
+            """
+        )
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1752")
     @Test
-    fun doesNotChangeOriginalVariableDeclaration() = assertChanged(
-        dependsOn = arrayOf("""
+    fun doesNotChangeOriginalVariableDeclaration() = rewriteRun(
+        { spec: RecipeSpec -> spec.recipe(ReplaceConstant("com.constant.B", "VAR", "\"newValue\"")) },
+        java("""
             package com.constant;
             public class B {
                 public static final String VAR = "default";
@@ -67,19 +75,25 @@ interface ReplaceConstantTest : JavaRecipeTest {
                 }
             }
         """),
-        recipe = ReplaceConstant("com.constant.B", "VAR", "\"newValue\""),
-        before = """
+        java("""
             package com.abc;
             import com.constant.B;
             class A {
                 String v = B.VAR;
+                private String method() {
+                    return B.VAR;
+                }
             }
-        """,
-        after = """
+            """,
+        """
             package com.abc;
             class A {
                 String v = "newValue";
+                private String method() {
+                    return "newValue";
+                }
             }
-        """
+            """
+        )
     )
 }
