@@ -39,6 +39,14 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         MavenResolutionResult resolutionResult = getResolutionResult();
         Pom requested = resolutionResult.getPom().getRequested();
 
+        Optional<Xml.Tag> properties = document.getRoot().getChild("properties");
+        if (properties.isPresent()) {
+            for (final Xml.Tag propertyTag : properties.get().getChildren()) {
+                requested.getProperties().put(propertyTag.getName(),
+                        propertyTag.getValue().orElseThrow(() -> new IllegalStateException("Maven property tag must have String value")));
+            }
+        }
+
         Optional<Xml.Tag> parent = document.getRoot().getChild("parent");
         if (parent.isPresent()) {
             Parent updatedParent = new Parent(new GroupArtifactVersion(
