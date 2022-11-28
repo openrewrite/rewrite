@@ -65,7 +65,6 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2285")
     @Test
     fun doesNotRenameAssociatedIdentifiers() = rewriteRun(
-        {spec -> spec.expectedCyclesThatMakeChanges(2)},
         java("""
             class A {
                 private static String MY_STRING = "VAR";
@@ -275,7 +274,7 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
                 interface Book{}
             """),
         java("""
-                class B (){
+                class B {
                     B(){
                         new Book() {
                           private String DoChange;
@@ -293,7 +292,7 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
     @Test
     fun handleStaticMethods() = rewriteRun(
        java("""
-                class A (){
+                class A {
                     private int _variable;
                     public static A getInstance(){
                         A a = new A();
@@ -303,7 +302,7 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
                 }
         """,
         """
-                class A (){
+                class A {
                     private int variable;
                     public static A getInstance(){
                         A a = new A();
@@ -317,14 +316,14 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
     @Test
     fun renameFinalMembers() = rewriteRun(
         java("""
-                class A (){
+                class A {
                     private final int _final_variable;
                     private static int _static_variable;
                     private static final int DO_NOT_CHANGE;
                 }
         """,
         """
-                class A (){
+                class A {
                     private final int finalVariable;
                     private static int staticVariable;
                     private static final int DO_NOT_CHANGE;
@@ -335,9 +334,9 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
     @Test
     fun doNotChangeWhenSameMethodParam() = rewriteRun(
         java("""
-                class A (){
+                class A {
                     private int _variable;
-                    public void getInstance(int _variable){
+                    public void getInstance(int _variable) {
                         this._variable = _variable;
                     }
                 }
@@ -347,17 +346,17 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
     @Test
     fun renameWhenSameMethodExists() = rewriteRun(
         java("""
-                class A (){
+                class A {
                     private boolean _hasMethod;
-                    public boolean hasMethod(){
+                    public boolean hasMethod() {
                         return _hasMethod;
                     }
                 }
         """,
         """
-                class A (){
+                class A {
                     private boolean hasMethod;
-                    public boolean hasMethod(){
+                    public boolean hasMethod() {
                         return hasMethod;
                     }
                 }

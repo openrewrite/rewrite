@@ -246,7 +246,6 @@ interface MethodNameCasingTest: RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2103")
     @Test
     fun snakeCaseToCamelCase() = rewriteRun(
-        {spec -> spec.expectedCyclesThatMakeChanges(2)},
         java("""
             class T {
                 private static int SOME_METHOD() {
