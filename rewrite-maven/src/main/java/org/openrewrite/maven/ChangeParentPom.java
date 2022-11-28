@@ -173,9 +173,9 @@ public class ChangeParentPom extends Recipe {
                         }
 
                         if (t != tag) {
-                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
+                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
                             maybeUpdateModel();
-                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true));
+                            doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
                         }
                     }
                 }

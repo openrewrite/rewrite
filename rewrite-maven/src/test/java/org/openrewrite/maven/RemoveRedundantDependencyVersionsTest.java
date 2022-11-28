@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Collections;
+
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -26,7 +28,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveRedundantDependencyVersions(null, null, null));
+        spec.recipe(new RemoveRedundantDependencyVersions(null, null, null, null));
     }
 
     @Test
@@ -947,7 +949,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
     @Test
     void onlyIfVersionsMatchFalse() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false)),
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
           pomXml(
             """
                   <project>
@@ -1004,6 +1006,57 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </project>
                 """
             )
+          )
+        );
+    }
+
+    @Test
+    void except() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, Collections.singletonList("org.junit.jupiter:junit-jupiter-api"))),
+          pomXml("""
+                <project>
+                    <parent>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>5.8.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.8.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-params</artifactId>
+                            <version>5.8.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """,
+            """
+                <project>
+                    <parent>
+                        <groupId>org.junit</groupId>
+                        <artifactId>junit-bom</artifactId>
+                        <version>5.8.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.8.0</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-params</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                  """
           )
         );
     }

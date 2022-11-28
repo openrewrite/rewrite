@@ -21,14 +21,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Objects;
+import java.util.List;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -58,6 +58,14 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Nullable
     Boolean onlyIfVersionsMatch;
 
+    @Option(displayName = "Except",
+            description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
+                    + " GAV versions are ignored if provided.",
+            example = "- com.jcraft:jsch",
+            required = false)
+    @Nullable
+    List<String> except;
+
     @Override
     public String getDisplayName() {
         return "Remove redundant explicit dependency versions";
@@ -70,6 +78,25 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     @Override
+    public Validated validate() {
+        Validated validated = Validated.none();
+        if (except != null) {
+            for (int i = 0; i < except.size(); i++) {
+                final String retainVersion = except.get(i);
+                validated = validated.and(Validated.test(
+                        String.format("except[%d]", i),
+                        "did not look like a two-or-three-part GAV",
+                        retainVersion,
+                        maybeGav -> {
+                            final int gavParts = maybeGav.split(":").length;
+                            return gavParts == 2 || gavParts == 3;
+                        }));
+            }
+        }
+        return validated;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
@@ -77,7 +104,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
                 if (!isManagedDependencyTag()) {
                     ResolvedDependency d = findDependency(tag);
                     if (d != null && matchesVersion(d) &&
-                            matchesGroup(d) && matchesArtifact(d)) {
+                            matchesGroup(d) && matchesArtifact(d)
+                            && isNotExcepted(d)) {
                         Xml.Tag version = tag.getChild("version").orElse(null);
                         return tag.withContent(ListUtils.map(tag.getContent(), c -> c == version ? null : c));
                     }
@@ -102,6 +130,22 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
             private boolean ignoreVersionMatching() {
                 return Boolean.FALSE.equals(onlyIfVersionsMatch);
+            }
+
+            private boolean isNotExcepted(ResolvedDependency d) {
+                if (except == null) {
+                    return true;
+                }
+                for (final String gav : except) {
+                    final String[] split = gav.split(":");
+                    final String exceptedGroupId = split[0];
+                    final String exceptedArtifactId = split[1];
+                    if (matchesGlob(d.getGroupId(), exceptedGroupId)
+                            && matchesGlob(d.getArtifactId(), exceptedArtifactId)) {
+                        return false;
+                    }
+                }
+                return true;
             }
         };
     }

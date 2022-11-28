@@ -145,7 +145,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
             if (t != tag) {
                 maybeUpdateModel();
-                doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, true));
+                doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, true, null));
             }
 
             return t;
