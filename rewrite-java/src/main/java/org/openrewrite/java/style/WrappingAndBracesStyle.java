@@ -25,6 +25,11 @@ public class WrappingAndBracesStyle implements JavaStyle {
 
     IfStatement ifStatement;
 
+    public IfStatement getIfStatement() {
+        //noinspection ConstantConditions
+        return ifStatement == null ? new IfStatement(false) : ifStatement;
+    }
+
     @Value
     @With
     public static class IfStatement {
