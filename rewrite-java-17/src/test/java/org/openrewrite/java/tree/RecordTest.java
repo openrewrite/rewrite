@@ -36,7 +36,6 @@ public class RecordTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires parsing support for record compact constructors.")
     @Issue("https://github.com/openrewrite/rewrite/issues/2455")
     @Test
     void compactConstructor() {
