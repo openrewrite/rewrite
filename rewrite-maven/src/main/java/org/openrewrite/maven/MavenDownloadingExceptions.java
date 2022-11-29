@@ -43,6 +43,7 @@ public class MavenDownloadingExceptions extends Exception {
         if (current == null) {
             current = new MavenDownloadingExceptions();
         }
+        current.addSuppressed(exception);
         current.exceptions.add(exception);
         return current;
     }
@@ -52,6 +53,7 @@ public class MavenDownloadingExceptions extends Exception {
         if (current == null) {
             current = new MavenDownloadingExceptions();
         }
+        exceptions.getExceptions().forEach(current::addSuppressed);
         current.exceptions.addAll(exceptions.getExceptions());
         return current;
     }
