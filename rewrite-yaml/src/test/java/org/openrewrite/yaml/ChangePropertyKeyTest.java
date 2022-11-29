@@ -147,7 +147,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     }
 
     @Nested
-    static class AvoidsRegenerativeChangesTest implements RewriteTest {
+    class AvoidsRegenerativeChangesTest implements RewriteTest {
         @Test
         void indentedProperty() {
             rewriteRun(
@@ -499,7 +499,7 @@ class ChangePropertyKeyTest implements RewriteTest {
 
     @Nested
     @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
-    static class WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest implements RewriteTest {
+    class WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest implements RewriteTest {
         @Test
         void scalarValue() {
             rewriteRun(
@@ -554,10 +554,10 @@ class ChangePropertyKeyTest implements RewriteTest {
 
     @Nested
     @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
-    static class ExceptTest implements RewriteTest {
+    class ExceptTest implements RewriteTest {
 
         @Nested
-        static class DotAndIndentCombinationsTest implements RewriteTest {
+        class DotAndIndentCombinationsTest implements RewriteTest {
             @Test
             void dotDotDot() {
                 rewriteRun(
