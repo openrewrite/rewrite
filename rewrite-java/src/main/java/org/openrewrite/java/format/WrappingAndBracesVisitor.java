@@ -20,10 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 
 import java.util.List;
 
@@ -118,10 +115,13 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.If.Else visitElse(J.If.Else elze, P p) {
         J.If.Else e = super.visitElse(elze, p);
-        if (style.getIfStatement().getElseOnNewLine() && !e.getPrefix().getWhitespace().contains("\n")) {
-            e = e.withPrefix(e.getPrefix().withWhitespace("\n" + e.getPrefix().getWhitespace()));
-        } else if (!style.getIfStatement().getElseOnNewLine() && e.getPrefix().getWhitespace().contains("\n")) {
-            e = e.withPrefix(Space.EMPTY);
+        boolean hasBody = e.getBody() instanceof J.Block || e.getBody() instanceof J.If;
+        if (hasBody) {
+            if (style.getIfStatement().getElseOnNewLine() && !e.getPrefix().getWhitespace().contains("\n")) {
+                e = e.withPrefix(e.getPrefix().withWhitespace("\n" + e.getPrefix().getWhitespace()));
+            } else if (!style.getIfStatement().getElseOnNewLine() && e.getPrefix().getWhitespace().contains("\n")) {
+                e = e.withPrefix(Space.EMPTY);
+            }
         }
 
         return e;
