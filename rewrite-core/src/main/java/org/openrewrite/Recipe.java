@@ -81,6 +81,11 @@ public abstract class Recipe implements Cloneable {
         }
 
         @Override
+        public String getDescription() {
+            return "Default no-op test, does nothing.";
+        }
+
+        @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return NOOP;
         }
