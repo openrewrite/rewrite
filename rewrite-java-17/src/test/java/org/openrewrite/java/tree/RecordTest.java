@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -29,6 +31,23 @@ public class RecordTest implements RewriteTest {
             """
                   public record JavaRecord(String name, @Deprecated int age) {
                   }
+              """
+          )
+        );
+    }
+
+    @Disabled("Requires parsing support for record compact constructors.")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2455")
+    @Test
+    void compactConstructor() {
+        rewriteRun(
+          java(
+            """
+                public record JavaRecord(String name, @Deprecated int age) {
+                    public JavaRecord {
+                        java.util.Objects.requireNonNull(name);
+                    }
+                }
               """
           )
         );
