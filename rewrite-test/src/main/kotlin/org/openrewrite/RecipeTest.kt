@@ -19,7 +19,6 @@ import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import org.openrewrite.config.CompositeRecipe
 import org.openrewrite.config.Environment
-import org.openrewrite.internal.StringUtils
 import org.openrewrite.scheduling.DirectScheduler
 import org.openrewrite.test.AdHocRecipe
 import java.io.File
@@ -258,12 +257,11 @@ interface RecipeTest<T : SourceFile> {
                 "%s Display Name should not end with a period",
                 recipe.name
             ).isFalse
-            if (!StringUtils.isNullOrEmpty(recipe.description)) {
-                assertThat(recipe.description.endsWith(".")).`as`(
-                    "%s Description should end with a period",
-                    recipe.name
-                ).isTrue
-            }
+            assertThat(recipe.description).`as`("%s Description should not be null or empty", recipe.name).isNotEmpty
+            assertThat(recipe.description.endsWith(".")).`as`(
+                "%s Description should end with a period",
+                recipe.name
+            ).isTrue
         }
     }
 }

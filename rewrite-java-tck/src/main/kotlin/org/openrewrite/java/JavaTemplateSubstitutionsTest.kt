@@ -32,9 +32,8 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         recipe = object : Recipe() {
             val cycle = AtomicInteger(0)
 
-            override fun getDisplayName(): String {
-                return ""
-            }
+            override fun getDisplayName() = "test"
+            override fun getDescription() = "Test recipe."
 
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaIsoVisitor<ExecutionContext>() {
@@ -89,9 +88,8 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         recipe = object : Recipe() {
             val cycle = AtomicInteger(0)
 
-            override fun getDisplayName(): String {
-                return ""
-            }
+            override fun getDisplayName() = "test"
+            override fun getDescription() = "Test recipe."
 
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaIsoVisitor<ExecutionContext>() {
@@ -185,9 +183,8 @@ interface JavaTemplateSubstitutionsTest : JavaRecipeTest {
         recipe = object : Recipe() {
             val cycle = AtomicInteger(0)
 
-            override fun getDisplayName(): String {
-                return ""
-            }
+            override fun getDisplayName() = "test"
+            override fun getDescription() = "Test recipe."
 
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaIsoVisitor<ExecutionContext>() {
