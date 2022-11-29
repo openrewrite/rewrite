@@ -34,6 +34,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -995,12 +996,16 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                     node.getName().toString(), null, null), returnType == null ? returnTypeAnnotations : Collections.emptyList());
         }
 
-        Space paramFmt = sourceBefore("(");
-        JContainer<Statement> params = !node.getParameters().isEmpty() ?
-                JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")),
-                        Markers.EMPTY) :
-                JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
-                        Markers.EMPTY), EMPTY)), Markers.EMPTY);
+        boolean isCompactConstructor = nodeSym != null && (nodeSym.flags() & Flags.COMPACT_RECORD_CONSTRUCTOR) != 0;
+        JContainer<Statement> params = JContainer.empty();
+        if (!isCompactConstructor) {
+            Space paramFmt = sourceBefore("(");
+            params = !node.getParameters().isEmpty() ?
+                    JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")),
+                            Markers.EMPTY) :
+                    JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
+                            Markers.EMPTY), EMPTY)), Markers.EMPTY);
+        }
 
         JContainer<NameTree> throwss = node.getThrows().isEmpty() ? null :
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
@@ -1011,11 +1016,13 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
 
-        return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
+        J.MethodDeclaration md = new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
                 returnType, name, params, throwss, body, defaultValue,
                 typeMapping.methodDeclarationType(jcMethod.sym, null));
+        md = isCompactConstructor ? md.withMarkers(md.getMarkers().addIfAbsent(new CompactConstructor(randomId()))) : md;
+        return md;
     }
 
     @Override
