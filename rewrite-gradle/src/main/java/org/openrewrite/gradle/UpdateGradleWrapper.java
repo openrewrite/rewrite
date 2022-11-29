@@ -178,14 +178,12 @@ public class UpdateGradleWrapper extends Recipe {
         @Override
         public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
             Properties p = super.visitFile(file, executionContext);
-            if (!StringUtils.isBlank(gradleWrapper.getDistributionChecksum())) {
-                Set<Properties.Entry> properties = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
-                if (properties.isEmpty()) {
-                    Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum());
-                    Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", propertyValue);
-                    List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
-                    p = ((Properties.File) p).withContent(contentList);
-                }
+            Set<Properties.Entry> properties = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
+            if (properties.isEmpty()) {
+                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());
+                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", propertyValue);
+                List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
+                p = ((Properties.File) p).withContent(contentList);
             }
             return p;
         }
@@ -195,8 +193,8 @@ public class UpdateGradleWrapper extends Recipe {
             if ("distributionUrl".equals(entry.getKey())) {
                 return entry.withValue(entry.getValue().withText(gradleWrapper.getPropertiesFormattedUrl()));
             }
-            if (!StringUtils.isBlank(gradleWrapper.getDistributionChecksum()) && DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
-                return entry.withValue(entry.getValue().withText(gradleWrapper.getDistributionChecksum()));
+            if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
+                return entry.withValue(entry.getValue().withText(gradleWrapper.getDistributionChecksum().getHexValue()));
             }
             return entry;
         }

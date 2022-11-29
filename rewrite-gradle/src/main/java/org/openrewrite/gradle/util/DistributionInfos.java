@@ -25,13 +25,15 @@ import java.net.URI;
 @Value
 public class DistributionInfos {
     String downloadUrl;
-    String checksum;
+    Checksum checksum;
+    Checksum wrapperJarChecksum;
 
     static DistributionInfos fetch(HttpSender httpSender, GradleWrapper.DistributionType distributionType,
                                    GradleWrapper.GradleVersion gradleVersion) throws IOException {
         String downloadUrl = toDistTypeUrl(distributionType, gradleVersion.getDownloadUrl());
-        String checksum = fetchChecksum(httpSender, toDistTypeUrl(distributionType, gradleVersion.getChecksumUrl()));
-        return new DistributionInfos(downloadUrl, checksum);
+        Checksum checksum = fetchChecksum(httpSender, toDistTypeUrl(distributionType, gradleVersion.getChecksumUrl()));
+        Checksum jarChecksum = fetchChecksum(httpSender, gradleVersion.getWrapperChecksumUrl());
+        return new DistributionInfos(downloadUrl, checksum, jarChecksum);
     }
 
     private static String toDistTypeUrl(GradleWrapper.DistributionType distributionType, String binUrl) {
@@ -41,8 +43,7 @@ public class DistributionInfos {
         return binUrl;
     }
 
-    private static String fetchChecksum(HttpSender httpSender, String checksumUrl) {
-        Checksum checksum = Checksum.fromUri(httpSender, URI.create(checksumUrl));
-        return checksum.getHexValue();
+    private static Checksum fetchChecksum(HttpSender httpSender, String checksumUrl) {
+        return Checksum.fromUri(httpSender, URI.create(checksumUrl));
     }
 }

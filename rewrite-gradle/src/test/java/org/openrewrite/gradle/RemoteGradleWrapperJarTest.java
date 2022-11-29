@@ -15,7 +15,9 @@
  */
 package org.openrewrite.gradle;
 
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.Checksum;
 import org.openrewrite.gradle.util.DistributionInfos;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -25,29 +27,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class RemoteGradleWrapperJarTest {
 
-    @Test
-    void gradleWrapper() {
-        Remote remoteArchive = new GradleWrapper("7.4.2",
-          new DistributionInfos("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip",
-            "29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda")).asRemote();
-        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
-                .isNotEmpty();
+    @ParameterizedTest
+    @CsvSource(value = {"7.4.2,29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda,575098db54a998ff1c6770b352c3b16766c09848bee7555dab09afc34e8cf590",
+                        "6.9.3,dcf350b8ae1aa192fc299aed6efc77b43825d4fedb224c94118ae7faf5fb035d,e996d452d2645e70c01c11143ca2d3742734a28da2bf61f25c82bdc288c9e637",
+                        "7.5-rc-1,8ba57a37e1e0b8c415e4d91718d51035223aa73131cf719a50c95a2a88269eb2,91a239400bb638f36a1795d8fdf7939d532cdc7d794d1119b7261aac158b1e60"})
+    void gradleWrapper(String version, String distChecksum, String jarChecksum) {
+        Remote remoteArchive = new GradleWrapper(version,
+          new DistributionInfos("https://services.gradle.org/distributions/gradle-" + version + "-bin.zip",
+            Checksum.fromHex("sha256", distChecksum),
+            Checksum.fromHex("sha256", jarChecksum))).asRemote();
+
+        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender())).isNotEmpty();
     }
 
-    @Test
-    void gradleWrapper693() {
-        Remote remoteArchive = new GradleWrapper("6.9.3",
-          new DistributionInfos("https://services.gradle.org/distributions/gradle-6.9.3-bin.zip",
-            "dcf350b8ae1aa192fc299aed6efc77b43825d4fedb224c94118ae7faf5fb035d")).asRemote();
-        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
-                .isNotEmpty();
-    }
-    @Test
-    void gradleWrapper75rc1() {
-        Remote remoteArchive = new GradleWrapper("7.5-rc-1",
-          new DistributionInfos("https://services.gradle.org/distributions/gradle-7.5-rc-1-bin.zip",
-            "8ba57a37e1e0b8c415e4d91718d51035223aa73131cf719a50c95a2a88269eb2")).asRemote();
-        assertThat(remoteArchive.getInputStream(new HttpUrlConnectionSender()))
-                .isNotEmpty();
-    }
 }

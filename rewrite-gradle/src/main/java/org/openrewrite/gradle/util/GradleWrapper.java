@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Value;
+import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -136,14 +137,14 @@ public class GradleWrapper {
         return getDistributionUrl().replaceAll("(?<!\\\\)://", "\\\\://");
     }
 
-    public String getDistributionChecksum() {
+    public Checksum getDistributionChecksum() {
         return distributionInfos.getChecksum();
     }
 
     static final FileAttributes WRAPPER_JAR_FILE_ATTRIBUTES = new FileAttributes(null, null, null, true, true, false, 0);
 
     public Remote asRemote() {
-        return new GradleWrapperJar(URI.create(getDistributionUrl()), version);
+        return new GradleWrapperJar(URI.create(getDistributionUrl()), version, distributionInfos.getWrapperJarChecksum());
     }
 
     public enum DistributionType {
@@ -155,14 +156,17 @@ public class GradleWrapper {
         String version;
         String downloadUrl;
         String checksumUrl;
+        String wrapperChecksumUrl;
 
         @JsonCreator
         public GradleVersion(@JsonProperty("version") String version,
                              @JsonProperty("downloadUrl") String downloadUrl,
-                             @JsonProperty("checksumUrl") String checksumUrl) {
+                             @JsonProperty("checksumUrl") String checksumUrl,
+                             @JsonProperty("wrapperChecksumUrl") String wrapperChecksumUrl) {
             this.version = version;
             this.downloadUrl = downloadUrl;
             this.checksumUrl = checksumUrl;
+            this.wrapperChecksumUrl = wrapperChecksumUrl;
         }
     }
 

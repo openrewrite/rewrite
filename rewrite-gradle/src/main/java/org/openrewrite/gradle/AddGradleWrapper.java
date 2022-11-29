@@ -128,7 +128,7 @@ public class AddGradleWrapper extends Recipe {
                             "distributionBase=GRADLE_USER_HOME\n" +
                                     "distributionPath=wrapper/dists\n" +
                                     "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
-                                    "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum() + "\n" +
+                                    "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n" +
                                     "zipStoreBase=GRADLE_USER_HOME\n" +
                                     "zipStorePath=wrapper/dists").get(0)
                     .withSourcePath(WRAPPER_PROPERTIES_LOCATION);

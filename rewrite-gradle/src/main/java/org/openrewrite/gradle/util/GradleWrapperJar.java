@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Checksum;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
@@ -56,11 +57,13 @@ public class GradleWrapperJar implements Remote {
     @Language("markdown")
     String description;
     String version;
+    Checksum checksum;
 
     @lombok.experimental.Tolerate
-    public GradleWrapperJar(URI uri, String version) {
+    public GradleWrapperJar(URI uri, String version, Checksum checksum) {
         this.uri = uri;
         this.version = version;
+        this.checksum = checksum;
         this.description = "gradle-wrapper.jar is part of the gradle wrapper";
         this.sourcePath = GradleWrapper.WRAPPER_JAR_LOCATION;
         this.charset = null;
@@ -77,6 +80,7 @@ public class GradleWrapperJar implements Remote {
         InputStream body = response.getBody();
         return readIntoArchive(body, "gradle-" + version + "/**/" + "gradle-wrapper-*.jar!gradle-wrapper.jar");
     }
+
 
     private InputStream readIntoArchive(InputStream body, String pathPattern) {
         String pathBeforeBang;
