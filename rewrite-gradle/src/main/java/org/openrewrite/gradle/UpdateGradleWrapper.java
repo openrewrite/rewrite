@@ -27,8 +27,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
@@ -36,6 +38,7 @@ import org.openrewrite.text.PlainText;
 import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
@@ -141,15 +144,7 @@ public class UpdateGradleWrapper extends Recipe {
                 return gradlewBat;
             }
             if (sourceFile instanceof Properties.File && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_PROPERTIES_LOCATION)) {
-                return (Properties.File) new PropertiesVisitor<ExecutionContext>() {
-                    @Override
-                    public Properties visitEntry(Properties.Entry entry, ExecutionContext context) {
-                        if (!"distributionUrl".equals(entry.getKey())) {
-                            return entry;
-                        }
-                        return entry.withValue(entry.getValue().withText(gradleWrapper.getPropertiesFormattedUrl()));
-                    }
-                }.visitNonNull(sourceFile, ctx);
+                return (Properties.File) new WrapperPropertiesVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
             }
             if (sourceFile instanceof Quark && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                 return gradleWrapper.asRemote().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
@@ -168,6 +163,40 @@ public class UpdateGradleWrapper extends Recipe {
             return sourceFile.withFileAttributes(new FileAttributes(now, now, now, true, true, true, 1));
         } else {
             return sourceFile.withFileAttributes(sourceFile.getFileAttributes().withExecutable(true));
+        }
+    }
+
+    private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {
+
+        private static final String DISTRIBUTION_SHA_256_SUM_KEY = "distributionSha256Sum";
+        private final GradleWrapper gradleWrapper;
+
+        public WrapperPropertiesVisitor(GradleWrapper gradleWrapper) {
+            this.gradleWrapper = gradleWrapper;
+        }
+
+        @Override
+        public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
+            Properties p = super.visitFile(file, executionContext);
+            Set<Properties.Entry> properties = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
+            if (properties.isEmpty()) {
+                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());
+                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", propertyValue);
+                List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
+                p = ((Properties.File) p).withContent(contentList);
+            }
+            return p;
+        }
+
+        @Override
+        public Properties visitEntry(Properties.Entry entry, ExecutionContext context) {
+            if ("distributionUrl".equals(entry.getKey())) {
+                return entry.withValue(entry.getValue().withText(gradleWrapper.getPropertiesFormattedUrl()));
+            }
+            if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
+                return entry.withValue(entry.getValue().withText(gradleWrapper.getDistributionChecksum().getHexValue()));
+            }
+            return entry;
         }
     }
 }

@@ -15,26 +15,30 @@
  */
 package org.openrewrite.gradle.util;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.Checksum;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.remote.RemoteArchive;
+import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
-import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,7 +50,7 @@ public class GradleWrapper {
     public static final Path WRAPPER_BATCH_LOCATION = Paths.get("gradlew.bat");
 
     String version;
-    DistributionType distributionType;
+    DistributionInfos distributionInfos;
 
     public static Validated validate(ExecutionContext ctx,
                                      String version,
@@ -56,7 +60,6 @@ public class GradleWrapper {
             return cachedValidation;
         }
         String distributionTypeName = distribution != null ? distribution : DistributionType.Bin.name().toLowerCase();
-        GradleWrapper wrapper = null;
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
 
         //noinspection unchecked
@@ -102,49 +105,69 @@ public class GradleWrapper {
                         .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
                 VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
 
-                //noinspection resource
-                try (InputStream is = httpSender.send(httpSender.get("https://services.gradle.org/distributions/").build()).getBody()) {
-                    Scanner scanner = new Scanner(is);
-                    Pattern wrapperPattern = Pattern.compile("gradle-(.+)-" +
-                            distributionType.toString().toLowerCase() + "\\.zip(?!\\.sha)");
-
-                    List<String> allVersions = new ArrayList<>();
-                    while (scanner.findWithinHorizon(wrapperPattern, 0) != null) {
-                        allVersions.add(scanner.match().group(1));
-                    }
-                    scanner.close();
-
-                    String version = allVersions.stream()
-                            .filter(v -> versionComparator.isValid(null, v))
-                            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                String gradleVersionsUrl = "https://services.gradle.org/versions/all";
+                try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
+                    if (resp.isSuccessful()) {
+                        List<GradleVersion> allVersions = new ObjectMapper()
+                            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                            .readValue(resp.getBody(), new TypeReference<List<GradleVersion>>() {});
+                        GradleVersion gradleVersion = allVersions.stream()
+                            .filter(v -> versionComparator.isValid(null, v.version))
+                            .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
                             .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
-                    wrapper = new GradleWrapper(version, distributionType);
-                    return wrapper;
+
+                        DistributionInfos infos = DistributionInfos.fetch(httpSender, distributionType, gradleVersion);
+                        wrapper = new GradleWrapper(gradleVersion.version, infos);
+                        return wrapper;
+                    }
+                    throw new IOException("Could not get Gradle versions at: " + gradleVersionsUrl);
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
             }
+
         };
     }
 
     public String getDistributionUrl() {
-        return "https://services.gradle.org/distributions/gradle-" + version + "-" + distributionType.toString().toLowerCase() + ".zip";
+        return distributionInfos.getDownloadUrl();
     }
 
     public String getPropertiesFormattedUrl() {
         return getDistributionUrl().replaceAll("(?<!\\\\)://", "\\\\://");
     }
 
+    public Checksum getDistributionChecksum() {
+        return distributionInfos.getChecksum();
+    }
+
     static final FileAttributes WRAPPER_JAR_FILE_ATTRIBUTES = new FileAttributes(null, null, null, true, true, false, 0);
 
-    public RemoteArchive asRemote() {
-        return new RemoteArchive(Tree.randomId(), GradleWrapper.WRAPPER_JAR_LOCATION, Markers.EMPTY,
-                URI.create(getDistributionUrl()), null, false, WRAPPER_JAR_FILE_ATTRIBUTES,
-                "gradle-wrapper.jar is part of the gradle wrapper",
-                Paths.get("gradle-" + version + "/lib/gradle-wrapper-" + version + ".jar!gradle-wrapper.jar"));
+    public Remote asRemote() {
+        return new GradleWrapperJar(URI.create(getDistributionUrl()), version, distributionInfos.getWrapperJarChecksum());
     }
 
     public enum DistributionType {
         Bin, All
     }
+
+    @Value
+    static class GradleVersion {
+        String version;
+        String downloadUrl;
+        String checksumUrl;
+        String wrapperChecksumUrl;
+
+        @JsonCreator
+        public GradleVersion(@JsonProperty("version") String version,
+                             @JsonProperty("downloadUrl") String downloadUrl,
+                             @JsonProperty("checksumUrl") String checksumUrl,
+                             @JsonProperty("wrapperChecksumUrl") String wrapperChecksumUrl) {
+            this.version = version;
+            this.downloadUrl = downloadUrl;
+            this.checksumUrl = checksumUrl;
+            this.wrapperChecksumUrl = wrapperChecksumUrl;
+        }
+    }
+
 }

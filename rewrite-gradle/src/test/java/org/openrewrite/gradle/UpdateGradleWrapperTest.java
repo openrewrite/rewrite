@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.PathUtils;
@@ -83,12 +84,43 @@ class UpdateGradleWrapperTest implements RewriteTest {
               distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
               zipStoreBase=GRADLE_USER_HOME
               zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
               """,
             spec -> spec.path(osPath)
           ),
           gradlew,
           gradlewBat,
           gradleWrapperJarQuark
+        );
+    }
+
+    @Test
+    void updateChecksumAlreadySet() {
+        rewriteRun(
+          spec -> spec.afterRecipe(run -> {
+              var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+              assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+              assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+          }),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-all.zip
+              distributionSha256Sum=cd5c2958a107ee7f0722004a12d0f8559b4564c34daad7df06cffd4d12a426d0
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          )
         );
     }
 
