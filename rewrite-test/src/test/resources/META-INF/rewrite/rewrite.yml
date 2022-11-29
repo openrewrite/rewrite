@@ -28,7 +28,7 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.text.HelloKotlin
 displayName: Hello Kotlin
-description: Changes Text to "Hello Kotlin"
+description: Changes Text to "Hello Kotlin."
 tags:
   - testing
   - plain text
@@ -39,14 +39,14 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.HelloJon
 displayName: Hello Jon
-description: Also Changes Text to "Hello Jon!"
+description: Also Changes Text to "Hello Jon!."
 recipeList:
   - org.openrewrite.text.ChangeTextToJon
 ---
 type: specs.openrewrite.org/v1beta/style
 name: org.openrewrite.SampleStyle
 displayName: Sample style
-description: Sample test style
+description: Sample test style.
 tags:
   - testing
 styleConfigs:

@@ -27,6 +27,11 @@ data class KotlinDataClassChangeText (
     val toText: String?,
 ) : Recipe() {
     override fun getDisplayName(): String = name
+
+    override fun getDescription(): String {
+        return "Should be equivalent in functionality to org.openrewrite.text.ChangeText " +
+                "Exists only so that a test may be written to guarantee that our serialization/deserialization supports kotlin data classes."
+    }
     override fun getTags() = mutableSetOf("plain text")
     override fun getVisitor(): PlainTextVisitor<ExecutionContext> = ChangeTextVisitor(toText!!)
     override fun validate(): Validated = Validated.required("toText", toText)

@@ -21,4 +21,8 @@ open class TestRecipe : Recipe() {
     override fun getDisplayName(): String {
         return name
     }
+
+    override fun getDescription(): String {
+        return "test recipe."
+    }
 }

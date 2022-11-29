@@ -81,6 +81,11 @@ public class AddRepository extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "Adds a new Maven Repository or Update a matching repository.";
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override

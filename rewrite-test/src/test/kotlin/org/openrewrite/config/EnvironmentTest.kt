@@ -253,7 +253,7 @@ class EnvironmentTest : RewriteTest {
         val sampleStyle = styles.firstOrNull { it.name == "org.openrewrite.SampleStyle" }
         assertThat(sampleStyle).isNotNull
         assertThat(sampleStyle!!.displayName).isEqualTo("Sample style")
-        assertThat(sampleStyle.description).isEqualTo("Sample test style")
+        assertThat(sampleStyle.description).isEqualTo("Sample test style.")
         assertThat(sampleStyle.tags).containsExactly("testing")
     }
 

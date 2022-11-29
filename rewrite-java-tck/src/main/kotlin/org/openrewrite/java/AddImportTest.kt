@@ -582,6 +582,7 @@ interface AddImportTest : JavaRecipeTest {
         jp,
         recipe = object : Recipe() {
             override fun getDisplayName() = "test"
+            override fun getDescription() = "Test recipe."
             override fun getVisitor() = object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitClassDeclaration(
                     classDecl: J.ClassDeclaration,
@@ -655,9 +656,8 @@ interface AddImportTest : JavaRecipeTest {
     fun addNamedStaticImportWhenReferenced(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : Recipe() {
-            override fun getDisplayName(): String {
-                return "Test"
-            }
+            override fun getDisplayName() = "test"
+            override fun getDescription() = "Test recipe."
 
             override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                 return object : JavaIsoVisitor<ExecutionContext>() {
@@ -1047,6 +1047,10 @@ interface AddImportTest : JavaRecipeTest {
     private class FixEmptyListMethodType : Recipe() {
         override fun getDisplayName(): String {
             return "Fix Empty List"
+        }
+
+        override fun getDescription(): String {
+            return "AddImportTest testing recipe."
         }
 
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
