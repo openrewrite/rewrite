@@ -41,6 +41,8 @@ class RecipeSchedulerTest : RewriteTest {
 
 class BoomRecipe : Recipe() {
     override fun getDisplayName() = "We go boom"
+
+    override fun getDescription() = "Test recipe."
     override fun getVisitor() = object : PlainTextVisitor<ExecutionContext>() {
         override fun visitText(text: PlainText, p: ExecutionContext): PlainText {
             throw BoomException()
