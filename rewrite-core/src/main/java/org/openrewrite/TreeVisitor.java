@@ -80,14 +80,15 @@ public abstract class TreeVisitor<T extends Tree, P> {
     private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
 
     private ObjectDiffer differ;
+
     private ObjectDiffer getObjectDiffer() {
-        if(differ == null) {
+        if (differ == null) {
             differ = ObjectDifferBuilder.startBuilding()
                     .inclusion()
                     .resolveUsing(new InclusionResolver() {
                         @Override
                         public Inclusion getInclusion(DiffNode node) {
-                            if(node.getPropertyAnnotation(Transient.class) != null) {
+                            if (node.getPropertyAnnotation(Transient.class) != null) {
                                 return Inclusion.EXCLUDED;
                             }
                             return Inclusion.DEFAULT;
@@ -306,10 +307,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 visitCountSummary.record(visitCount);
 
                 if (t != null) {
-                    for (TreeVisitor<T, P> v : afterVisit) {
-                        if (v != null) {
-                            v.setCursor(getCursor());
-                            t = v.visit(t, p);
+                    if (afterVisit != null) {
+                        for (TreeVisitor<T, P> v : afterVisit) {
+                            if (v != null) {
+                                v.setCursor(getCursor());
+                                t = v.visit(t, p);
+                            }
                         }
                     }
                 }
