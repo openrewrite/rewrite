@@ -190,7 +190,7 @@ public class ChangeParentPom extends Recipe {
                         try {
                             Optional<String> targetVersion = findNewerDependencyVersion(targetGroupId, targetArtifactId, oldVersion, ctx);
                             if (targetVersion.isPresent()) {
-                                final ArrayList<XmlVisitor<ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
+                                List<XmlVisitor<ExecutionContext>> changeParentTagVisitors = new ArrayList<>();
                                 if (!oldGroupId.equals(targetGroupId)) {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("groupId").get(), targetGroupId));
                                 }
@@ -222,7 +222,7 @@ public class ChangeParentPom extends Recipe {
             }
 
             private void retainVersions() {
-                for (final Recipe retainVersionRecipe : ChangeParentPom.retainVersions(this, retainVersions)) {
+                for (Recipe retainVersionRecipe : ChangeParentPom.retainVersions(this, retainVersions)) {
                     doAfterVisit(retainVersionRecipe);
                 }
             }
@@ -246,13 +246,13 @@ public class ChangeParentPom extends Recipe {
      * for dependencies matching the GAVs in param `retainVersions`
      */
     public static ArrayList<Recipe> retainVersions(MavenVisitor<?> currentVisitor, List<String> retainVersions) {
-        final ArrayList<Recipe> recipes = new ArrayList<>();
-        for (final String gav : retainVersions) {
-            final String[] split = gav.split(":");
-            final String requestedRetainedGroupId = split[0];
-            final String requestedRetainedArtifactId = split[1];
-            final String requestedRetainedVersion = split.length == 3 ? split[2] : null;
-            final Set<Xml.Tag> existingDependencies = FindDependency.find(
+        List<Recipe> recipes = new ArrayList<>();
+        for (String gav : retainVersions) {
+            String[] split = gav.split(":");
+            String requestedRetainedGroupId = split[0];
+            String requestedRetainedArtifactId = split[1];
+            String requestedRetainedVersion = split.length == 3 ? split[2] : null;
+            Set<Xml.Tag> existingDependencies = FindDependency.find(
                     currentVisitor.getCursor().firstEnclosingOrThrow(Xml.Document.class),
                     requestedRetainedGroupId, requestedRetainedArtifactId);
 
@@ -263,10 +263,10 @@ public class ChangeParentPom extends Recipe {
                 continue;
             }
 
-            for (final Xml.Tag existingDependency : existingDependencies) {
-                final String retainedGroupId = existingDependency.getChildValue("groupId")
+            for (Xml.Tag existingDependency : existingDependencies) {
+                String retainedGroupId = existingDependency.getChildValue("groupId")
                         .orElseThrow(() -> new IllegalStateException("Dependency tag must have groupId"));
-                final String retainedArtifactId = existingDependency.getChildValue("artifactId")
+                String retainedArtifactId = existingDependency.getChildValue("artifactId")
                         .orElseThrow(() -> new IllegalStateException("Dependency tag must have artifactId"));
                 String retainedVersion = requestedRetainedVersion;
 
@@ -274,7 +274,7 @@ public class ChangeParentPom extends Recipe {
                     if (existingDependency.getChildValue("version").isPresent()) {
                         continue;
                     } else {
-                        final ResolvedManagedDependency managedDependency = currentVisitor.findManagedDependency(
+                        ResolvedManagedDependency managedDependency = currentVisitor.findManagedDependency(
                                 retainedGroupId, retainedArtifactId);
                         retainedVersion = Objects.requireNonNull(managedDependency, String.format(
                                 "'%s' from 'retainVersions' did not have a version specified and was not in the project's dependency management",
