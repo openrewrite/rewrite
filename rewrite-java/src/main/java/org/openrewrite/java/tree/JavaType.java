@@ -492,6 +492,17 @@ public interface JavaType {
          * @return Any class found in the type cache
          */
         public static ShallowClass build(String fullyQualifiedName) {
+            return build(fullyQualifiedName, Kind.Class);
+        }
+
+        /**
+         * Build a class type only from the class' fully qualified name with a specified Kind.
+         *
+         * @param fullyQualifiedName The fully qualified name of the class to build
+         * @param kind The {@link Kind} for the ShallowClass.
+         * @return Any class found in the type cache
+         */
+        public static ShallowClass build(String fullyQualifiedName, Kind kind) {
             ShallowClass owningClass = null;
 
             int firstClassNameIndex = 0;
@@ -513,7 +524,7 @@ public interface JavaType {
                 owningClass = build(fullyQualifiedName.substring(0, lastDot));
             }
 
-            return new ShallowClass(null, 1, fullyQualifiedName, Kind.Class, emptyList(), null, owningClass,
+            return new ShallowClass(null, 1, fullyQualifiedName, kind, emptyList(), null, owningClass,
                     emptyList(), emptyList(), emptyList(), emptyList());
         }
     }
