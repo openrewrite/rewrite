@@ -881,50 +881,6 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     )
 
     @Test
-    fun staticImportEnumSamePackage(jp: JavaParser) = assertChanged(
-            jp,
-            dependsOn = arrayOf("""
-            package org.openrewrite;
-            public enum MyEnum {
-                A,
-                B
-            }
-        """.trimIndent()),
-            before = """
-            package org.openrewrite;
-            import static org.openrewrite.MyEnum.A;
-            import static org.openrewrite.MyEnum.B;
-
-            public class App {
-                public void test(String s) {
-                    if (s.equals(" " + A + B)) {
-
-                    }
-                }
-            }
-        """,
-            after = """
-            package org.openrewrite.test;
-            import static org.openrewrite.test.MyEnum.A;
-            import static org.openrewrite.test.MyEnum.B;
-
-            public class App {
-                public void test(String s) {
-                    if (s.equals(" " + A + B)) {
-
-                    }
-                }
-            }
-        """,
-            afterConditions = { cu ->
-                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty()
-                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty()
-                assertThat(cu.findType("org.openrewrite.App")).isEmpty()
-                assertThat(cu.findType("org.openrewrite.test.App")).isNotEmpty()
-            }
-    )
-
-    @Test
     fun changeTypeWithInnerClass(jp: JavaParser) = assertChanged(
         recipe = ChangePackage("com.acme.product", "com.acme.product.v2", null),
         dependsOn = arrayOf(
