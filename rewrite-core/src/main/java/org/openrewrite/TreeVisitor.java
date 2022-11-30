@@ -306,13 +306,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 sample.stop(Timer.builder("rewrite.visitor.visit").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
                 visitCountSummary.record(visitCount);
 
-                if (t != null) {
-                    if (afterVisit != null) {
-                        for (TreeVisitor<T, P> v : afterVisit) {
-                            if (v != null) {
-                                v.setCursor(getCursor());
-                                t = v.visit(t, p);
-                            }
+                if (t != null && afterVisit != null) {
+                    for (TreeVisitor<T, P> v : afterVisit) {
+                        if (v != null) {
+                            v.setCursor(getCursor());
+                            t = v.visit(t, p);
                         }
                     }
                 }
