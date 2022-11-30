@@ -118,7 +118,7 @@ public class ChangePackage extends Recipe {
                 )));
 
                 for (J.Import anImport : c.getImports()) {
-                    if (anImport.getPackageName().equals(changingTo)) {
+                    if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
                         c = new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visitJavaSourceFile(c, ctx);
                     }
                 }
