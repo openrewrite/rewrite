@@ -245,7 +245,7 @@ public class ChangeParentPom extends Recipe {
      * Returns a list of recipes which can be applied to add explicit versions
      * for dependencies matching the GAVs in param `retainVersions`
      */
-    public static ArrayList<Recipe> retainVersions(MavenVisitor<?> currentVisitor, List<String> retainVersions) {
+    public static List<Recipe> retainVersions(MavenVisitor<?> currentVisitor, List<String> retainVersions) {
         List<Recipe> recipes = new ArrayList<>();
         for (String gav : retainVersions) {
             String[] split = gav.split(":");
