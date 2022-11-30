@@ -17,6 +17,7 @@ package org.openrewrite.properties
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.properties.tree.Properties
 
 @Suppress("UnusedProperty")
@@ -126,5 +127,25 @@ class PropertiesParserTest {
             .hasSize(2).containsExactly("key", "key2")
         assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
             .hasSize(2).containsExactly("value", "value2")
+    }
+
+    @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2471")
+    @Test
+    fun escapedEndOfLine() {
+        val props = PropertiesParser().parse(
+            """
+                key=val\
+                          ue
+                ke\
+                    y2 = value2
+            """.trimIndent()
+        )[0]
+        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
+            .hasSize(2)
+            .containsExactly("key", "key2")
+        assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
+            .hasSize(2)
+            .containsExactly("value", "value2")
     }
 }

@@ -30,8 +30,6 @@ import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -79,18 +77,36 @@ public class PropertiesParser implements Parser<Properties.File> {
         StringBuilder prefix = new StringBuilder();
         StringBuilder buff = new StringBuilder();
         String s = source.readFully();
+
+        char prev = '$';
+        boolean isEscapedNewLine = false;
         for (char c : s.toCharArray()) {
-            if (c == '\n') {
-                Properties.Content content = extractContent(buff.toString(), prefix);
-                if (content != null) {
-                    contents.add(content);
+            if (isEscapedNewLine) {
+                if (Character.isWhitespace(c)) {
+                    continue;
+                } else {
+                    isEscapedNewLine = false;
                 }
-                buff = new StringBuilder();
-                prefix.append(c);
+            }
+
+            if (c == '\n') {
+                if (prev == '\\') {
+                    isEscapedNewLine = true;
+                    buff.deleteCharAt(buff.length() - 1);
+                } else {
+                    Properties.Content content = extractContent(buff.toString(), prefix);
+                    if (content != null) {
+                        contents.add(content);
+                    }
+                    buff = new StringBuilder();
+                    prefix.append(c);
+                }
             } else {
                 buff.append(c);
             }
+            prev = c;
         }
+
         Properties.Content content = extractContent(buff.toString(), prefix);
         if (content != null) {
             contents.add(content);
