@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
-import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.*
 import org.openrewrite.test.RewriteTest
@@ -38,8 +37,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     val replaceToStringWithLiteralRecipe: Recipe
         get() = RewriteTest.toRecipe{object : JavaVisitor<ExecutionContext>() {
             private var TO_STRING = MethodMatcher("java.lang.String toString()")
-            private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}")
-                .doBeforeParseTemplate(System.out::println).build()
+            private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}").build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
                 val mi = super.visitMethodInvocation(method, ctx) as J
