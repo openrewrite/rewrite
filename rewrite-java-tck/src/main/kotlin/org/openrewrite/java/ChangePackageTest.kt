@@ -18,24 +18,27 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Recipe
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import java.nio.file.Paths
 
-interface ChangePackageTest: JavaRecipeTest, RewriteTest {
-
-    override val recipe: Recipe
-        get() = ChangePackage("org.openrewrite", "org.openrewrite.test", null)
+interface ChangePackageTest: RewriteTest {
 
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(recipe)
+        spec.recipe(ChangePackage("org.openrewrite", "org.openrewrite.test", null))
     }
 
     companion object {
-        private val testClass = """
+        private val testClassBefore = """
             package org.openrewrite;
+            public class Test extends Exception {
+                public static void stat() {}
+                public void foo() {}
+            }
+        """.trimIndent()
+        private val testClassAfter = """
+            package org.openrewrite.test;
             public class Test extends Exception {
                 public static void stat() {}
                 public void foo() {}
@@ -44,59 +47,61 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     }
 
     @Test
-    fun renamePackageNonRecursive(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = ChangePackage(
+    fun renamePackageNonRecursive() = rewriteRun(
+        { spec -> spec.recipe(
+            ChangePackage(
             "org.openrewrite",
             "org.openrewrite.test",
             false
-        ),
-        before = """
+        ))},
+        java("""
             package org.openrewrite.internal;
             class Test {
             }
-        """
+        """)
     )
 
     @Test
-    fun dontAddImportWhenNoChangesWereMade(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun dontAddImportWhenNoChangesWereMade() = rewriteRun(
+        java("""
             public class B {}
-        """
+        """)
     )
 
     @Test
-    fun renameImport(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun renameImport() = rewriteRun(
+        java("""
             package org.openrewrite;
             public class Test {
             }
+        """,
+        """
+            package org.openrewrite.test;
+            public class Test {
+            }
         """),
-        before = """
+        java("""
             import org.openrewrite.Test;
             
             class A {
             }
         """,
-        after = """ 
+            """
             import org.openrewrite.test.Test;
             
             class A {
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             val imported = cu.imports[0]
             assertThat(imported.packageName).isEqualTo("org.openrewrite.test")
-        }
+        }}
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
-    fun typesInUseContainsOneTypeReference() = assertChanged(
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun typesInUseContainsOneTypeReference() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import org.openrewrite.Test;
             
             public class A {
@@ -105,7 +110,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 Test c;
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             
             public class A {
@@ -113,18 +118,17 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 Test b;
                 Test c;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.typesInUse.typesInUse).hasSize(1)
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun typesInUseContainsOneMethodTypeReference() = assertChanged(
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun typesInUseContainsOneMethodTypeReference() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import org.openrewrite.Test;
             
             public class A {
@@ -139,7 +143,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             
             public class A {
@@ -153,22 +157,26 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     return test;
                 }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.typesInUse.usedMethods).hasSize(1)
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun updateMethodType() = assertChanged(
-        dependsOn = arrayOf("""
+    fun updateMethodType() = rewriteRun(
+        java("""
             package org.openrewrite;
             public class Test {
             }
-            """,
-            """
+        """,
+        """
+            package org.openrewrite.test;
+            public class Test {
+            }
+        """),
+        java("""
             package org.foo;
             
             import org.openrewrite.Test;
@@ -178,8 +186,19 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     return test;
                 }
             }
+        """,
+        """
+            package org.foo;
+            
+            import org.openrewrite.test.Test;
+            
+            public class Example {
+                public static Test method(Test test) {
+                    return test;
+                }
+            }
         """),
-        before = """
+        java("""
             import org.openrewrite.Test;
             import org.foo.Example;
             
@@ -187,119 +206,124 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 Test local = Example.method(null);
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             import org.foo.Example;
             
             public class A {
                 Test local = Example.method(null);
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             val methodType = cu.typesInUse.usedMethods.toTypedArray()[0]
             assertThat(methodType.returnType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.test.Test")
             assertThat(methodType.parameterTypes[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.test.Test")
-        }
+        }}
     )
 
     @Test
-    fun updateVariableType() = assertChanged(
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun updateVariableType() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import org.openrewrite.Test;
             
             public class A {
                 Test a;
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             
             public class A {
                 Test a;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.typesInUse.variables.toTypedArray()[0].type.asFullyQualified()!!.fullyQualifiedName).isEqualTo("org.openrewrite.test.Test")
-        }
+        }}
     )
 
     @Test
-    fun renamePackage(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renamePackage() = rewriteRun(
+        java("""
             package org.openrewrite;
             class Test {
             }
         """,
-        after = """ 
+        """
             package org.openrewrite.test;
             class Test {
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun renamePackageRecursive(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renamePackageRecursive() = rewriteRun(
+        java("""
             package org.openrewrite.internal;
             class Test {
             }
         """,
-        after = """ 
+        """
             package org.openrewrite.test.internal;
             class Test {
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.sourcePath).isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"))
 
             assertThat(cu.findType("org.openrewrite.internal.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.internal.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun renamePackageRecursiveImported(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangePackage("org.openrewrite", "org.openrewrite.test", true),
-        dependsOn = arrayOf("""
+    fun renamePackageRecursiveImported() = rewriteRun(
+        { spec -> spec.recipe(
+            ChangePackage(
+                "org.openrewrite",
+                "org.openrewrite.test",
+                true
+        ))},
+        java("""
             package org.openrewrite.other;
             public class Test {}
+        """,
+        """
+            package org.openrewrite.test.other;
+            public class Test {}
         """),
-        before = """
+        java("""
             import org.openrewrite.other.Test;
             class A {
                 Test test = null;
             }
         """,
-        after = """ 
+        """
             import org.openrewrite.test.other.Test;
             class A {
                 Test test = null;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.other.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.other.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
-    fun typeParameter(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun typeParameter() = rewriteRun(
+        java("""
             package org.openrewrite;
             public class Test {
             }
+        """,
+        """
+            package org.openrewrite.test;
+            public class Test {
+            }
         """),
-        before = """
+        java("""
             import org.openrewrite.Test;
             import java.util.List;
             
@@ -307,50 +331,52 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 List<Test> list;
             }
         """,
-        after = """ 
+        """
             import org.openrewrite.test.Test;
             import java.util.List;
             
             class A {
                 List<Test> list;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun classTypeParameter(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun classTypeParameter() = rewriteRun(
+        java("""
             package org.openrewrite;
             public class Test {
             }
+        """,
+        """
+            package org.openrewrite.test;
+            public class Test {
+            }
         """),
-        before = """
+        java("""
             import org.openrewrite.Test;
             
             class A<T extends Test> {
             }
         """,
-        after = """ 
+        """
             import org.openrewrite.test.Test;
             
             class A<T extends Test> {
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun boundedGenericType() = assertChanged(
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun boundedGenericType() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import org.openrewrite.Test;
             
             public class A {
@@ -359,7 +385,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             
             public class A {
@@ -367,135 +393,146 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     return t;
                 }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun annotation(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
-                package org.openrewrite;
-                
-                import java.lang.annotation.ElementType;
-                import java.lang.annotation.Retention;
-                import java.lang.annotation.RetentionPolicy;
-                import java.lang.annotation.Target;
-                
-                @Target({ElementType.TYPE, ElementType.METHOD})
-                @Retention(RetentionPolicy.RUNTIME)
-                public @interface Test {}
+    fun annotation() = rewriteRun(
+        java("""
+            package org.openrewrite;
+            
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+            
+            @Target({ElementType.TYPE, ElementType.METHOD})
+            @Retention(RetentionPolicy.RUNTIME)
+            public @interface Test {}
+        """,
+        """
+            package org.openrewrite.test;
+            
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+            
+            @Target({ElementType.TYPE, ElementType.METHOD})
+            @Retention(RetentionPolicy.RUNTIME)
+            public @interface Test {}
         """),
-        before = """
+        java("""
             import org.openrewrite.Test;
             public class A {
                 @Test
                 void method() {}
             }
         """,
-
-        after = """
+        """
             import org.openrewrite.test.Test;
             public class A {
                 @Test
                 void method() {}
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun array(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun array() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             public class B {
                org.openrewrite.Test[] a = new org.openrewrite.Test[0];
             }
         """,
-        after = """
+        """
             public class B {
                org.openrewrite.test.Test[] a = new org.openrewrite.test.Test[0];
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
-    fun multiDimensionalArray() = assertChanged(
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun multiDimensionalArray() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import org.openrewrite.Test;
             
             public class A {
                 Test[][] multiDimensionalArray;
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             
             public class A {
                 Test[][] multiDimensionalArray;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun classDecl(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass, "public interface I1 {}"),
-        before = """
+    fun classDecl() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("public interface I1 {}"),
+        java("""
             public class B extends org.openrewrite.Test implements I1 {}
         """,
-        after = """
+        """
             public class B extends org.openrewrite.test.Test implements I1 {}
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun updatesImplements(jp: JavaParser) = assertChanged(
-        dependsOn = arrayOf(
-            """
-                package org.openrewrite;
-                public interface Oi{}
-            """
-        ),
-        before = """
+    fun updatesImplements() = rewriteRun(
+        java("""
+            package org.openrewrite;
+            public interface Oi{}
+        """,
+        """
+            package org.openrewrite.test;
+            public interface Oi{}
+        """),
+        java("""
             package org.openrewrite;
             
             public class Mi implements org.openrewrite.Oi {
             }
         """,
-        after = """
+        """
             package org.openrewrite.test;
             
             public class Mi implements org.openrewrite.test.Oi {
             }
-        """
+        """)
     )
 
     @Test
-    fun moveToSubPackageRemoveImport() = assertChanged(
-        recipe = ChangePackage("com.acme.project", "com.acme.product", null),
-        dependsOn = arrayOf("""
+    fun moveToSubPackageRemoveImport() = rewriteRun(
+        { spec -> spec.recipe(
+            ChangePackage(
+                "com.acme.project",
+                "com.acme.product",
+                null
+        ))},
+        java("""
             package com.acme.product;
 
             public class RunnableFactory {
@@ -504,7 +541,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """),
-        before = """
+        java("""
             package com.acme.project;
 
             import com.acme.product.RunnableFactory;
@@ -515,7 +552,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             package com.acme.product;
             
             public class StaticImportWorker {
@@ -523,14 +560,19 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     RunnableFactory.getRunnable().run();
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
-    fun moveToSubPackageDoNotRemoveImport() = assertChanged(
-        recipe = ChangePackage("com.acme.project", "com.acme.product", true),
-        dependsOn = arrayOf("""
+    fun moveToSubPackageDoNotRemoveImport() = rewriteRun(
+        { spec -> spec.recipe(
+            ChangePackage(
+                "com.acme.project",
+                "com.acme.product",
+                true
+        ))},
+        java("""
             package com.acme.product;
 
             public class RunnableFactory {
@@ -539,7 +581,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """),
-        before = """
+        java("""
             package com.acme.project.other;
 
             import com.acme.product.RunnableFactory;
@@ -550,7 +592,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             package com.acme.product.other;
             
             import com.acme.product.RunnableFactory;
@@ -560,18 +602,24 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     RunnableFactory.getRunnable().run();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun lambda(jp: JavaParser) = assertChanged(
-        dependsOn = arrayOf("""
+    fun lambda() = rewriteRun(
+        java("""
             package org.openrewrite;
             public interface Procedure {
                 void execute();
             }
+        """,
+        """
+            package org.openrewrite.test;
+            public interface Procedure {
+                void execute();
+            }
         """),
-        before = """
+        java("""
             import org.openrewrite.Procedure;
             public abstract class Worker {
                 void callWorker() {
@@ -580,7 +628,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 abstract void worker(Procedure procedure);
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Procedure;
             public abstract class Worker {
                 void callWorker() {
@@ -588,50 +636,59 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
                 abstract void worker(Procedure procedure);
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Procedure")).isEmpty()
-        }
+        }}
     )
 
     @Test
-    fun method(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun method() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             public class A {
                public org.openrewrite.Test foo() { return null; }
             }
         """,
-        after = """
+        """
             public class A {
                public org.openrewrite.test.Test foo() { return null; }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun methodInvocationTypeParametersAndWildcard(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass,
-        """
+    fun methodInvocationTypeParametersAndWildcard() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             package org.openrewrite;
             public class ThingOne {            
             }
         """,
         """
+            package org.openrewrite.test;
+            public class ThingOne {            
+            }
+        """),
+        java("""
             package org.openrewrite;
             public class ThingTwo {
                 public static ThingOne getThingOne() {
                     return new ThingOne();
                 }
             }
+        """,
+        """
+            package org.openrewrite.test;
+            public class ThingTwo {
+                public static ThingOne getThingOne() {
+                    return new ThingOne();
+                }
+            }
         """),
-        before = """
+        java("""
             import java.util.List;
             import org.openrewrite.ThingOne;
             import org.openrewrite.ThingTwo;
@@ -646,7 +703,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
             import org.openrewrite.test.ThingOne;
             import org.openrewrite.test.ThingTwo;
@@ -660,18 +717,16 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     ThingOne t1 = ThingTwo.getThingOne();
                 }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun multiCatch(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun multiCatch() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             public class B {
                public void test() {
                    try {System.out.println();}
@@ -679,44 +734,41 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                }
             }
         """,
-        after = """
+        """
             public class B {
                public void test() {
                    try {System.out.println();}
                    catch(org.openrewrite.test.Test | RuntimeException ignored) {}
                }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun multiVariable(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun multiVariable() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             public class B {
                org.openrewrite.Test f1, f2;
             }
         """,
-        after = """
+        """
             public class B {
                org.openrewrite.test.Test f1, f2;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun assignment(jp: JavaParser) = assertChanged(
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun assignment() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             public class B {
                org.openrewrite.Test t;
                void method(org.openrewrite.Test param) {
@@ -724,66 +776,64 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                }
             }
         """,
-        after = """
+        """
             public class B {
                org.openrewrite.test.Test t;
                void method(org.openrewrite.test.Test param) {
                    t = param;
                }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun newClass(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun newClass() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             public class B {
                org.openrewrite.Test test = new org.openrewrite.Test();
             }
         """,
-        after = """
+        """
             public class B {
                org.openrewrite.test.Test test = new org.openrewrite.test.Test();
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun parameterizedType(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun parameterizedType() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
+            import org.openrewrite.Test;
+            import java.util.Map;
             public class B {
-               Map<org.openrewrite.Test, org.openrewrite.Test> m;
+               Map<Test, Test> m;
             }
         """,
-        after = """
+        """
+            import org.openrewrite.test.Test;
+            import java.util.Map;
             public class B {
-               Map<org.openrewrite.test.Test, org.openrewrite.test.Test> m;
+               Map<Test, Test> m;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
-    fun typeCast(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun typeCast() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import org.openrewrite.Test;
             
             public class A {
@@ -792,7 +842,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             
             public class A {
@@ -800,63 +850,57 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     return (Test) obj;
                 }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1997")
     @Test
-    fun classReference(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun classReference() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import org.openrewrite.Test;
             public class Test {
                 Class<?> clazz = Test.class;
             }
         """,
-        after = """
+        """
             import org.openrewrite.test.Test;
             public class Test {
                 Class<?> clazz = Test.class;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun methodSelect(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun methodSelect() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             public class B {
                org.openrewrite.Test test = null;
                public void getFoo() { test.foo(); }
             }
         """,
-        after = """
+        """
             public class B {
                org.openrewrite.test.Test test = null;
                public void getFoo() { test.foo(); }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun staticImport(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(testClass),
-        before = """
+    fun staticImport() = rewriteRun(
+        java(testClassBefore, testClassAfter),
+        java("""
             import static org.openrewrite.Test.stat;
 
             public class B {
@@ -865,7 +909,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             import static org.openrewrite.test.Test.stat;
 
             public class B {
@@ -873,28 +917,39 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     stat();
                 }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun changeTypeWithInnerClass(jp: JavaParser) = assertChanged(
-        recipe = ChangePackage("com.acme.product", "com.acme.product.v2", null),
-        dependsOn = arrayOf(
-            """
-                package com.acme.product;
-                
-                public class OuterClass {
-                    public static class InnerClass {
-                
-                    }
+    fun changeTypeWithInnerClass() = rewriteRun(
+        { spec -> spec.recipe(
+            ChangePackage(
+                "com.acme.product",
+                "com.acme.product.v2",
+                null
+        ))},
+        java("""
+            package com.acme.product;
+            
+            public class OuterClass {
+                public static class InnerClass {
+            
                 }
-            """
-        ),
-        before = """
+            }
+        """,
+        """
+            package com.acme.product.v2;
+            
+            public class OuterClass {
+                public static class InnerClass {
+            
+                }
+            }
+        """),
+        java("""
             package de;
             
             import com.acme.product.OuterClass.InnerClass;
@@ -910,7 +965,7 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                 }
             }
         """,
-        after = """
+        """
             package de;
 
             import com.acme.product.v2.OuterClass.InnerClass;
@@ -925,15 +980,17 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
                     return new OuterClass().toString();
                 }
             }
-        """
+        """)
     )
 
     @Test
     fun updateImportPrefixWithEmptyPackage() = rewriteRun(
-        { spec ->
-            spec.recipe(
-                ChangePackage("a.b", "", false)
-            )},
+        { spec -> spec.recipe(
+            ChangePackage(
+                "a.b",
+                "",
+                false
+        ))},
         java("""
             package a.b;
             
@@ -941,40 +998,44 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
             
             class Test {
             }
-            """,
-            """
+        """,
+        """
             import java.util.List;
             
             class Test {
             }
-            """
-        )
+        """)
     )
 
     @Test
     fun updateClassPrefixWithEmptyPackage() = rewriteRun(
-        { spec ->
-            spec.recipe(
-                ChangePackage("a.b", "", false)
-            )
-        },
+        { spec -> spec.recipe(
+            ChangePackage(
+                "a.b",
+                "",
+                false
+        ))},
         java("""
             package a.b;
             
             class Test {
             }
-            """,
+        """,
             """
             class Test {
             }
-            """
-        )
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2328")
     @Test
     fun renameSingleSegmentPackage() = rewriteRun(
-        {spec -> spec.recipe(ChangePackage("x", "y", false))},
+        { spec -> spec.recipe(
+            ChangePackage(
+                "x",
+                "y",
+                false
+        ))},
         java("""
             package x;
             
@@ -993,7 +1054,12 @@ interface ChangePackageTest: JavaRecipeTest, RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2328")
     @Test
     fun removePackage() = rewriteRun(
-        {spec -> spec.recipe(ChangePackage("x.y.z", "x", false))},
+        { spec -> spec.recipe(
+            ChangePackage(
+                "x.y.z",
+                "x",
+                false
+        ))},
         java(
         """
             package x.y.z;

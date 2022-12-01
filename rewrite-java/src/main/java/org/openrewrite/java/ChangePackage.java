@@ -229,7 +229,7 @@ public class ChangePackage extends Recipe {
                     if (tp instanceof JavaType.FullyQualified) {
                         JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
                         if (isTargetFullyQualifiedType(tpFq)) {
-                            return TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(tpFq.getPackageName()) + "." + tpFq.getClassName()));
+                            return TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(tpFq.getPackageName()) + "." + tpFq.getClassName(), ((JavaType.Parameterized) oldType).getKind()));
                         }
                     }
                     return tp;
@@ -244,7 +244,7 @@ public class ChangePackage extends Recipe {
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(original.getPackageName()) + "." + original.getClassName()));
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(original.getPackageName()) + "." + original.getClassName(), ((JavaType.FullyQualified) oldType).getKind()));
                     oldNameToChangedType.put(oldType.toString(), fq);
                     return fq;
                 }
