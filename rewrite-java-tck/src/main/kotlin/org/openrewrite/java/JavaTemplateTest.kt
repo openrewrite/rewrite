@@ -32,7 +32,7 @@ import java.util.*
 import java.util.Comparator.comparing
 
 @Suppress("Convert2MethodRef", "UnnecessaryBoxing")
-interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
+interface JavaTemplateTest : RewriteTest {
 
     val replaceToStringWithLiteralRecipe: Recipe
         get() = RewriteTest.toRecipe{object : JavaVisitor<ExecutionContext>() {
@@ -74,8 +74,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1339")
     @Test
-    fun templateStatementIsWithinTryWithResourcesBlock() = assertChanged(
-        recipe = toRecipe {
+    fun templateStatementIsWithinTryWithResourcesBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J {
                     var nc = super.visitNewClass(newClass, p)
@@ -94,8 +94,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return nc
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.io.*;
             import java.nio.charset.StandardCharsets;
             
@@ -114,7 +114,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.io.*;
             import java.nio.charset.StandardCharsets;
             
@@ -132,13 +132,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1796")
     @Test
-    fun replaceIdentifierWithMethodInvocation() = assertChanged(
-        recipe = toRecipe {
+    fun replaceIdentifierWithMethodInvocation() =  rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
                     return method.withBody(visit(method.body, p) as J.Block)
@@ -156,8 +156,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        },
-        before = """
+        }).expectedCyclesThatMakeChanges(1).cycles(1)},
+        java("""
             import java.io.File;
             class Test {
                 void test(File f) {
@@ -165,22 +165,20 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.io.File;
             class Test {
                 void test(File f) {
                     System.out.println(f.getCanonicalFile().toPath());
                 }
             }
-        """,
-        expectedCyclesThatMakeChanges = 1,
-        cycles = 1
+        """)
     )
 
     @Suppress("UnaryPlus", "UnusedAssignment")
     @Test
-    fun replaceExpressionWithAnotherExpression() = assertChanged(
-        recipe = toRecipe {
+    fun replaceExpressionWithAnotherExpression() =  rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 override fun visitUnary(unary: J.Unary, p: ExecutionContext): J {
                     return unary.withTemplate(
@@ -190,29 +188,27 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     )
                 }
             }
-        },
-        before = """
+        }).expectedCyclesThatMakeChanges(1).cycles(1)},
+        java("""
             class Test {
                 void test(int i) {
                     int n = +i;
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void test(int i) {
                     int n = i++;
                 }
             }
-        """,
-        expectedCyclesThatMakeChanges = 1,
-        cycles = 1
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1796")
     @Test
-    fun replaceFieldAccessWithMethodInvocation() = assertChanged(
-        recipe = toRecipe {
+    fun replaceFieldAccessWithMethodInvocation() =  rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 override fun visitMethodDeclaration(method: J.MethodDeclaration, p: ExecutionContext): J {
                     return method.withBody(visit(method.body, p) as J.Block)
@@ -230,8 +226,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        },
-        before = """
+        }).expectedCyclesThatMakeChanges(1).cycles(1)},
+        java("""
             import java.io.File;
             class Test {
                 File f;
@@ -240,7 +236,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.io.File;
             class Test {
                 File f;
@@ -248,15 +244,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     System.out.println(this.f.getCanonicalFile().toPath());
                 }
             }
-        """,
-        expectedCyclesThatMakeChanges = 1,
-        cycles = 1
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1092")
     @Test
-    fun methodInvocationReplacementHasContextAboutLocalVariables() = assertChanged(
-        recipe = toRecipe {
+    fun methodInvocationReplacementHasContextAboutLocalVariables() =  rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitMethodInvocation(
                     method: J.MethodInvocation,
@@ -271,8 +265,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     } else method
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.List;
             class Test {
                 List<String> words;
@@ -281,7 +275,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
             class Test {
                 List<String> words;
@@ -289,13 +283,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     words.add("jon");
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun innerEnumWithStaticMethod(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun innerEnumWithStaticMethod() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new A()")
                     .build()
@@ -306,11 +299,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                         else -> newClass.withTemplate(t, newClass.coordinates.replace())
                     }
             }
-        },
-        typeValidation = {
-            identifiers = false
-        },
-        before = """
+        })},
+        java("""
             class A {
                 public enum Type {
                     One;
@@ -333,7 +323,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 public enum Type {
                     One;
@@ -355,13 +345,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     new A();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replacePackage(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replacePackage(jp: JavaParser) =  rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "b").build()
 
@@ -383,23 +372,22 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return cd
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             package a;
             class Test {
             }
         """,
-        after = """
+        """
             package b;
             class Test {
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceMethod(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceMethod() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int test2(int n) { return n; }").build()
 
@@ -413,32 +401,31 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodDeclaration(method, p)
                 }
             }
-        },
-        before = """
+        }).afterRecipe{
+            val cu = it.results.get(0).after as J.CompilationUnit
+            val methodType = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
+            assertThat(methodType.returnType).isEqualTo(JavaType.Primitive.Int)
+            assertThat(methodType.parameterTypes).containsExactly(JavaType.Primitive.Int)
+        }},
+        java("""
             class Test {
                 void test() {
                 }
             }
         """,
-        after = """
+        """
             class Test {
             
                 int test2(int n) {
                     return n;
                 }
             }
-        """,
-        afterConditions = { cu ->
-            val methodType = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
-            assertThat(methodType.returnType).isEqualTo(JavaType.Primitive.Int)
-            assertThat(methodType.parameterTypes).containsExactly(JavaType.Primitive.Int)
-        }
+        """)
     )
 
     @Test
-    fun replaceLambdaWithMethodReference(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceLambdaWithMethodReference() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Object::toString").build()
 
@@ -446,29 +433,28 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return lambda.withTemplate(t, lambda.coordinates.replace())
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.function.Function;
 
             class Test {
                 Function<Object, String> toString = it -> it.toString();
             }
         """,
-        after = """
+        """
             import java.util.function.Function;
 
             class Test {
                 Function<Object, String> toString = Object::toString;
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     @Suppress("UnusedAssignment", "ResultOfMethodCallIgnored", "CodeBlock2Expr")
-    fun replaceStatementInLambdaBodySingleStatementBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceStatementInLambdaBodySingleStatementBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "return n == 1;").build()
 
@@ -482,8 +468,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return retrn
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.stream.Stream;
 
             class Test {
@@ -496,7 +482,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.stream.Stream;
 
             class Test {
@@ -508,15 +494,14 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     });
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     @Suppress("UnusedAssignment", "ResultOfMethodCallIgnored", "ConstantConditions")
-    fun replaceStatementInLambdaBodyWithVariableDeclaredInBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceStatementInLambdaBodyWithVariableDeclaredInBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "return n == 1;").build()
 
@@ -530,8 +515,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return retrn
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.stream.Stream;
 
             class Test {
@@ -543,7 +528,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.stream.Stream;
 
             class Test {
@@ -554,15 +539,14 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     });
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     @Suppress("ResultOfMethodCallIgnored", "UnusedAssignment")
-    fun replaceStatementInLambdaBodyMultiStatementBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceStatementInLambdaBodyMultiStatementBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(java.lang.String)}.toUpperCase()").build()
 
@@ -573,8 +557,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodInvocation(method, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.stream.Stream;
 
             class Test {
@@ -587,7 +571,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.stream.Stream;
 
             class Test {
@@ -599,15 +583,14 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     });
                 }
             }
-        """
+        """)
     )
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     @Suppress("ResultOfMethodCallIgnored", "SizeReplaceableByIsEmpty")
-    fun replaceSingleExpressionInLambdaBody(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceSingleExpressionInLambdaBody() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(java.lang.String)}.toUpperCase()").build()
 
@@ -618,8 +601,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodInvocation(method, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.stream.Stream;
 
             class Test {
@@ -628,7 +611,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.stream.Stream;
 
             class Test {
@@ -636,14 +619,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     obj.filter(o -> o.toUpperCase().length() > 0);
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2176")
     @Test
-    fun replaceSingleExpressionInLambdaBodyWithExpression(jp: JavaParser.Builder<*, *>) = assertChanged (
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceSingleExpressionInLambdaBodyWithExpression() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val ENUM_EQUALS = MethodMatcher("java.lang.Enum equals(java.lang.Object)")
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any()} == #{any()}").build()
@@ -655,8 +637,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodInvocation(method, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.stream.Stream;
 
             class Test {
@@ -666,7 +648,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.stream.Stream;
 
             class Test {
@@ -675,14 +657,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     Object a = obj.filter(o -> o == Abc.A);
                 }
             }
-        """
+        """)
     )
 
     @Suppress("ClassInitializerMayBeStatic")
     @Test
-    fun replaceMethodNameAndArgumentsSimultaneously(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceMethodNameAndArgumentsSimultaneously() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "acceptString(#{any()}.toString())")
                     .javaParser {
@@ -712,8 +693,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return m
                 }
             }
-        },
-        dependsOn = arrayOf(
+        })},
+        java(
             """
                 package org.openrewrite;
                 public class A {
@@ -723,7 +704,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             """
         ),
-        before = """
+        java("""
             package org.openrewrite;
             
             public class Foo {
@@ -735,7 +716,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package org.openrewrite;
             
             public class Foo {
@@ -746,22 +727,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                             .someOtherMethod();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceMethodInvocationWithArray(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
-            package org.openrewrite;
-            public class Test {
-                public void method(int[] val) {}
-                public void method(int[] val1, String val2) {}
-            }
-        """.trimIndent()
-        ),
-        recipe = toRecipe {
+    fun replaceMethodInvocationWithArray() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "#{anyArray(int)}").build()
 
@@ -776,11 +747,15 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return m
                 }
             }
-        },
-        typeValidation = {
-            identifiers = false
-        },
-        before = """
+        })},
+        java("""
+            package org.openrewrite;
+            public class Test {
+                public void method(int[] val) {}
+                public void method(int[] val1, String val2) {}
+            }
+        """),
+        java("""
             import org.openrewrite.Test;
             class A {
                 public void method() {
@@ -790,7 +765,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import org.openrewrite.Test;
             class A {
                 public void method() {
@@ -799,14 +774,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     test.method(arr);
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/602")
     @Test
-    fun replaceMethodInvocationWithMethodReference(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceMethodInvocationWithMethodReference() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Object::toString").build()
 
@@ -815,8 +789,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
 
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.function.Function;
 
             class Test {
@@ -827,7 +801,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 } 
             }
         """,
-        after = """
+        """
             import java.util.function.Function;
 
             class Test {
@@ -837,13 +811,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return Object::toString;
                 } 
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceMethodParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceMethodParameters() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m, java.util.List<String> n")
                     .build()
@@ -864,28 +837,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodDeclaration(method, p)
                 }
             }
-        },
-        before = """
-            class Test {
-                void test() {
-                    new Runnable() {
-                        void inner() {
-                        }
-                    };
-                }
-            }
-        """,
-        after = """
-            class Test {
-                void test(int m, java.util.List<String> n) {
-                    new Runnable() {
-                        void inner(int m, java.util.List<String> n) {
-                        }
-                    };
-                }
-            }
-        """,
-        afterConditions = { cu ->
+        }).afterRecipe{
+            val cu = it.results[0].after as J.CompilationUnit
             val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
 
             assertThat(type.parameterNames)
@@ -905,13 +858,37 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     },
                     "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
                 )
-        }
+        }},
+        java(
+            """
+            class Test {
+                void test() {
+                    new Runnable() {
+                        void inner() {
+                        }
+                        @Override 
+                        public void run() {}
+                    };
+                }
+            }
+        """,
+        """
+            class Test {
+                void test(int m, java.util.List<String> n) {
+                    new Runnable() {
+                        void inner(int m, java.util.List<String> n) {
+                        }
+                        @Override 
+                        public void run() {}
+                    };
+                }
+            }
+        """),
     )
 
     @Test
-    fun replaceMethodParametersVariadicArray(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceMethodParametersVariadicArray() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Object[]... values")
                     .build()
@@ -932,28 +909,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodDeclaration(method, p)
                 }
             }
-        },
-        before = """
-            class Test {
-                void test() {
-                    new Runnable() {
-                        void inner() {
-                        }
-                    };
-                }
-            }
-        """,
-        after = """
-            class Test {
-                void test(Object[]... values) {
-                    new Runnable() {
-                        void inner(Object[]... values) {
-                        }
-                    };
-                }
-            }
-        """,
-        afterConditions = { cu ->
+        }).afterRecipe{
+            val cu = it.results[0].after as J.CompilationUnit
             val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
 
             assertThat(type.parameterNames)
@@ -963,13 +920,32 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             assertThat(param.asArray()!!.elemType)
                 .`as`("Changing the method's parameters should have resulted in the first parameter's type being 'Object[]'")
                 .matches { it.asArray()!!.elemType.asFullyQualified()?.fullyQualifiedName == "java.lang.Object" }
-        }
+        }},
+        java("""
+            class Test {
+                void test() {
+                    new Runnable() {
+                        void inner() {
+                        }
+                    };
+                }
+            }
+        """,
+        """
+            class Test {
+                void test(Object[]... values) {
+                    new Runnable() {
+                        void inner(Object[]... values) {
+                        }
+                    };
+                }
+            }
+        """)
     )
 
     @Test
-    fun replaceAndInterpolateMethodParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceAndInterpolateMethodParameters() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int n, #{}")
                     .build()
@@ -988,20 +964,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
-            class Test {
-                void test(String s) {
-                }
-            }
-        """,
-        after = """
-            class Test {
-                void test(int n, String s) {
-                }
-            }
-        """,
-        afterConditions = { cu ->
+        }).afterRecipe{
+            val cu = it.results[0].after as J.CompilationUnit
             val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
 
             assertThat(type.parameterNames)
@@ -1013,13 +977,24 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
             assertThat(type.parameterTypes[1])
                 .`as`("Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'")
                 .matches { it.asFullyQualified()!!.fullyQualifiedName == "java.lang.String" }
-        }
+        }},
+        java("""
+            class Test {
+                void test(String s) {
+                }
+            }
+        """,
+        """
+            class Test {
+                void test(int n, String s) {
+                }
+            }
+        """)
     )
 
     @Test
-    fun replaceLambdaParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceLambdaParameters() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m, int n")
                     .build()
@@ -1031,27 +1006,26 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                         super.visitLambda(lambda, p)
                     }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 void test() {
                     Object o = () -> 1;
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void test() {
                     Object o = (int m, int n) -> 1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceSingleStatement(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceSingleStatement() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder(
                     { cursor.parentOrThrow },
@@ -1064,8 +1038,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 override fun visitAssert(_assert: J.Assert, p: ExecutionContext): J =
                     _assert.withTemplate(t, _assert.coordinates.replace())
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -1073,7 +1047,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 void test() {
@@ -1082,14 +1056,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     }
                 }
             }
-        """
+        """)
     )
 
     @Suppress("UnusedAssignment")
     @Test
-    fun replaceStatementInBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceStatementInBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 2;\nn = 3;")
                     .build()
@@ -1102,8 +1075,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -1112,7 +1085,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 void test() {
@@ -1121,13 +1094,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     n = 3;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun beforeStatementInBlock(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun beforeStatementInBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "assert n == 0;")
                     .build()
@@ -1140,8 +1112,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -1149,7 +1121,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 void test() {
@@ -1157,13 +1129,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     n = 1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun afterStatementInBlock(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun afterStatementInBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 1;")
                     .build()
@@ -1175,8 +1146,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -1184,7 +1155,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 void test() {
@@ -1192,14 +1163,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     n = 1;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1093")
     @Test
-    fun firstStatementInClassBlock(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun firstStatementInClassBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m;")
                     .build()
@@ -1211,27 +1181,26 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return classDecl
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 // comment
                 int n;
             }
         """,
-        after = """
+        """
             class Test {
                 int m;
                 // comment
                 int n;
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1093")
     @Test
-    fun firstStatementInMethodBlock(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun firstStatementInMethodBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int m = 0;")
                     .build()
@@ -1243,8 +1212,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -1253,7 +1222,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 void test() {
@@ -1262,13 +1231,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     int n = 1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun lastStatementInClassBlock(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun lastStatementInClassBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "int n;")
                     .build()
@@ -1280,22 +1248,21 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return classDecl
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
             }
-        """
+        """)
     )
 
     @Test
-    fun lastStatementInMethodBlock(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun lastStatementInMethodBlock() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 1;")
                     .build()
@@ -1307,8 +1274,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -1316,7 +1283,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 void test() {
@@ -1324,13 +1291,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     n = 1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceStatementRequiringNewImport(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceStatementRequiringNewImport() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "List<String> s = null;")
                     .imports("java.util.List")
@@ -1341,8 +1307,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return _assert.withTemplate(t, _assert.coordinates.replace())
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -1350,7 +1316,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.List;
             
             class Test {
@@ -1359,14 +1325,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     List<String> s = null;
                 }
             }
-        """
+        """)
     )
 
     @Suppress("UnnecessaryBoxing")
     @Test
-    fun replaceArguments(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceArguments() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "m, Integer.valueOf(n), \"foo\"")
                     .build()
@@ -1381,8 +1346,15 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
+        }).afterRecipe{
+            val cu = it.results[0].after as J.CompilationUnit
+            val m = (cu.classes[0].body.statements[2] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
+            val type = m.methodType!!
+            assertThat(type.parameterTypes[0]).isEqualTo(JavaType.Primitive.Int)
+            assertThat(type.parameterTypes[1]).isEqualTo(JavaType.Primitive.Int)
+            assertThat(type.parameterTypes[2]).matches { it.asFullyQualified()!!.fullyQualifiedName.equals("java.lang.String") }
+        }},
+        java("""
             abstract class Test {
                 abstract void test();
                 abstract void test(int m, int n, String foo);
@@ -1391,7 +1363,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             abstract class Test {
                 abstract void test();
                 abstract void test(int m, int n, String foo);
@@ -1399,14 +1371,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     test(m, Integer.valueOf(n), "foo");
                 }
             }
-        """,
-        afterConditions = { cu ->
-            val m = (cu.classes[0].body.statements[2] as J.MethodDeclaration).body!!.statements[0] as J.MethodInvocation
-            val type = m.methodType!!
-            assertThat(type.parameterTypes[0]).isEqualTo(JavaType.Primitive.Int)
-            assertThat(type.parameterTypes[1]).isEqualTo(JavaType.Primitive.Int)
-            assertThat(type.parameterTypes[2]).matches { it.asFullyQualified()!!.fullyQualifiedName.equals("java.lang.String") }
-        }
+        """)
     )
 
     val replaceAnnotationRecipe: Recipe
@@ -1499,9 +1464,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     )
 
     @Test
-    fun replaceMethodAnnotations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceMethodAnnotations() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
@@ -1516,8 +1480,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodDeclaration(method, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 static final String WARNINGS = "ALL";
             
@@ -1531,7 +1495,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 static final String WARNINGS = "ALL";
             
@@ -1547,13 +1511,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 public void test2() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceClassAnnotations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceClassAnnotations() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
@@ -1568,8 +1531,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitClassDeclaration(classDecl, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 static final String WARNINGS = "ALL";
                 
@@ -1577,7 +1540,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 static final String WARNINGS = "ALL";
             
@@ -1585,13 +1548,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 class Inner1 {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceVariableAnnotations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceVariableAnnotations() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
@@ -1606,8 +1568,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitVariableDeclarations(multiVariable, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 void test() {
                     // the m
@@ -1616,7 +1578,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void test() {
                     // the m
@@ -1626,13 +1588,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     final int n;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun addVariableAnnotationsToVariableAlreadyAnnotated(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun addVariableAnnotationsToVariableAlreadyAnnotated() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@Deprecated")
                     .build()
@@ -1647,8 +1608,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitVariableDeclarations(multiVariable, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 @SuppressWarnings("ALL") private final int m, a;
                 void test() {
@@ -1664,7 +1625,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 @SuppressWarnings("ALL")
                 @Deprecated
@@ -1686,13 +1647,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     private Boolean x, y;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun addVariableAnnotationsToVariableNotAnnotated(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun addVariableAnnotationsToVariableNotAnnotated() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"ALL\")")
                     .build()
@@ -1710,8 +1670,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitVariableDeclarations(multiVariable, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 void test() {
                     final int m;
@@ -1719,7 +1679,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void test() {
                     @SuppressWarnings("ALL")
@@ -1728,14 +1688,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     int n;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1111")
     @Test
-    fun addMethodAnnotations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun addMethodAnnotations() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
@@ -1750,8 +1709,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodDeclaration(method, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 public void test0() {
                 }
@@ -1762,7 +1721,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 @SuppressWarnings("other")
                 public void test0() {
@@ -1774,13 +1733,12 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 void test1() {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun addClassAnnotations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun addClassAnnotations() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@SuppressWarnings(\"other\")")
                     .build()
@@ -1798,30 +1756,27 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitClassDeclaration(classDecl, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 class Inner1 {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 @SuppressWarnings("other")
                 class Inner1 {
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceAnnotation(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceAnnotation() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
-                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@Deprecated")
-                        .javaParser { jp }
-                        .build()
+                val t = JavaTemplate.builder({ cursor.parentOrThrow }, "@Deprecated").build()
 
                 override fun visitAnnotation(annotation: J.Annotation, p: ExecutionContext): J.Annotation {
                     if(annotation.simpleName == "SuppressWarnings") {
@@ -1830,23 +1785,22 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return annotation
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             @SuppressWarnings("ALL")
             class Test {
             }
         """,
-        after = """
+        """
             @Deprecated
             class Test {
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceClassImplements(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceClassImplements() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Serializable, Closeable")
                     .imports("java.io.*")
@@ -1864,24 +1818,23 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitClassDeclaration(classDecl, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
             }
         """,
-        after = """
+        """
             import java.io.Closeable;
             import java.io.Serializable;
             
             class Test implements Serializable, Closeable {
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceClassExtends(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceClassExtends() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "List<String>")
                     .imports("java.util.*")
@@ -1898,24 +1851,23 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitClassDeclaration(classDecl, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
             }
         """,
-        after = """
+        """
             import java.util.List;
             
             class Test extends List<String> {
             }
-        """
+        """)
     )
 
     @Suppress("RedundantThrows")
     @Test
-    fun replaceThrows(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceThrows() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "Exception")
                     .build()
@@ -1930,29 +1882,28 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodDeclaration(method, p)
                 }
             }
-        },
-        before = """
+        }).afterRecipe{
+            val cu = it.results[0].after as J.CompilationUnit
+            val testMethodDecl = cu.classes.first().body.statements.first() as J.MethodDeclaration
+            assertThat(testMethodDecl.methodType!!.thrownExceptions.map { it.fullyQualifiedName })
+                .containsExactly("java.lang.Exception")
+        }},
+        java("""
             class Test {
                 void test() {}
             }
         """,
-        after = """
+        """
             class Test {
                 void test() throws Exception {}
             }
-        """,
-        afterConditions = { cu ->
-            val testMethodDecl = cu.classes.first().body.statements.first() as J.MethodDeclaration
-            assertThat(testMethodDecl.methodType!!.thrownExceptions.map { it.fullyQualifiedName })
-                .containsExactly("java.lang.Exception")
-        }
+        """)
     )
 
     @Disabled
     @Test
-    fun replaceMethodTypeParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceMethodTypeParameters() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val typeParamsTemplate = JavaTemplate.builder({ cursor.parentOrThrow }, "T, U")
                     .build()
@@ -1975,29 +1926,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodDeclaration(method, p)
                 }
             }
-        },
-        before = """
-            import java.util.List;
-            
-            class Test {
-            
-                void test() {
-                }
-            }
-        """,
-        after = """
-            import java.util.List;
-            
-            class Test {
-            
-                <T, U> void test(List<T> t, U u) {
-                }
-            }
-        """,
-        typeValidation = {
-            identifiers = false
-        },
-        afterConditions = { cu ->
+        }).afterRecipe{
+            val cu = it.results[0].after as J.CompilationUnit
             val type = (cu.classes.first().body.statements.first() as J.MethodDeclaration).methodType!!
             assertThat(type).isNotNull
             val paramTypes = type.parameterTypes
@@ -2015,13 +1945,30 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                             uType.name == "U" &&
                             uType.bounds.isEmpty()
                 }
-        }
+        }},
+        java("""
+            import java.util.List;
+            
+            class Test {
+            
+                void test() {
+                }
+            }
+        """,
+        """
+            import java.util.List;
+            
+            class Test {
+            
+                <T, U> void test(List<T> t, U u) {
+                }
+            }
+        """)
     )
 
     @Test
-    fun replaceClassTypeParameters(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = toRecipe {
+    fun replaceClassTypeParameters() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "T, U")
                     .build()
@@ -2036,21 +1983,20 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitClassDeclaration(classDecl, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
             }
         """,
-        after = """
+        """
             class Test<T, U> {
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceBody(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceBody() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "n = 1;")
                     .build()
@@ -2063,8 +2009,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return method
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class Test {
                 int n;
                 void test() {
@@ -2072,20 +2018,19 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int n;
                 void test() {
                     n = 1;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun replaceMissingBody(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceMissingBody() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "")
                     .build()
@@ -2103,18 +2048,18 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return m
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             abstract class Test {
                 abstract void test();
             }
         """,
-        after = """
+        """
             abstract class Test {
                 void test(){
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
@@ -2126,9 +2071,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         "UnnecessaryTemporaryOnConversionToString",
         "ResultOfMethodCallIgnored"
     )
-    fun replaceNamedVariableInitializerMethodInvocation(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun replaceNamedVariableInitializerMethodInvocation() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val matcher = MethodMatcher("Integer valueOf(..)")
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new Integer(#{any()})").build()
@@ -2139,8 +2083,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodInvocation(method, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.Arrays;
             import java.util.List;
             import java.util.function.Function;
@@ -2168,7 +2112,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.util.Arrays;
             import java.util.List;
             import java.util.function.Function;
@@ -2195,7 +2139,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     }.toString();
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
@@ -2206,9 +2150,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         "CachedNumberConstructorCall",
         "UnnecessaryTemporaryOnConversionToString"
     )
-    fun lambdaIsVariableInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.logCompilationWarningsAndErrors(true).build(),
-        recipe = toRecipe {
+    fun lambdaIsVariableInitializer() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 val matcher = MethodMatcher("Integer valueOf(..)")
                 val t = JavaTemplate.builder({ cursor.parentOrThrow }, "new Integer(#{any()})").build()
@@ -2219,25 +2162,25 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return super.visitMethodInvocation(method, p)
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             import java.util.function.Function;
             class Test {
                 Function<String, Integer> asInteger = it -> Integer.valueOf(it);
             }
         """,
-        after = """
+        """
             import java.util.function.Function;
             class Test {
                 Function<String, Integer> asInteger = it -> new Integer(it);
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1505")
     @Test
-    fun methodDeclarationWithComment() = assertChanged(
-        recipe = toRecipe {
+    fun methodDeclarationWithComment() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaVisitor<ExecutionContext>() {
                 override fun visitClassDeclaration(classDeclaration: J.ClassDeclaration, p: ExecutionContext): J {
                     var cd = classDeclaration
@@ -2261,13 +2204,13 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return cd
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class A {
             
             }
         """,
-        after = """
+        """
             class A {
                 /**
                  * comment
@@ -2276,14 +2219,14 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
 
             }
-        """
+        """)
     )
 
     @Suppress("UnusedAssignment")
     @Issue("https://github.com/openrewrite/rewrite/issues/1821")
     @Test
-    fun assignmentNotPartOfVariableDeclaration() = assertChanged(
-        recipe = toRecipe {
+    fun assignmentNotPartOfVariableDeclaration() = rewriteRun(
+        {spec-> spec.recipe(RewriteTest.toRecipe {
             object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J.Assignment {
                     var a = assignment
@@ -2299,8 +2242,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                     return a
                 }
             }
-        },
-        before = """
+        })},
+        java("""
             class A {
                 void foo() {
                     int i;
@@ -2308,21 +2251,21 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 void foo() {
                     int i;
                     i = 1;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2090")
     @Test
     fun assignmentWithinIfPredicate() = rewriteRun(
         { spec ->
-            spec.recipe(toRecipe {
+            spec.recipe(RewriteTest.toRecipe {
                 object : JavaIsoVisitor<ExecutionContext>() {
                     override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J.Assignment {
                         if((assignment.assignment is J.Literal) && "1" == (assignment.assignment as J.Literal).valueSource) {
@@ -2358,7 +2301,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Test
     fun lambdaIsNewClass() = rewriteRun(
         { spec ->
-            spec.recipe(toRecipe {
+            spec.recipe(RewriteTest.toRecipe {
                 object : JavaIsoVisitor<ExecutionContext>() {
                     override fun visitAssignment(assignment: J.Assignment, p: ExecutionContext): J.Assignment {
                         var a = assignment
@@ -2403,7 +2346,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Test
     fun replaceForEachControlVariable() = rewriteRun(
         { spec ->
-            spec.recipe(toRecipe {
+            spec.recipe(RewriteTest.toRecipe{
                 object : JavaIsoVisitor<ExecutionContext>() {
                     override fun visitVariableDeclarations(
                         multiVariable: J.VariableDeclarations,
@@ -2446,7 +2389,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Test
     fun replaceForEachControlIterator() = rewriteRun(
         { spec ->
-            spec.recipe(toRecipe {
+            spec.recipe(RewriteTest.toRecipe{
                 object : JavaVisitor<ExecutionContext>() {
                     override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J {
                         var nc = super.visitNewClass(newClass, p)
@@ -2547,7 +2490,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Test
     fun templatingWhileLoopCondition() = rewriteRun(
         { spec ->
-            spec.recipe(toRecipe {
+            spec.recipe(RewriteTest.toRecipe {
                 object : JavaVisitor<ExecutionContext>() {
                     override fun visitBinary(binary: J.Binary, p: ExecutionContext): J {
                         if (binary.left is J.MethodInvocation) {
@@ -2587,7 +2530,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Test
     fun javaTemplateControlsSemiColons() = rewriteRun(
         { spec ->
-            spec.recipe(toRecipe {
+            spec.recipe(RewriteTest.toRecipe{
                 object : JavaVisitor<ExecutionContext>() {
                     var BIG_DECIMAL_SET_SCALE = MethodMatcher("java.math.BigDecimal setScale(int, int)")
                     var twoArgScale = JavaTemplate.builder({ cursor.parentOrThrow }, "#{any(int)}, #{}")
@@ -2795,7 +2738,8 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2375")
     fun arrayInitializer() = rewriteRun(
-        {spec -> spec.recipe(toRecipe {object : JavaIsoVisitor<ExecutionContext>() {
+        {spec -> spec.recipe(RewriteTest.toRecipe{
+            object : JavaIsoVisitor<ExecutionContext>() {
             val mm = MethodMatcher("abc.ArrayHelper of(..)")
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 var mi = super.visitMethodInvocation(method, p)
@@ -2841,7 +2785,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2375")
     fun multiDimentionalArrayInitializer() = rewriteRun(
-        {spec -> spec.recipe(toRecipe {object : JavaVisitor<ExecutionContext>() {
+        {spec -> spec.recipe(RewriteTest.toRecipe {object : JavaVisitor<ExecutionContext>() {
             val mm = MethodMatcher("java.util.stream.IntStream sum()")
             override fun visitNewClass(newClass: J.NewClass, p: ExecutionContext): J {
                 val nc = super.visitNewClass(newClass, p) as J.NewClass
