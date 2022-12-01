@@ -20,6 +20,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.markers.EntryContinuation;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.function.UnaryOperator;
@@ -38,11 +39,83 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     @Override
     public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
-        p.out.append(entry.getKey())
-                .append(entry.getBeforeEquals())
-                .append('=');
-        beforeSyntax(entry.getValue().getPrefix(), entry.getValue().getMarkers(), p);
-        p.out.append(entry.getValue().getText());
+        EntryContinuation entryContinuation = entry.getMarkers().findFirst(EntryContinuation.class).orElse(null);
+        // Track the current position relative to the properties without markers and / or continuation lines.
+        StringBuilder currentPos = new StringBuilder();
+        if (entryContinuation != null) {
+            if (entryContinuation.getContinuationMap().containsKey(0)) {
+                p.out.append(entryContinuation.getContinuationMap().get(0));
+            }
+
+            char[] charArray = entry.getKey().toCharArray();
+            for (char c : charArray) {
+                p.out.append(c);
+                currentPos.append(c);
+
+                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                }
+            }
+        } else {
+            p.out.append(entry.getKey());
+            currentPos.append(entry.getKey());
+        }
+
+        if (entryContinuation != null) {
+            for (char c : entry.getBeforeEquals().toCharArray()) {
+                p.out.append(c);
+                currentPos.append(c);
+
+                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                }
+            }
+        } else {
+            p.out.append(entry.getBeforeEquals());
+            currentPos.append(entry.getBeforeEquals());
+        }
+
+        p.append("=");
+        currentPos.append("=");
+
+        if (entryContinuation != null) {
+            for (Marker marker : entry.getValue().getMarkers().getMarkers()) {
+                p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
+            }
+
+            char[] charArray = entry.getValue().getPrefix().toCharArray();
+            for (char c : charArray) {
+                p.out.append(c);
+                currentPos.append(c);
+
+                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                }
+            }
+
+            visitMarkers(entry.getValue().getMarkers(), p);
+            for (Marker marker : entry.getValue().getMarkers().getMarkers()) {
+                p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
+            }
+        } else {
+            beforeSyntax(entry.getValue().getPrefix(), entry.getValue().getMarkers(), p);
+            currentPos.append(entry.getValue().getPrefix());
+        }
+
+        if (entryContinuation != null) {
+            char[] charArray = entry.getValue().getText().toCharArray();
+            for (char c : charArray) {
+                p.out.append(c);
+                currentPos.append(c);
+
+                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                }
+            }
+        } else {
+            p.out.append(entry.getValue().getText());
+        }
+
         afterSyntax(entry.getValue().getMarkers(), p);
         afterSyntax(entry, p);
         return entry;

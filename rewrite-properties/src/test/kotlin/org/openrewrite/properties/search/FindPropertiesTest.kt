@@ -70,4 +70,22 @@ class FindPropertiesTest : PropertiesRecipeTest {
         """
     )
 
+    @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2473")
+    @Test
+    fun findPropertyWithContinuations() = assertChanged(
+        recipe = FindProperties("management.metrics.binders.files.enabled", null),
+        before = """
+            manag\
+                ement.met\
+                        rics.bin\
+                            ders.files.enabled=true
+        """,
+        after = """
+            manag\
+                ement.met\
+                        rics.bin\
+                            ders.files.enabled=~~>true
+        """
+    )
 }

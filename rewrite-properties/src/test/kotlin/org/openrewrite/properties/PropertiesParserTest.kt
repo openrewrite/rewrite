@@ -17,7 +17,10 @@ package org.openrewrite.properties
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.PrintOutputCapture
+import org.openrewrite.properties.internal.PropertiesPrinter
 import org.openrewrite.properties.tree.Properties
 
 @Suppress("UnusedProperty")
@@ -130,22 +133,36 @@ class PropertiesParserTest {
     }
 
     @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
-    @Issue("https://github.com/openrewrite/rewrite/issues/2471")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2473")
     @Test
-    fun escapedEndOfLine() {
-        val props = PropertiesParser().parse(
-            """
-                key=val\
-                          ue
-                ke\
-                    y2 = value2
+    fun escapedNewLines() {
+        val source = """
+                \
+                
+                k\
+                 e\
+                
+                  y \
+                   = \
+                
+                    v\
+                
+                     al\
+                      ue\
+                       
             """.trimIndent()
-        )[0]
+        val props = PropertiesParser().parse(source)[0] as Properties.File
+
         assertThat(props.content.map { it as Properties.Entry }.map { it.key })
-            .hasSize(2)
-            .containsExactly("key", "key2")
+            .hasSize(1)
+            .containsExactly("key")
         assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
-            .hasSize(2)
-            .containsExactly("value", "value2")
+            .hasSize(1)
+            .containsExactly("value")
+
+        val outputCapture = PrintOutputCapture(InMemoryExecutionContext())
+        val printer = PropertiesPrinter<InMemoryExecutionContext>()
+        printer.visitFile(props, outputCapture)
+        assertThat(outputCapture.out.toString()).isEqualTo(source)
     }
 }
