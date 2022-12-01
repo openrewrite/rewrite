@@ -427,7 +427,10 @@ public class BlockStatementTemplateGenerator {
             } else if (statement instanceof J.ClassDeclaration) {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
-                classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, !isNestedClass);
+                // if the class is an enum then it's a nested enum and must be printed as a class.
+                J.ClassDeclaration cd = (J.ClassDeclaration)statement;
+                boolean isNestedEnum = cd.getKind() != J.ClassDeclaration.Kind.Type.Enum && !isNestedClass;
+                classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, isNestedEnum);
             }
         }
         before.insert(0, enumClass);

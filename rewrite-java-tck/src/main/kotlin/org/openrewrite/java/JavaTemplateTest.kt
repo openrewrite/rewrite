@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
+import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.*
 import org.openrewrite.test.RewriteTest
@@ -38,7 +39,7 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
         get() = RewriteTest.toRecipe{object : JavaVisitor<ExecutionContext>() {
             private var TO_STRING = MethodMatcher("java.lang.String toString()")
             private val t = JavaTemplate.builder({ cursor }, "#{any(java.lang.String)}")
-                .build()
+                .doBeforeParseTemplate(System.out::println).build()
 
             override fun visitMethodInvocation(method: J.MethodInvocation, ctx: ExecutionContext): J {
                 val mi = super.visitMethodInvocation(method, ctx) as J
@@ -48,6 +49,30 @@ interface JavaTemplateTest : RewriteTest, JavaRecipeTest {
                 return mi
             }
         }}
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2475")
+    @Test
+    fun enumWithinEnum() = rewriteRun(
+        {spec -> spec
+            .recipe(replaceToStringWithLiteralRecipe)},
+        java("""
+            public enum Test {
+                INSTANCE;
+                public enum MatchMode { DEFAULT }
+                public String doSomething() {
+                    return "STARTING".toString();
+                }
+            }
+        ""","""
+            public enum Test {
+                INSTANCE;
+                public enum MatchMode { DEFAULT }
+                public String doSomething() {
+                    return "STARTING";
+                }
+            }
+        """)
+    )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1339")
     @Test
