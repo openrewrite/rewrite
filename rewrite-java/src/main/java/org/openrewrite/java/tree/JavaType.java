@@ -60,11 +60,21 @@ public interface JavaType {
      * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
      */
     static JavaType buildType(String typeName) {
+        return buildType(typeName, FullyQualified.Kind.Class);
+    }
+
+    /**
+     * Return a JavaType for the specified string.
+     * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
+     * @param typeName The fully qualified name of the class to build
+     * @param kind The {@link FullyQualified.Kind} for the ShallowClass.
+     */
+    static JavaType buildType(String typeName, FullyQualified.Kind kind) {
         Primitive primitive = Primitive.fromKeyword(typeName);
         if (primitive != null) {
             return primitive;
         }
-        return ShallowClass.build(typeName);
+        return ShallowClass.build(typeName, kind);
     }
 
     default boolean isAssignableFrom(Pattern pattern) {
