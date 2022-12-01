@@ -41,19 +41,19 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     static SourceSpecs other(@Nullable String before, Consumer<SourceSpec<Quark>> spec) {
-        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, QuarkParser.builder(), before, (String) null);
+        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, QuarkParser.builder(), before, null);
         spec.accept(quark);
         return quark;
     }
 
-    static SourceSpecs other(@Nullable String before, String after) {
+    static SourceSpecs other(@Nullable String before, @Nullable String after) {
         return other(before, after, s -> {
         });
     }
 
-    static SourceSpecs other(@Nullable String before, String after,
+    static SourceSpecs other(@Nullable String before, @Nullable String after,
                              Consumer<SourceSpec<Quark>> spec) {
-        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, QuarkParser.builder(), before, after);
+        SourceSpec<Quark> quark = new SourceSpec<>(Quark.class, null, QuarkParser.builder(), before, s -> after);
         spec.accept(quark);
         return quark;
     }
@@ -64,19 +64,19 @@ public interface SourceSpecs extends Iterable<SourceSpec<?>> {
     }
 
     static SourceSpecs text(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, (String) null);
+        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, null);
         spec.accept(text);
         return text;
     }
 
-    static SourceSpecs text(@Nullable String before, String after) {
+    static SourceSpecs text(@Nullable String before, @Nullable String after) {
         return text(before, after, s -> {
         });
     }
 
-    static SourceSpecs text(@Nullable String before, String after,
+    static SourceSpecs text(@Nullable String before, @Nullable String after,
                             Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, after);
+        SourceSpec<PlainText> text = new SourceSpec<>(PlainText.class, null, PlainTextParser.builder(), before, s-> after);
         spec.accept(text);
         return text;
     }

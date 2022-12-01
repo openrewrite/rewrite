@@ -361,8 +361,21 @@ public interface RewriteTest extends SourceSpecs {
                                     .isEqualTo(result.getBefore().printAll(out.clone()));
                         }
                     } else if (result.getAfter() == null) {
-                        assert result.getBefore() != null;
-                        fail("The recipe deleted a source file [" + result.getBefore().getSourcePath() + "] that was not expected to change");
+                        if (specForSourceFile.getValue().after == null) {
+                            // If the source spec was not expecting a change (spec.after == null) but the file has been
+                            // deleted, assert failure.
+                            assert result.getBefore() != null;
+                            fail("The recipe deleted a source file \"" + result.getBefore().getSourcePath() + "\" that was not expected to change");
+                        } else {
+                            String expected = specForSourceFile.getValue().after.apply(null);
+                            if (expected != null) {
+                                // The spec expected the file to be changed, not deleted.
+                                assert result.getBefore() != null;
+                                assertThat((String) null)
+                                        .as("The recipe deleted a source file \"" + result.getBefore().getSourcePath() + "\" but should have changed it instead")
+                                        .isEqualTo(expected);
+                            }
+                        }
                     }
 
 

@@ -44,7 +44,7 @@ public class Assertions {
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") @Nullable String after,
                                    Consumer<SourceSpec<Properties.File>> spec) {
-        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, after);
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, s -> after);
         spec.accept(properties);
         return properties;
     }

@@ -42,7 +42,7 @@ public class Assertions {
     }
 
     public static SourceSpecs hcl(@Nullable String before, @Nullable String after, Consumer<SourceSpec<Hcl.ConfigFile>> spec) {
-        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(),  before, after);
+        SourceSpec<Hcl.ConfigFile> hcl = new SourceSpec<>(Hcl.ConfigFile.class, null, HclParser.builder(),  before, s -> after);
         spec.accept(hcl);
         return hcl;
     }

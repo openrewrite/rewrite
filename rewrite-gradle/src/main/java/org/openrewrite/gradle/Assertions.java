@@ -53,7 +53,7 @@ public class Assertions {
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
                                           Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, after);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("build.gradle");
         spec.accept(gradle);
         return gradle;
@@ -78,7 +78,7 @@ public class Assertions {
 
     public static SourceSpecs settingsGradle(@Language("groovy") @Nullable String before, @Language("groovy") @Nullable String after,
                                              Consumer<SourceSpec<G.CompilationUnit>> spec) {
-        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, after);
+        SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("settings.gradle");
         spec.accept(gradle);
         return gradle;

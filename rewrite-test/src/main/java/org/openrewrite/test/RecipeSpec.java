@@ -16,7 +16,6 @@
 package org.openrewrite.test;
 
 import lombok.Getter;
-import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
@@ -85,7 +84,7 @@ public class RecipeSpec {
     };
 
     // The before and after here don't mean anything
-    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser.builder(), "", (String) null);
+    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser.builder(), "", null);
 
     /**
      * Configuration that applies to all source file inputs.
