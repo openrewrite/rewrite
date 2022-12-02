@@ -238,6 +238,8 @@ public class BlockStatementTemplateGenerator {
             }
 
             after.append('}');
+        } else if (j instanceof J.Assert) {
+            before.insert(0, "assert ");
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray)j;
             before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");

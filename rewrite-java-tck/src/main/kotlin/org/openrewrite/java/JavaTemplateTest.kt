@@ -2807,4 +2807,35 @@ interface JavaTemplateTest : RewriteTest {
             }
         """)
     )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2486")
+    @Test
+    fun dontDropTheAssert() = rewriteRun(
+        {spec -> spec.recipe(RewriteTest.toRecipe{
+            object : JavaVisitor<ExecutionContext>() {
+                override fun visitBinary(binary: J.Binary, p: ExecutionContext): J {
+                    val sizeCall = binary.left as J.MethodInvocation
+                    return sizeCall.withTemplate<J?>(JavaTemplate.builder({ cursor }, "!#{any(java.util.Collection)}.isEmpty()").build(),
+                        sizeCall.coordinates.replace(), sizeCall.select).withPrefix(binary.prefix)
+                }
+            }
+        })},
+        java("""
+            import java.util.Collection;
+            
+            class Test {
+                void doSomething(Collection<Object> c) {
+                    assert c.size() > 0;
+                }
+            }
+        ""","""
+            import java.util.Collection;
+            
+            class Test {
+                void doSomething(Collection<Object> c) {
+                    assert !c.isEmpty();
+                }
+            }
+        """)
+    )
 }
