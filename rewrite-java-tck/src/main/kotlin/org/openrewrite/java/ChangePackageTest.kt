@@ -1075,9 +1075,7 @@ interface ChangePackageTest: RewriteTest {
         """)
     )
 
-    @Disabled("Requires investigation.")
     @Suppress("StatementWithEmptyBody")
-    @Issue("https://github.com/openrewrite/rewrite/issues/2439")
     @Test
     fun staticImportEnumSamePackage() = rewriteRun(
         java("""
