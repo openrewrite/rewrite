@@ -261,6 +261,7 @@ public class ChangePackage extends Recipe {
                 return gtv;
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
+                variable = variable.withOwner(updateType(variable.getOwner()));
                 variable = variable.withType(updateType(variable.getType()));
                 oldNameToChangedType.put(oldType.toString(), variable);
                 return variable;

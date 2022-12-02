@@ -78,6 +78,7 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
             "public class ThinkPositive { private Long fred = 1;}")
     )
 
+    @Suppress("deprecation", "KotlinRedundantDiagnosticSuppress")
     @Test
     fun allowJavaLangSubpackages() = rewriteRun(
         { spec -> spec.recipe(ChangeType("java.util.logging.LoggingMXBean","java.lang.management.PlatformLoggingMXBean", true)) },
@@ -1566,7 +1567,7 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
             }
         """,
             """
-            package org.openrewrite.test;
+            package org.openrewrite;
             import static org.openrewrite.MyEnum2.A;
             import static org.openrewrite.MyEnum2.B;
             public class App {
@@ -1577,10 +1578,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
             }
         """) { spec ->
             spec.afterRecipe { cu ->
-                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty()
-                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty()
-                assertThat(cu.findType("org.openrewrite.App")).isEmpty()
-                assertThat(cu.findType("org.openrewrite.test.App")).isNotEmpty()
+                assertThat(cu.findType("org.openrewrite.MyEnum1")).isEmpty()
+                assertThat(cu.findType("org.openrewrite.MyEnum2")).isNotEmpty()
             }
         }
     )

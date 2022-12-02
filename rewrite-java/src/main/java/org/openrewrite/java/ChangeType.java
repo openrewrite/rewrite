@@ -136,10 +136,26 @@ public class ChangeType extends Recipe {
         @Override
         public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             J.CompilationUnit c = visitAndCast(cu, ctx, super::visitCompilationUnit);
-            c = (J.CompilationUnit) new RemoveImport<>(originalType.getFullyQualifiedName()).visit(c, ctx);
-            if (originalType.getOwningClass() != null) {
-                c = (J.CompilationUnit) new RemoveImport(originalType.getOwningClass().getFullyQualifiedName()).visit(c, ctx);
+            if (targetType instanceof JavaType.FullyQualified) {
+                for (J.Import anImport : c.getImports()) {
+                    if (anImport.isStatic()) {
+                        continue;
+                    }
+
+                    JavaType maybeType = anImport.getQualid().getType();
+                    if (maybeType instanceof JavaType.FullyQualified) {
+                        JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
+                        if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                            c = (J.CompilationUnit) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(c, ctx);
+                            assert c != null;
+                        } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                            c = (J.CompilationUnit) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(c, ctx);
+                            assert c != null;
+                        }
+                    }
+                }
             }
+
             JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
             if (fullyQualifiedTarget != null) {
                 if (fullyQualifiedTarget.getOwningClass() != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
@@ -342,12 +358,15 @@ public class ChangeType extends Recipe {
             return typeTree;
         }
 
+        @Nullable
         private JavaType updateType(@Nullable JavaType oldType) {
-            if (oldType != null && !(oldType instanceof JavaType.Unknown)) {
-                JavaType type = oldNameToChangedType.get(oldType.toString());
-                if (type != null) {
-                    return type;
-                }
+            if (oldType == null || oldType instanceof JavaType.Unknown) {
+                return oldType;
+            }
+
+            JavaType type = oldNameToChangedType.get(oldType.toString());
+            if (type != null) {
+                return type;
             }
 
             if (oldType instanceof JavaType.Parameterized) {
@@ -385,6 +404,7 @@ public class ChangeType extends Recipe {
                 return gtv;
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
+                variable = variable.withOwner(updateType(variable.getOwner()));
                 variable = variable.withType(updateType(variable.getType()));
                 oldNameToChangedType.put(oldType.toString(), variable);
                 return variable;
@@ -395,7 +415,6 @@ public class ChangeType extends Recipe {
                 return array;
             }
 
-            // noinspection ConstantConditions
             return oldType;
         }
 
