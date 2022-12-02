@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
@@ -1072,6 +1073,55 @@ interface ChangePackageTest: RewriteTest {
             class A {
             }
         """)
+    )
+
+    @Disabled("Requires investigation.")
+    @Suppress("StatementWithEmptyBody")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2439")
+    @Test
+    fun staticImportEnumSamePackage() = rewriteRun(
+        java("""
+            package org.openrewrite;
+            public enum MyEnum {
+                A,
+                B
+            }
+        ""","""
+            package org.openrewrite.test;
+            public enum MyEnum {
+                A,
+                B
+            }
+        """),
+        java("""
+            package org.openrewrite;
+            import static org.openrewrite.MyEnum.A;
+            import static org.openrewrite.MyEnum.B;
+            public class App {
+                public void test(String s) {
+                    if (s.equals(" " + A + B)) {
+                    }
+                }
+            }
+        """,
+            """
+            package org.openrewrite.test;
+            import static org.openrewrite.test.MyEnum.A;
+            import static org.openrewrite.test.MyEnum.B;
+            public class App {
+                public void test(String s) {
+                    if (s.equals(" " + A + B)) {
+                    }
+                }
+            }
+        """) { spec ->
+            spec.afterRecipe { cu ->
+                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty()
+                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty()
+                assertThat(cu.findType("org.openrewrite.App")).isEmpty()
+                assertThat(cu.findType("org.openrewrite.test.App")).isNotEmpty()
+            }
+        }
     )
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")

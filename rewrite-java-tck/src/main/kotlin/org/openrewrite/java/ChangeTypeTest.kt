@@ -22,44 +22,66 @@ import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
 import org.openrewrite.config.CompositeRecipe
+import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.tree.TypeUtils
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 import java.nio.file.Path
 
-interface ChangeTypeTest : JavaRecipeTest {
+interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     override val recipe: ChangeType
         get() = ChangeType("a.A1","a.A2", true)
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(recipe)
+    }
 
+    //language=java
     companion object {
-        private val a1 = """
+
+        private const val a1Before = """
             package a;
             public class A1 extends Exception {
                 public static void stat() {}
                 public void foo() {}
             }
-        """.trimIndent()
+        """
 
-        private val a2 = """
+        private const val a1After = """
+            package a;
+            public class A1 extends Exception {
+                public static void stat() {}
+                public void foo() {}
+            }
+        """
+
+        private const val a2Before = """
             package a;
             public class A2 extends Exception {
                 public static void stat() {}
                 public void foo() {}
             }
-        """.trimIndent()
+        """
+
+        private const val a2After = """
+            package a;
+            public class A2 extends Exception {
+                public static void stat() {}
+                public void foo() {}
+            }
+        """
     }
 
     @Test
-    fun doNotAddJavaLangWrapperImports(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("java.lang.Integer","java.lang.Long", true),
-        before = "public class ThinkPositive { private Integer fred = 1;}",
-        after = "public class ThinkPositive { private Long fred = 1;}"
+    fun doNotAddJavaLangWrapperImports() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("java.lang.Integer","java.lang.Long", true)) },
+        java("public class ThinkPositive { private Integer fred = 1;}",
+            "public class ThinkPositive { private Long fred = 1;}")
     )
 
     @Test
-    fun allowJavaLangSubpackages(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("java.util.logging.LoggingMXBean","java.lang.management.PlatformLoggingMXBean", true),
-        before = """
+    fun allowJavaLangSubpackages() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("java.util.logging.LoggingMXBean","java.lang.management.PlatformLoggingMXBean", true)) },
+        java("""
             import java.util.logging.LoggingMXBean;
 
             class Test {
@@ -68,7 +90,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import java.lang.management.PlatformLoggingMXBean;
 
             class Test {
@@ -76,24 +98,23 @@ interface ChangeTypeTest : JavaRecipeTest {
                     PlatformLoggingMXBean loggingBean = null;
                 }
             }
-        """
+        """)
     )
 
     @Suppress("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite/issues/788")
     @Test
-    fun unnecessaryImport(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = ChangeType("test.Outer.Inner", "java.util.ArrayList", true),
-        before = """
+    fun unnecessaryImport() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("test.Outer.Inner", "java.util.ArrayList", true)) },
+        java("""
             import test.Outer;
             
             class Test {
                 private Outer p = Outer.of();
                 private Outer p2 = test.Outer.of();
             }
-        """,
-        dependsOn = arrayOf("""
+        """),
+        java("""
             package test;
             
             public class Outer {
@@ -104,16 +125,15 @@ interface ChangeTypeTest : JavaRecipeTest {
                 public static class Inner {
                 }
             }
-        """.trimIndent())
+        """)
     )
 
     @Suppress("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/868")
     @Test
-    fun changeInnerClassToOuterClass(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("java.util.Map${'$'}Entry", "java.util.List", true),
-        before = """
+    fun changeInnerClassToOuterClass() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("java.util.Map${'$'}Entry", "java.util.List", true)) },
+        java("""
             import java.util.Map;
             import java.util.Map.Entry;
             
@@ -122,112 +142,105 @@ interface ChangeTypeTest : JavaRecipeTest {
                 Map.Entry p2;
             }
         """,
-        after = """
+        """
             import java.util.List;
             
             class Test {
                 List p;
                 List p2;
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/768")
     @Test
-    fun changeStaticFieldAccess(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("java.io.File", "my.pkg.List", true),
-        before = """
+    fun changeStaticFieldAccess() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("java.io.File", "my.pkg.List", true)) },
+        java("""
             import java.io.File;
             
             class Test {
                 String p = File.separator;
             }
         """,
-        after = """
+        """
             import my.pkg.List;
             
             class Test {
                 String p = List.separator;
             }
-        """
+        """)
     )
 
     @Test
-    fun dontAddImportWhenNoChangesWereMade(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = "public class B {}"
+    fun dontAddImportWhenNoChangesWereMade() = rewriteRun(
+        java("public class B {}")
     )
 
     @Suppress("rawtypes")
     @Issue("https://github.com/openrewrite/rewrite/issues/774")
     @Test
-    fun replaceWithNestedType(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("java.io.File", "java.util.Map${'$'}Entry", true),
-        before = """
+    fun replaceWithNestedType() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("java.io.File", "java.util.Map${'$'}Entry", true)) },
+        java("""
             import java.io.File;
             
             class Test {
                 File p;
             }
         """,
-        after = """
+        """
             import java.util.Map;
             
             class Test {
                 Map.Entry p;
             }
-        """
+        """)
     )
 
     @Test
-    fun simpleName(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun simpleName() = rewriteRun(
+        java(a1Before, a1After),
+        java(a2Before, a2After),
+        java("""
             import a.A1;
             
             public class B extends A1 {}
         """,
-        after = """
+        """
             import a.A2;
             
             public class B extends A2 {}
-        """
+        """)
     )
 
     @Test
-    fun fullyQualifiedName(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = "public class B extends a.A1 {}",
-        after = "public class B extends a.A2 {}"
+    fun fullyQualifiedName() = rewriteRun(
+        java(a1Before, a1After),
+        java(a2Before, a2After),
+        java("public class B extends a.A1 {}",
+        "public class B extends a.A2 {}")
     )
 
     @Test
-    fun annotation(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("a.b.c.A1","a.b.d.A2", true),
-        dependsOn = arrayOf(
-            "package a.b.c;\npublic @interface A1 {}",
-            "package a.b.d;\npublic @interface A2 {}"
-        ),
-        before = "@a.b.c.A1 public class B {}",
-        after = "@a.b.d.A2 public class B {}"
+    fun annotation() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.b.c.A1","a.b.d.A2", true)) },
+        java("package a.b.c;\npublic @interface A1 {}"),
+        java("package a.b.d;\npublic @interface A2 {}"),
+        java("@a.b.c.A1 public class B {}",
+        "@a.b.d.A2 public class B {}")
     )
 
     @Test
-    fun array2(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("com.acme.product.Pojo","com.acme.product.v2.Pojo", true),
-        dependsOn = arrayOf("""
+    fun array2() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.Pojo","com.acme.product.v2.Pojo", true)) },
+        java("""
             package com.acme.product;
             
             public class Pojo {
             }
         """),
-        before = """
+        java("""
             package com.acme.project.impl;
             
             import com.acme.product.Pojo;
@@ -240,7 +253,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.acme.project.impl;
             
             import com.acme.product.v2.Pojo;
@@ -252,102 +265,100 @@ interface ChangeTypeTest : JavaRecipeTest {
                     p[0] = null;
                 }
             }
-        """
+        """)
     )
 
     // array types and new arrays
     @Test
-    fun array(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun array() = rewriteRun(
+        java(a1Before, a1After),
+        java(a2Before, a2After),
+        java("""
             import a.A1;
             
             public class B {
                A1[] a = new A1[0];
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
                A2[] a = new A2[0];
             }
-        """
+        """)
     )
 
     @Test
-    fun multiDimensionalArray() = assertChanged(
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun multiDimensionalArray() = rewriteRun(
+        java(a1Before, a1After),
+        java(a2Before, a2After),
+        java("""
             import a.A1;
             
             public class A {
                 A1[][] multiDimensionalArray;
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class A {
                 A2[][] multiDimensionalArray;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("a.A1")).isEmpty()
             assertThat(cu.findType("a.A2")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun classDecl(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            a1, a2,
-            "public interface I1 {}",
-            "public interface I2 {}"
-        ),
-        recipe = CompositeRecipe()
+    fun classDecl() = rewriteRun(
+        { spec -> spec.recipe(CompositeRecipe()
                 .doNext(recipe)
-                .doNext(ChangeType("I1", "I2", true)),
-        before = """
+                .doNext(ChangeType("I1", "I2", true))) },
+        java(a1Before),
+        java(a2Before),
+        java("public interface I1 {}"),
+        java("public interface I2 {}"),
+        java("""
             import a.A1;
             
             public class B extends A1 implements I1 {}
         """,
-        after = """
+        """
             import a.A2;
             
             public class B extends A2 implements I2 {}
-        """
+        """)
     )
 
     @Suppress("RedundantThrows")
     @Test
-    fun method(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun method() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
                public A1 foo() throws A1 { return null; }
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
                public A2 foo() throws A2 { return null; }
             }
-        """
+        """)
     )
 
     @Test
-    fun methodInvocationTypeParametersAndWildcard(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun methodInvocationTypeParametersAndWildcard() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
@@ -360,7 +371,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                }
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
@@ -372,15 +383,15 @@ interface ChangeTypeTest : JavaRecipeTest {
                    this.<A2>generic(null, true);
                }
             }
-        """
+        """)
     )
 
     @Suppress("EmptyTryBlock", "CatchMayIgnoreException")
     @Test
-    fun multiCatch(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun multiCatch() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
@@ -390,7 +401,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                }
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
@@ -399,56 +410,56 @@ interface ChangeTypeTest : JavaRecipeTest {
                    catch(A2 | RuntimeException e) {}
                }
             }
-        """
+        """)
     )
 
     @Test
-    fun multiVariable(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun multiVariable() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
                A1 f1, f2;
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
                A2 f1, f2;
             }
-        """
+        """)
     )
 
     @Test
-    fun newClass(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun newClass() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
                A1 a = new A1();
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
                A2 a = new A2();
             }
-        """
+        """)
     )
 
     @Suppress("UnnecessaryLocalVariable")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/704")
-    fun updateAssignments(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun updateAssignments() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
 
             class B {
@@ -457,7 +468,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import a.A2;
 
             class B {
@@ -465,75 +476,75 @@ interface ChangeTypeTest : JavaRecipeTest {
                     A2 a = param;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun parameterizedType(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun parameterizedType() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
                Map<A1, A1> m;
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
                Map<A2, A2> m;
             }
-        """
+        """)
     )
 
     @Suppress("RedundantCast")
     @Test
-    fun typeCast(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun typeCast() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
                A1 a = (A1) null;
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
                A2 a = (A2) null;
             }
-        """
+        """)
     )
 
     @Test
-    fun classReference(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun classReference() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class A {
                 Class<?> clazz = A1.class;
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class A {
                 Class<?> clazz = A2.class;
             }
-        """
+        """)
     )
 
     @Test
-    fun methodSelect(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun methodSelect() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class B {
@@ -541,22 +552,22 @@ interface ChangeTypeTest : JavaRecipeTest {
                public void test() { a.foo(); }
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class B {
                A2 a = null;
                public void test() { a.foo(); }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2302")
     @Test
-    fun staticImport(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun staticImport() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import static a.A1.stat;
             
             public class B {
@@ -565,7 +576,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import static a.A2.stat;
             
             public class B {
@@ -573,14 +584,13 @@ interface ChangeTypeTest : JavaRecipeTest {
                     stat();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun staticImports2(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory", true),
-        dependsOn = arrayOf("""
+    fun staticImports2() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory", true)) },
+        java("""
             package com.acme.product;
             
             public class RunnableFactory {
@@ -589,7 +599,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """),
-        before = """
+        java("""
             package com.acme.project.impl;
             
             import static com.acme.product.RunnableFactory.getString;
@@ -600,7 +610,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.acme.project.impl;
             
             import static com.acme.product.v2.RunnableFactory.getString;
@@ -610,21 +620,20 @@ interface ChangeTypeTest : JavaRecipeTest {
                     getString().toLowerCase();
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun staticConstant(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory", true),
-        dependsOn = arrayOf("""
+    fun staticConstant() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.RunnableFactory","com.acme.product.v2.RunnableFactory", true)) },
+        java("""
             package com.acme.product;
             
             public class RunnableFactory {
                 public static final String CONSTANT = "hello";
             }
         """),
-        before = """
+        java("""
             package com.acme.project.impl;
             
             import static com.acme.product.RunnableFactory.CONSTANT;
@@ -635,7 +644,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package com.acme.project.impl;
             
             import static com.acme.product.v2.RunnableFactory.CONSTANT;
@@ -645,15 +654,14 @@ interface ChangeTypeTest : JavaRecipeTest {
                     System.out.println(CONSTANT + " fred.");
                 }
             }
-        """
+        """)
     )
 
     @Disabled("https://github.com/openrewrite/rewrite/issues/62")
     @Test
-    fun primitiveToClass(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("int", "java.lang.Integer", true),
-        before = """
+    fun primitiveToClass() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("int", "java.lang.Integer", true)) },
+        java("""
             class A {
                 int foo = 5;
                 int getFoo() {
@@ -661,21 +669,20 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 Integer foo = 5;
                 Integer getFoo() {
                     return foo;
                 }
             }
-        """
+        """)
     )
 
     @Test
-    fun classToPrimitive(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("java.lang.Integer","int", true),
-        before = """
+    fun classToPrimitive() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("java.lang.Integer","int", true)) },
+        java("""
             class A {
                 Integer foo = 5;
                 Integer getFoo() {
@@ -683,30 +690,29 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class A {
                 int foo = 5;
                 int getFoo() {
                     return foo;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/698")
     @Test
-    fun importOrdering(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("com.yourorg.a.A", "com.myorg.b.B", true),
-        dependsOn = arrayOf("""
+    fun importOrdering() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.yourorg.a.A", "com.myorg.b.B", true)) },
+        java("""
             package com.yourorg.a;
             public class A {}
-        """,
-        """
+        """),
+        java("""
             package com.myorg.b;
             public class B {}
         """),
-        before = """
+        java("""
             package com.myorg;
 
             import java.util.ArrayList;
@@ -717,7 +723,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 List<A> a = new ArrayList<>();
             }
         """,
-        after = """
+        """
             package com.myorg;
 
             import com.myorg.b.B;
@@ -728,14 +734,13 @@ interface ChangeTypeTest : JavaRecipeTest {
             public class Foo {
                 List<B> a = new ArrayList<>();
             }
-        """
+        """)
     )
 
     @Test
-    fun changeTypeWithInnerClass(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
+    fun changeTypeWithInnerClass() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", true)) },
+        java("""
                 package com.acme.product;
                 
                 public class OuterClass {
@@ -743,10 +748,8 @@ interface ChangeTypeTest : JavaRecipeTest {
                 
                     }
                 }
-            """
-        ),
-        recipe = ChangeType("com.acme.product.OuterClass", "com.acme.product.v2.OuterClass", true),
-        before = """
+        """),
+        java("""
             package de;
             
             import com.acme.product.OuterClass.InnerClass;
@@ -762,7 +765,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package de;
 
             import com.acme.product.v2.OuterClass.InnerClass;
@@ -777,24 +780,21 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return new OuterClass().toString();
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/925")
     @Test
-    fun uppercaseInPackage(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
+    fun uppercaseInPackage() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)) },
+        java("""
                 package com.acme.product.util.accessDecision;
                 
                 public enum AccessVote {
                     ABSTAIN
                 }
-            """
-        ),
-        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true),
-        before = """
+        """),
+        java("""
             package de;
             
             import com.acme.product.util.accessDecision.AccessVote;
@@ -805,7 +805,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package de;
 
             import com.acme.product.v2.util.accessDecision.AccessVote;
@@ -815,23 +815,20 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return AccessVote.ABSTAIN;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/934")
     @Test
-    fun lambda(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
-                package com.acme.product;
-                public interface Procedure {
-                    void execute();
-                }
-            """
-        ),
-        recipe = ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2", true),
-        before = """
+    fun lambda() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.Procedure", "com.acme.product.Procedure2", true)) },
+        java("""
+            package com.acme.product;
+            public interface Procedure {
+                void execute();
+            }
+        """),
+        java("""
             import com.acme.product.Procedure;
             
             public abstract class Worker {
@@ -842,7 +839,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 abstract void worker(Procedure callback);
             }
         """,
-        after = """
+        """
             import com.acme.product.Procedure2;
             
             public abstract class Worker {
@@ -852,25 +849,22 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
                 abstract void worker(Procedure2 callback);
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/932")
     @Test
-    fun assignment(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
-                package com.acme.product.util.accessDecision;
-                
-                public enum AccessVote {
-                    ABSTAIN,
-                    GRANT
-                }
-            """
-        ),
-        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true),
-        before = """
+    fun assignment() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)) },
+        java("""
+            package com.acme.product.util.accessDecision;
+            
+            public enum AccessVote {
+                ABSTAIN,
+                GRANT
+            }
+        """),
+        java("""
             package de;
             
             import com.acme.product.util.accessDecision.AccessVote;
@@ -883,7 +877,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package de;
 
             import com.acme.product.v2.util.accessDecision.AccessVote;
@@ -895,25 +889,22 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return fred;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/932")
     @Test
-    fun ternary(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf(
-            """
-                package com.acme.product.util.accessDecision;
-                
-                public enum AccessVote {
-                    ABSTAIN,
-                    GRANT
-                }
-            """
-        ),
-        recipe = ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true),
-        before = """
+    fun ternary() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.util.accessDecision.AccessVote", "com.acme.product.v2.util.accessDecision.AccessVote", true)) },
+        java("""
+            package com.acme.product.util.accessDecision;
+            
+            public enum AccessVote {
+                ABSTAIN,
+                GRANT
+            }
+        """),
+        java("""
             package de;
             
             import com.acme.product.util.accessDecision.AccessVote;
@@ -924,7 +915,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package de;
 
             import com.acme.product.v2.util.accessDecision.AccessVote;
@@ -934,39 +925,37 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return input == null ? AccessVote.GRANT : AccessVote.ABSTAIN;
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/775")
     @Test
-    fun changeTypeInTypeDeclaration(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = ChangeType("de.Class2", "de.Class1", false),
-        before = """
+    fun changeTypeInTypeDeclaration() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("de.Class2", "de.Class1", false)) },
+        java("""
             package de;
             public class Class2 {}
         """,
-            after = """
+            """
             package de;
             public class Class1 {}
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1291")
     @Test
-    fun doNotChangeTypeInTypeDeclaration(jp: JavaParser) = assertUnchanged(
-        jp,
-        recipe = ChangeType("de.Class2", "de.Class1", true),
-        before = """
+    fun doNotChangeTypeInTypeDeclaration() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("de.Class2", "de.Class1", true)) },
+        java("""
             package de;
             public class Class2 {}
-        """
+        """)
     )
 
     @Test
-    fun javadocs() = assertChanged(
-        recipe = ChangeType("java.util.List", "java.util.Collection", true),
-        before = """
+    fun javadocs() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("java.util.List", "java.util.Collection", true)) },
+        java("""
             import java.util.List;
             
             /**
@@ -976,7 +965,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 int n;
             }
         """,
-        after = """
+        """
             import java.util.Collection;
             
             /**
@@ -985,14 +974,14 @@ interface ChangeTypeTest : JavaRecipeTest {
             class Test {
                 int n;
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/978")
     @Test
-    fun onlyUpdateApplicableImport(jp: JavaParser) = assertChanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun onlyUpdateApplicableImport() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("com.acme.product.factory.V1Factory","com.acme.product.factory.V1FactoryA", true)) },
+        java("""
             package com.acme.product.factory;
 
             public class V1Factory {
@@ -1000,8 +989,8 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return "V1Factory";
                 }
             }
-        """,
-            """
+        """),
+        java("""
             package com.acme.product.factory;
 
             public class V2Factory {
@@ -1010,8 +999,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """),
-        recipe = ChangeType("com.acme.product.factory.V1Factory","com.acme.product.factory.V1FactoryA", true),
-        before = """
+        java("""
             import com.acme.product.factory.V1Factory;
 
             import static com.acme.product.factory.V2Factory.getItem;
@@ -1028,7 +1016,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import com.acme.product.factory.V1FactoryA;
 
             import static com.acme.product.factory.V2Factory.getItem;
@@ -1044,7 +1032,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return getItem();
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
@@ -1111,7 +1099,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     fun renameClassAndFilePath(@TempDir tempDir: Path) {
-        val sources = parser.parse(
+        val sources = JavaParser.fromJavaVersion().build().parse(
             listOf(tempDir.resolve("a/b/Original.java").apply {
                 toFile().parentFile.mkdirs()
                 // language=java
@@ -1150,7 +1138,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     fun renamePackageAndFilePath(@TempDir tempDir: Path) {
-        val sources = parser.parse(
+        val sources = JavaParser.fromJavaVersion().build().parse(
             listOf(tempDir.resolve("a/b/Original.java").apply {
                 toFile().parentFile.mkdirs()
                 // language=java
@@ -1188,7 +1176,7 @@ interface ChangeTypeTest : JavaRecipeTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     fun renamePackageAndInnerClassName(@TempDir tempDir: Path) {
-        val sources = parser.parse(
+        val sources = JavaParser.fromJavaVersion().build().parse(
             listOf(tempDir.resolve("a/b/C.java").apply {
                 toFile().parentFile.mkdirs()
                 // language=java
@@ -1230,9 +1218,9 @@ interface ChangeTypeTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
-    fun updateImportPrefixWithEmptyPackage(jp: JavaParser) = assertChanged(
-        recipe = ChangeType("a.b.Original", "Target", false),
-        before = """
+    fun updateImportPrefixWithEmptyPackage() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.b.Original", "Target", false)) },
+        java("""
             package a.b;
             
             import java.util.List;
@@ -1240,54 +1228,54 @@ interface ChangeTypeTest : JavaRecipeTest {
             class Original {
             }
         """,
-        after = """
+        """
             import java.util.List;
             
             class Target {
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
-    fun updateClassPrefixWithEmptyPackage(jp: JavaParser) = assertChanged(
-        recipe = ChangeType("a.b.Original", "Target", false),
-        before = """
+    fun updateClassPrefixWithEmptyPackage() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.b.Original", "Target", false)) },
+        java("""
             package a.b;
             
             class Original {
             }
         """,
-        after = """
+        """
             class Target {
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
-    fun renameInnerClass(jp: JavaParser) = assertChanged(
-        recipe = ChangeType("a.b.C${'$'}Original", "a.b.C${'$'}Target", false),
-        before = """
+    fun renameInnerClass() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.b.C${'$'}Original", "a.b.C${'$'}Target", false)) },
+        java("""
             package a.b;
             public class C {
                 public static class Original {
                 }
             }
         """,
-        after = """
+        """
             package a.b;
             public class C {
                 public static class Target {
                 }
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     fun multipleLevelsOfInnerClasses(@TempDir tempDir: Path) {
-        val sources = parser.parse(
+        val sources = JavaParser.fromJavaVersion().build().parse(
             listOf(tempDir.resolve("a/b/C.java").apply {
                 toFile().parentFile.mkdirs()
                 // language=java
@@ -1333,45 +1321,50 @@ interface ChangeTypeTest : JavaRecipeTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
-    fun renamePackage(jp: JavaParser) = assertChanged(
-        recipe = ChangeType("a.b.Original", "x.y.Original", false),
-        before = """
+    fun renamePackage() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.b.Original", "x.y.Original", false)) },
+        java("""
             package a.b;
             class Original {
             }
         """,
-        after = """
+        """
             package x.y;
             class Original {
             }
-        """
+        """)
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
-    fun renameClass(jp: JavaParser) = assertChanged(
-        recipe = ChangeType("a.b.Original", "a.b.Target", false),
-        before = """
+    fun renameClass() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.b.Original", "a.b.Target", false)) },
+        java("""
             package a.b;
             class Original {
             }
         """,
-        after = """
+        """
             package a.b;
             class Target {
             }
-        """
+        """)
     )
 
     @Test
-    fun updateMethodType() = assertChanged(
-        recipe = ChangeType("a.A1", "a.A2", false),
-        dependsOn = arrayOf("""
+    fun updateMethodType() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.A1", "a.A2", false)) },
+        java("""
             package a;
             public class A1 {
             }
-            """,
-            """
+        """,
+        """
+            package a;
+            public class A2 {
+            }
+        """),
+        java("""
             package org.foo;
             
             import a.A1;
@@ -1381,8 +1374,19 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return a1;
                 }
             }
+        """,
+        """
+            package org.foo;
+            
+            import a.A2;
+            
+            public class Example {
+                public A2 method(A2 a1) {
+                    return a1;
+                }
+            }
         """),
-        before = """
+        java("""
             import a.A1;
             import org.foo.Example;
             
@@ -1390,50 +1394,50 @@ interface ChangeTypeTest : JavaRecipeTest {
                 A1 local = new Example().method(null);
             }
         """,
-        after = """
+        """
             import a.A2;
             import org.foo.Example;
             
             public class Test {
                 A2 local = new Example().method(null);
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             val methodType = cu.typesInUse.usedMethods.filter { "a.A2" == it.returnType.asFullyQualified()!!.fullyQualifiedName }
             assertThat(methodType).hasSize(1)
             assertThat(methodType[0].returnType.asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
             assertThat(methodType[0].parameterTypes[0].asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
-        }
+        }}
     )
 
     @Test
-    fun updateVariableType() = assertChanged(
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun updateVariableType() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class Test {
                 A1 a;
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class Test {
                 A2 a;
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.typesInUse.variables.toTypedArray()[0].type.asFullyQualified()!!.fullyQualifiedName).isEqualTo("a.A2")
             assertThat(cu.findType("a.A1")).isEmpty()
             assertThat(cu.findType("a.A2")).isNotEmpty()
-        }
+        }}
     )
 
     @Test
-    fun boundedGenericType() = assertChanged(
-        dependsOn = arrayOf(a1, a2),
-        before = """
+    fun boundedGenericType() = rewriteRun(
+        java(a1Before),
+        java(a2Before),
+        java("""
             import a.A1;
             
             public class Test {
@@ -1442,7 +1446,7 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             import a.A2;
             
             public class Test {
@@ -1450,18 +1454,17 @@ interface ChangeTypeTest : JavaRecipeTest {
                     return t;
                 }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("a.A1")).isEmpty()
             assertThat(cu.findType("a.A2")).isNotEmpty()
-        }
+        }}
     )
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2034")
     @Test
-    fun changeConstructor() = assertChanged(
-        recipe = ChangeType("a.A1", "a.A2", false),
-        before = """
+    fun changeConstructor() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.A1", "a.A2", false)) },
+        java("""
             package a;
             
             public class A1 {
@@ -1469,17 +1472,116 @@ interface ChangeTypeTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             package a;
             
             public class A2 {
                 public A2() {
                 }
             }
-        """,
-        afterConditions = { cu ->
+        """) { spec -> spec.afterRecipe { cu ->
             assertThat(cu.findType("a.A1")).isEmpty()
             assertThat(cu.findType("a.A2")).isNotEmpty()
+        }}
+    )
+
+    @Disabled("requires correct Kind.")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2478")
+    @Test
+    fun updateJavaTypeClassKindAnnotation() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("org.openrewrite.Test1", "org.openrewrite.Test2", false)) },
+        java("""
+            package org.openrewrite;
+            
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+            
+            @Target({ElementType.TYPE, ElementType.METHOD})
+            @Retention(RetentionPolicy.RUNTIME)
+            public @interface Test1 {}
+        """,
+            """
+            package org.openrewrite;
+            
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+            
+            @Target({ElementType.TYPE, ElementType.METHOD})
+            @Retention(RetentionPolicy.RUNTIME)
+            public @interface Test2 {}
+        """),
+        java("""
+            import org.openrewrite.Test1;
+            
+            public class A {
+                @Test1
+                void method() {}
+            }
+        """,
+            """
+            import org.openrewrite.Test2;
+            
+            public class A {
+                @Test2
+                void method() {}
+            }
+        """) { spec -> spec.afterRecipe { cu ->
+            assertThat(cu.findType("org.openrewrite.Test1")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.Test2")).isNotEmpty()
+        }}
+    )
+
+    @Disabled("requires correct Kind.")
+    @Suppress("StatementWithEmptyBody")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2478")
+    @Test
+    fun changeJavaTypeClassKindEnum() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("org.openrewrite.MyEnum1", "org.openrewrite.MyEnum2", false)) },
+        java("""
+            package org.openrewrite;
+            public enum MyEnum1 {
+                A,
+                B
+            }
+        ""","""
+            package org.openrewrite;
+            public enum MyEnum2 {
+                A,
+                B
+            }
+        """),
+        java("""
+            package org.openrewrite;
+            import static org.openrewrite.MyEnum1.A;
+            import static org.openrewrite.MyEnum1.B;
+            public class App {
+                public void test(String s) {
+                    if (s.equals(" " + A + B)) {
+                    }
+                }
+            }
+        """,
+            """
+            package org.openrewrite.test;
+            import static org.openrewrite.MyEnum2.A;
+            import static org.openrewrite.MyEnum2.B;
+            public class App {
+                public void test(String s) {
+                    if (s.equals(" " + A + B)) {
+                    }
+                }
+            }
+        """) { spec ->
+            spec.afterRecipe { cu ->
+                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty()
+                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty()
+                assertThat(cu.findType("org.openrewrite.App")).isEmpty()
+                assertThat(cu.findType("org.openrewrite.test.App")).isNotEmpty()
+            }
         }
     )
 
