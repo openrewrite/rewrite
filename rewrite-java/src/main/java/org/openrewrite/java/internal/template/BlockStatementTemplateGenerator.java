@@ -248,11 +248,12 @@ public class BlockStatementTemplateGenerator {
             J.NewClass n = (J.NewClass) j;
             String newClassString;
             JavaType.Class constructorTypeClass = n.getConstructorType() != null ? TypeUtils.asClass(n.getConstructorType().getReturnType()) : null;
+            boolean isEnum = JavaType.FullyQualified.Kind.Enum == constructorTypeClass.getKind();
             if (n.getClazz() != null) {
                 newClassString = "new " + n.getClazz().printTrimmed(cursor);
             } else if (constructorTypeClass != null) {
                 // enum definitions with anonymous class initializers or a J.NewClass with a null clazz and valid constructor type.
-                newClassString = JavaType.FullyQualified.Kind.Enum == constructorTypeClass.getKind() ? "" : "new " + constructorTypeClass.getFullyQualifiedName();
+                newClassString = isEnum ? "" : "new " + constructorTypeClass.getFullyQualifiedName();
             } else {
                 throw new IllegalStateException("Unable to template a J.NewClass instance having a null clazz and constructor type.");
             }
@@ -274,7 +275,10 @@ public class BlockStatementTemplateGenerator {
                 }
                 afterSegments.append(")");
                 if (priorFound && !afterSegments.toString().contains(STOP_COMMENT)) {
-                    afterSegments.append(";/*" + STOP_COMMENT + "*/");
+                    if (isEnum) {
+                        afterSegments.append(";");
+                    }
+                    afterSegments.append("/*" + STOP_COMMENT + "*/");
                 }
                 before.insert(0, beforeSegments);
                 after.append(afterSegments);

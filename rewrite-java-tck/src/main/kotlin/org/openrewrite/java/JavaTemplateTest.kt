@@ -48,6 +48,35 @@ interface JavaTemplateTest : RewriteTest {
             }
         }}
 
+    @Test
+    fun methodArgumentStopCommentsOnlyTerminateEnumInitializers() = rewriteRun(
+        {spec -> spec.recipe(replaceToStringWithLiteralRecipe)},
+        java("""
+            import java.io.File;
+            import java.io.IOException;
+            import java.util.List;
+            
+            class Test {
+                File getFile(File testDir, List<String> compileClassPath ) throws IOException {
+                    assertEquals(new File(testDir, "ejbs/target/classes").getCanonicalFile(),
+                        new File(compileClassPath.get(1).toString()).getCanonicalFile());
+                }
+                void assertEquals(File f1, File f2) {}
+            }
+        ""","""
+            import java.io.File;
+            import java.io.IOException;
+            import java.util.List;
+            
+            class Test {
+                File getFile(File testDir, List<String> compileClassPath ) throws IOException {
+                    assertEquals(new File(testDir, "ejbs/target/classes").getCanonicalFile(),
+                        new File(compileClassPath.get(1)).getCanonicalFile());
+                }
+                void assertEquals(File f1, File f2) {}
+            }
+        """)
+    )
     @Issue("https://github.com/openrewrite/rewrite/issues/2475")
     @Test
     fun enumWithinEnum() = rewriteRun(
