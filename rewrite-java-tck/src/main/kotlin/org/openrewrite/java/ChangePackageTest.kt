@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.Assertions.java
@@ -24,10 +23,12 @@ import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 import java.nio.file.Paths
 
-interface ChangePackageTest: RewriteTest {
+interface ChangePackageTest: JavaRecipeTest, RewriteTest {
+    override val recipe: ChangePackage
+        get() = ChangePackage("org.openrewrite", "org.openrewrite.test", null)
 
     override fun defaults(spec: RecipeSpec) {
-        spec.recipe(ChangePackage("org.openrewrite", "org.openrewrite.test", null))
+        spec.recipe(recipe)
     }
 
     companion object {
@@ -401,48 +402,38 @@ interface ChangePackageTest: RewriteTest {
     )
 
     @Test
-    fun annotation() = rewriteRun(
-        java("""
-            package org.openrewrite;
-            
-            import java.lang.annotation.ElementType;
-            import java.lang.annotation.Retention;
-            import java.lang.annotation.RetentionPolicy;
-            import java.lang.annotation.Target;
-            
-            @Target({ElementType.TYPE, ElementType.METHOD})
-            @Retention(RetentionPolicy.RUNTIME)
-            public @interface Test {}
-        """,
-        """
-            package org.openrewrite.test;
-            
-            import java.lang.annotation.ElementType;
-            import java.lang.annotation.Retention;
-            import java.lang.annotation.RetentionPolicy;
-            import java.lang.annotation.Target;
-            
-            @Target({ElementType.TYPE, ElementType.METHOD})
-            @Retention(RetentionPolicy.RUNTIME)
-            public @interface Test {}
+    fun annotation() = assertChanged(
+        dependsOn = arrayOf("""
+                package org.openrewrite;
+                
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+                
+                @Target({ElementType.TYPE, ElementType.METHOD})
+                @Retention(RetentionPolicy.RUNTIME)
+                public @interface Test {}
         """),
-        java("""
+        before = """
             import org.openrewrite.Test;
             public class A {
                 @Test
                 void method() {}
             }
         """,
-        """
+
+        after = """
             import org.openrewrite.test.Test;
             public class A {
                 @Test
                 void method() {}
             }
-        """) { spec -> spec.afterRecipe { cu ->
+        """,
+        afterConditions = { cu ->
             assertThat(cu.findType("org.openrewrite.Test")).isEmpty()
             assertThat(cu.findType("org.openrewrite.test.Test")).isNotEmpty()
-        }}
+        }
     )
 
     @Test
@@ -502,27 +493,25 @@ interface ChangePackageTest: RewriteTest {
     )
 
     @Test
-    fun updatesImplements() = rewriteRun(
-        java("""
-            package org.openrewrite;
-            public interface Oi{}
-        """,
-        """
-            package org.openrewrite.test;
-            public interface Oi{}
-        """),
-        java("""
+    fun updatesImplements() = assertChanged(
+        dependsOn = arrayOf(
+            """
+                package org.openrewrite;
+                public interface Oi{}
+            """
+        ),
+        before = """
             package org.openrewrite;
             
             public class Mi implements org.openrewrite.Oi {
             }
         """,
-        """
+        after = """
             package org.openrewrite.test;
             
             public class Mi implements org.openrewrite.test.Oi {
             }
-        """)
+        """
     )
 
     @Test
@@ -607,20 +596,14 @@ interface ChangePackageTest: RewriteTest {
     )
 
     @Test
-    fun lambda() = rewriteRun(
-        java("""
+    fun lambda() = assertChanged(
+        dependsOn = arrayOf("""
             package org.openrewrite;
             public interface Procedure {
                 void execute();
             }
-        """,
-        """
-            package org.openrewrite.test;
-            public interface Procedure {
-                void execute();
-            }
         """),
-        java("""
+        before = """
             import org.openrewrite.Procedure;
             public abstract class Worker {
                 void callWorker() {
@@ -629,7 +612,7 @@ interface ChangePackageTest: RewriteTest {
                 abstract void worker(Procedure procedure);
             }
         """,
-        """
+        after = """
             import org.openrewrite.test.Procedure;
             public abstract class Worker {
                 void callWorker() {
@@ -637,9 +620,10 @@ interface ChangePackageTest: RewriteTest {
                 }
                 abstract void worker(Procedure procedure);
             }
-        """) { spec -> spec.afterRecipe { cu ->
+        """,
+        afterConditions = { cu ->
             assertThat(cu.findType("org.openrewrite.Procedure")).isEmpty()
-        }}
+        }
     )
 
     @Test
@@ -1077,21 +1061,15 @@ interface ChangePackageTest: RewriteTest {
 
     @Suppress("StatementWithEmptyBody")
     @Test
-    fun staticImportEnumSamePackage() = rewriteRun(
-        java("""
+    fun staticImportEnumSamePackage() = assertChanged(
+        dependsOn = arrayOf("""
             package org.openrewrite;
             public enum MyEnum {
                 A,
                 B
             }
-        ""","""
-            package org.openrewrite.test;
-            public enum MyEnum {
-                A,
-                B
-            }
         """),
-        java("""
+        before = """
             package org.openrewrite;
             import static org.openrewrite.MyEnum.A;
             import static org.openrewrite.MyEnum.B;
@@ -1102,7 +1080,7 @@ interface ChangePackageTest: RewriteTest {
                 }
             }
         """,
-            """
+        after = """
             package org.openrewrite.test;
             import static org.openrewrite.test.MyEnum.A;
             import static org.openrewrite.test.MyEnum.B;
@@ -1112,13 +1090,12 @@ interface ChangePackageTest: RewriteTest {
                     }
                 }
             }
-        """) { spec ->
-            spec.afterRecipe { cu ->
-                assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty()
-                assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty()
-                assertThat(cu.findType("org.openrewrite.App")).isEmpty()
-                assertThat(cu.findType("org.openrewrite.test.App")).isNotEmpty()
-            }
+        """,
+        afterConditions = { cu ->
+            assertThat(cu.findType("org.openrewrite.MyEnum")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.MyEnum")).isNotEmpty()
+            assertThat(cu.findType("org.openrewrite.App")).isEmpty()
+            assertThat(cu.findType("org.openrewrite.test.App")).isNotEmpty()
         }
     )
 

@@ -31,6 +31,7 @@ import java.nio.file.Path
 interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     override val recipe: ChangeType
         get() = ChangeType("a.A1","a.A2", true)
+
     override fun defaults(spec: RecipeSpec) {
         spec.recipe(recipe)
     }
