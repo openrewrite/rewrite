@@ -65,7 +65,7 @@ public class JsonParser implements Parser<Json.Document> {
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile.getRelativePath(relativeTo), this, t);
+                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, this, t);
                         ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
                         return null;
                     }

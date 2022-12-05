@@ -191,7 +191,7 @@ public class ReloadableJava11Parser implements JavaParser {
                                                 .tag("file.type", "Java")
                                                 .tag("step", "(3) Map to Rewrite AST"), t)
                                 .register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(input.getRelativePath(relativeTo), this, t);
+                        ParsingExecutionContextView.view(ctx).parseFailure(input, this, t);
                         ctx.getOnError().accept(t);
                         return null;
                     }

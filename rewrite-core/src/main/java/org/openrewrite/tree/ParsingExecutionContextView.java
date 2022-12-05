@@ -17,15 +17,18 @@ package org.openrewrite.tree;
 
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.quark.Quark;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.text.PlainText;
 
 import java.nio.charset.Charset;
+
+import static org.openrewrite.Tree.randomId;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
@@ -39,7 +42,7 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
     }
 
     public static ParsingExecutionContextView view(ExecutionContext ctx) {
-        if(ctx instanceof ParsingExecutionContextView) {
+        if (ctx instanceof ParsingExecutionContextView) {
             return (ParsingExecutionContextView) ctx;
         }
         return new ParsingExecutionContextView(ctx);
@@ -54,24 +57,26 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
     }
 
-    @SuppressWarnings("UnusedReturnValue")
-    public ParsingExecutionContextView parseFailure(Path path, Parser<?> parser, Throwable t) {
-        if(path.isAbsolute()) {
-            throw new RuntimeException("Relative paths only");
-        }
+    public ParsingExecutionContextView parseFailure(Parser.Input input, Parser<?> parser, Throwable t) {
+        PlainText pt = new PlainText(randomId(), input.getPath(), Markers.EMPTY, null, false,
+                null, null, input.getSource(this).readFully());
+        return parseFailure(pt, parser, t);
+    }
+
+    public ParsingExecutionContextView parseFailure(PlainText raw, Parser<?> parser, Throwable t) {
         putMessageInCollection(PARSING_FAILURES,
-                new Quark(Tree.randomId(), path, Markers.EMPTY.addIfAbsent(ParseExceptionResult.build(parser, t)), null, null),
+                raw.withMarkers(raw.getMarkers().addIfAbsent(ParseExceptionResult.build(parser, t))),
                 ArrayList::new);
         return this;
     }
 
     @SuppressWarnings("unused")
-    public List<Quark> getParseFailures() {
+    public List<PlainText> getParseFailures() {
         return getMessage(PARSING_FAILURES, Collections.emptyList());
     }
 
     @SuppressWarnings("unused")
-    public List<Quark> pollParseFailures() {
+    public List<PlainText> pollParseFailures() {
         return pollMessage(PARSING_FAILURES, Collections.emptyList());
     }
 

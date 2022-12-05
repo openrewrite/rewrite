@@ -74,8 +74,8 @@ public class ProtoParser implements Parser<Proto.Document> {
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
+                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, this, t);
                         ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
-                        ParsingExecutionContextView.view(ctx).parseFailure(path, this, t);
                         return null;
                     }
                 })
