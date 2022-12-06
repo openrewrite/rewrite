@@ -30,7 +30,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Stack;
 
@@ -111,7 +111,7 @@ public class ChangeType extends Recipe {
         @Nullable
         private final Boolean ignoreDefinition;
 
-        private final Map<String, JavaType> oldNameToChangedType = new HashMap<>();
+        private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
 
         private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -364,7 +364,7 @@ public class ChangeType extends Recipe {
                 return oldType;
             }
 
-            JavaType type = oldNameToChangedType.get(oldType.toString());
+            JavaType type = oldNameToChangedType.get(oldType);
             if (type != null) {
                 return type;
             }
@@ -375,7 +375,7 @@ public class ChangeType extends Recipe {
                     if (tp instanceof JavaType.FullyQualified) {
                         JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
                         if (isTargetFullyQualifiedType(tpFq)) {
-                            return targetType;
+                            return updateType(tpFq);
                         }
                     }
                     return tp;
@@ -384,7 +384,8 @@ public class ChangeType extends Recipe {
                 if (isTargetFullyQualifiedType(pt)) {
                     pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
                 }
-                oldNameToChangedType.put(oldType.toString(), pt);
+                oldNameToChangedType.put(oldType, pt);
+                oldNameToChangedType.put(pt, pt);
                 return pt;
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
@@ -400,18 +401,21 @@ public class ChangeType extends Recipe {
                     return b;
                 }));
 
-                oldNameToChangedType.put(oldType.toString(), gtv);
+                oldNameToChangedType.put(oldType, gtv);
+                oldNameToChangedType.put(gtv, gtv);
                 return gtv;
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
                 variable = variable.withOwner(updateType(variable.getOwner()));
                 variable = variable.withType(updateType(variable.getType()));
-                oldNameToChangedType.put(oldType.toString(), variable);
+                oldNameToChangedType.put(oldType, variable);
+                oldNameToChangedType.put(variable, variable);
                 return variable;
             } else if (oldType instanceof JavaType.Array) {
                 JavaType.Array array = (JavaType.Array) oldType;
                 array = array.withElemType(updateType(array.getElemType()));
-                oldNameToChangedType.put(oldType.toString(), array);
+                oldNameToChangedType.put(oldType, array);
+                oldNameToChangedType.put(array, array);
                 return array;
             }
 
@@ -419,11 +423,20 @@ public class ChangeType extends Recipe {
         }
 
         @Nullable
-        private JavaType.Method updateType(@Nullable JavaType.Method mt) {
-            if (mt != null) {
-                return mt.withDeclaringType((JavaType.FullyQualified) updateType(mt.getDeclaringType()))
-                        .withReturnType(updateType(mt.getReturnType()))
-                        .withParameterTypes(ListUtils.map(mt.getParameterTypes(), this::updateType));
+        private JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
+            if (oldMethodType != null) {
+                JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
+                if (method != null) {
+                    return method;
+                }
+
+                method = oldMethodType;
+                method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
+                        .withReturnType(updateType(method.getReturnType()))
+                        .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
+                oldNameToChangedType.put(oldMethodType, method);
+                oldNameToChangedType.put(method, method);
+                return method;
             }
             return null;
         }
