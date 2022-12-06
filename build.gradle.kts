@@ -57,7 +57,7 @@ dependencies {
     compileOnly("com.google.code.findbugs:jsr305:latest.release")
     annotationProcessor("org.projectlombok:lombok:latest.release")
 
-    implementation(platform(kotlin("bom", "latest.release")))
+    implementation(platform(kotlin("bom", "1.7.22")))
     implementation(kotlin("compiler-embeddable"))
     implementation(kotlin("stdlib"))
 
