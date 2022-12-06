@@ -72,7 +72,7 @@ public class XmlParser implements Parser<Xml.Document> {
                         return document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, this, t);
+                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
                         ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
                         return null;
                     }

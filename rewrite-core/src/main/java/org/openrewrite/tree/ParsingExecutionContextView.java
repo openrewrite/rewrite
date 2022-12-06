@@ -57,8 +57,8 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
     }
 
-    public ParsingExecutionContextView parseFailure(Parser.Input input, Parser<?> parser, Throwable t) {
-        PlainText pt = new PlainText(randomId(), input.getPath(), Markers.EMPTY, null, false,
+    public ParsingExecutionContextView parseFailure(Parser.Input input, @Nullable Path relativeTo, Parser<?> parser, Throwable t) {
+        PlainText pt = new PlainText(randomId(), input.getRelativePath(relativeTo), Markers.EMPTY, null, false,
                 null, null, input.getSource(this).readFully());
         return parseFailure(pt, parser, t);
     }

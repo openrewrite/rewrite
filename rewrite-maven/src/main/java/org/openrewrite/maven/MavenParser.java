@@ -102,7 +102,7 @@ public class MavenParser implements Parser<Xml.Document> {
                 projectPoms.put(xml, pom);
                 projectPomsByPath.put(pomPath, pom);
             } catch (Throwable t) {
-                ParsingExecutionContextView.view(ctx).parseFailure(source, this, t);
+                ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, t);
                 ctx.getOnError().accept(t);
             }
         }
