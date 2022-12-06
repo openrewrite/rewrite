@@ -27,6 +27,7 @@ import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 /**
@@ -100,7 +101,7 @@ public class ChangePackage extends Recipe {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
 
-        private final Map<String, JavaType> oldNameToChangedType = new HashMap<>();
+        private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
 
         @Override
@@ -218,7 +219,7 @@ public class ChangePackage extends Recipe {
                 return oldType;
             }
 
-            JavaType type = oldNameToChangedType.get(oldType.toString());
+            JavaType type = oldNameToChangedType.get(oldType);
             if (type != null) {
                 return type;
             }
@@ -229,7 +230,7 @@ public class ChangePackage extends Recipe {
                     if (tp instanceof JavaType.FullyQualified) {
                         JavaType.FullyQualified tpFq = (JavaType.FullyQualified) tp;
                         if (isTargetFullyQualifiedType(tpFq)) {
-                            return TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(tpFq.getPackageName()) + "." + tpFq.getClassName()));
+                            return updateType(tpFq);
                         }
                     }
                     return tp;
@@ -239,13 +240,14 @@ public class ChangePackage extends Recipe {
                     pt = pt.withType((JavaType.FullyQualified) updateType(pt.getType()));
                 }
 
-                oldNameToChangedType.put(oldType.toString(), pt);
+                oldNameToChangedType.put(oldType, pt);
                 return pt;
             } else if (oldType instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified original = TypeUtils.asFullyQualified(oldType);
                 if (isTargetFullyQualifiedType(original)) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(JavaType.buildType(getNewPackageName(original.getPackageName()) + "." + original.getClassName()));
-                    oldNameToChangedType.put(oldType.toString(), fq);
+                    oldNameToChangedType.put(oldType, fq);
+                    oldNameToChangedType.put(fq, fq);
                     return fq;
                 }
             } else if (oldType instanceof JavaType.GenericTypeVariable) {
@@ -257,18 +259,21 @@ public class ChangePackage extends Recipe {
                     return b;
                 }));
 
-                oldNameToChangedType.put(oldType.toString(), gtv);
+                oldNameToChangedType.put(oldType, gtv);
+                oldNameToChangedType.put(gtv, gtv);
                 return gtv;
             } else if (oldType instanceof JavaType.Variable) {
                 JavaType.Variable variable = (JavaType.Variable) oldType;
                 variable = variable.withOwner(updateType(variable.getOwner()));
                 variable = variable.withType(updateType(variable.getType()));
-                oldNameToChangedType.put(oldType.toString(), variable);
+                oldNameToChangedType.put(oldType, variable);
+                oldNameToChangedType.put(variable, variable);
                 return variable;
             } else if (oldType instanceof JavaType.Array) {
                 JavaType.Array array = (JavaType.Array) oldType;
                 array = array.withElemType(updateType(array.getElemType()));
-                oldNameToChangedType.put(oldType.toString(), array);
+                oldNameToChangedType.put(oldType, array);
+                oldNameToChangedType.put(array, array);
                 return array;
             }
             return oldType;
@@ -277,7 +282,7 @@ public class ChangePackage extends Recipe {
         @Nullable
         private JavaType.Method updateType(@Nullable JavaType.Method oldMethodType) {
             if (oldMethodType != null) {
-                JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType.toString());
+                JavaType.Method method = (JavaType.Method) oldNameToChangedType.get(oldMethodType);
                 if (method != null) {
                     return method;
                 }
@@ -286,12 +291,12 @@ public class ChangePackage extends Recipe {
                 method = method.withDeclaringType((JavaType.FullyQualified) updateType(method.getDeclaringType()))
                         .withReturnType(updateType(method.getReturnType()))
                         .withParameterTypes(ListUtils.map(method.getParameterTypes(), this::updateType));
-                oldNameToChangedType.put(oldMethodType.toString(), method);
+                oldNameToChangedType.put(oldMethodType, method);
+                oldNameToChangedType.put(method, method);
                 return method;
             }
             return null;
         }
-
 
         private String getNewPackageName(String packageName) {
             return (recursive == null || recursive) && !newPackageName.endsWith(packageName.substring(oldPackageName.length()))?
