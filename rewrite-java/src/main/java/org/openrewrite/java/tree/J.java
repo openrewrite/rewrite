@@ -3577,7 +3577,7 @@ public interface J extends Tree {
                     newType = this.methodType.getName().equals(name.getSimpleName()) ? this.methodType : this.methodType.withName(name.getSimpleName());
                 }
             }
-            return new MethodInvocation(id, prefix, markers, select, typeParameters, name, arguments, newType);
+            return new MethodInvocation(id, prefix, markers, select, typeParameters, name.withType(newType), arguments, newType);
         }
 
         JContainer<Expression> arguments;

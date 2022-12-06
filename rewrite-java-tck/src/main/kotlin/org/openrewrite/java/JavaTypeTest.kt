@@ -139,42 +139,4 @@ interface JavaTypeTest {
             .initializer as J.MethodInvocation)
         assertThat(mi.name.type === mi.methodType).isTrue
     }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/2493")
-    @Test
-    fun updateMethodType(jp: JavaParser.Builder<*, *>) {
-        val cu = jp.build().parse(
-            executionContext,
-            """
-                public class Test {
-                }
-            """,
-            """
-            public class A {
-                void method() {
-                    Test a = test(null);
-                }
-                
-                Test test(Test test) {
-                    return test;
-                }
-            }
-            """
-        )
-        val cu2 = object : JavaIsoVisitor<ExecutionContext>() {
-            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
-                var m = super.visitMethodInvocation(method, p)
-                if (m.name.simpleName.equals("test")) {
-                    m = m.withName(m.name.withSimpleName("newName"))
-                }
-                return m
-            }
-        }.visit(cu[1], InMemoryExecutionContext()) as J.CompilationUnit
-
-        val mi = ((((cu2.classes[0].body.statements[0] as J.MethodDeclaration)
-            .body!!.statements[0] as J.VariableDeclarations)
-            .variables[0] as J.VariableDeclarations.NamedVariable)
-            .initializer as J.MethodInvocation)
-        assertThat(mi.name.type !== mi.methodType).isTrue
-    }
 }
