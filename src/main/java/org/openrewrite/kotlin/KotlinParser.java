@@ -15,17 +15,16 @@
  */
 package org.openrewrite.kotlin;
 
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.*;
-import org.jetbrains.kotlin.com.intellij.core.CoreProjectScopeBuilder;
-import org.jetbrains.kotlin.com.intellij.mock.MockFileIndexFacade;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.project.Project;
-import org.jetbrains.kotlin.com.intellij.openapi.roots.FileIndexFacade;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.StandardFileSystems;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFileManager;
@@ -39,7 +38,7 @@ import org.jetbrains.kotlin.fir.builder.BodyBuildingMode;
 import org.jetbrains.kotlin.fir.builder.PsiHandlingMode;
 import org.jetbrains.kotlin.fir.builder.RawFirBuilder;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
-import org.jetbrains.kotlin.fir.deserialization.SingleModuleDataProvider;
+import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
 import org.jetbrains.kotlin.fir.session.FirSessionFactory;
@@ -136,7 +135,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 cus.add(kcu);
                 parsingListener.parsed(compiled.getKey(), kcu);
             } catch (Throwable t) {
-                pctx.parseFailure(compiled.getKey().getRelativePath(relativeTo), t);
+//                pctx.parseFailure(compiled.getKey().getRelativePath(relativeTo), t);
                 ctx.getOnError().accept(t);
             }
         }
@@ -151,44 +150,53 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     disposable, compilerConfiguration(), EnvironmentConfigFiles.JVM_CONFIG_FILES);
 
             Project project = kenv.getProject();
-            LanguageVersionSettings languageVersionSettings = new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7,
-                    ApiVersion.KOTLIN_1_7);
-            FileIndexFacade fileIndexFacade = new MockFileIndexFacade(project);
-            CoreProjectScopeBuilder coreProjectScopeBuilder = new CoreProjectScopeBuilder(project, fileIndexFacade);
-            GlobalSearchScope globalScope = coreProjectScopeBuilder.buildAllScope();
-            JvmPackagePartProvider packagePartProvider = new JvmPackagePartProvider(languageVersionSettings, globalScope);
-            Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
-            TargetPlatform targetPlatform = JvmPlatforms.INSTANCE.getJvm17();
-            FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
-            VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(project,
-                    VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
-                    packagePartProviderFunction::apply);
 
-            PsiBasedProjectFileSearchScope librariesScope = new PsiBasedProjectFileSearchScope(globalScope);
+            /*
+                TopDownAnalyzerFacadeForJVM.kt
+                fun newModuleSearchScope(project: Project, files: Collection<KtFile>): GlobalSearchScope {
+                    // In case of separate modules, the source module scope generally consists of the following scopes:
+                    // 1) scope which only contains passed Kotlin source files (.kt and .kts)
+                    // 2) scope which contains all Java source files (.java) in the project
+                    return GlobalSearchScope.filesScope(project, files.map { it.virtualFile }.toSet()).uniteWith(AllJavaSourcesInProjectScope(project))
+                }
+             */
+
+            TargetPlatform targetPlatform = JvmPlatforms.INSTANCE.getJvm17();
+
+            Collection<KtFile> files = new ArrayList<>(); // todo
+            GlobalSearchScope testScope = TopDownAnalyzerFacadeForJVM.INSTANCE.newModuleSearchScope(project, files);
+
+            Function1<FirSessionFactory.FirSessionConfigurator, Unit> sessionConfigurator = (firProjectSessionProvider) -> Unit.INSTANCE;
+
+            // todo
             List<FirModuleData> dependencies = Collections.emptyList();
             List<FirModuleData> dependsOnDependencies = Collections.emptyList();
             List<FirModuleData> friendDependencies = Collections.emptyList();
-            Name name = Name.identifier("main");
             FirModuleData firModuleData = new FirModuleDataImpl(
-                    name,
+                    Name.identifier("main"),
                     dependencies,
                     dependsOnDependencies,
                     friendDependencies,
                     targetPlatform,
                     JvmPlatformAnalyzerServices.INSTANCE
             );
-            SingleModuleDataProvider moduleDataProvider = new SingleModuleDataProvider(firModuleData);
 
-            FirSession librarySession = FirSessionFactory.INSTANCE.createLibrarySession(
-                    name,
+            FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
+
+            LanguageVersionSettings languageVersionSettings = new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7,
+                    ApiVersion.KOTLIN_1_7);
+
+            FirSession firSessionComponents = configureMainSession(
+                    project,
+                    sessionConfigurator,
+                    Collections.emptyList(), // todo
+                    testScope,
+                    firModuleData,
                     firProjectSessionProvider,
-                    moduleDataProvider,
-                    librariesScope,
-                    projectEnvironment,
-                    packagePartProvider,
                     languageVersionSettings
             );
-            RawFirBuilder rawFirBuilder = new RawFirBuilder(librarySession,
+
+            RawFirBuilder rawFirBuilder = new RawFirBuilder(firSessionComponents,
                     new FirKotlinScopeProvider(), PsiHandlingMode.IDE, BodyBuildingMode.NORMAL);
             PsiFileFactory psiFileFactory = PsiFileFactory.getInstance(project);
             Map<Input, FirFile> cus = new LinkedHashMap<>();
@@ -210,6 +218,39 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 MessageCollector.Companion.getNONE());
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
         return compilerConfiguration;
+    }
+
+    private static FirSession configureMainSession(Project project,
+                                            Function1<? super FirSessionFactory.FirSessionConfigurator, Unit> sessionConfigurator,
+                                            List<FirExtensionRegistrar> extensionRegistrars,
+                                            GlobalSearchScope sourcesScope,
+                                            FirModuleData mainModuleData,
+                                            FirProjectSessionProvider sessionProvider,
+                                            @Nullable LanguageVersionSettings languageVersionSettings) {
+
+        LanguageVersionSettings languageVersionSettingsOrDefault = languageVersionSettings == null ? LanguageVersionSettingsImpl.DEFAULT : languageVersionSettings;
+
+        JvmPackagePartProvider packagePartProvider = new JvmPackagePartProvider(languageVersionSettingsOrDefault, sourcesScope);
+        Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
+        VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
+                project,
+                VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
+                packagePartProviderFunction::apply);
+
+        PsiBasedProjectFileSearchScope projectFileSearchScope = new PsiBasedProjectFileSearchScope(sourcesScope);
+        return FirSessionFactory.INSTANCE.createJavaModuleBasedSession(
+                mainModuleData,
+                sessionProvider,
+                projectFileSearchScope,
+                projectEnvironment,
+                null, // todo
+                extensionRegistrars,
+                languageVersionSettingsOrDefault,
+                null, // todo
+                null, // todo
+                true,
+                sessionConfigurator
+        );
     }
 
     @Override
