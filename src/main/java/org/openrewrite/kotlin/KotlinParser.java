@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFileManager;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory;
 import org.jetbrains.kotlin.com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.kotlin.config.*;
+import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirModuleData;
 import org.jetbrains.kotlin.fir.FirModuleDataImpl;
 import org.jetbrains.kotlin.fir.FirSession;
@@ -168,17 +169,28 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             Function1<FirSessionFactory.FirSessionConfigurator, Unit> sessionConfigurator = (firProjectSessionProvider) -> Unit.INSTANCE;
 
-            // todo
-            List<FirModuleData> dependencies = Collections.emptyList();
-            List<FirModuleData> dependsOnDependencies = Collections.emptyList();
-            List<FirModuleData> friendDependencies = Collections.emptyList();
+            JvmPlatformAnalyzerServices jvmPlatformAnalyzerServices = JvmPlatformAnalyzerServices.INSTANCE;
+            Name name = Name.identifier("main");
+
+            // TODO. Setup CompilerConfiguration or find auto-configuration and set dependencies via configuration.
+            // https://github.com/JetBrains/kotlin/blob/1.7.20/compiler/tests-common-new/tests/org/jetbrains/kotlin/test/frontend/fir/FirFrontendFacade.kt#L157
+            DependencyListForCliModule dependencyListForCliModule = new DependencyListForCliModule.Builder(name, targetPlatform, jvmPlatformAnalyzerServices)
+//                    .dependencies()
+//                    .dependsOnDependencies()
+//                    .friendDependencies()
+                    // Note: FirModuleData may be registered here with .source<X>()
+                    .build();
+
+            List<FirModuleData> dependencies = dependencyListForCliModule.getRegularDependencies();
+            List<FirModuleData> dependsOnDependencies = dependencyListForCliModule.getDependsOnDependencies();
+            List<FirModuleData> friendDependencies = dependencyListForCliModule.getFriendsDependencies();
             FirModuleData firModuleData = new FirModuleDataImpl(
-                    Name.identifier("main"),
+                    name,
                     dependencies,
                     dependsOnDependencies,
                     friendDependencies,
                     targetPlatform,
-                    JvmPlatformAnalyzerServices.INSTANCE
+                    jvmPlatformAnalyzerServices
             );
 
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
