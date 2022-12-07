@@ -21,6 +21,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Parent;
+import org.openrewrite.xml.XmlIsoVisitor;
+import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.maven.MavenVisitor.*;
 
 @Getter
 public class MavenDownloadingExceptions extends Exception {
@@ -65,7 +68,7 @@ public class MavenDownloadingExceptions extends Exception {
                     exception.getRoot().getArtifactId()), ga -> new ArrayList<>()).add(exception);
         }
 
-        return (Xml.Document) new MavenIsoVisitor<Integer>() {
+        return (Xml.Document) new XmlIsoVisitor<Integer>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, Integer integer) {
                 return sourceFile instanceof Xml.Document;
@@ -75,16 +78,9 @@ public class MavenDownloadingExceptions extends Exception {
             public Xml.Tag visitTag(Xml.Tag tag, Integer integer) {
                 Xml.Tag t = tag;
                 for (GroupArtifact ga : byGav.keySet()) {
-                    boolean hasException = (isDependencyTag() || isManagedDependencyTag()) &&
+                    boolean hasException = (DEPENDENCY_MATCHER.matches(getCursor()) || MANAGED_DEPENDENCY_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor())) &&
                                            tag.getChildValue("groupId").map(a -> ga.getGroupId().equals(a)).orElse(false) &&
                                            tag.getChildValue("artifactId").map(a -> ga.getArtifactId().equals(a)).orElse(false);
-                    if (isParentTag()) {
-                        Parent parent = requireNonNull(getResolutionResult().getPom().getRequested().getParent());
-                        if (parent.getGroupId().equals(ga.getGroupId()) && parent.getArtifactId().equals(ga.getArtifactId())) {
-                            hasException = true;
-                        }
-                    }
-
                     if (hasException) {
                         for (MavenDownloadingException exception : byGav.get(ga)) {
                             t = Markup.warn(t, exception);
