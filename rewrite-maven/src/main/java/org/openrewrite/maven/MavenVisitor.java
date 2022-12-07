@@ -37,14 +37,13 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MavenVisitor<P> extends XmlVisitor<P> {
-    private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
-    private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
-    private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
-    private static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
-    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+    static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
+    static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
+    static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
+    static final XPathMatcher PLUGIN_MATCHER = new XPathMatcher("/project/*/plugins/plugin");
+    static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
 
     private transient MavenResolutionResult resolutionResult;
-    private transient List<MavenResolutionResult> modules;
 
     @Override
     public String getLanguage() {
