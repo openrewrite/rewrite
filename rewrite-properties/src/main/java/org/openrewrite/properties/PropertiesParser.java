@@ -129,7 +129,7 @@ public class PropertiesParser implements Parser<Properties.File> {
     @Nullable
     private Properties.Content extractContent(String line, StringBuilder prefix) {
         Properties.Content content = null;
-        if (line.trim().startsWith("#")) {
+        if (line.trim().startsWith("#") || line.trim().startsWith("!")) {
             content = commentFromLine(line, prefix.toString());
             prefix.delete(0, prefix.length());
         } else if (line.contains("=")) {
@@ -157,7 +157,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                     }
                     state++;
                 case 1:
-                    if (c == '#') {
+                    if (c == '#' || c == '!') {
                         continue;
                     } else if (!Character.isWhitespace(c)) {
                         message.append(c);

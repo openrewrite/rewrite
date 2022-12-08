@@ -91,6 +91,23 @@ class PropertiesParserTest {
     }
 
     @Test
+    fun commentThenEntryByExclamationMark() {
+        val props = PropertiesParser().parse(
+            """
+            ! this is a comment
+            key=value
+        """.trimIndent()
+        )[0]
+
+        val comment = props.content[0] as Properties.Comment
+        assertThat(comment.message).isEqualTo(" this is a comment")
+        val entry = props.content[1] as Properties.Entry
+        assertThat(entry.prefix).isEqualTo("\n")
+        assertThat(entry.key).isEqualTo("key")
+        assertThat(entry.value.text).isEqualTo("value")
+    }
+
+    @Test
     fun entryCommentEntry() {
         val props = PropertiesParser().parse(
             """
