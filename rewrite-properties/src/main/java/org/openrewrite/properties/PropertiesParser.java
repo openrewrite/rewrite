@@ -147,6 +147,7 @@ public class PropertiesParser implements Parser<Properties.File> {
         StringBuilder prefixBuilder = new StringBuilder(prefix);
         StringBuilder message = new StringBuilder();
 
+        boolean inComment = false;
         int state = 0;
         for (char c : line.toCharArray()) {
             switch (state) {
@@ -157,7 +158,8 @@ public class PropertiesParser implements Parser<Properties.File> {
                     }
                     state++;
                 case 1:
-                    if (c == '#' || c == '!') {
+                    if ((c == '#' || c == '!') && !inComment) {
+                        inComment = true;
                         continue;
                     } else if (!Character.isWhitespace(c)) {
                         message.append(c);
