@@ -20,6 +20,7 @@ import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDescriptor;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.*;
@@ -33,17 +34,29 @@ import org.jetbrains.kotlin.com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirModuleData;
-import org.jetbrains.kotlin.fir.FirModuleDataImpl;
 import org.jetbrains.kotlin.fir.FirSession;
+import org.jetbrains.kotlin.fir.backend.Fir2IrComponentsStorage;
+import org.jetbrains.kotlin.fir.backend.Fir2IrConverter;
+import org.jetbrains.kotlin.fir.backend.Fir2IrExtensions;
+import org.jetbrains.kotlin.fir.backend.jvm.FirJvmKotlinMangler;
 import org.jetbrains.kotlin.fir.builder.BodyBuildingMode;
 import org.jetbrains.kotlin.fir.builder.PsiHandlingMode;
 import org.jetbrains.kotlin.fir.builder.RawFirBuilder;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
+import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor;
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
+import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
 import org.jetbrains.kotlin.fir.session.FirSessionFactory;
+import org.jetbrains.kotlin.fir.signaturer.FirBasedSignatureComposer;
+import org.jetbrains.kotlin.fir.signaturer.FirMangler;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
+import org.jetbrains.kotlin.ir.backend.jvm.serialization.JvmDescriptorMangler;
+import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl;
+import org.jetbrains.kotlin.ir.util.KotlinMangler;
+import org.jetbrains.kotlin.ir.util.NameProvider;
+import org.jetbrains.kotlin.ir.util.SymbolTable;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.platform.TargetPlatform;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
@@ -132,6 +145,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                         typeCache,
                         ctx
                 );
+                mappingVisitor.visitFile(compiled.getValue(), new InMemoryExecutionContext());
+
                 K.CompilationUnit kcu = null; // FIXME map the compiler's AST to a K.CompilationUnit
                 cus.add(kcu);
                 parsingListener.parsed(compiled.getKey(), kcu);
@@ -169,30 +184,17 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             Function1<FirSessionFactory.FirSessionConfigurator, Unit> sessionConfigurator = (firProjectSessionProvider) -> Unit.INSTANCE;
 
-            JvmPlatformAnalyzerServices jvmPlatformAnalyzerServices = JvmPlatformAnalyzerServices.INSTANCE;
             Name name = Name.identifier("main");
 
             // TODO. Setup CompilerConfiguration or find auto-configuration and set dependencies via configuration.
             // https://github.com/JetBrains/kotlin/blob/1.7.20/compiler/tests-common-new/tests/org/jetbrains/kotlin/test/frontend/fir/FirFrontendFacade.kt#L157
-            DependencyListForCliModule dependencyListForCliModule = new DependencyListForCliModule.Builder(name, targetPlatform, jvmPlatformAnalyzerServices)
-//                    .dependencies()
-//                    .dependsOnDependencies()
-//                    .friendDependencies()
-                    // Note: FirModuleData may be registered here with .source<X>()
-                    .build();
+            DependencyListForCliModule.Builder dependencyListForCliModuleBuilder = new DependencyListForCliModule.Builder(name, targetPlatform, JvmPlatformAnalyzerServices.INSTANCE);
+            dependencyListForCliModuleBuilder.dependencies(Collections.emptyList());
+            dependencyListForCliModuleBuilder.dependsOnDependencies(Collections.emptyList());
+            dependencyListForCliModuleBuilder.friendDependencies(Collections.emptyList());
+            DependencyListForCliModule dependencyListForCliModule = dependencyListForCliModuleBuilder.build();
 
-            List<FirModuleData> dependencies = dependencyListForCliModule.getRegularDependencies();
-            List<FirModuleData> dependsOnDependencies = dependencyListForCliModule.getDependsOnDependencies();
-            List<FirModuleData> friendDependencies = dependencyListForCliModule.getFriendsDependencies();
-            FirModuleData firModuleData = new FirModuleDataImpl(
-                    name,
-                    dependencies,
-                    dependsOnDependencies,
-                    friendDependencies,
-                    targetPlatform,
-                    jvmPlatformAnalyzerServices
-            );
-
+            FirModuleData firModuleData = dependencyListForCliModule.getRegularDependencies().get(0); // todo
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
 
             LanguageVersionSettings languageVersionSettings = new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7,
@@ -210,11 +212,33 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             RawFirBuilder rawFirBuilder = new RawFirBuilder(firSessionComponents,
                     new FirKotlinScopeProvider(), PsiHandlingMode.IDE, BodyBuildingMode.NORMAL);
+
             PsiFileFactory psiFileFactory = PsiFileFactory.getInstance(project);
             Map<Input, FirFile> cus = new LinkedHashMap<>();
+
+            ScopeSession scopeSession = new ScopeSession();
+            FirMangler firMangler = new FirJvmKotlinMangler(firSessionComponents);
+            FirBasedSignatureComposer firBasedSignatureComposer = new FirBasedSignatureComposer(firMangler);
+            KotlinMangler.DescriptorMangler descriptorMangler = new JvmDescriptorMangler(null); // todo
+            IdSignatureDescriptor idSignatureDescriptor = new IdSignatureDescriptor(descriptorMangler);
+            SymbolTable symbolTable = new SymbolTable(idSignatureDescriptor, IrFactoryImpl.INSTANCE, NameProvider.DEFAULT.INSTANCE);
+
+            Fir2IrComponentsStorage fir2IrComponentsStorage = new Fir2IrComponentsStorage(
+                    firSessionComponents,
+                    scopeSession,
+                    symbolTable,
+                    IrFactoryImpl.INSTANCE,
+                    firBasedSignatureComposer,
+                    Fir2IrExtensions.Default.INSTANCE
+            );
+
+            FirModuleDescriptor firModuleDescriptor = new FirModuleDescriptor(firSessionComponents);
+            Fir2IrConverter fir2IrConverter = new Fir2IrConverter(firModuleDescriptor, fir2IrComponentsStorage);
+
             for (Input sourceFile : sources) {
                 KtFile ktFile = (KtFile) psiFileFactory.createFileFromText(KotlinLanguage.INSTANCE, sourceFile.getSource().readFully());
                 FirFile firFile = rawFirBuilder.buildFirFile(ktFile);
+                fir2IrConverter.processClassHeaders(firFile);
                 cus.put(sourceFile, firFile);
             }
             return cus;

@@ -15,17 +15,25 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.kotlin.fir.FirElement;
+import org.jetbrains.kotlin.fir.declarations.FirClass;
+import org.jetbrains.kotlin.fir.declarations.FirFile;
+import org.jetbrains.kotlin.fir.expressions.FirBlock;
+import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.kotlin.KotlinTypeMapping;
+import org.openrewrite.kotlin.tree.K;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 
-public class KotlinParserVisitor {
+// todo: find visitor with type attribution and replace FirVisitor.
+public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
     private final Path sourcePath;
 
     @Nullable
@@ -46,5 +54,25 @@ public class KotlinParserVisitor {
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new KotlinTypeMapping(typeCache);
         this.ctx = ctx;
+    }
+
+    @Override
+    public K visitFile(@NotNull FirFile file, ExecutionContext ctx) {
+        return super.visitFile(file, ctx);
+    }
+
+    @Override
+    public K visitBlock(@NotNull FirBlock block, ExecutionContext data) {
+        return super.visitBlock(block, data);
+    }
+
+    @Override
+    public K visitClass(@NotNull FirClass klass, ExecutionContext ctx) {
+        return super.visitClass(klass, ctx);
+    }
+
+    @Override
+    public K visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
+        return null;
     }
 }

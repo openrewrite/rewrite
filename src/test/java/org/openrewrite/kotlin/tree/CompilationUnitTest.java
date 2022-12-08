@@ -12,8 +12,10 @@ public class CompilationUnitTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun main() {
+                  class Test {
+                    fun main() {
                       println("Hello, world!")
+                    }
                   }
               """
           )
