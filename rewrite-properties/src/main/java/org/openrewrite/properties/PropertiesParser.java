@@ -26,14 +26,13 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.properties.markers.EntryContinuation;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
@@ -76,26 +75,42 @@ public class PropertiesParser implements Parser<Properties.File> {
 
         StringBuilder prefix = new StringBuilder();
         StringBuilder buff = new StringBuilder();
-        String s = source.readFully();
+        StringBuilder continuation = new StringBuilder();
 
+        Map<Integer, String> continuationPositions = new HashMap<>();
+        boolean inContinuation = false;
         char prev = '$';
-        boolean isEscapedNewLine = false;
+
+        String s = source.readFully();
         for (char c : s.toCharArray()) {
-            if (isEscapedNewLine) {
-                if (Character.isWhitespace(c)) {
+            if (inContinuation) {
+                if (Character.isWhitespace(c) && !(c == '\n' && prev == '\n')) {
+                    continuation.append(c);
+                    prev = c;
                     continue;
                 } else {
-                    isEscapedNewLine = false;
+                    continuationPositions.put(buff.length(), continuation.toString());
+                    continuation.setLength(0);
+                    inContinuation = false;
                 }
             }
 
             if (c == '\n') {
                 if (prev == '\\') {
-                    isEscapedNewLine = true;
+                    inContinuation = true;
+
+                    // Move the escape character to the continuation.
                     buff.deleteCharAt(buff.length() - 1);
+                    continuation.append("\\");
+
+                    continuation.append(c);
                 } else {
                     Properties.Content content = extractContent(buff.toString(), prefix);
                     if (content != null) {
+                        if (!continuationPositions.isEmpty() && content instanceof Properties.Entry) {
+                            content = content.withMarkers(content.getMarkers().addIfAbsent(new EntryContinuation(randomId(), continuationPositions)));
+                            continuationPositions = new HashMap<>();
+                        }
                         contents.add(content);
                     }
                     buff = new StringBuilder();
@@ -107,8 +122,16 @@ public class PropertiesParser implements Parser<Properties.File> {
             prev = c;
         }
 
+        if (inContinuation) {
+            continuationPositions.put(buff.length(), continuation.toString());
+            continuation.setLength(0);
+        }
+
         Properties.Content content = extractContent(buff.toString(), prefix);
         if (content != null) {
+            if (!continuationPositions.isEmpty() && content instanceof Properties.Entry) {
+                content = content.withMarkers(content.getMarkers().addIfAbsent(new EntryContinuation(randomId(), continuationPositions)));
+            }
             contents.add(content);
         }
 

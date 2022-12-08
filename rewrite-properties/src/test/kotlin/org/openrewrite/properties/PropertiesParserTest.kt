@@ -16,8 +16,12 @@
 package org.openrewrite.properties
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.InMemoryExecutionContext
 import org.openrewrite.Issue
+import org.openrewrite.PrintOutputCapture
+import org.openrewrite.properties.internal.PropertiesPrinter
 import org.openrewrite.properties.tree.Properties
 
 @Suppress("UnusedProperty")
@@ -148,23 +152,66 @@ class PropertiesParserTest {
     }
 
     @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
-    @Issue("https://github.com/openrewrite/rewrite/issues/2471")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2473")
     @Test
-    fun escapedEndOfLine() {
-        val props = PropertiesParser().parse(
-            """
-                key=val\
-                          ue
-                ke\
-                    y2 = value2
+    fun escapedNewLines() {
+        val source = """
+                \
+                k\
+                 e\
+                  y \
+                   = \
+                    v\
+                     al\
+                      ue\
+                
+                key2=value2
             """.trimIndent()
-        )[0]
+        val props = PropertiesParser().parse(source)[0] as Properties.File
+
         assertThat(props.content.map { it as Properties.Entry }.map { it.key })
             .hasSize(2)
             .containsExactly("key", "key2")
         assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
             .hasSize(2)
             .containsExactly("value", "value2")
+
+        val outputCapture = PrintOutputCapture(InMemoryExecutionContext())
+        val printer = PropertiesPrinter<InMemoryExecutionContext>()
+        printer.visitFile(props, outputCapture)
+        assertThat(outputCapture.out.toString()).isEqualTo(source)
+    }
+
+    @Disabled("Requires support for CRLF")
+    @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2473")
+    @Test
+    fun escapedNewLinesCRLF() {
+        val source = "" +
+                "\\\r\n" +
+                "k\\\r\n" +
+                " e\\\r\n" +
+                "  y \\\r\n" +
+                "   = \\\r\n" +
+                "    v\\\r\n" +
+                "     al\\\r\n" +
+                "      ue\\\r\n" +
+                "\r\n" +
+                "key2=value2"
+
+        val props = PropertiesParser().parse(source)[0] as Properties.File
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
+            .hasSize(2)
+            .containsExactly("key", "key2")
+        assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
+            .hasSize(2)
+            .containsExactly("value", "value2")
+
+        val outputCapture = PrintOutputCapture(InMemoryExecutionContext())
+        val printer = PropertiesPrinter<InMemoryExecutionContext>()
+        printer.visitFile(props, outputCapture)
+        assertThat(outputCapture.out.toString()).isEqualTo(source)
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2411")
@@ -251,5 +298,181 @@ class PropertiesParserTest {
             .hasSize(4).containsExactly("ke\\=y", "key\\:2", "key3", "key4")
         assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
             .hasSize(4).containsExactly("value", "value2", "val\\=ue3", "val\\:ue4")
+    }
+
+    @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2473")
+    @Test
+    fun continuedKey() {
+        //language=properties
+        val source = """
+                  ke\
+                      y=va\
+                  lue
+        """.trimIndent()
+
+        val props = PropertiesParser().parse(source)[0] as Properties.File
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
+            .hasSize(1)
+            .containsExactly("key")
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
+            .hasSize(1)
+            .containsExactly("value")
+
+        val outputCapture = PrintOutputCapture(InMemoryExecutionContext())
+        val printer = PropertiesPrinter<InMemoryExecutionContext>()
+
+        val entry = props.content[0] as Properties.Entry
+        val sameLength = entry.withKey("yes")
+        printer.visitEntry(sameLength, outputCapture)
+
+        //language=properties
+        val result = """
+                  yes=va\
+                  lue
+        """.trimIndent()
+
+        assertThat(outputCapture.out.toString()).isEqualTo(result)
+
+        outputCapture.out.setLength(0)
+        val diffLength = entry.withKey("newKey")
+        printer.visitEntry(diffLength, outputCapture)
+
+        //language=properties
+        val result2 = """
+                  newKey=va\
+                  lue
+        """.trimIndent()
+        assertThat(outputCapture.out.toString()).isEqualTo(result2)
+
+        outputCapture.out.setLength(0)
+        val containsContinue = entry.withKey("new\\\n    Key")
+        printer.visitEntry(containsContinue, outputCapture)
+
+        //language=properties
+        val result3 = """
+                  new\
+                      Key=va\
+                  lue
+        """.trimIndent()
+        assertThat(outputCapture.out.toString()).isEqualTo(result3)
+        println()
+    }
+
+    @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2473")
+    @Test
+    fun continuedBeforeEquals() {
+        //language=properties
+        val source = """
+                  key  \
+                      = va\
+                  lue
+        """.trimIndent()
+
+        val props = PropertiesParser().parse(source)[0] as Properties.File
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
+            .hasSize(1)
+            .containsExactly("key")
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
+            .hasSize(1)
+            .containsExactly("value")
+
+        val outputCapture = PrintOutputCapture(InMemoryExecutionContext())
+        val printer = PropertiesPrinter<InMemoryExecutionContext>()
+
+        val entry = props.content[0] as Properties.Entry
+        val sameLength = entry.withBeforeEquals(" *")
+        printer.visitEntry(sameLength, outputCapture)
+
+        //language=properties
+        val result = """
+                  key *= va\
+                  lue
+        """.trimIndent()
+
+        assertThat(outputCapture.out.toString()).isEqualTo(result)
+
+        outputCapture.out.setLength(0)
+        val diffLength = entry.withBeforeEquals("   ")
+        printer.visitEntry(diffLength, outputCapture)
+
+        //language=properties
+        val result2 = """
+                  key   = va\
+                  lue
+        """.trimIndent()
+        assertThat(outputCapture.out.toString()).isEqualTo(result2)
+
+        outputCapture.out.setLength(0)
+        val containsContinue = entry.withBeforeEquals("  \\\n")
+        printer.visitEntry(containsContinue, outputCapture)
+
+        //language=properties
+        val result3 = """
+                  key  \
+                  = va\
+                  lue
+        """.trimIndent()
+        assertThat(outputCapture.out.toString()).isEqualTo(result3)
+        println()
+    }
+
+    @Disabled
+    @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2473")
+    @Test
+    fun continuedValue() {
+        //language=properties
+        val source = """
+                  key=va\
+                  lue
+        """.trimIndent()
+
+        val props = PropertiesParser().parse(source)[0] as Properties.File
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
+            .hasSize(1)
+            .containsExactly("key")
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
+            .hasSize(1)
+            .containsExactly("value")
+
+        val outputCapture = PrintOutputCapture(InMemoryExecutionContext())
+        val printer = PropertiesPrinter<InMemoryExecutionContext>()
+
+        val entry = props.content[0] as Properties.Entry
+        val sameLength = entry.withValue(entry.value.withText("words"))
+        printer.visitEntry(sameLength, outputCapture)
+
+        //language=properties
+        val result = "key=words"
+
+        assertThat(outputCapture.out.toString()).isEqualTo(result)
+
+        outputCapture.out.setLength(0)
+        val diffLength = entry.withValue(entry.value.withText("more words"))
+        printer.visitEntry(diffLength, outputCapture)
+
+        //language=properties
+        val result2 = "key=more words"
+        assertThat(outputCapture.out.toString()).isEqualTo(result2)
+
+        outputCapture.out.setLength(0)
+        val containsContinue = entry.withValue(entry.value.withText("wor\\\n  ds"))
+        printer.visitEntry(containsContinue, outputCapture)
+
+        //language=properties
+        val result3 = """
+                  key=wor\
+                    ds
+        """.trimIndent()
+        assertThat(outputCapture.out.toString()).isEqualTo(result3)
+        println()
     }
 }
