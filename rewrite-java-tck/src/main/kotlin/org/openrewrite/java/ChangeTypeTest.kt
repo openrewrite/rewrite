@@ -39,7 +39,7 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     //language=java
     companion object {
 
-        private const val a1Before = """
+        private const val a1 = """
             package a;
             public class A1 extends Exception {
                 public static void stat() {}
@@ -47,23 +47,7 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
             }
         """
 
-        private const val a1After = """
-            package a;
-            public class A1 extends Exception {
-                public static void stat() {}
-                public void foo() {}
-            }
-        """
-
-        private const val a2Before = """
-            package a;
-            public class A2 extends Exception {
-                public static void stat() {}
-                public void foo() {}
-            }
-        """
-
-        private const val a2After = """
+        private const val a2 = """
             package a;
             public class A2 extends Exception {
                 public static void stat() {}
@@ -202,8 +186,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun simpleName() = rewriteRun(
-        java(a1Before, a1After),
-        java(a2Before, a2After),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -218,8 +202,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun fullyQualifiedName() = rewriteRun(
-        java(a1Before, a1After),
-        java(a2Before, a2After),
+        java(a1),
+        java(a2),
         java("public class B extends a.A1 {}",
         "public class B extends a.A2 {}")
     )
@@ -273,8 +257,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     // array types and new arrays
     @Test
     fun array() = rewriteRun(
-        java(a1Before, a1After),
-        java(a2Before, a2After),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -293,8 +277,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun multiDimensionalArray() = rewriteRun(
-        java(a1Before, a1After),
-        java(a2Before, a2After),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -319,8 +303,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
         { spec -> spec.recipe(CompositeRecipe()
                 .doNext(recipe)
                 .doNext(ChangeType("I1", "I2", true))) },
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("public interface I1 {}"),
         java("public interface I2 {}"),
         java("""
@@ -338,8 +322,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     @Suppress("RedundantThrows")
     @Test
     fun method() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -358,8 +342,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun methodInvocationTypeParametersAndWildcard() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -391,8 +375,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     @Suppress("EmptyTryBlock", "CatchMayIgnoreException")
     @Test
     fun multiCatch() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -417,8 +401,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun multiVariable() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -437,8 +421,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun newClass() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -459,8 +443,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/704")
     fun updateAssignments() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
 
@@ -483,8 +467,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun parameterizedType() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -504,8 +488,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     @Suppress("RedundantCast")
     @Test
     fun typeCast() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -524,8 +508,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun classReference() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -544,8 +528,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun methodSelect() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -567,8 +551,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2302")
     @Test
     fun staticImport() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import static a.A1.stat;
             
@@ -1413,8 +1397,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun updateVariableType() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
@@ -1437,8 +1421,8 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
 
     @Test
     fun boundedGenericType() = rewriteRun(
-        java(a1Before),
-        java(a2Before),
+        java(a1),
+        java(a2),
         java("""
             import a.A1;
             
