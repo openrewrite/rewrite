@@ -283,6 +283,7 @@ public interface RewriteTest extends SourceSpecs {
                 // If sourceSpec defines a source path, enforce there is a result that has the same source path and
                 // the contents match the expected value.
                 for (Result result : recipeRun.getResults()) {
+
                     if (result.getAfter() != null && sourceSpec.getSourcePath().equals(result.getAfter().getSourcePath())) {
                         expectedNewSources.remove(sourceSpec);
                         assertThat(result.getBefore())
@@ -389,7 +390,9 @@ public interface RewriteTest extends SourceSpecs {
             if (specForSourceFile.getValue().after != null) {
                 String before = trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
                 String expected = trimIndentPreserveCRLF(specForSourceFile.getValue().after.apply(null));
-
+                assertThat(expected)
+                        .as("To assert that a Recipe makes no change, supply only \"before\" source.")
+                        .isNotEqualTo(before);
                 assertThat(before)
                         .as("The recipe should have made the following change.")
                         .isEqualTo(expected);
