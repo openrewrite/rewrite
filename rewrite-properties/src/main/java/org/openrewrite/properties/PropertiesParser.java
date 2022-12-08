@@ -132,7 +132,7 @@ public class PropertiesParser implements Parser<Properties.File> {
         if (line.trim().startsWith("#") || line.trim().startsWith("!")) {
             content = commentFromLine(line, prefix.toString());
             prefix.delete(0, prefix.length());
-        } else if (line.contains("=")) {
+        } else if (line.contains("=") || line.contains(":") || isDelimitedByWhitespace(line)) {
             StringBuilder trailingWhitespaceBuffer = new StringBuilder();
             content = entryFromLine(line, prefix.toString(), trailingWhitespaceBuffer);
             prefix.delete(0, prefix.length());
@@ -141,6 +141,10 @@ public class PropertiesParser implements Parser<Properties.File> {
             prefix.append(line);
         }
         return content;
+    }
+
+    private boolean isDelimitedByWhitespace(String line) {
+        return line.length() >=3 && !Character.isWhitespace(line.charAt(0)) && !Character.isWhitespace(line.length() - 1) && line.contains(" ");
     }
 
     private Properties.Comment commentFromLine(String line, String prefix) {
@@ -193,6 +197,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 valuePrefix = new StringBuilder(),
                 value = new StringBuilder();
 
+        char prev = '$';
         int state = 0;
         for (char c : line.toCharArray()) {
             switch (state) {
@@ -203,8 +208,13 @@ public class PropertiesParser implements Parser<Properties.File> {
                     }
                     state++;
                 case 1:
-                    if (c == '=') {
-                        state += 2;
+                    if (c == '=' || c == ':') {
+                        if (prev == '\\') {
+                            key.append(c);
+                            break;
+                        } else {
+                            state += 2;
+                        }
                     } else if (!Character.isWhitespace(c)) {
                         key.append(c);
                         break;
@@ -218,7 +228,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                     }
                     state++;
                 case 3:
-                    if (c == '=') {
+                    if (c == '=' || c == ':') {
                         continue;
                     } else if (Character.isWhitespace(c)) {
                         valuePrefix.append(c);
@@ -243,6 +253,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                         trailingWhitespaceBuffer.append(c);
                     }
             }
+            prev = c;
         }
 
         return new Properties.Entry(
