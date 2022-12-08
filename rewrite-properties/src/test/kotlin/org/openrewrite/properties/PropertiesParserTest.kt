@@ -90,6 +90,7 @@ class PropertiesParserTest {
         assertThat(entry.value.text).isEqualTo("value")
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2499")
     @Test
     fun commentThenEntryByExclamationMark() {
         val props = PropertiesParser().parse(
@@ -164,5 +165,52 @@ class PropertiesParserTest {
         assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
             .hasSize(2)
             .containsExactly("value", "value2")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2411")
+    @Test
+    fun commentsWithMultipleDelimiters() {
+        val props = PropertiesParser().parse(
+            """
+            ########################
+            #
+            ########################
+            
+            key1=value1
+            
+            !!!!!!!!!!!!!!!!!!!!!!!
+            !
+            !!!!!!!!!!!!!!!!!!!!!!!
+            
+            key2=value2
+
+        """.trimIndent()
+        )[0]
+
+        val comment1 = props.content[0] as Properties.Comment
+        assertThat(comment1.message).isEqualTo("#######################")
+
+        val comment2 = props.content[1] as Properties.Comment
+        assertThat(comment2.message).isEqualTo("")
+
+        val comment3 = props.content[2] as Properties.Comment
+        assertThat(comment3.message).isEqualTo("#######################")
+
+        val entry1 = props.content[3] as Properties.Entry
+        assertThat(entry1.key).isEqualTo("key1")
+        assertThat(entry1.value.text).isEqualTo("value1")
+
+        val comment4 = props.content[4] as Properties.Comment
+        assertThat(comment4.message).isEqualTo("!!!!!!!!!!!!!!!!!!!!!!")
+
+        val comment5 = props.content[5] as Properties.Comment
+        assertThat(comment5.message).isEqualTo("")
+
+        val comment6 = props.content[6] as Properties.Comment
+        assertThat(comment6.message).isEqualTo("!!!!!!!!!!!!!!!!!!!!!!")
+
+        val entry2 = props.content[7] as Properties.Entry
+        assertThat(entry2.key).isEqualTo("key2")
+        assertThat(entry2.value.text).isEqualTo("value2")
     }
 }
