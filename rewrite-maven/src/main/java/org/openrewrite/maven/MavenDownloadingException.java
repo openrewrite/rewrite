@@ -78,7 +78,7 @@ public class MavenDownloadingException extends Exception {
     @Override
     public String getMessage() {
         String message = "";
-        if (root != null && !root.equals(failedOn)) {
+        if (!failedOn.equals(root)) {
             message += failedOn + " failed. ";
         }
         message += super.getMessage();
