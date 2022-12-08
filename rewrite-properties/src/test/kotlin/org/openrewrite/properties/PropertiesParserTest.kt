@@ -213,4 +213,43 @@ class PropertiesParserTest {
         assertThat(entry2.key).isEqualTo("key2")
         assertThat(entry2.value.text).isEqualTo("value2")
     }
+
+    @Suppress("WrongPropertyKeyValueDelimiter")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2501")
+    @Test
+    fun delimitedByWhitespace() {
+        val props = PropertiesParser().parse(
+            """
+            key1         value1
+            key2:value2
+        """.trimIndent()
+        )[0]
+
+        val entries = props.content.map { it as Properties.Entry }
+        assertThat(entries).hasSize(2)
+        val entry = entries[0]
+        assertThat(entry.key).isEqualTo("key1")
+        assertThat(entry.value.text).isEqualTo("value1")
+        val entry2 = entries[1]
+        assertThat(entry2.key).isEqualTo("key2")
+        assertThat(entry2.value.text).isEqualTo("value2")
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2501")
+    @Test
+    fun escapedEntryDelimiters() {
+        val props = PropertiesParser().parse(
+            """
+            ke\=y=value
+            key\:2=value2
+            key3=val\=ue3
+            key4=val\:ue4
+        """.trimIndent()
+        )[0]
+
+        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
+            .hasSize(4).containsExactly("ke\\=y", "key\\:2", "key3", "key4")
+        assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
+            .hasSize(4).containsExactly("value", "value2", "val\\=ue3", "val\\:ue4")
+    }
 }
