@@ -281,13 +281,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             //Called by a shutdown hook, this will flush any in-memory memtables to disk and free up resources held
             //by the underlying C++ code. The worse case scenario is that this is not called because the system exits
             //abnormally, in which case, the data in-memory is simply not saved to the cache.
-            writeOptions.close();
-            options.close();
             if (Files.exists(Paths.get(cacheFolder))) {
                 //Attempting to close the database if the file has been deleted underneath it prevents the process
                 //from exiting.
                 database.close();
             }
+            writeOptions.close();
+            options.close();
         }
     }
 }
