@@ -420,7 +420,6 @@ class PropertiesParserTest {
         assertThat(outputCapture.out.toString()).isEqualTo(result3)
     }
 
-    @Disabled
     @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
     @Issue("https://github.com/openrewrite/rewrite/issues/2473")
     @Test

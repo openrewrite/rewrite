@@ -20,7 +20,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
-import org.openrewrite.properties.markers.EntryContinuation;
+import org.openrewrite.properties.markers.LineContinuation;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.function.UnaryOperator;
@@ -39,12 +39,12 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     @Override
     public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
-        EntryContinuation entryContinuation = entry.getMarkers().findFirst(EntryContinuation.class).orElse(null);
+        LineContinuation lineContinuation = entry.getMarkers().findFirst(LineContinuation.class).orElse(null);
         // Track the current position relative to the properties without markers and / or continuation lines.
         StringBuilder currentPos = new StringBuilder();
-        if (entryContinuation != null) {
-            if (entryContinuation.getContinuationMap().containsKey(0)) {
-                p.out.append(entryContinuation.getContinuationMap().get(0));
+        if (lineContinuation != null) {
+            if (lineContinuation.getContinuationMap().containsKey(0)) {
+                p.out.append(lineContinuation.getContinuationMap().get(0));
             }
 
             char[] charArray = entry.getKey().toCharArray();
@@ -52,8 +52,8 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
                 p.out.append(c);
                 currentPos.append(c);
 
-                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
-                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                if (lineContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(lineContinuation.getContinuationMap().get(currentPos.length()));
                 }
             }
         } else {
@@ -61,13 +61,13 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
             currentPos.append(entry.getKey());
         }
 
-        if (entryContinuation != null) {
+        if (lineContinuation != null) {
             for (char c : entry.getBeforeEquals().toCharArray()) {
                 p.out.append(c);
                 currentPos.append(c);
 
-                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
-                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                if (lineContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(lineContinuation.getContinuationMap().get(currentPos.length()));
                 }
             }
         } else {
@@ -78,7 +78,9 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
         p.append("=");
         currentPos.append("=");
 
-        if (entryContinuation != null) {
+        LineContinuation valueContinuation = entry.getValue().getMarkers().findFirst(LineContinuation.class).orElse(null);
+        if (valueContinuation != null) {
+            currentPos.setLength(0);
             for (Marker marker : entry.getValue().getMarkers().getMarkers()) {
                 p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
             }
@@ -88,8 +90,8 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
                 p.out.append(c);
                 currentPos.append(c);
 
-                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
-                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                if (valueContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(valueContinuation.getContinuationMap().get(currentPos.length()));
                 }
             }
 
@@ -102,14 +104,14 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
             currentPos.append(entry.getValue().getPrefix());
         }
 
-        if (entryContinuation != null) {
+        if (lineContinuation != null) {
             char[] charArray = entry.getValue().getText().toCharArray();
             for (char c : charArray) {
                 p.out.append(c);
                 currentPos.append(c);
 
-                if (entryContinuation.getContinuationMap().containsKey(currentPos.length())) {
-                    p.out.append(entryContinuation.getContinuationMap().get(currentPos.length()));
+                if (valueContinuation.getContinuationMap().containsKey(currentPos.length())) {
+                    p.out.append(valueContinuation.getContinuationMap().get(currentPos.length()));
                 }
             }
         } else {

@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @Value
 @With
-public class EntryContinuation implements Marker {
+public class LineContinuation implements Marker {
     UUID id;
     Map<Integer, String> continuationMap;
 }

@@ -26,15 +26,17 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.properties.markers.EntryContinuation;
+import org.openrewrite.properties.markers.LineContinuation;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static org.openrewrite.Tree.randomId;
 
 public class PropertiesParser implements Parser<Properties.File> {
@@ -108,7 +110,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                     Properties.Content content = extractContent(buff.toString(), prefix);
                     if (content != null) {
                         if (!continuationPositions.isEmpty() && content instanceof Properties.Entry) {
-                            content = content.withMarkers(content.getMarkers().addIfAbsent(new EntryContinuation(randomId(), continuationPositions)));
+                            content = content.withMarkers(content.getMarkers().addIfAbsent(new LineContinuation(randomId(), continuationPositions)));
                             continuationPositions = new HashMap<>();
                         }
                         contents.add(content);
@@ -130,9 +132,34 @@ public class PropertiesParser implements Parser<Properties.File> {
         Properties.Content content = extractContent(buff.toString(), prefix);
         if (content != null) {
             if (!continuationPositions.isEmpty() && content instanceof Properties.Entry) {
-                content = content.withMarkers(content.getMarkers().addIfAbsent(new EntryContinuation(randomId(), continuationPositions)));
+                content = content.withMarkers(content.getMarkers().addIfAbsent(new LineContinuation(randomId(), continuationPositions)));
             }
             contents.add(content);
+        }
+
+        List<Properties.Content> fixedMarkers = new ArrayList<>(contents.size());
+        for (Properties.Content properties : contents) {
+            if (properties instanceof Properties.Entry) {
+                LineContinuation lineContinuation = properties.getMarkers().findFirst(LineContinuation.class).orElse(null);
+                if (lineContinuation != null) {
+                    Properties.Entry entry = (Properties.Entry) properties;
+                    int beforeValue = entry.getPrefix().length() + entry.getKey().length() + entry.getBeforeEquals().length() + 1;
+                    Map<Integer, String> onValue = new HashMap<>();
+                    List<Map.Entry<Integer, String>> entries = lineContinuation.getContinuationMap().entrySet().stream().filter(e -> e.getKey() > beforeValue).collect(Collectors.toList());
+                    if (!entries.isEmpty()) {
+                        entries.forEach(e -> onValue.put(e.getKey() - beforeValue, e.getValue()));
+                        entries.forEach(lineContinuation.getContinuationMap().entrySet()::remove);
+
+                        if (lineContinuation.getContinuationMap().isEmpty()) {
+                            entry = entry.withMarkers(entry.getMarkers().removeByType(LineContinuation.class));
+                        }
+                        entry = entry.withValue(entry.getValue().withMarkers(entry.getValue().getMarkers().addIfAbsent(new LineContinuation(randomId(), onValue))));
+                        fixedMarkers.add(entry);
+                        continue;
+                    }
+                }
+            }
+            fixedMarkers.add(properties);
         }
 
         return new Properties.File(
@@ -140,7 +167,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 "",
                 Markers.EMPTY,
                 sourceFile,
-                contents,
+                fixedMarkers,
                 prefix.toString(),
                 source.getCharset().name(),
                 source.isCharsetBomMarked(),

@@ -21,7 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
-import org.openrewrite.properties.markers.EntryContinuation;
+import org.openrewrite.properties.markers.LineContinuation;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -121,15 +121,15 @@ public interface Properties extends Tree {
                 return this;
             }
 
-            Optional<EntryContinuation> entryContinuationOptional = markers.findFirst(EntryContinuation.class);
+            Optional<LineContinuation> entryContinuationOptional = markers.findFirst(LineContinuation.class);
             String cleaned = key;
             Markers maybeUpdate = markers;
             if (entryContinuationOptional.isPresent()) {
-                EntryContinuation entryContinuation = entryContinuationOptional.get();
+                LineContinuation lineContinuation = entryContinuationOptional.get();
                 int beginning = prefix.length();
                 int end = beginning + this.key.length();
 
-                List<Map.Entry<Integer, String>> entries = entryContinuation.getContinuationMap().entrySet()
+                List<Map.Entry<Integer, String>> entries = lineContinuation.getContinuationMap().entrySet()
                         .stream()
                         .filter(e -> e.getKey() >= beginning && e.getKey() <= end)
                         .collect(Collectors.toList());
@@ -145,30 +145,30 @@ public interface Properties extends Tree {
                 }
 
                 for (Map.Entry<Integer, String> entry : entries) {
-                    entryContinuation.getContinuationMap().remove(entry.getKey());
+                    lineContinuation.getContinuationMap().remove(entry.getKey());
                 }
 
                 int newLength = this.key.length() >= cleaned.length() ? this.key.length() - cleaned.length() : cleaned.length() - this.key.length();
                 int diff = continuationLength - (continuationLength - newLength);
                 Map<Integer, String> newContinuations = new HashMap<>();
                 if (diff != 0) {
-                    for (Integer integer : entryContinuation.getContinuationMap().keySet()) {
-                        String value = entryContinuation.getContinuationMap().get(integer);
+                    for (Integer integer : lineContinuation.getContinuationMap().keySet()) {
+                        String value = lineContinuation.getContinuationMap().get(integer);
                         newContinuations.put(integer + diff, value);
                     }
                 }
 
                 if (!continuations.isEmpty()) {
                     if (diff == 0) {
-                        newContinuations.putAll(entryContinuation.getContinuationMap());
+                        newContinuations.putAll(lineContinuation.getContinuationMap());
                     }
                     newContinuations.putAll(continuations);
                 }
 
                 if (!newContinuations.isEmpty()) {
-                    maybeUpdate = markers.removeByType(EntryContinuation.class);
-                    entryContinuation = entryContinuation.withContinuationMap(newContinuations);
-                    maybeUpdate = maybeUpdate.addIfAbsent(entryContinuation);
+                    maybeUpdate = markers.removeByType(LineContinuation.class);
+                    lineContinuation = lineContinuation.withContinuationMap(newContinuations);
+                    maybeUpdate = maybeUpdate.addIfAbsent(lineContinuation);
                 }
             }
 
@@ -182,15 +182,15 @@ public interface Properties extends Tree {
                 return this;
             }
 
-            Optional<EntryContinuation> entryContinuationOptional = markers.findFirst(EntryContinuation.class);
+            Optional<LineContinuation> entryContinuationOptional = markers.findFirst(LineContinuation.class);
             String cleaned = beforeEquals;
             Markers maybeUpdate = markers;
             if (entryContinuationOptional.isPresent()) {
-                EntryContinuation entryContinuation = entryContinuationOptional.get();
+                LineContinuation lineContinuation = entryContinuationOptional.get();
                 int beginning = prefix.length() + key.length();
                 int end = beginning + this.beforeEquals.length();
 
-                List<Map.Entry<Integer, String>> entries = entryContinuation.getContinuationMap().entrySet()
+                List<Map.Entry<Integer, String>> entries = lineContinuation.getContinuationMap().entrySet()
                         .stream()
                         .filter(e -> e.getKey() >= beginning && e.getKey() <= end)
                         .collect(Collectors.toList());
@@ -206,44 +206,37 @@ public interface Properties extends Tree {
                 }
 
                 for (Map.Entry<Integer, String> entry : entries) {
-                    entryContinuation.getContinuationMap().remove(entry.getKey());
+                    lineContinuation.getContinuationMap().remove(entry.getKey());
                 }
 
                 int newLength = this.beforeEquals.length() >= cleaned.length() ? this.beforeEquals.length() - cleaned.length() : cleaned.length() - this.beforeEquals.length();
                 int diff = continuationLength - (continuationLength - newLength);
                 Map<Integer, String> newContinuations = new HashMap<>();
                 if (diff != 0) {
-                    for (Integer integer : entryContinuation.getContinuationMap().keySet()) {
-                        String value = entryContinuation.getContinuationMap().get(integer);
+                    for (Integer integer : lineContinuation.getContinuationMap().keySet()) {
+                        String value = lineContinuation.getContinuationMap().get(integer);
                         newContinuations.put(integer + diff, value);
                     }
                 }
 
                 if (!continuations.isEmpty()) {
                     if (diff == 0) {
-                        newContinuations.putAll(entryContinuation.getContinuationMap());
+                        newContinuations.putAll(lineContinuation.getContinuationMap());
                     }
                     newContinuations.putAll(continuations);
                 }
 
                 if (!newContinuations.isEmpty()) {
-                    maybeUpdate = markers.removeByType(EntryContinuation.class);
-                    entryContinuation = entryContinuation.withContinuationMap(newContinuations);
-                    maybeUpdate = maybeUpdate.addIfAbsent(entryContinuation);
+                    maybeUpdate = markers.removeByType(LineContinuation.class);
+                    lineContinuation = lineContinuation.withContinuationMap(newContinuations);
+                    maybeUpdate = maybeUpdate.addIfAbsent(lineContinuation);
                 }
             }
             return new Entry(id, prefix, maybeUpdate, key, cleaned, value);
         }
 
+        @With
         Value value;
-
-        public Entry withValue(Value value) {
-            if (this.value == value) {
-                return this;
-            }
-
-            return new Entry(id, prefix, markers, key, beforeEquals, value);
-        }
 
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
@@ -258,14 +251,77 @@ public interface Properties extends Tree {
      */
     @lombok.Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
     class Value {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         String prefix;
+
+        @With
         Markers markers;
+
         String text;
+
+        public Value withText(String text) {
+            if (this.text.equals(text)) {
+                return this;
+            }
+
+            Optional<LineContinuation> entryContinuationOptional = markers.findFirst(LineContinuation.class);
+            String cleaned = text;
+            Markers maybeUpdate = markers;
+            if (entryContinuationOptional.isPresent()) {
+                LineContinuation lineContinuation = entryContinuationOptional.get();
+                int beginning = prefix.length();
+                int end = beginning + this.text.length();
+
+                List<Map.Entry<Integer, String>> entries = lineContinuation.getContinuationMap().entrySet()
+                        .stream()
+                        .filter(e -> e.getKey() >= beginning && e.getKey() <= end)
+                        .collect(Collectors.toList());
+
+                int continuationLength = 0;
+                for (Map.Entry<Integer, String> entry : entries) {
+                    continuationLength += entry.getValue().length();
+                }
+
+                Map<Integer, String> continuations = new HashMap<>();
+                if (LineContinuationUtil.containsEscapedContinuation(text)) {
+                    cleaned = LineContinuationUtil.extractValue(cleaned, beginning, continuations);
+                }
+
+                for (Map.Entry<Integer, String> entry : entries) {
+                    lineContinuation.getContinuationMap().remove(entry.getKey());
+                }
+
+                int newLength = this.text.length() >= cleaned.length() ? this.text.length() - cleaned.length() : cleaned.length() - this.text.length();
+                int diff = continuationLength - (continuationLength - newLength);
+                Map<Integer, String> newContinuations = new HashMap<>();
+                if (diff != 0) {
+                    for (Integer integer : lineContinuation.getContinuationMap().keySet()) {
+                        String value = lineContinuation.getContinuationMap().get(integer);
+                        newContinuations.put(integer + diff, value);
+                    }
+                }
+
+                if (!continuations.isEmpty()) {
+                    if (diff == 0) {
+                        newContinuations.putAll(lineContinuation.getContinuationMap());
+                    }
+                    newContinuations.putAll(continuations);
+                }
+
+                if (!newContinuations.isEmpty()) {
+                    maybeUpdate = markers.removeByType(LineContinuation.class);
+                    lineContinuation = lineContinuation.withContinuationMap(newContinuations);
+                    maybeUpdate = maybeUpdate.addIfAbsent(lineContinuation);
+                } else if (lineContinuation.getContinuationMap().isEmpty()) {
+                    maybeUpdate = markers.removeByType(LineContinuation.class);
+                }
+            }
+            return new Value(id, prefix, maybeUpdate, text);
+        }
     }
 
     @lombok.Value
