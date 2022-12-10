@@ -358,7 +358,6 @@ class PropertiesParserTest {
                   lue
         """.trimIndent()
         assertThat(outputCapture.out.toString()).isEqualTo(result3)
-        println()
     }
 
     @Suppress("WrongPropertyKeyValueDelimiter", "TrailingSpacesInProperty")
@@ -419,7 +418,6 @@ class PropertiesParserTest {
                   lue
         """.trimIndent()
         assertThat(outputCapture.out.toString()).isEqualTo(result3)
-        println()
     }
 
     @Disabled
@@ -473,6 +471,5 @@ class PropertiesParserTest {
                     ds
         """.trimIndent()
         assertThat(outputCapture.out.toString()).isEqualTo(result3)
-        println()
     }
 }
