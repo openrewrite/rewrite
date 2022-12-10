@@ -26,8 +26,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-stdlib-common")
 
     testImplementation("org.assertj:assertj-core:latest.release")
-
-    testRuntimeOnly("ch.qos.logback:logback-classic:1.2.10")
 }
 
 tasks.withType<Javadoc>().configureEach {

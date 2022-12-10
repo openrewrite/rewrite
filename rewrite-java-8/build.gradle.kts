@@ -28,7 +28,6 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-tck"))
-    testRuntimeOnly("ch.qos.logback:logback-classic:1.2.11")
 }
 
 java {
