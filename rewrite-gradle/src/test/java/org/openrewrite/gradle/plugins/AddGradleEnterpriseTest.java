@@ -42,7 +42,7 @@ public class AddGradleEnterpriseTest implements RewriteTest {
               """,
             spec -> spec.after(actual -> {
                 assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
+                Matcher version = Pattern.compile("3.\\d+(.\\d+)?").matcher(actual);
                 assertThat(version.find()).isTrue();
                 return """
                   plugins {
