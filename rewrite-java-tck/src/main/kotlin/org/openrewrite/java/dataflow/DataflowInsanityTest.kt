@@ -85,14 +85,6 @@ interface DataflowInsanityTest : RewriteTest {
                     i = 1;
                 }
             }
-        """,
-            """
-            public class A {
-                public void m() {
-                    int i = 0;
-                    i = 1;
-                }
-            }
         """
         )
     )
