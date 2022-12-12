@@ -20,7 +20,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -116,11 +115,7 @@ public class MavenParser implements Parser<Xml.Document> {
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
         MavenSettings sanitizedSettings = mavenCtx.getSettings() == null ? null : mavenCtx.getSettings()
-                .withServers(mavenCtx.getSettings().getServers() == null ? null :
-                        mavenCtx.getSettings().getServers().withServers(
-                                ListUtils.map(mavenCtx.getSettings().getServers().getServers(), server ->
-                                        server.withUsername(null).withPassword(null))
-                        ));
+                .withServers(null);
 
         for (Map.Entry<Xml.Document, Pom> docToPom : projectPoms.entrySet()) {
             try {

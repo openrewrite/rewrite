@@ -23,10 +23,7 @@ import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -104,10 +101,15 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The credentials to use for dependency resolution.
      */
     public Collection<MavenRepositoryCredentials> getCredentials(@Nullable MavenSettings mavenSettings) {
+
+        //Prefer any credentials defined in the mavenSettings passed to this method, but also consider any credentials
+        //defined in the context as well.
+        List<MavenRepositoryCredentials> credentials = new ArrayList<>();
         if (mavenSettings != null) {
-            return mapCredentials(mavenSettings);
+            credentials.addAll(mapCredentials(mavenSettings));
         }
-        return getMessage(MAVEN_CREDENTIALS, emptyList());
+        credentials.addAll(getMessage(MAVEN_CREDENTIALS, emptyList()));
+        return credentials;
     }
 
     public MavenExecutionContextView setPomCache(MavenPomCache pomCache) {
