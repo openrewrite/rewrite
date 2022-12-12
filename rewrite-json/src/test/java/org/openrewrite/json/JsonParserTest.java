@@ -1,0 +1,120 @@
+package org.openrewrite.json;
+
+import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
+import org.openrewrite.Recipe;
+import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.json.Assertions.json;
+
+@SuppressWarnings({"JsonStandardCompliance", "JsonDuplicatePropertyKeys"})
+public class JsonParserTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.parser(JsonParser.builder())
+          .recipe(Recipe.noop());
+    }
+
+    @Test
+    void parseJsonDocument() {
+        rewriteRun(
+          json(
+      """
+                {
+                  // comments
+                  unquoted: 'and you can quote me on that',
+                  singleQuotes: 'I can use "double quotes" here',
+                  hexadecimal: 0xdecaf,
+                  leadingDecimalPoint: .8675309, andTrailing: 8675309.,
+                  positiveSign: +1,
+                  trailingComma: 'in objects', andIn: ['arrays',],
+                  "backwardsCompatible": "with JSON",
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void stringLiteral() {
+        rewriteRun(
+          json("'hello world'")
+        );
+    }
+
+    @Test
+    void booleanLiteral() {
+        rewriteRun(
+          json("true")
+        );
+    }
+
+    @Test
+    void doubleLiteralExpSigned() {
+        rewriteRun(
+          json("-1.e3")
+        );
+    }
+
+    @Test
+    void array() {
+        rewriteRun(
+          json("[ 1 , 2 , 3 , ]")
+        );
+    }
+
+    @Test
+    void object() {
+        rewriteRun(
+          json(
+            """
+                {
+                    key: "value",
+                    "key": 1,
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void comments() {
+        rewriteRun(
+          json(
+            """
+                // test
+                {
+                    /* test */
+                    key: "value",
+                    // test
+                    "key": 1,
+                }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1145")
+    @Test
+    void longValue() {
+        rewriteRun(
+          json(
+            """
+                {
+                    "timestamp": 1577000812973
+                }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2511")
+    @Test
+    void empty() {
+        rewriteRun(
+          json("")
+        );
+    }
+}

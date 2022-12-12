@@ -89,7 +89,18 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     @Override
     public Json.Document visitJson5(JSON5Parser.Json5Context ctx) {
-        return convert(ctx, (c, prefix) -> new Json.Document(
+        return !ctx.children.isEmpty() && "<EOF>".equals(ctx.children.get(0).getText()) ? new Json.Document(
+                randomId(),
+                path,
+                Space.EMPTY,
+                Markers.EMPTY,
+                charset.name(),
+                charsetBomMarked,
+                null,
+                fileAttributes,
+                new Json.Literal(randomId(), Space.EMPTY, Markers.EMPTY, source, ""),
+                Space.EMPTY
+        ) : convert(ctx, (c, prefix) -> new Json.Document(
                 randomId(),
                 path,
                 prefix,
