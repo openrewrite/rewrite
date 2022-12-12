@@ -20,8 +20,10 @@ import org.openrewrite.Issue
 import org.openrewrite.Recipe
 import org.openrewrite.java.Assertions.java
 import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.java.marker.JavaVersion
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
+import java.util.*
 
 @Suppress(
     "ConstantConditions",
@@ -784,6 +786,30 @@ interface RemoveUnusedLocalVariablesTest : RewriteTest, JavaRecipeTest {
                 void foo() {
                     Long.parseLong("123");
                 }
+            }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2509")
+    @Test
+    fun recordCompactConstructor() = rewriteRun(
+        { spec -> spec.beforeRecipe { sf ->
+            val javaRuntimeVersion = System.getProperty("java.runtime.version")
+            val javaVendor = System.getProperty("java.vm.vendor")
+            if (JavaVersion(UUID.randomUUID(), javaRuntimeVersion, javaVendor, javaRuntimeVersion, javaRuntimeVersion).majorVersion != 17) {
+                spec.recipe(Recipe.noop())
+            }
+        }},
+        java("""
+            public record MyRecord(
+               boolean bar,
+               String foo
+            ) {
+               public MyRecord {
+                  if (foo == null) {
+                      foo = "defaultValue";
+                  }
+              }
             }
         """)
     )

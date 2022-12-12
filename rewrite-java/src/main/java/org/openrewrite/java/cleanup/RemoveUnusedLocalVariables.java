@@ -82,7 +82,8 @@ public class RemoveUnusedLocalVariables extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             private Cursor getCursorToParentScope(Cursor cursor) {
                 return cursor.dropParentUntil(is ->
-                        is instanceof J.Block ||
+                        is instanceof J.ClassDeclaration ||
+                                is instanceof J.Block ||
                                 is instanceof J.MethodDeclaration ||
                                 is instanceof J.ForLoop ||
                                 is instanceof J.ForEachLoop ||
@@ -108,8 +109,8 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 Cursor parentScope = getCursorToParentScope(getCursor());
                 J parent = parentScope.getValue();
                 if (parentScope.getParent() == null ||
-                        // skip class instance variables
-                        parentScope.getParent().getValue() instanceof J.ClassDeclaration ||
+                        // skip class instance variables. parentScope.getValue() covers java records.
+                        parentScope.getParent().getValue() instanceof J.ClassDeclaration || parentScope.getValue() instanceof J.ClassDeclaration ||
                         // skip anonymous class instance variables
                         parentScope.getParent().getValue() instanceof J.NewClass ||
                         // skip if method declaration parameter
