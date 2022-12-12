@@ -1,6 +1,6 @@
 plugins {
     `java-platform`
-    id("org.openrewrite.maven-publish")
+    id("org.openrewrite.build.publish")
 }
 
 dependencies {

@@ -1,11 +1,10 @@
 plugins {
-    id("org.openrewrite.java-library")
-    id("org.openrewrite.maven-publish")
+    id("org.openrewrite.build.language-library")
 }
 
 // run manually with -x compileKotlin when you need to regenerate
 tasks.register<JavaExec>("generateAntlrSources") {
-    main = "org.antlr.v4.Tool"
+    mainClass.set("org.antlr.v4.Tool")
 
     args = listOf(
             "-o", "src/main/java/org/openrewrite/xml/internal/grammar",

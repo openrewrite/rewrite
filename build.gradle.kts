@@ -1,3 +1,3 @@
 plugins {
-    id("org.openrewrite.root-project")
+    id("org.openrewrite.build.root")
 }

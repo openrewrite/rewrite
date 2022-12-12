@@ -1,6 +1,5 @@
 plugins {
-    id("org.openrewrite.java-library")
-    id("org.openrewrite.maven-publish")
+    id("org.openrewrite.build.language-library")
 }
 
 dependencies {

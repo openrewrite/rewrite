@@ -1,13 +1,16 @@
 pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.namespace!!.startsWith("org.openrewrite.build")) {
+                useVersion("latest.release")
+            }
+        }
+    }
     repositories {
         mavenLocal()
         gradlePluginPortal()
     }
 }
-
-includeBuild(
-    "build-src"
-)
 
 include(
     "rewrite-core",
@@ -16,8 +19,6 @@ include(
     "rewrite-hcl",
     "rewrite-java",
     "rewrite-java-tck",
-    "rewrite-java-8",
-    "rewrite-java-11",
     "rewrite-java-17",
     "rewrite-json",
     "rewrite-maven",
@@ -29,6 +30,14 @@ include(
     "rewrite-bom",
     "rewrite-benchmarks"
 )
+
+if(System.getProperty("idea.active") == null ||
+        System.getProperty("idea.sync.active") == null) {
+    include(
+        "rewrite-java-8",
+        "rewrite-java-11"
+    )
+}
 
 plugins {
     id("com.gradle.enterprise") version "3.11"
