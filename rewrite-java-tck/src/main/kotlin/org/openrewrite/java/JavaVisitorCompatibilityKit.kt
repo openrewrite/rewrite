@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.cleanup.*
@@ -130,6 +131,7 @@ abstract class JavaVisitorCompatibilityKit {
     @Nested
     inner class CovariantEqualsTck : CovariantEqualsTest
 
+    @Disabled("flaky")
     @Nested
     inner class DataflowInsanityTck : DataflowInsanityTest
 
