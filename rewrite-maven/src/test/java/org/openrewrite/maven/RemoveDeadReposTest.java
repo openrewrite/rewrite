@@ -104,6 +104,139 @@ class RemoveDeadReposTest implements RewriteTest {
     }
 
     @Test
+    void removeFakeAbcmavenDeadRepoHalfInProperty() {
+        rewriteRun(pomXml("""
+              <project>
+                  <properties>
+                      <maven.repo.url.suffix>maven</maven.repo.url.suffix>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>abcmaven</id>
+                          <url>https://abc${maven.repo.url.suffix}.com</url>
+                      </repository>
+                      <repository>
+                          <id>spring-snapshots</id>
+                          <url>https://repo.spring.io/snapshot</url>
+                      </repository>
+                      <repository>
+                          <id>spring-milestones</id>
+                          <url>https://repo.spring.io/milestone</url>
+                      </repository>
+                  </repositories>
+              </project>
+          """, """
+              <project>
+                  <properties>
+                      <maven.repo.url.suffix>maven</maven.repo.url.suffix>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>spring-snapshots</id>
+                          <url>https://repo.spring.io/snapshot</url>
+                      </repository>
+                      <repository>
+                          <id>spring-milestones</id>
+                          <url>https://repo.spring.io/milestone</url>
+                      </repository>
+                  </repositories>
+              </project>
+          """));
+    }
+
+    @Test
+    void removeFakeAbcmavenDeadRepoHalfInPropertyMultipleProps() {
+        rewriteRun(pomXml("""
+              <project>
+                  <properties>
+                      <maven.repo.url.suffix>maven</maven.repo.url.suffix>
+                      <https.prefix>https://</https.prefix>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>abcmaven</id>
+                          <url>${https.prefix}abc${maven.repo.url.suffix}.com</url>
+                      </repository>
+                      <repository>
+                          <id>spring-snapshots</id>
+                          <url>https://repo.spring.io/snapshot</url>
+                      </repository>
+                      <repository>
+                          <id>spring-milestones</id>
+                          <url>https://repo.spring.io/milestone</url>
+                      </repository>
+                  </repositories>
+              </project>
+          """, """
+              <project>
+                  <properties>
+                      <maven.repo.url.suffix>maven</maven.repo.url.suffix>
+                      <https.prefix>https://</https.prefix>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>spring-snapshots</id>
+                          <url>https://repo.spring.io/snapshot</url>
+                      </repository>
+                      <repository>
+                          <id>spring-milestones</id>
+                          <url>https://repo.spring.io/milestone</url>
+                      </repository>
+                  </repositories>
+              </project>
+          """));
+    }
+
+    @Test
+    void removeFakeAbcmavenDeadRepoHalfInPropertyMultipleMultipleProps() {
+        rewriteRun(pomXml("""
+              <project>
+                  <properties>
+                      <maven.repo.url.suffix>maven</maven.repo.url.suffix>
+                      <https.prefix>https://</https.prefix>
+                      <abc.prefix>abc</abc.prefix>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>abcmaven</id>
+                          <url>${https.prefix}abc${maven.repo.url.suffix}.com</url>
+                      </repository>
+                      <repository>
+                          <id>spring-snapshots</id>
+                          <url>https://repo.spring.io/snapshot</url>
+                      </repository>
+                      <repository>
+                          <id>abcmaven</id>
+                          <url>${https.prefix}${abc.prefix}maven.com</url>
+                      </repository>
+                      <repository>
+                          <id>spring-milestones</id>
+                          <url>https://repo.spring.io/milestone</url>
+                      </repository>
+                  </repositories>
+              </project>
+          """, """
+              <project>
+                  <properties>
+                      <maven.repo.url.suffix>maven</maven.repo.url.suffix>
+                      <https.prefix>https://</https.prefix>
+                      <abc.prefix>abc</abc.prefix>
+                  </properties>
+                  <repositories>
+                      <repository>
+                          <id>spring-snapshots</id>
+                          <url>https://repo.spring.io/snapshot</url>
+                      </repository>
+                      <repository>
+                          <id>spring-milestones</id>
+                          <url>https://repo.spring.io/milestone</url>
+                      </repository>
+                  </repositories>
+              </project>
+          """));
+    }
+
+    @Test
     void replaceHttpsMavenGlassfishDeadRepoLinkInProperties() {
         rewriteRun(pomXml("""
               <project>

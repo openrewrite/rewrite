@@ -74,7 +74,6 @@ public class IdentifyUnreachableRepos extends Recipe {
                 if (url != null) {
                     if (url.startsWith("$")) {
                         String repositoryUrlProperty = tag.getValue().get();
-                        System.out.println("Repository URL is a property: " + repositoryUrlProperty);
                         doAfterVisit(new MarkPropertyLink(
                                 repositoryUrlProperty.substring(2, repositoryUrlProperty.length() - 1)
                         ));

@@ -17,11 +17,15 @@ package org.openrewrite.maven;
 
 import lombok.AllArgsConstructor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
-import org.openrewrite.Recipe;
+
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class RemoveDeadRepos extends Recipe {
     private static final XPathMatcher REPOSITORY_URL_MATCHER = new XPathMatcher("/project/repositories/repository");
@@ -44,18 +48,27 @@ public class RemoveDeadRepos extends Recipe {
         return new RemoveDeadReposVisitor();
     }
 
+    static private final Set<String> propNamesToSearch = new HashSet<>();
+    static private final Map<String, String> propNamesToValues = new HashMap<>();
 
     private static class RemoveDeadReposVisitor extends MavenIsoVisitor<ExecutionContext> {
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag newTag = super.visitTag(tag, ctx);
             if (isRepositoryTag()) {
-                newTag = tag.getChild("url").flatMap(Xml.Tag::getValue).map(url -> {
+                String url = tag.getChild("url").flatMap(Xml.Tag::getValue).orElse(null);
+                if (url != null) {
                     // if the url is a property, check if the property's URL is in KNOWN_DEFUNCT; if so,
                     // replace/remove the property (if the property is removed, remove the repo as well)
-                    if (url.startsWith("$")) {
+                    if (url.matches("\\$\\{([^}]+)}")) {
                         String propertyName = url.substring(2, url.length() - 1);
                         doAfterVisit(new CheckPropertyLink(propertyName));
+                        return tag;
+                    } else if (url.matches(".*\\$\\{([^}]+)}.*")) {
+                        // add all the property names found in getProperties(url) to propNamesToSearch
+                        List<String> propertyNames = getProperties(url);
+                        propNamesToSearch.addAll(propertyNames);
+                        doAfterVisit(new GetProperties());
+                        doAfterVisit(new RemoveDeadReposVisitorWithPropsInURL());
                         return tag;
                     }
                     // otherwise, simply check if the repo URL is in KNOWN_DEFUNCT; accordingly replace the
@@ -63,9 +76,38 @@ public class RemoveDeadRepos extends Recipe {
                     else {
                         return maybeDeleteOrReplaceUrlAndOrRepo(tag, url, false);
                     }
-                }).orElse(null);
+                }
             }
-            return newTag;
+            return super.visitTag(tag, ctx);
+        }
+
+        private boolean isRepositoryTag() {
+            return REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                    PLUGIN_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                    DISTRIBUTION_MANAGEMENT_REPOSITORY_URL_MATCHER.matches(getCursor()) ||
+                    DISTRIBUTION_MANAGEMENT_SNAPSHOT_REPOSITORY_URL_MATCHER.matches(getCursor());
+        }
+
+    }
+
+    private static class RemoveDeadReposVisitorWithPropsInURL extends MavenIsoVisitor<ExecutionContext> {
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isRepositoryTag()) {
+                String url = tag.getChild("url").flatMap(Xml.Tag::getValue).orElse(null);
+                if (url != null && url.matches(".*\\$\\{([^}]+)}.*") && !url.matches("\\$\\{([^}]+)}")) {
+                    List<String> propertyNames = getProperties(url);
+                    if (propertyNames.isEmpty()) {
+                        return tag;
+                    }
+                    // replace the ith property name with the ith property value
+                    for (String propertyName : propertyNames) {
+                        url = url.replace("${" + propertyName + "}", propNamesToValues.get(propertyName));
+                    }
+                    return maybeDeleteOrReplaceUrlAndOrRepo(tag, url, false);
+                }
+            }
+            return super.visitTag(tag, ctx);
         }
 
         private boolean isRepositoryTag() {
@@ -83,14 +125,26 @@ public class RemoveDeadRepos extends Recipe {
 
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag newPropTag = super.visitTag(tag, ctx);
             if (isPropertyTag() && propertyName.equals(tag.getName())) {
-                newPropTag = maybeDeleteOrReplaceUrlAndOrRepo(tag, tag.getValue().orElse(""), true);
+                Xml.Tag newPropTag = maybeDeleteOrReplaceUrlAndOrRepo(tag, tag.getValue().orElse(""), true);
                 if (newPropTag == null) {
                     doAfterVisit(new DeleteReposWithProperty(propertyName));
                 }
+                return newPropTag;
             }
-            return newPropTag;
+            return super.visitTag(tag, ctx);
+        }
+    }
+
+    @AllArgsConstructor
+    private static class GetProperties extends MavenIsoVisitor<ExecutionContext> {
+        @Override
+        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            // if propertyNames contains tag.getName(), set the mapping from tag.getName() to tag.getValue() in propNamesToValues
+            if (isPropertyTag() && propNamesToSearch.contains(tag.getName())) {
+                propNamesToValues.put(tag.getName(), tag.getValue().orElse(""));
+            }
+            return super.visitTag(tag, ctx);
         }
     }
 
@@ -137,5 +191,14 @@ public class RemoveDeadRepos extends Recipe {
             return tag.withChildValue("url", "https://" + IdentifyUnreachableRepos.KNOWN_DEFUNCT.get(urlKey));
         }
         return tag;
+    }
+
+    private static List<String> getProperties(String url) {
+        List<String> props = new LinkedList<>();
+        Matcher m = Pattern.compile("(?=(\\$\\{([^}]+)}))").matcher(url);
+        while(m.find()) {
+            props.add(m.group(1).substring(2, m.group(1).length() - 1));
+        }
+        return props;
     }
 }
