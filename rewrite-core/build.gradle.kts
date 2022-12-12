@@ -5,10 +5,6 @@ plugins {
     id("org.openrewrite.build.shadow")
 }
 
-rewriteJava {
-    kotlinTests.set(true)
-}
-
 dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
     testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")

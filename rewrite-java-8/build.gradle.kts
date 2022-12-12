@@ -29,10 +29,6 @@ dependencies {
     testImplementation(project(":rewrite-java-tck"))
 }
 
-rewriteJava {
-    kotlinTests.set(true)
-}
-
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(8))

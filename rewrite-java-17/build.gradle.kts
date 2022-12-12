@@ -16,10 +16,6 @@ dependencies {
     testImplementation(project(":rewrite-java-tck"))
 }
 
-rewriteJava {
-    kotlinTests.set(true)
-}
-
 tasks.withType<JavaCompile> {
     sourceCompatibility = JavaVersion.VERSION_17.toString()
     targetCompatibility = JavaVersion.VERSION_17.toString()

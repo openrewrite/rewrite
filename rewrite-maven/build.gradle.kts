@@ -6,10 +6,6 @@ plugins {
 
 val rocksDbVersion = "7.4.3" // https://github.com/facebook/rocksdb/issues/10448
 
-rewriteJava {
-    kotlinTests.set(true)
-}
-
 dependencies {
     api(project(":rewrite-xml"))
     api("org.jetbrains:annotations:latest.release")

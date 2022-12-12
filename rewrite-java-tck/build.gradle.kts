@@ -2,10 +2,6 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-rewriteJava {
-    kotlinTests.set(true)
-}
-
 dependencies {
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-test"))
