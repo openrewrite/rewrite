@@ -18,18 +18,22 @@ package org.openrewrite.java.cleanup
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Recipe
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRecipeTest
+import org.openrewrite.Tree
+import org.openrewrite.java.Assertions.java
+import org.openrewrite.java.marker.JavaVersion
+import org.openrewrite.test.RecipeSpec
+import org.openrewrite.test.RewriteTest
 
-interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
-    override val recipe: Recipe?
-        get() = RenameLocalVariablesToCamelCase()
+interface RenameLocalVariablesToCamelCaseTest : RewriteTest {
+
+    override fun defaults(spec: RecipeSpec) {
+        spec.recipe(RenameLocalVariablesToCamelCase())
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2227")
     @Test
-    fun lowerCamelVariableHasNonLowerCamelVariableSibling(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun lowerCamelVariableHasNonLowerCamelVariableSibling() = rewriteRun(
+        java("""
             class A {
                 void m()  {
                     boolean secure = _secure > 0;
@@ -40,30 +44,31 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
+
     @Test
-    fun renameAllCapsAcronyms(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renameAllCapsAcronyms() = rewriteRun(
+        java("""
             class Test {
                 void test() {
                     String ID;
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 void test() {
                     String id;
                 }
             }
         """
+        )
     )
 
     @Test
-    fun renameLocalVariables(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renameLocalVariables() = rewriteRun(
+        java("""
             class Test {
                 int DoNoTChange;
 
@@ -75,7 +80,7 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 int DoNoTChange;
 
@@ -87,14 +92,14 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Suppress("JavadocDeclaration")
     @Issue("https://github.com/openrewrite/rewrite/issues/2437")
     @Test
-    fun renameJavaDocParam(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
+    fun renameJavaDocParam() = rewriteRun(
+        java("""
             class Test {
                 /**
                  * @param rename_one
@@ -103,7 +108,7 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """,
-        after = """
+        """
             class Test {
                 /**
                  * @param renameOne
@@ -112,17 +117,17 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun doNotChangeStaticImports(jp: JavaParser) = assertUnchanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun doNotChangeStaticImports() = rewriteRun(
+        java("""
             class B {
                 public static int _staticImport_ = 0;
             }
         """),
-        before = """
+        java("""
             import static B._staticImport_;
 
             class Test {
@@ -132,17 +137,17 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun doNotChangeInheritedFields(jp: JavaParser) = assertUnchanged(
-        jp,
-        dependsOn = arrayOf("""
+    fun doNotChangeInheritedFields() = rewriteRun(
+        java("""
             class A {
                 public int _inheritedField_ = 0;
             }
         """),
-        before = """
+        java("""
             class Test extends A {
                 public int addTen(int testValue) {
                     _inheritedField_++;
@@ -150,12 +155,12 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun doNotChangeIfToNameExists(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotChangeIfToNameExists() = rewriteRun(
+        java("""
             class Test {
                 int DoNoTChange;
 
@@ -165,12 +170,12 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun doNotChangeCatch(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotChangeCatch() = rewriteRun(
+        java("""
             class Test {
                 int DoNoTChange;
 
@@ -185,12 +190,12 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun doNotForLoop(jp: JavaParser) = assertUnchanged(
-        jp,
-        before = """
+    fun doNotForLoop() = rewriteRun(
+        java("""
             class Test {
                 int DoNoTChange;
 
@@ -202,12 +207,12 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
                 }
             }
         """
+        )
     )
 
     @Test
-    fun doNotRenameConstantVariable(jp: JavaParser) = assertUnchanged(
-            jp,
-            before = """
+    fun doNotRenameConstantVariable() = rewriteRun(
+        java("""
             import java.util.ArrayList;
             import java.util.List;
             class Test {
@@ -221,5 +226,29 @@ interface RenameLocalVariablesToCamelCaseTest : JavaRecipeTest {
             }
 
         """
+        )
+    )
+
+    @Test
+    fun recordCompactConstructor() = rewriteRun(
+        { spec -> spec.beforeRecipe { sf ->
+            val javaRuntimeVersion = System.getProperty("java.runtime.version")
+            val javaVendor = System.getProperty("java.vm.vendor")
+            if (JavaVersion(Tree.randomId(), javaRuntimeVersion, javaVendor, javaRuntimeVersion, javaRuntimeVersion).majorVersion != 17) {
+                spec.recipe(Recipe.noop())
+            }
+        }},
+        java("""
+            public record MyRecord(
+               boolean bar,
+               String foo
+            ) {
+               public MyRecord {
+                  if (foo == null) {
+                      foo = "defaultValue";
+                  }
+              }
+            }
+        """)
     )
 }

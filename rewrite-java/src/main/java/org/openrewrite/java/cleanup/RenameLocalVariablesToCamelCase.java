@@ -99,7 +99,9 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
             Cursor parentScope = getCursorToParentScope(getCursor());
 
             // Does not currently support renaming fields in a J.ClassDeclaration.
-            if (!(parentScope.getParent() != null && parentScope.getParent().getValue() instanceof J.ClassDeclaration) &&
+            if (!(parentScope.getParent() != null && (parentScope.getParent().getValue() instanceof J.ClassDeclaration ||
+                    // Detect java records
+                    parentScope.getValue() instanceof J.ClassDeclaration)) &&
                     // Does not apply for instance variables of anonymous inner classes
                     !(parentScope.getParent().getValue() instanceof J.NewClass) &&
                     // Does not apply to for loop controls.
@@ -135,7 +137,8 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
          */
         private static Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
-                    is instanceof J.Block ||
+                    is instanceof J.ClassDeclaration ||
+                            is instanceof J.Block ||
                             is instanceof J.MethodDeclaration ||
                             is instanceof J.ForLoop ||
                             is instanceof J.ForEachLoop ||
