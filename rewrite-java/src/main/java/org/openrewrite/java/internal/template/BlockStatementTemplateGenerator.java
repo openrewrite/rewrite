@@ -248,7 +248,7 @@ public class BlockStatementTemplateGenerator {
             J.NewClass n = (J.NewClass) j;
             String newClassString;
             JavaType.Class constructorTypeClass = n.getConstructorType() != null ? TypeUtils.asClass(n.getConstructorType().getReturnType()) : null;
-            boolean isEnum = JavaType.FullyQualified.Kind.Enum == constructorTypeClass.getKind();
+            boolean isEnum = constructorTypeClass != null && JavaType.FullyQualified.Kind.Enum == constructorTypeClass.getKind();
             if (n.getClazz() != null) {
                 newClassString = "new " + n.getClazz().printTrimmed(cursor);
             } else if (constructorTypeClass != null) {
