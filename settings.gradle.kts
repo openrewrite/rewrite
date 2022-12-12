@@ -1,13 +1,16 @@
 pluginManagement {
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.namespace!!.startsWith("org.openrewrite.build")) {
+                useVersion("0.1.0-dev.2.uncommitted+cf1e46b")
+            }
+        }
+    }
     repositories {
         mavenLocal()
         gradlePluginPortal()
     }
 }
-
-includeBuild(
-    "build-src"
-)
 
 include(
     "rewrite-core",

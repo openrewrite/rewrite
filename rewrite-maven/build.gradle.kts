@@ -1,11 +1,14 @@
 import nl.javadude.gradle.plugins.license.LicenseExtension
 
 plugins {
-    id("org.openrewrite.java-library")
-    id("org.openrewrite.maven-publish")
+    id("org.openrewrite.build.language-library")
 }
 
 val rocksDbVersion = "7.4.3" // https://github.com/facebook/rocksdb/issues/10448
+
+rewriteJava {
+    kotlinTests.set(true)
+}
 
 dependencies {
     api(project(":rewrite-xml"))
@@ -54,7 +57,7 @@ dependencies {
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {
-    main = "org.antlr.v4.Tool"
+    mainClass.set("org.antlr.v4.Tool")
 
     args = listOf(
             "-o", "src/main/java/org/openrewrite/maven/internal/grammar",

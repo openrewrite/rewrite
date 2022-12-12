@@ -1,8 +1,7 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    id("org.openrewrite.java-library")
-    id("org.openrewrite.maven-publish")
+    id("org.openrewrite.build.language-library")
 }
 
 val compiler = javaToolchains.compilerFor {
@@ -30,6 +29,10 @@ dependencies {
     testImplementation(project(":rewrite-java-tck"))
 }
 
+rewriteJava {
+    kotlinTests.set(true)
+}
+
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(8))
@@ -46,13 +49,10 @@ tasks.withType<JavaCompile>().configureEach {
     sourceCompatibility = JavaVersion.VERSION_1_8.toString()
     targetCompatibility = JavaVersion.VERSION_1_8.toString()
     options.isFork = true
-    options.release.set(null as? Int) // remove `--release 8` set in `org.openrewrite.java-base`
+    options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
 }
 
 tasks.withType<Test>().configureEach {
-    useJUnitPlatform {
-        excludeTags("debug")
-    }
     jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
     javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(8))

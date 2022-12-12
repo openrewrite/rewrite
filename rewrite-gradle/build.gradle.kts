@@ -1,9 +1,7 @@
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
-    id("org.openrewrite.java-library")
-    id("org.openrewrite.maven-publish")
-    id("org.openrewrite.shadow")
+    id("org.openrewrite.build.language-library")
 }
 
 repositories {

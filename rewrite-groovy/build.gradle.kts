@@ -1,8 +1,5 @@
 plugins {
-//    // temporary, just to write source files to test the limits of Groovy syntax
-//    groovy
-    id("org.openrewrite.java-library")
-    id("org.openrewrite.maven-publish")
+    id("org.openrewrite.build.language-library")
 }
 
 dependencies {
