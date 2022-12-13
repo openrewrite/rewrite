@@ -22,6 +22,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.BuildEnvironment;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
@@ -48,6 +49,12 @@ public class GitProvenance implements Marker {
     String branch;
 
     String change;
+    
+    @Nullable
+    AutoCRLF autocrlf;
+
+    @Nullable
+    EOL eol;
 
     @Nullable
     public String getOrganizationName() {
@@ -90,15 +97,16 @@ public class GitProvenance implements Marker {
      * @return A marker containing git provenance information.
      * @deprecated Use {@link #fromProjectDirectory(Path, BuildEnvironment) instead}.
      */
+    @Nullable
     @Deprecated
-    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir) {
+    public static GitProvenance fromProjectDirectory(Path projectDir) {
         return fromProjectDirectory(projectDir, null);
     }
 
     /**
-     * @param projectDir The project directory.
+     * @param projectDir       The project directory.
      * @param buildEnvironment In detached head scenarios, the branch is best
-     *                determined from a {@link BuildEnvironment} marker if possible.
+     *                         determined from a {@link BuildEnvironment} marker if possible.
      * @return A marker containing git provenance information.
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment buildEnvironment) {
@@ -137,7 +145,8 @@ public class GitProvenance implements Marker {
                 }
             }
 
-            return new GitProvenance(randomId(), getOrigin(repository), branch, changeset);
+            return new GitProvenance(randomId(), getOrigin(repository), branch, changeset,
+                    getAutocrlf(repository), getEOF(repository));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (IllegalArgumentException | GitAPIException e) {
@@ -159,7 +168,7 @@ public class GitProvenance implements Marker {
             List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
-                        (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
+                    (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
                     branch = remoteBranch.substring(remote.getName().length() + 1); // +1 for the forward slash
                 }
             }
@@ -182,6 +191,36 @@ public class GitProvenance implements Marker {
     }
 
     @Nullable
+    private static AutoCRLF getAutocrlf(Repository repository) {
+        WorkingTreeOptions opt = repository.getConfig().get(WorkingTreeOptions.KEY);
+        switch (opt.getAutoCRLF()) {
+            case FALSE:
+                return AutoCRLF.False;
+            case TRUE:
+                return AutoCRLF.True;
+            case INPUT:
+                return AutoCRLF.Input;
+            default:
+                return null;
+        }
+    }
+
+    @Nullable
+    private static EOL getEOF(Repository repository) {
+        WorkingTreeOptions opt = repository.getConfig().get(WorkingTreeOptions.KEY);
+        switch (opt.getEOL()) {
+            case CRLF:
+                return EOL.CRLF;
+            case LF:
+                return EOL.LF;
+            case NATIVE:
+                return EOL.Native;
+            default:
+                return null;
+        }
+    }
+
+    @Nullable
     private static String getChangeset(Repository repository) throws IOException {
         ObjectId head = repository.resolve(Constants.HEAD);
         if (head == null) {
@@ -200,5 +239,17 @@ public class GitProvenance implements Marker {
             throw new IllegalStateException("Unable to remove credentials from repository URL. {0}", e);
         }
         return url;
+    }
+
+    public enum AutoCRLF {
+        False,
+        True,
+        Input;
+    }
+
+    public enum EOL {
+        CRLF,
+        LF,
+        Native;
     }
 }

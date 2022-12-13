@@ -49,14 +49,14 @@ class GitProvenanceTest {
     @ParameterizedTest
     @MethodSource("remotes")
     fun getOrganizationName(remote: String) {
-        assertThat(GitProvenance(randomId(), remote, "main", "123").organizationName)
+        assertThat(GitProvenance(randomId(), remote, "main", "123", null, null).organizationName)
             .isEqualTo("openrewrite")
     }
 
     @ParameterizedTest
     @MethodSource("remotes")
     fun getRepositoryName(remote: String) {
-        assertThat(GitProvenance(randomId(), remote, "main", "123").repositoryName)
+        assertThat(GitProvenance(randomId(), remote, "main", "123", null, null).repositoryName)
             .isEqualTo("rewrite")
     }
 
