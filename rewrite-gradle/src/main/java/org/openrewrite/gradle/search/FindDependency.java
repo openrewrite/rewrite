@@ -23,6 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -75,7 +76,7 @@ public class FindDependency extends Recipe {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 if (dependency.matches(method)) {
-                    if (configuration == null || method.getSimpleName().equals(configuration)) {
+                    if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = method.getArguments();
                         if (depArgs.get(0) instanceof J.Literal) {
                             String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
