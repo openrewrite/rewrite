@@ -18,6 +18,7 @@ package org.openrewrite.properties;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
 public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
@@ -42,7 +43,16 @@ public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
     public Properties visitEntry(Properties.Entry entry, P p) {
         Properties.Entry e = entry;
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        if (e.getValue() != null) {
+            e = e.withValue(visitValue(e.getValue(), p));
+        }
         return e;
+    }
+
+    //Note: Properties.Value does not currently implement Properties, so this is a bit of an outlier.
+    @Nullable
+    public Properties.Value visitValue(Properties.Value value, P p) {
+        return value.withMarkers(visitMarkers(value.getMarkers(), p));
     }
 
     public Properties visitComment(Properties.Comment comment, P p) {
