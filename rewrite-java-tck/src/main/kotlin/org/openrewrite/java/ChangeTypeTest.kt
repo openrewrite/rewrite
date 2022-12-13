@@ -184,6 +184,25 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
         """)
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2521")
+    @Test
+    fun replacePrivateNestedType() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.A.B1", "a.A.B2", false)) },
+        java("""
+            package a;
+            
+            class A {
+                private static class B1 {} 
+            }
+        """,
+        """
+            package a;
+            
+            class A {
+                private static class B2 {} 
+            }
+        """)
+    )
     @Test
     fun simpleName() = rewriteRun(
         java(a1),
