@@ -40,4 +40,23 @@ class FindDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findDependencyByGlob() {
+        rewriteRun(
+          spec -> spec.recipe(new FindDependency("org.*", "*", "")),
+          buildGradle(
+            """
+              dependencies {
+                  api 'org.openrewrite:rewrite-core:latest.release'
+              }
+              """,
+            """
+              dependencies {
+                  /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
+              }
+              """
+          )
+        );
+    }
 }
