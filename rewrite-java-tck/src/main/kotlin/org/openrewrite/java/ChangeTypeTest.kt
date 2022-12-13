@@ -184,6 +184,7 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
         """)
     )
 
+    @Disabled("Requires updates to add/remove import.")
     @Issue("https://github.com/openrewrite/rewrite/issues/2521")
     @Test
     fun replacePrivateNestedType() = rewriteRun(
@@ -203,6 +204,7 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
             }
         """)
     )
+
     @Test
     fun simpleName() = rewriteRun(
         java(a1),
