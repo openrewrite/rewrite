@@ -184,7 +184,6 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
         """)
     )
 
-    @Disabled("Requires updates to add/remove import.")
     @Issue("https://github.com/openrewrite/rewrite/issues/2521")
     @Test
     fun replacePrivateNestedType() = rewriteRun(
@@ -193,14 +192,40 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
             package a;
             
             class A {
-                private static class B1 {} 
+                private static class B1 {}
             }
         """,
         """
             package a;
             
             class A {
-                private static class B2 {} 
+                private static class B2 {}
+            }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2521")
+    @Test
+    fun deeplyNestedInnerClass() = rewriteRun(
+        { spec -> spec.recipe(ChangeType("a.A.B.C", "a.A.B.C2", false)) },
+        java("""
+            package a;
+            
+            class A {
+                public static class B {
+                    public static class C {
+                    }
+                }
+            }
+        """,
+            """
+            package a;
+            
+            class A {
+                public static class B {
+                    public static class C2 {
+                    }
+                }
             }
         """)
     )
