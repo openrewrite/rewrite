@@ -16,32 +16,34 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.xml.Assertions.xml;
 
-public class CountLinesTest {
+public class CountLinesTest implements RewriteTest {
 
     @Test
     public void testLineCount() {
-
-        Xml.Document ast = XmlParser.builder().build().parse(
+        rewriteRun(
+          xml(
             """
                 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                          xmlns="http://maven.apache.org/POM/4.0.0"
                          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
-        
+                    
                     <groupId>org.openrewrite.maven</groupId>
                     <artifactId>round_trip_serialization</artifactId>
                     <version>1.0</version>
                     <packaging>jar</packaging>
                     <name>BasicIT#round_trip_serialization</name>
-        
+                    
                     <properties>
                         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
                     </properties>
-        
+                    
                     <build>
                         <plugins>
                             <plugin>
@@ -58,11 +60,9 @@ public class CountLinesTest {
                         </plugins>
                     </build>
                 </project>
-            """
-        ).get(0);
-
-        int lines = CountLinesVisitor.countLines(ast);
-        assertThat(lines).isEqualTo(28);
-
+              """,
+            spec -> spec.afterRecipe(xml -> assertThat(CountLinesVisitor.countLines(xml)).isEqualTo(28))
+          )
+        );
     }
 }

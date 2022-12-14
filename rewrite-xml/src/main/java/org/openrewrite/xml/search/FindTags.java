@@ -17,10 +17,7 @@ package org.openrewrite.xml.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XPathMatcher;
@@ -66,26 +63,22 @@ public class FindTags extends Recipe {
 
     public static Set<Xml.Tag> find(Xml x, String xPath) {
         XPathMatcher matcher = new XPathMatcher(xPath);
-        XmlVisitor<Set<Xml.Tag>> findVisitor = new XmlVisitor<Set<Xml.Tag>>() {
-
+        return TreeVisitor.collect(new XmlVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (matcher.matches(getCursor())) {
-                    ts.add(tag);
+                    return SearchResult.found(tag);
                 }
-                return super.visitTag(tag, ts);
+                return super.visitTag(tag, ctx);
             }
-        };
-
-        Set<Xml.Tag> ts = new HashSet<>();
-        findVisitor.visit(x, ts);
-        return ts;
+        }, x, new HashSet<>());
     }
 
     /**
-     * Returns null if there is not exactly one tag matching this xPath
+     * Returns <code>null</code> if there is not exactly one tag matching this xPath
      */
     @Nullable
+    @Incubating(since = "7.33.0")
     public static Xml.Tag findSingle(Xml x, String xPath) {
         final Set<Xml.Tag> tags = find(x, xPath);
         if (tags.size() != 1) {

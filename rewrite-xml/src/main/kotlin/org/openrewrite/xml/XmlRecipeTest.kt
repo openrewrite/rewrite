@@ -23,6 +23,7 @@ import org.openrewrite.xml.tree.Xml
 import java.io.File
 import java.nio.file.Path
 
+@Deprecated("Use RewriteTest instead")
 @Suppress("unused")
 interface XmlRecipeTest : RecipeTest<Xml.Document> {
     override val parser: XmlParser
