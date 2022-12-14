@@ -27,8 +27,10 @@ import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -76,5 +78,22 @@ public class FindProperties extends Recipe {
                 return t;
             }
         };
+    }
+
+    public static Set<Xml.Tag> find(Xml.Document xml, String propertyPattern) {
+        Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
+                .replace("*", ".*"));
+        Set<Xml.Tag> found = new HashSet<>();
+        new MavenVisitor<Set<Xml.Tag>>(){
+            @Override
+            public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> tags) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, tags);
+                if (isPropertyTag() && propertyMatcher.matcher(tag.getName()).matches()) {
+                    tags.add(t);
+                }
+                return t;
+            }
+        }.visit(xml, found);
+        return found;
     }
 }
