@@ -102,6 +102,8 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     protected boolean skip = false;
 
+    protected boolean noTrim = false;
+
     public SourceSpec<T> path(Path sourcePath) {
         this.sourcePath = sourcePath;
         return this;
@@ -140,8 +142,21 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return this;
     }
 
+    public SourceSpec<T> skip() {
+        return skip(true);
+    }
+
     public SourceSpec<T> skip(@Nullable Boolean skip) {
         this.skip = Boolean.TRUE.equals(skip);
+        return this;
+    }
+
+    public SourceSpec<T> noTrim() {
+        return noTrim(true);
+    }
+
+    public SourceSpec<T> noTrim(@Nullable Boolean noTrim) {
+        this.noTrim = Boolean.TRUE.equals(noTrim);
         return this;
     }
 

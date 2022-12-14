@@ -177,7 +177,9 @@ public interface RewriteTest extends SourceSpecs {
                 if (sourceSpec.before == null) {
                     continue;
                 }
-                String beforeTrimmed = trimIndentPreserveCRLF(sourceSpec.before);
+                String beforeTrimmed = sourceSpec.noTrim ?
+                        sourceSpec.before :
+                        trimIndentPreserveCRLF(sourceSpec.before);
                 Path sourcePath;
                 if (sourceSpec.sourcePath != null) {
                     sourcePath = sourceSpec.dir.resolve(sourceSpec.sourcePath);
@@ -291,7 +293,9 @@ public interface RewriteTest extends SourceSpecs {
                                     sourceSpec.getSourcePath())
                                 .isNull();
                         String actual = result.getAfter().printAll(out.clone()).trim();
-                        String expected = trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
+                        String expected = sourceSpec.noTrim ?
+                                sourceSpec.after.apply(actual) :
+                                trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                         assertThat(actual).isEqualTo(expected);
                         continue nextSourceSpec;
                     }
@@ -343,7 +347,7 @@ public interface RewriteTest extends SourceSpecs {
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             for (Result result : recipeRun.getResults()) {
                 if (result.getBefore() == specForSourceFile.getKey()) {
-                    if(result.getAfter() != null) {
+                    if (result.getAfter() != null) {
                         String expectedAfter = specForSourceFile.getValue().after == null ? null :
                                 specForSourceFile.getValue().after.apply(result.getAfter().printAll(out.clone()));
                         if (expectedAfter != null) {

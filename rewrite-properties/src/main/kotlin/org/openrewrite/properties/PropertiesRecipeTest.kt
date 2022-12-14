@@ -23,6 +23,7 @@ import org.openrewrite.properties.tree.Properties
 import java.io.File
 import java.nio.file.Path
 
+@Deprecated("Use RewriteTest instead")
 @Suppress("unused")
 interface PropertiesRecipeTest : RecipeTest<Properties.File> {
     override val parser: PropertiesParser

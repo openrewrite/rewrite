@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -76,7 +77,7 @@ class AddPropertyTest implements RewriteTest {
                       </properties>
                     </project>
               """,
-            spec -> spec.skip(true)
+            SourceSpec::skip
           ),
           mavenProject("my-app",
             pomXml(
