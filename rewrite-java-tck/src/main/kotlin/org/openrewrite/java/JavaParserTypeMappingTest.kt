@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
 import org.openrewrite.InMemoryExecutionContext
@@ -38,6 +39,7 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
         parser.reset()
     }
 
+    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/2445")
     @Test
     fun annotationParameterDefaults() {
