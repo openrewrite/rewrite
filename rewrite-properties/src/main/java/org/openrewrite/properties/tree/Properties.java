@@ -111,11 +111,33 @@ public interface Properties extends Tree {
         Markers markers;
         String key;
         String beforeEquals;
+        Delimiter delimiter;
         Value value;
 
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
             return v.visitEntry(this, p);
+        }
+
+        public enum Delimiter {
+            COLON(':'), EQUALS('='), NONE('\0');
+
+            private final Character character;
+
+            Delimiter(Character character) {
+                this.character = character;
+            }
+
+            public static Delimiter getDelimiter(String value) {
+                return "=".equals(value.trim()) ? Delimiter.EQUALS :
+                            ":".equals(value.trim()) ? Delimiter.COLON :
+                            "".equals(value.trim()) ? Delimiter.NONE :
+                                    Delimiter.EQUALS;
+            }
+
+            public Character getCharacter() {
+                return character;
+            }
         }
     }
 

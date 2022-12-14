@@ -75,7 +75,7 @@ public class AddProperty extends Recipe {
                         sourceFile :
                         new ChangePropertyValue(key, value, null, null, null)
                                 .getVisitor().visitNonNull(sourceFile, ctx);
-                return (SourceFile) new org.openrewrite.properties.AddProperty(key, value, null)
+                return (SourceFile) new org.openrewrite.properties.AddProperty(key, value, null, null)
                         .getVisitor()
                         .visitNonNull(t, ctx);
             }

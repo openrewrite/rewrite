@@ -74,7 +74,6 @@ class PropertiesParserTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2499")
     @ParameterizedTest
     @ValueSource(strings = {"#", "!"})
-    @Disabled
     void commentThenEntry(String commentStyle) {
         rewriteRun(
           properties(
@@ -151,7 +150,6 @@ class PropertiesParserTest implements RewriteTest {
     @SuppressWarnings("WrongPropertyKeyValueDelimiter")
     @Issue("https://github.com/openrewrite/rewrite/issues/2501")
     @Test
-    @Disabled
     void delimitedByWhitespace() {
         rewriteRun(
           properties(

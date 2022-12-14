@@ -28,7 +28,6 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -140,7 +139,7 @@ public class ActivateStyle extends Recipe {
             if(!keyExists.get()) {
                 // Existing key not found, need to add one
                 p = p.withContent(ListUtils.concat(p.getContent(),
-                        new Properties.Entry(randomId(), "\n", Markers.EMPTY, STYLE_KEY, "",
+                        new Properties.Entry(randomId(), "\n", Markers.EMPTY, STYLE_KEY, "", Properties.Entry.Delimiter.EQUALS,
                                 new Properties.Value(randomId(), "", Markers.EMPTY, fullyQualifiedStyleName))));
             }
             return p;

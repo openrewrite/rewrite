@@ -39,8 +39,10 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
         p.out.append(entry.getKey())
-                .append(entry.getBeforeEquals())
-                .append('=');
+                .append(entry.getBeforeEquals());
+        if (entry.getDelimiter() != Properties.Entry.Delimiter.NONE) {
+            p.out.append(entry.getDelimiter().getCharacter());
+        }
         beforeSyntax(entry.getValue().getPrefix(), entry.getValue().getMarkers(), p);
         p.out.append(entry.getValue().getText());
         afterSyntax(entry.getValue().getMarkers(), p);
