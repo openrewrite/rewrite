@@ -31,5 +31,7 @@ class SemverTest {
             .isInstanceOf(TildeRange::class.java)
         assertThat(Semver.validate("^1.5", null).getValue<VersionComparator>())
             .isInstanceOf(CaretRange::class.java)
+        assertThat(Semver.validate("[1.5,2)", null).getValue<VersionComparator>())
+            .isInstanceOf(SetRange::class.java)
     }
 }
