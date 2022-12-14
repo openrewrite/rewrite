@@ -1351,6 +1351,49 @@ interface ChangeTypeTest : JavaRecipeTest, RewriteTest {
         """.trimIndent() + "\n")
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2528")
+    @Test
+    fun changePathOfNonPublicClass(@TempDir tempDir: Path) {
+        val sources = JavaParser.fromJavaVersion().build().parse(
+            listOf(tempDir.resolve("a/b/C.java").apply {
+                toFile().parentFile.mkdirs()
+                // language=java
+                toFile().writeText("""
+                    package a.b;
+                    class C {
+                    }
+                    class D {
+                    }
+                """.trimIndent())
+            }),
+            tempDir,
+            InMemoryExecutionContext()
+        )
+
+        val results = ChangeType("a.b.C", "x.y.Z", false).run(sources).results
+
+        // similarity index doesn't matter
+        // language=diff
+        assertThat(results.joinToString("") { it.diff() }).isEqualTo("""
+            diff --git a/a/b/C.java b/x/y/Z.java
+            similarity index 0%
+            rename from a/b/C.java
+            rename to x/y/Z.java
+            index 1ef60ec..3b77cb3 100644
+            --- a/a/b/C.java
+            +++ b/x/y/Z.java
+            @@ -1,5 +1,5 @@ org.openrewrite.java.ChangeType
+            -package a.b;
+            -class C {
+            +package x.y;
+            +class Z {
+             }
+             class D {
+             }
+            \ No newline at end of file
+        """.trimIndent() + "\n")
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1904")
     @Test
     fun renamePackage() = rewriteRun(

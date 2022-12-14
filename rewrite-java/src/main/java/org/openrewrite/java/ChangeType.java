@@ -166,7 +166,7 @@ public class ChangeType extends Recipe {
                     .map(it -> it.getType().getFullyQualifiedName())
                     .collect(Collectors.toSet());
 
-            if (fullyQualifiedTarget != null && !(fullyQualifiedTarget.getOwningClass() != null && classNames.contains(getParentClassName(fullyQualifiedTarget)))) {
+            if (fullyQualifiedTarget != null && !(fullyQualifiedTarget.getOwningClass() != null && classNames.contains(getTopLevelClassName(fullyQualifiedTarget)))) {
                 if (fullyQualifiedTarget.getOwningClass() != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                     c = (J.CompilationUnit) new AddImport(fullyQualifiedTarget.getOwningClass().getFullyQualifiedName(), null, true).visit(c, ctx);
                 }
@@ -179,14 +179,6 @@ public class ChangeType extends Recipe {
                 c = c.withImports(ListUtils.map(c.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
             }
             return c;
-        }
-
-        private String getParentClassName(JavaType.FullyQualified fullyQualified) {
-            if (fullyQualified.getOwningClass() == null) {
-                return fullyQualified.getFullyQualifiedName();
-            }
-
-            return getParentClassName(fullyQualified.getOwningClass());
         }
 
         @Override
@@ -497,16 +489,9 @@ public class ChangeType extends Recipe {
 
         private boolean updatePath(JavaSourceFile sf, String oldPath, String newPath) {
             return !oldPath.equals(newPath) && sf.getClasses().stream()
-                    .anyMatch(o -> J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Public) &&
+                    .anyMatch(o -> !J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Private) &&
                             o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
                             TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType)));
-        }
-
-        private String getTopLevelClassName(JavaType.FullyQualified classType) {
-            if (classType.getOwningClass() == null) {
-                return classType.getFullyQualifiedName();
-            }
-            return getTopLevelClassName(classType.getOwningClass());
         }
 
         @Override
@@ -593,5 +578,12 @@ public class ChangeType extends Recipe {
         private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName());
         }
+    }
+
+    public static String getTopLevelClassName(JavaType.FullyQualified classType) {
+        if (classType.getOwningClass() == null) {
+            return classType.getFullyQualifiedName();
+        }
+        return getTopLevelClassName(classType.getOwningClass());
     }
 }
