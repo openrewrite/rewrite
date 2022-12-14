@@ -21,15 +21,12 @@ import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
-import java.util.stream.Collectors;
-
-import static java.util.Spliterators.spliteratorUnknownSize;
-import static java.util.stream.StreamSupport.stream;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -69,7 +66,7 @@ public class FindProperty extends Recipe {
                 if (!Boolean.FALSE.equals(relaxedBinding) ?
                         NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) :
                         StringUtils.matchesGlob(prop, propertyKey)) {
-                    e = e.withValue(e.getValue().withMarkers(e.getValue().getMarkers().searchResult()));
+                    e = e.withValue(SearchResult.found(e.getValue()));
                 }
                 return e;
             }
