@@ -4,4 +4,5 @@ plugins {
 
 allprojects {
     group = "org.openrewrite"
+    description = "Eliminate tech-debt. Automatically."
 }
