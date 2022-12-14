@@ -23,6 +23,7 @@ import org.openrewrite.protobuf.tree.Proto
 import java.io.File
 import java.nio.file.Path
 
+@Deprecated("Use RewriteTest instead")
 @Suppress("unused")
 interface ProtoRecipeTest : RecipeTest<Proto.Document> {
     override val parser: ProtoParser

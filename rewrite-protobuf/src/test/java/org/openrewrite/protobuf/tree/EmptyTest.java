@@ -13,30 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.protobuf.tree
+package org.openrewrite.protobuf.tree;
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.protobuf.ProtoParserTest
+import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RewriteTest;
 
-class ServiceTest : ProtoParserTest() {
+import static org.openrewrite.protobuf.Assertions.proto;
 
-    @Test
-    fun options() = assertUnchanged(
-        before = """
-            syntax = 'proto2';
-            service MyService {
-              option my_option = "test";
-            }
-        """
-    )
+class EmptyTest implements RewriteTest {
 
     @Test
-    fun rpc() = assertUnchanged(
-        before = """
-            syntax = 'proto2';
-            service SearchService {
-              rpc Search ( SearchRequest ) returns ( SearchResponse );
-            }
-        """
-    )
+    void empty() {
+        rewriteRun(
+          proto(
+            """
+              syntax = 'proto2';
+              ; ; ;
+              """
+          )
+        );
+    }
 }
