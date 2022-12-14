@@ -5278,7 +5278,19 @@ public interface J extends Tree {
             Positive,
             Negative,
             Complement,
-            Not
+            Not;
+
+            public boolean isModifying() {
+                switch (this) {
+                    case PreIncrement:
+                    case PreDecrement:
+                    case PostIncrement:
+                    case PostDecrement:
+                        return true;
+                    default:
+                        return false;
+                }
+            }
         }
 
         public Padding getPadding() {

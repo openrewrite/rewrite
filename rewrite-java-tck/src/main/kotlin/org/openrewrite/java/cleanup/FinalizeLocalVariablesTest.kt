@@ -396,4 +396,28 @@ interface FinalizeLocalVariablesTest : RewriteTest {
             }
         """)
     )
+
+    @Test
+    fun nonModifyingUnaryOperatorAwareness() = rewriteRun(
+        java("""
+            class Test {
+                void test() {
+                    int i = 1;
+                    int j = -i;
+                    int k = +j;
+                    int l = ~k;
+                }
+            }
+        """,
+        """
+            class Test {
+                void test() {
+                    final int i = 1;
+                    final int j = -i;
+                    final int k = +j;
+                    final int l = ~k;
+                }
+            }
+        """)
+    )
 }

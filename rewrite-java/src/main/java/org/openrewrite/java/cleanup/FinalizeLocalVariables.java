@@ -146,7 +146,7 @@ public class FinalizeLocalVariables extends Recipe {
             }
 
             J.Unary u = super.visitUnary(unary, hasAssignment);
-            if (u.getExpression() instanceof J.Identifier) {
+            if (u.getOperator().isModifying() && u.getExpression() instanceof J.Identifier) {
                 J.Identifier i = (J.Identifier) u.getExpression();
                 if (i.getSimpleName().equals(variable.getSimpleName())) {
                     hasAssignment.set(true);
