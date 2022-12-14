@@ -181,7 +181,7 @@ public class UpdateGradleWrapper extends Recipe {
             Set<Properties.Entry> properties = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
             if (properties.isEmpty()) {
                 Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());
-                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", propertyValue);
+                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
                 List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
                 p = ((Properties.File) p).withContent(contentList);
             }
