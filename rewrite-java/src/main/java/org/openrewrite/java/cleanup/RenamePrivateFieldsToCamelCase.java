@@ -104,6 +104,7 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
             // Only make a change if the variable does not conform to lower camelcase format.
             if (parentScope.getParent() != null
                     && parentScope.getParent().getValue() instanceof J.ClassDeclaration
+                    && !(parentScope.getValue() instanceof J.ClassDeclaration)
                     && variable.getVariableType() != null
                     && variable.getVariableType().hasFlags(Flag.Private)
                     && !(variable.getVariableType().hasFlags(Flag.Static, Flag.Final))
@@ -127,7 +128,7 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
          * J.* types that may only reference an existing name and do not create a new name scope are excluded.
          */
         private static Cursor getCursorToParentScope(Cursor cursor) {
-            return cursor.dropParentUntil(is -> is instanceof J.Block);
+            return cursor.dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.Block);
         }
     }
 

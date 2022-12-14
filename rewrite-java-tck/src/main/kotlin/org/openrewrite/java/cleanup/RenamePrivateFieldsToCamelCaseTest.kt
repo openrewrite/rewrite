@@ -19,7 +19,10 @@ package org.openrewrite.java.cleanup
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
+import org.openrewrite.Recipe
+import org.openrewrite.Tree
 import org.openrewrite.java.Assertions.java
+import org.openrewrite.java.marker.JavaVersion
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
 
@@ -360,6 +363,30 @@ interface RenamePrivateFieldsToCamelCaseTest : RewriteTest {
                         return hasMethod;
                     }
                 }
+        """)
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2526")
+    @Test
+    fun recordCompactConstructor() = rewriteRun(
+        { spec -> spec.beforeRecipe { sf ->
+            val javaRuntimeVersion = System.getProperty("java.runtime.version")
+            val javaVendor = System.getProperty("java.vm.vendor")
+            if (JavaVersion(Tree.randomId(), javaRuntimeVersion, javaVendor, javaRuntimeVersion, javaRuntimeVersion).majorVersion != 17) {
+                spec.recipe(Recipe.noop())
+            }
+        }},
+        java("""
+            public record MyRecord(
+               boolean bar,
+               String foo
+            ) {
+               public MyRecord {
+                  if (foo == null) {
+                      foo = "defaultValue";
+                  }
+              }
+            }
         """)
     )
 }
