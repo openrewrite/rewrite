@@ -42,6 +42,13 @@ public class AddProperty extends Recipe {
             example = "true")
     String value;
 
+    @Option(displayName = "Optional delimiter",
+            description = "Property entries support different delimiters (`=`, `:`, or whitespace). The default value is `=` unless provided the delimiter of the new property entry.",
+            required = false,
+            example = ":")
+    @Nullable
+    String delimiter;
+
     @Option(displayName = "Optional file matcher",
             description = "Matching files will be modified. This is a glob expression.",
             required = false,
@@ -77,7 +84,9 @@ public class AddProperty extends Recipe {
                     Set<Properties.Entry> properties = FindProperties.find(p, property, false);
                     if (properties.isEmpty()) {
                         Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
-                        Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, "", propertyValue);
+                        Properties.Entry.Delimiter delimitedBy = delimiter != null && !delimiter.isEmpty() ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
+                        String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
+                        Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
                         List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
                         p = ((Properties.File) p).withContent(contentList);
                     }

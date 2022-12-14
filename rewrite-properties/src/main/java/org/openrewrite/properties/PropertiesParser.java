@@ -200,6 +200,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 valuePrefix = new StringBuilder(),
                 value = new StringBuilder();
 
+        Properties.Entry.Delimiter delimiter = Properties.Entry.Delimiter.NONE;
         char prev = '$';
         int state = 0;
         for (char c : line.toCharArray()) {
@@ -216,6 +217,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                             key.append(c);
                             break;
                         } else {
+                            delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
                             state += 2;
                         }
                     } else if (!Character.isWhitespace(c)) {
@@ -228,6 +230,8 @@ public class PropertiesParser implements Parser<Properties.File> {
                     if (Character.isWhitespace(c)) {
                         equalsPrefix.append(c);
                         break;
+                    } else if (c == '=' || c == ':') {
+                        delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
                     }
                     state++;
                 case 3:
@@ -265,6 +269,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 Markers.EMPTY,
                 key.toString(),
                 equalsPrefix.toString(),
+                delimiter,
                 new Properties.Value(randomId(), valuePrefix.toString(), Markers.EMPTY, value.toString())
         );
     }
