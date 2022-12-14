@@ -499,7 +499,8 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     null,
                     paramNames,
                     null, null, null,
-                    methodSymbol.getDefaultValue() != null ? methodSymbol.defaultValue.getValue() : null
+                    // TODO: Figure out the correct thing to put here based on methodSymbol.defaultValue.getValue()
+                    null
             );
             typeCache.put(signature, method);
 

@@ -39,7 +39,6 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
         parser.reset()
     }
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/2445")
     @Test
     fun annotationParameterDefaults() {
