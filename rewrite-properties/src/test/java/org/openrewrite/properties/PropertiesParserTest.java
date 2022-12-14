@@ -127,7 +127,6 @@ class PropertiesParserTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2411")
     @Test
-    @Disabled
     void commentsWithMultipleDelimiters() {
         rewriteRun(
           properties(

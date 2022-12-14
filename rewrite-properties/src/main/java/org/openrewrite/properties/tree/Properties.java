@@ -145,11 +145,26 @@ public interface Properties extends Tree {
 
         String prefix;
         Markers markers;
+        Delimiter delimiter;
         String message;
 
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
             return v.visitComment(this, p);
+        }
+
+        public enum Delimiter {
+            HASH_TAG('#'), EXCLAMATION_MARK('!');
+
+            private final Character character;
+
+            Delimiter(Character character) {
+                this.character = character;
+            }
+
+            public Character getCharacter() {
+                return character;
+            }
         }
     }
 }

@@ -130,7 +130,9 @@ public class PropertiesParser implements Parser<Properties.File> {
     private Properties.Content extractContent(String line, StringBuilder prefix) {
         Properties.Content content = null;
         if (line.trim().startsWith("#") || line.trim().startsWith("!")) {
-            content = commentFromLine(line, prefix.toString());
+            Properties.Comment.Delimiter delimiter = line.trim().startsWith("#") ?
+                    Properties.Comment.Delimiter.HASH_TAG : Properties.Comment.Delimiter.EXCLAMATION_MARK;
+            content = commentFromLine(line, prefix.toString(), delimiter);
             prefix.delete(0, prefix.length());
         } else if (line.contains("=") || line.contains(":") || isDelimitedByWhitespace(line)) {
             StringBuilder trailingWhitespaceBuffer = new StringBuilder();
@@ -147,7 +149,7 @@ public class PropertiesParser implements Parser<Properties.File> {
         return line.length() >=3 && !Character.isWhitespace(line.charAt(0)) && !Character.isWhitespace(line.length() - 1) && line.contains(" ");
     }
 
-    private Properties.Comment commentFromLine(String line, String prefix) {
+    private Properties.Comment commentFromLine(String line, String prefix, Properties.Comment.Delimiter delimiter) {
         StringBuilder prefixBuilder = new StringBuilder(prefix);
         StringBuilder message = new StringBuilder();
 
@@ -186,6 +188,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 randomId(),
                 prefixBuilder.toString(),
                 Markers.EMPTY,
+                delimiter,
                 message.toString()
         );
     }

@@ -51,7 +51,8 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     @Override
     public Properties visitComment(Properties.Comment comment, PrintOutputCapture<P> p) {
         beforeSyntax(comment, p);
-        p.out.append('#').append(comment.getMessage());
+        p.out.append(comment.getDelimiter().getCharacter());
+        p.out.append(comment.getMessage());
         afterSyntax(comment, p);
         return comment;
     }
