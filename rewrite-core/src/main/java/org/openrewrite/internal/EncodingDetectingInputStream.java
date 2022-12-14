@@ -68,78 +68,86 @@ public class EncodingDetectingInputStream extends InputStream {
 
         // if we haven't yet determined a charset...
         if (charset == null) {
-            if (prev3 == 0xC3 && prev2 == 0xAF && prev == 0xC2) {
-                charsetBomMarked = true;
-                charset = StandardCharsets.UTF_8;
-            } else {
-                if (aByte == -1 || !(prev2 == 0 && prev == 0xC3 || prev3 == 0 && prev2 == 0xC3)) {
-                    if (maybeTwoByteSequence) {
-                        if (aByte == -1 && !utf8SequenceEnd(prev) || aByte != -1 && !(utf8SequenceEnd(aByte))) {
-                            charset = WINDOWS_1252;
-                        } else {
-                            maybeTwoByteSequence = false;
-                            prev2 = -1;
-                            prev = -1;
-                        }
-                    } else if (maybeThreeByteSequence) {
-                        if (aByte == -1 ||
-                                utf8SequenceEnd(prev) && !(utf8SequenceEnd(aByte)) ||
-                                !utf8SequenceEnd(aByte)) {
-                            charset = WINDOWS_1252;
-                        }
-
-                        if (utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
-                            maybeThreeByteSequence = false;
-                            prev2 = -1;
-                            prev = -1;
-                        }
-                    } else if (maybeFourByteSequence) {
-                        if (aByte == -1 ||
-                                utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
-                                utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
-                                !(utf8SequenceEnd(aByte))) {
-                            charset = WINDOWS_1252;
-                        }
-
-                        if (utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
-                            maybeFourByteSequence = false;
-                            prev2 = -1;
-                            prev = -1;
-                        }
-                    } else if (utf8TwoByteSequence(aByte)) {
-                        maybeTwoByteSequence = true;
-                    } else if (utf8ThreeByteSequence(aByte)) {
-                        maybeThreeByteSequence = true;
-                    } else if (utf8FourByteSequence(aByte)) {
-                        maybeFourByteSequence = true;
-                    } else if (!utf8TwoByteSequence(prev) && utf8SequenceEnd(aByte)) {
-                        charset = WINDOWS_1252;
-                    }
-                }
-
-                if (aByte == -1 && charset == null) {
-                    charset = StandardCharsets.UTF_8;
-                }
-            }
-
-            prev3 = prev2;
-            prev2 = prev;
-            prev = aByte;
+            guessCharset(aByte);
         }
         return aByte;
     }
 
+    private void guessCharset(int aByte) {
+        if (prev3 == 0xC3 && prev2 == 0xAF && prev == 0xC2) {
+            charsetBomMarked = true;
+            charset = StandardCharsets.UTF_8;
+        } else {
+            if (aByte == -1 || !(prev2 == 0 && prev == 0xC3 || prev3 == 0 && prev2 == 0xC3)) {
+                if (maybeTwoByteSequence) {
+                    if (aByte == -1 && !utf8SequenceEnd(prev) || aByte != -1 && !(utf8SequenceEnd(aByte))) {
+                        charset = WINDOWS_1252;
+                    } else {
+                        maybeTwoByteSequence = false;
+                        prev2 = -1;
+                        prev = -1;
+                    }
+                } else if (maybeThreeByteSequence) {
+                    if (aByte == -1 ||
+                            utf8SequenceEnd(prev) && !(utf8SequenceEnd(aByte)) ||
+                            !utf8SequenceEnd(aByte)) {
+                        charset = WINDOWS_1252;
+                    }
+
+                    if (utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
+                        maybeThreeByteSequence = false;
+                        prev2 = -1;
+                        prev = -1;
+                    }
+                } else if (maybeFourByteSequence) {
+                    if (aByte == -1 ||
+                            utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
+                            utf8SequenceEnd(prev) && !utf8SequenceEnd(aByte) ||
+                            !(utf8SequenceEnd(aByte))) {
+                        charset = WINDOWS_1252;
+                    }
+
+                    if (utf8SequenceEnd(prev2) && utf8SequenceEnd(prev) && utf8SequenceEnd(aByte)) {
+                        maybeFourByteSequence = false;
+                        prev2 = -1;
+                        prev = -1;
+                    }
+                } else if (utf8TwoByteSequence(aByte)) {
+                    maybeTwoByteSequence = true;
+                } else if (utf8ThreeByteSequence(aByte)) {
+                    maybeThreeByteSequence = true;
+                } else if (utf8FourByteSequence(aByte)) {
+                    maybeFourByteSequence = true;
+                } else if (!utf8TwoByteSequence(prev) && utf8SequenceEnd(aByte)) {
+                    charset = WINDOWS_1252;
+                }
+            }
+
+            if (aByte == -1 && charset == null) {
+                charset = StandardCharsets.UTF_8;
+            }
+        }
+
+        prev3 = prev2;
+        prev2 = prev;
+        prev = aByte;
+    }
+
     public String readFully() {
         try (InputStream is = this) {
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream() {
+                @Override
+                public synchronized String toString() {
+                    return new String(buf, 0, count, getCharset());
+                }
+            };
             byte[] buffer = new byte[4096];
             int n;
             while ((n = is.read(buffer)) != -1) {
                 bos.write(buffer, 0, n);
             }
 
-            byte[] bytes = bos.toByteArray();
-            return new String(bytes, 0, bytes.length, getCharset());
+            return bos.toString();
         } catch (IOException e) {
             throw new UnsupportedOperationException(e);
         }
