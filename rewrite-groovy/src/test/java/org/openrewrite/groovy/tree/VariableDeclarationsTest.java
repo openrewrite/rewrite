@@ -17,8 +17,15 @@ package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,6 +122,30 @@ class VariableDeclarationsTest implements RewriteTest {
                   def b = new Object() { }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void annotatedField() {
+        rewriteRun(
+          groovy(
+            """
+              class Example {
+                  @Deprecated
+                  Object fred = new Object()
+              }
+              """,
+            spec -> spec.beforeRecipe(
+              cu -> {
+                List<J.VariableDeclarations> variables = TreeVisitor.collect(new JavaVisitor<>() {
+                    @Override
+                    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                        return SearchResult.found(multiVariable);
+                    }
+                }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
+                assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
+            })
           )
         );
     }

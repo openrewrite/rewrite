@@ -332,6 +332,13 @@ public class GroovyParserVisitor {
         private void visitVariableField(FieldNode field) {
             RewriteGroovyVisitor visitor = new RewriteGroovyVisitor(field, this);
 
+            List<J.Annotation> annotations = field.getAnnotations().stream()
+                    .map(a -> {
+                        visitAnnotation(a);
+                        return (J.Annotation) pollQueue();
+                    })
+                    .collect(Collectors.toList());
+
             List<J.Modifier> modifiers = visitModifiers(field.getModifiers());
             TypeTree typeExpr = visitTypeTree(field.getOriginType());
 
@@ -358,7 +365,7 @@ public class GroovyParserVisitor {
                     randomId(),
                     EMPTY,
                     Markers.EMPTY,
-                    emptyList(),
+                    annotations,
                     modifiers,
                     typeExpr,
                     null,
