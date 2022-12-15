@@ -23,7 +23,10 @@ import org.openrewrite.java.tree.JavaType;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
@@ -392,6 +395,16 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
+        List<String> defaultValues = null;
+        if(method.getDefaultValue() != null) {
+            if(method.getDefaultValue().getClass().isArray()) {
+                defaultValues = Arrays.stream((Object[])method.getDefaultValue())
+                        .map(Object::toString)
+                        .collect(Collectors.toList());
+            } else {
+                defaultValues = Collections.singletonList(method.getDefaultValue().toString());
+            }
+        }
         JavaType.Method mappedMethod = new JavaType.Method(
                 null,
                 method.getModifiers(),
@@ -400,7 +413,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
                 null,
                 paramNames,
                 null, null, null,
-                method.getDefaultValue()
+                defaultValues
         );
         typeCache.put(signature, mappedMethod);
 

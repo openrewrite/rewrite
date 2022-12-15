@@ -490,7 +490,16 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     paramNames.add(s);
                 }
             }
-
+            List<String> defaultValues = null;
+            if(methodSymbol.getDefaultValue() != null) {
+                if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
+                    defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
+                            .map(attr -> attr.getValue().toString())
+                            .collect(Collectors.toList());
+                } else {
+                    defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                }
+            }
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -499,8 +508,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     null,
                     paramNames,
                     null, null, null,
-                    // TODO: Figure out the correct thing to put here based on methodSymbol.defaultValue.getValue()
-                    null
+                    defaultValues
             );
             typeCache.put(signature, method);
 

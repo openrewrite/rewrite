@@ -39,19 +39,24 @@ interface JavaParserTypeMappingTest : JavaTypeMappingTest {
         parser.reset()
     }
 
-    @Disabled("Disabled until we correctly handle the default value")
     @Issue("https://github.com/openrewrite/rewrite/issues/2445")
     @Test
     fun annotationParameterDefaults() {
         val source = """
-            @Deprecated
+            @AnAnnotation
             class Test {
             }
+            @interface AnAnnotation {
+                int scalar() default 1;
+                String[] array() default {"a", "b"};
+            }
         """
-
         val cu = parser.parse(source)[0]
         val t = TypeUtils.asClass(cu.classes[0].allAnnotations[0].type)!!
-        assertThat(t.methods.map { it.defaultValue }).allMatch { it != null }
+        assertThat(t.methods.find { it.name == "scalar"}!!.defaultValue!![0]).isEqualTo("1")
+        val array = t.methods.find { it.name == "array"}!!
+        assertThat(array.defaultValue!!.find { it == "a" }).isNotNull
+        assertThat(array.defaultValue!!.find { it == "b" }).isNotNull
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1782")

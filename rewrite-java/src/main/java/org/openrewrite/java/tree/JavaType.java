@@ -911,12 +911,12 @@ public interface JavaType {
 
         @Incubating(since = "7.34.0")
         @Nullable
-        Object defaultValue;
+        List<String> defaultValue;
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
                       @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
-                      @Nullable List<FullyQualified> annotations, @Nullable Object defaultValue) {
+                      @Nullable List<FullyQualified> annotations, @Nullable List<String> defaultValue) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
             this.declaringType = unknownIfNull(declaringType);

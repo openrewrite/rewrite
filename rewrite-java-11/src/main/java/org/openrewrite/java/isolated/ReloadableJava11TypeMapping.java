@@ -489,6 +489,16 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
 
+            List<String> defaultValues = null;
+            if(methodSymbol.getDefaultValue() != null) {
+                if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
+                    defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
+                            .map(attr -> attr.getValue().toString())
+                            .collect(Collectors.toList());
+                } else {
+                    defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
+                }
+            }
             JavaType.Method method = new JavaType.Method(
                     null,
                     methodSymbol.flags_field,
@@ -498,7 +508,7 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
                     paramNames,
                     null, null, null,
                     // TODO: Figure out the correct thing to put here based on methodSymbol.defaultValue.getValue()
-                    null
+                    defaultValues
             );
             typeCache.put(signature, method);
 
