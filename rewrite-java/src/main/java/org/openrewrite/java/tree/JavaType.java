@@ -916,6 +916,14 @@ public interface JavaType {
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
                       @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
+                      @Nullable List<FullyQualified> annotations) {
+            this(managedReference, flagsBitMap, declaringType, name, returnType, parameterNames, parameterTypes,
+                    thrownExceptions, annotations, null);
+        }
+
+        public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
+                      @Nullable JavaType returnType, @Nullable List<String> parameterNames,
+                      @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
                       @Nullable List<FullyQualified> annotations, @Nullable List<String> defaultValue) {
             this.managedReference = managedReference;
             this.flagsBitMap = flagsBitMap & Flag.VALID_FLAGS;
