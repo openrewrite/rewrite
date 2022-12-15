@@ -29,7 +29,9 @@ import javax.lang.model.type.NullType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
@@ -402,8 +404,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                 methodSymbol.isConstructor() ? "<constructor>" : methodSymbol.getSimpleName().toString(),
                 null,
                 paramNames,
-                null, null, null,
-                methodSymbol.getDefaultValue() != null ? methodSymbol.defaultValue.getValue() : null
+                null, null, null, null
         );
         typeCache.put(signature, method);
 
