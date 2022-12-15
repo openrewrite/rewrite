@@ -14,7 +14,9 @@ public class CompilationUnitTest implements RewriteTest {
             """
                   class Test {
                     fun main() {
-                      println("Hello, world!")
+                      if (true) {
+                        println("Hello, world!")
+                      }
                     }
                   }
               """

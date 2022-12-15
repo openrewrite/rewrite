@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDe
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.*;
+import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.project.Project;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
@@ -36,7 +37,6 @@ import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirModuleData;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.backend.Fir2IrComponentsStorage;
-import org.jetbrains.kotlin.fir.backend.Fir2IrConverter;
 import org.jetbrains.kotlin.fir.backend.Fir2IrExtensions;
 import org.jetbrains.kotlin.fir.backend.jvm.FirJvmKotlinMangler;
 import org.jetbrains.kotlin.fir.builder.BodyBuildingMode;
@@ -47,11 +47,13 @@ import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor;
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
+import org.jetbrains.kotlin.fir.resolve.transformers.FirTotalResolveProcessor;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
 import org.jetbrains.kotlin.fir.session.FirSessionFactory;
 import org.jetbrains.kotlin.fir.signaturer.FirBasedSignatureComposer;
 import org.jetbrains.kotlin.fir.signaturer.FirMangler;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
+import org.jetbrains.kotlin.incremental.IncrementalFirJvmCompilerRunner;
 import org.jetbrains.kotlin.ir.backend.jvm.serialization.JvmDescriptorMangler;
 import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl;
 import org.jetbrains.kotlin.ir.util.KotlinMangler;
@@ -189,9 +191,10 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             // TODO. Setup CompilerConfiguration or find auto-configuration and set dependencies via configuration.
             // https://github.com/JetBrains/kotlin/blob/1.7.20/compiler/tests-common-new/tests/org/jetbrains/kotlin/test/frontend/fir/FirFrontendFacade.kt#L157
             DependencyListForCliModule.Builder dependencyListForCliModuleBuilder = new DependencyListForCliModule.Builder(name, targetPlatform, JvmPlatformAnalyzerServices.INSTANCE);
-            dependencyListForCliModuleBuilder.dependencies(Collections.emptyList());
-            dependencyListForCliModuleBuilder.dependsOnDependencies(Collections.emptyList());
-            dependencyListForCliModuleBuilder.friendDependencies(Collections.emptyList());
+            // TODO: Add dependencies. Imports are not being configured correctly.
+//            dependencyListForCliModuleBuilder.dependencies(Collections.emptyList());
+//            dependencyListForCliModuleBuilder.dependsOnDependencies(Collections.emptyList());
+//            dependencyListForCliModuleBuilder.friendDependencies(Collections.emptyList());
             DependencyListForCliModule dependencyListForCliModule = dependencyListForCliModuleBuilder.build();
 
             FirModuleData firModuleData = dependencyListForCliModule.getRegularDependencies().get(0); // todo
@@ -233,14 +236,26 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             );
 
             FirModuleDescriptor firModuleDescriptor = new FirModuleDescriptor(firSessionComponents);
-            Fir2IrConverter fir2IrConverter = new Fir2IrConverter(firModuleDescriptor, fir2IrComponentsStorage);
+//            Fir2IrConverter fir2IrConverter = new Fir2IrConverter(firModuleDescriptor, fir2IrComponentsStorage);
 
+            List<FirFile> firFiles = new ArrayList<>();
             for (Input sourceFile : sources) {
                 KtFile ktFile = (KtFile) psiFileFactory.createFileFromText(KotlinLanguage.INSTANCE, sourceFile.getSource().readFully());
                 FirFile firFile = rawFirBuilder.buildFirFile(ktFile);
-                fir2IrConverter.processClassHeaders(firFile);
+                firFiles.add(firFile);
                 cus.put(sourceFile, firFile);
             }
+
+            // Example of how the compiler is configured and run.
+//            IncrementalFirJvmCompilerRunner incrementalFirJvmCompilerRunner = new IncrementalFirJvmCompilerRunner();
+
+            // The CompilerPipeline automatically calls FirSessionFactory.createSessionWithDependencies, which should generate a valid session.
+//            CompilerPipelineKt.createSession();
+//            CompilerPipelineKt.createProjectEnvironment();
+//            CompilerPipelineKt.compileModuleToAnalyzedFir();
+
+            FirTotalResolveProcessor firTotalResolveProcessor = new FirTotalResolveProcessor(firSessionComponents);
+            firTotalResolveProcessor.process(firFiles);
             return cus;
         } finally {
             disposable.dispose();
