@@ -211,8 +211,6 @@ public abstract class Recipe implements Cloneable {
      * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not included in the results.
      * <p>
-     * The applicability test only affects whether this recipes {@link #getVisitor()} will run. Downstream
-     * {@link #doNext(Recipe)} will still run.
      *
      * @return A tree visitor that performs an applicability test.
      */
@@ -236,9 +234,6 @@ public abstract class Recipe implements Cloneable {
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not included in the results.
-     * <p>
-     * The applicability test only affects whether this recipes {@link #getVisitor()} will run. Downstream
-     * {@link #doNext(Recipe)} will still run.
      *
      * @return A tree visitor that performs an applicability test.
      */
@@ -253,9 +248,6 @@ public abstract class Recipe implements Cloneable {
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not included in the results.
-     * <p>
-     * The applicability test only affects whether this recipes {@link #getVisitor()} will run. Downstream
-     * {@link #doNext(Recipe)} will still run.
      *
      * @return A tree visitor that performs an applicability test.
      */
