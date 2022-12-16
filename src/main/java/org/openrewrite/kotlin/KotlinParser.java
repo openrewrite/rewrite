@@ -154,13 +154,12 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                         typeCache,
                         ctx
                 );
-                mappingVisitor.visitFile(compiled.getValue(), new InMemoryExecutionContext());
 
-                K.CompilationUnit kcu = null; // FIXME map the compiler's AST to a K.CompilationUnit
+                K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getValue(), new InMemoryExecutionContext());
                 cus.add(kcu);
                 parsingListener.parsed(compiled.getKey(), kcu);
             } catch (Throwable t) {
-//                pctx.parseFailure(compiled.getKey().getRelativePath(relativeTo), t);
+                pctx.parseFailure(compiled.getKey(), compiled.getKey().getRelativePath(relativeTo), KotlinParser.builder().build(), t);
                 ctx.getOnError().accept(t);
             }
         }

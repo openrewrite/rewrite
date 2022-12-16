@@ -13,8 +13,8 @@ public class CompilationUnitTest implements RewriteTest {
           kotlin(
             """
                   package kotlin
-                  
                   import kotlin.collections.List
+                  
                   fun method(list: List<Int>): Int {
                     return 0
                   }
