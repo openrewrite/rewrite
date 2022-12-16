@@ -74,14 +74,15 @@ public class RemoveDuplicateDependencies extends Recipe {
         private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
         private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
+        @SuppressWarnings("DataFlowIssue")
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependenciesTag()) {
-                ctx.putMessage("dependencies", new HashMap<DependencyKey, Xml.Tag>());
+                getCursor().putMessage("dependencies", new HashMap<DependencyKey, Xml.Tag>());
             } else if (isManagedDependenciesTag()) {
-                ctx.putMessage("managedDependencies", new HashMap<DependencyKey, Xml.Tag>());
+                getCursor().putMessage("managedDependencies", new HashMap<DependencyKey, Xml.Tag>());
             } else if (isDependencyTag()) {
-                Map<DependencyKey, Xml.Tag> dependencies = ctx.getMessage("dependencies");
+                Map<DependencyKey, Xml.Tag> dependencies = getCursor().getNearestMessage("dependencies");
                 DependencyKey dependencyKey = getDependencyKey(tag);
                 if (dependencyKey != null) {
                     Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
@@ -91,7 +92,7 @@ public class RemoveDuplicateDependencies extends Recipe {
                     }
                 }
             } else if (isManagedDependencyTag()) {
-                Map<DependencyKey, Xml.Tag> dependencies = ctx.getMessage("managedDependencies");
+                Map<DependencyKey, Xml.Tag> dependencies = getCursor().getNearestMessage("managedDependencies");
                 DependencyKey dependencyKey = getManagedDependencyKey(tag);
                 if (dependencyKey != null) {
                     Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
