@@ -25,8 +25,11 @@ import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.*;
 import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt;
+import org.jetbrains.kotlin.com.intellij.core.CoreProjectScopeBuilder;
+import org.jetbrains.kotlin.com.intellij.mock.MockFileIndexFacade;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.project.Project;
+import org.jetbrains.kotlin.com.intellij.openapi.roots.FileIndexFacade;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.StandardFileSystems;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFileManager;
@@ -37,6 +40,7 @@ import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirModuleData;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.backend.Fir2IrComponentsStorage;
+import org.jetbrains.kotlin.fir.backend.Fir2IrConverter;
 import org.jetbrains.kotlin.fir.backend.Fir2IrExtensions;
 import org.jetbrains.kotlin.fir.backend.jvm.FirJvmKotlinMangler;
 import org.jetbrains.kotlin.fir.builder.BodyBuildingMode;
@@ -47,9 +51,12 @@ import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor;
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrar;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
+import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProvider;
 import org.jetbrains.kotlin.fir.resolve.transformers.FirTotalResolveProcessor;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
 import org.jetbrains.kotlin.fir.session.FirSessionFactory;
+import org.jetbrains.kotlin.fir.session.environment.AbstractProjectEnvironment;
+import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.fir.signaturer.FirBasedSignatureComposer;
 import org.jetbrains.kotlin.fir.signaturer.FirMangler;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
@@ -169,27 +176,20 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             Project project = kenv.getProject();
 
-            /*
-                TopDownAnalyzerFacadeForJVM.kt
-                fun newModuleSearchScope(project: Project, files: Collection<KtFile>): GlobalSearchScope {
-                    // In case of separate modules, the source module scope generally consists of the following scopes:
-                    // 1) scope which only contains passed Kotlin source files (.kt and .kts)
-                    // 2) scope which contains all Java source files (.java) in the project
-                    return GlobalSearchScope.filesScope(project, files.map { it.virtualFile }.toSet()).uniteWith(AllJavaSourcesInProjectScope(project))
-                }
-             */
+            // Example of how the compiler is configured and run.
+//            IncrementalFirJvmCompilerRunner incrementalFirJvmCompilerRunner = new IncrementalFirJvmCompilerRunner();
 
             TargetPlatform targetPlatform = JvmPlatforms.INSTANCE.getJvm17();
 
-            Collection<KtFile> files = new ArrayList<>(); // todo
-            GlobalSearchScope testScope = TopDownAnalyzerFacadeForJVM.INSTANCE.newModuleSearchScope(project, files);
-
-            Function1<FirSessionFactory.FirSessionConfigurator, Unit> sessionConfigurator = (firProjectSessionProvider) -> Unit.INSTANCE;
+            FileIndexFacade fileIndexFacade = new MockFileIndexFacade(project);
+            CoreProjectScopeBuilder coreProjectScopeBuilder = new CoreProjectScopeBuilder(project, fileIndexFacade);
+            GlobalSearchScope globalScope = coreProjectScopeBuilder.buildAllScope();
 
             Name name = Name.identifier("main");
 
             // TODO. Setup CompilerConfiguration or find auto-configuration and set dependencies via configuration.
             // https://github.com/JetBrains/kotlin/blob/1.7.20/compiler/tests-common-new/tests/org/jetbrains/kotlin/test/frontend/fir/FirFrontendFacade.kt#L157
+
             DependencyListForCliModule.Builder dependencyListForCliModuleBuilder = new DependencyListForCliModule.Builder(name, targetPlatform, JvmPlatformAnalyzerServices.INSTANCE);
             // TODO: Add dependencies. Imports are not being configured correctly.
 //            dependencyListForCliModuleBuilder.dependencies(Collections.emptyList());
@@ -197,48 +197,46 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 //            dependencyListForCliModuleBuilder.friendDependencies(Collections.emptyList());
             DependencyListForCliModule dependencyListForCliModule = dependencyListForCliModuleBuilder.build();
 
-            FirModuleData firModuleData = dependencyListForCliModule.getRegularDependencies().get(0); // todo
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
 
             LanguageVersionSettings languageVersionSettings = new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7,
                     ApiVersion.KOTLIN_1_7);
 
-            FirSession firSessionComponents = configureMainSession(
+            JvmPackagePartProvider packagePartProvider = new JvmPackagePartProvider(languageVersionSettings, globalScope);
+            Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
+            VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
                     project,
-                    sessionConfigurator,
-                    Collections.emptyList(), // todo
-                    testScope,
-                    firModuleData,
-                    firProjectSessionProvider,
-                    languageVersionSettings
-            );
+                    VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
+                    packagePartProviderFunction::apply);
 
-            RawFirBuilder rawFirBuilder = new RawFirBuilder(firSessionComponents,
-                    new FirKotlinScopeProvider(), PsiHandlingMode.IDE, BodyBuildingMode.NORMAL);
-
-            PsiFileFactory psiFileFactory = PsiFileFactory.getInstance(project);
-            Map<Input, FirFile> cus = new LinkedHashMap<>();
-
-            ScopeSession scopeSession = new ScopeSession();
-            FirMangler firMangler = new FirJvmKotlinMangler(firSessionComponents);
-            FirBasedSignatureComposer firBasedSignatureComposer = new FirBasedSignatureComposer(firMangler);
             KotlinMangler.DescriptorMangler descriptorMangler = new JvmDescriptorMangler(null); // todo
             IdSignatureDescriptor idSignatureDescriptor = new IdSignatureDescriptor(descriptorMangler);
             SymbolTable symbolTable = new SymbolTable(idSignatureDescriptor, IrFactoryImpl.INSTANCE, NameProvider.DEFAULT.INSTANCE);
 
-            Fir2IrComponentsStorage fir2IrComponentsStorage = new Fir2IrComponentsStorage(
-                    firSessionComponents,
-                    scopeSession,
-                    symbolTable,
-                    IrFactoryImpl.INSTANCE,
-                    firBasedSignatureComposer,
-                    Fir2IrExtensions.Default.INSTANCE
+            Function1<DependencyListForCliModule.Builder, Unit> cliModuleUnitFunction1 = (module) -> Unit.INSTANCE;
+            FirSession firSession = CompilerPipelineKt.createSession(
+                    name.asString(),
+                    targetPlatform,
+                    kenv.getConfiguration(),
+                    projectEnvironment,
+                    AbstractProjectFileSearchScope.EMPTY.INSTANCE,
+                    dependencyListForCliModule.getAnalyzerServices(),
+                    firProjectSessionProvider,
+                    Collections.emptyList(),
+                    null,
+                    true,
+                    true,
+                    cliModuleUnitFunction1
             );
 
-            FirModuleDescriptor firModuleDescriptor = new FirModuleDescriptor(firSessionComponents);
-//            Fir2IrConverter fir2IrConverter = new Fir2IrConverter(firModuleDescriptor, fir2IrComponentsStorage);
+            RawFirBuilder rawFirBuilder = new RawFirBuilder(firSession,
+                    new FirKotlinScopeProvider(), PsiHandlingMode.IDE, BodyBuildingMode.NORMAL);
 
+            PsiFileFactory psiFileFactory = PsiFileFactory.getInstance(project);
+
+            Map<Input, FirFile> cus = new LinkedHashMap<>();
             List<FirFile> firFiles = new ArrayList<>();
+
             for (Input sourceFile : sources) {
                 KtFile ktFile = (KtFile) psiFileFactory.createFileFromText(KotlinLanguage.INSTANCE, sourceFile.getSource().readFully());
                 FirFile firFile = rawFirBuilder.buildFirFile(ktFile);
@@ -246,15 +244,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 cus.put(sourceFile, firFile);
             }
 
-            // Example of how the compiler is configured and run.
-//            IncrementalFirJvmCompilerRunner incrementalFirJvmCompilerRunner = new IncrementalFirJvmCompilerRunner();
-
-            // The CompilerPipeline automatically calls FirSessionFactory.createSessionWithDependencies, which should generate a valid session.
-//            CompilerPipelineKt.createSession();
-//            CompilerPipelineKt.createProjectEnvironment();
-//            CompilerPipelineKt.compileModuleToAnalyzedFir();
-
-            FirTotalResolveProcessor firTotalResolveProcessor = new FirTotalResolveProcessor(firSessionComponents);
+            FirTotalResolveProcessor firTotalResolveProcessor = new FirTotalResolveProcessor(firSession);
             firTotalResolveProcessor.process(firFiles);
             return cus;
         } finally {
