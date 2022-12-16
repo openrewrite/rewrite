@@ -21,6 +21,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureDescriptor;
+import org.jetbrains.kotlin.backend.jvm.serialization.JvmIdSignatureDescriptor;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.*;
@@ -175,10 +176,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     disposable, compilerConfiguration(), EnvironmentConfigFiles.JVM_CONFIG_FILES);
 
             Project project = kenv.getProject();
-
-            // Example of how the compiler is configured and run.
-//            IncrementalFirJvmCompilerRunner incrementalFirJvmCompilerRunner = new IncrementalFirJvmCompilerRunner();
-
             TargetPlatform targetPlatform = JvmPlatforms.INSTANCE.getJvm17();
 
             FileIndexFacade fileIndexFacade = FileIndexFacade.getInstance(project);
@@ -187,14 +184,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             Name name = Name.identifier("main");
 
-            // TODO. Setup CompilerConfiguration or find auto-configuration and set dependencies via configuration.
-            // https://github.com/JetBrains/kotlin/blob/1.7.20/compiler/tests-common-new/tests/org/jetbrains/kotlin/test/frontend/fir/FirFrontendFacade.kt#L157
-
             DependencyListForCliModule.Builder dependencyListForCliModuleBuilder = new DependencyListForCliModule.Builder(name, targetPlatform, JvmPlatformAnalyzerServices.INSTANCE);
-            // TODO: Add dependencies. Imports are not being configured correctly.
-//            dependencyListForCliModuleBuilder.dependencies(Collections.emptyList());
-//            dependencyListForCliModuleBuilder.dependsOnDependencies(Collections.emptyList());
-//            dependencyListForCliModuleBuilder.friendDependencies(Collections.emptyList());
             DependencyListForCliModule dependencyListForCliModule = dependencyListForCliModuleBuilder.build();
 
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
@@ -209,16 +199,13 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
                     packagePartProviderFunction::apply);
 
-            KotlinMangler.DescriptorMangler descriptorMangler = new JvmDescriptorMangler(null); // todo
-            IdSignatureDescriptor idSignatureDescriptor = new IdSignatureDescriptor(descriptorMangler);
-
-            Function1<DependencyListForCliModule.Builder, Unit> cliModuleUnitFunction1 = (module) -> Unit.INSTANCE;
+            Function1<DependencyListForCliModule.Builder, Unit> cliModuleUnitFunction1 = (builder) -> Unit.INSTANCE;
             FirSession firSession = CompilerPipelineKt.createSession(
                     name.asString(),
                     targetPlatform,
                     kenv.getConfiguration(),
                     projectEnvironment,
-                    AbstractProjectFileSearchScope.EMPTY.INSTANCE,
+                    AbstractProjectFileSearchScope.ANY.INSTANCE,
                     dependencyListForCliModule.getAnalyzerServices(),
                     firProjectSessionProvider,
                     Collections.emptyList(),
@@ -228,23 +215,29 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     cliModuleUnitFunction1
             );
 
-            RawFirBuilder rawFirBuilder = new RawFirBuilder(firSession,
-                    new FirKotlinScopeProvider(), PsiHandlingMode.IDE, BodyBuildingMode.NORMAL);
+            RawFirBuilder rawFirBuilder = new RawFirBuilder(
+                    firSession,
+                    new FirKotlinScopeProvider(),
+                    PsiHandlingMode.IDE,
+                    BodyBuildingMode.NORMAL
+            );
 
             PsiFileFactory psiFileFactory = PsiFileFactory.getInstance(project);
 
             Map<Input, FirFile> cus = new LinkedHashMap<>();
-            List<FirFile> firFiles = new ArrayList<>();
 
             for (Input sourceFile : sources) {
-                KtFile ktFile = (KtFile) psiFileFactory.createFileFromText(KotlinLanguage.INSTANCE, sourceFile.getSource().readFully());
+                KtFile ktFile = (KtFile) psiFileFactory.createFileFromText(
+                        sourceFile.getPath().getFileName().toString(),
+                        KotlinLanguage.INSTANCE,
+                        sourceFile.getSource().readFully());
+
                 FirFile firFile = rawFirBuilder.buildFirFile(ktFile);
-                firFiles.add(firFile);
                 cus.put(sourceFile, firFile);
             }
 
             FirTotalResolveProcessor firTotalResolveProcessor = new FirTotalResolveProcessor(firSession);
-            firTotalResolveProcessor.process(firFiles);
+            firTotalResolveProcessor.process(new ArrayList<>(cus.values()));
             return cus;
         } finally {
             disposable.dispose();
@@ -260,39 +253,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         return compilerConfiguration;
     }
 
-    private static FirSession configureMainSession(Project project,
-                                            Function1<? super FirSessionFactory.FirSessionConfigurator, Unit> sessionConfigurator,
-                                            List<FirExtensionRegistrar> extensionRegistrars,
-                                            GlobalSearchScope sourcesScope,
-                                            FirModuleData mainModuleData,
-                                            FirProjectSessionProvider sessionProvider,
-                                            @Nullable LanguageVersionSettings languageVersionSettings) {
-
-        LanguageVersionSettings languageVersionSettingsOrDefault = languageVersionSettings == null ? LanguageVersionSettingsImpl.DEFAULT : languageVersionSettings;
-
-        JvmPackagePartProvider packagePartProvider = new JvmPackagePartProvider(languageVersionSettingsOrDefault, sourcesScope);
-        Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
-        VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
-                project,
-                VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL),
-                packagePartProviderFunction::apply);
-
-        PsiBasedProjectFileSearchScope projectFileSearchScope = new PsiBasedProjectFileSearchScope(sourcesScope);
-        return FirSessionFactory.INSTANCE.createJavaModuleBasedSession(
-                mainModuleData,
-                sessionProvider,
-                projectFileSearchScope,
-                projectEnvironment,
-                null, // todo
-                extensionRegistrars,
-                languageVersionSettingsOrDefault,
-                null, // todo
-                null, // todo
-                true,
-                sessionConfigurator
-        );
-    }
-
     @Override
     public boolean accept(Path path) {
         return path.toString().endsWith(".kt") || path.toString().endsWith(".kts");
@@ -306,7 +266,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve("file.groovy");
+        return prefix.resolve("file.kt");
     }
 
     public static Builder builder() {
