@@ -179,7 +179,8 @@ public class MethodMatcher {
 
     public boolean matches(@Nullable Expression maybeMethod) {
         return (maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod)) ||
-                (maybeMethod instanceof J.NewClass && matches((J.NewClass) maybeMethod));
+                (maybeMethod instanceof J.NewClass && matches((J.NewClass) maybeMethod)) ||
+                (maybeMethod instanceof J.MemberReference && matches((J.MemberReference) maybeMethod));
     }
 
     public boolean matches(@Nullable J.MethodInvocation method) {
@@ -272,6 +273,10 @@ public class MethodMatcher {
         }
 
         return argumentPattern.matcher(joiner.toString()).matches();
+    }
+
+    public boolean matches(J.MemberReference memberReference) {
+        return matches(memberReference.getMethodType());
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {

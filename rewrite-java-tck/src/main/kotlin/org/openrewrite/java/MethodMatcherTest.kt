@@ -181,6 +181,33 @@ interface MethodMatcherTest {
     }
 
     @Test
+    fun matchesMemberReferenceAsExpressionUsage(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+            package a;
+            import java.util.function.Supplier;
+            
+            class A {
+                Supplier<A> a = A::new;
+            }
+        """.trimIndent()
+        )[0]
+
+        assertTrue(
+            MethodMatcher("a.A <constructor>()").matches(
+                (cu.classes.first().body.statements.first() as J.VariableDeclarations)
+                    .variables.first().initializer!!
+            )
+        )
+        assertTrue(
+            MethodMatcher("a.A *()").matches(
+                (cu.classes.first().body.statements.first() as J.VariableDeclarations)
+                    .variables.first().initializer!!
+            )
+        )
+    }
+
+    @Test
     fun matchesMethod(jp: JavaParser) {
         val cu = jp.parse(
             """
