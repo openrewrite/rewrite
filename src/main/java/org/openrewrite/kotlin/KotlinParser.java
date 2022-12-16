@@ -211,7 +211,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             KotlinMangler.DescriptorMangler descriptorMangler = new JvmDescriptorMangler(null); // todo
             IdSignatureDescriptor idSignatureDescriptor = new IdSignatureDescriptor(descriptorMangler);
-            SymbolTable symbolTable = new SymbolTable(idSignatureDescriptor, IrFactoryImpl.INSTANCE, NameProvider.DEFAULT.INSTANCE);
 
             Function1<DependencyListForCliModule.Builder, Unit> cliModuleUnitFunction1 = (module) -> Unit.INSTANCE;
             FirSession firSession = CompilerPipelineKt.createSession(
