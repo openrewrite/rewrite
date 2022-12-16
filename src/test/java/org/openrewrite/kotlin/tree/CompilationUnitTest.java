@@ -13,7 +13,7 @@ public class CompilationUnitTest implements RewriteTest {
           kotlin(
             """
                   class Test {
-                    val test = 10
+                    val test: Int  = 10
                     fun main() {
                       if (true) {
                         println("Hello, world!")

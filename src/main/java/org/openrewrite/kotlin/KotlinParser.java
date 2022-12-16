@@ -181,7 +181,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             TargetPlatform targetPlatform = JvmPlatforms.INSTANCE.getJvm17();
 
-            FileIndexFacade fileIndexFacade = new MockFileIndexFacade(project);
+            FileIndexFacade fileIndexFacade = FileIndexFacade.getInstance(project);
             CoreProjectScopeBuilder coreProjectScopeBuilder = new CoreProjectScopeBuilder(project, fileIndexFacade);
             GlobalSearchScope globalScope = coreProjectScopeBuilder.buildAllScope();
 
