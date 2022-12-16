@@ -167,9 +167,7 @@ public interface RecipeScheduler {
                             continue nextTest;
                         }
                     }
-                    if (!before.isEmpty()) {
-                        return before;
-                    }
+                    return before;
                 }
             }
         } catch (Throwable t) {
