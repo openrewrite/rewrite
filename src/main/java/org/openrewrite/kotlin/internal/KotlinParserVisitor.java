@@ -19,6 +19,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.declarations.FirClass;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
+import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction;
+import org.jetbrains.kotlin.fir.declarations.impl.FirFileImpl;
 import org.jetbrains.kotlin.fir.expressions.FirBlock;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.openrewrite.ExecutionContext;
@@ -67,12 +69,21 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
     }
 
     @Override
+    public K visitSimpleFunction(@NotNull FirSimpleFunction simpleFunction, ExecutionContext data) {
+        return super.visitSimpleFunction(simpleFunction, data);
+    }
+
+    @Override
     public K visitClass(@NotNull FirClass klass, ExecutionContext ctx) {
         return super.visitClass(klass, ctx);
     }
 
     @Override
-    public K visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
+    public K visitElement(@NotNull FirElement firElement, ExecutionContext executionContext) {
+        if (firElement instanceof FirFileImpl) {
+            FirFileImpl file = (FirFileImpl) firElement;
+            System.out.println();
+        }
         return null;
     }
 }

@@ -20,6 +20,7 @@ import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.kotlin.backend.jvm.serialization.JvmIdSignatureDescriptor;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
@@ -39,15 +40,32 @@ import org.jetbrains.kotlin.com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
+import org.jetbrains.kotlin.fir.backend.*;
+import org.jetbrains.kotlin.fir.backend.generators.AnnotationGenerator;
+import org.jetbrains.kotlin.fir.backend.generators.CallAndReferenceGenerator;
+import org.jetbrains.kotlin.fir.backend.generators.DelegatedMemberGenerator;
+import org.jetbrains.kotlin.fir.backend.generators.FakeOverrideGenerator;
+import org.jetbrains.kotlin.fir.backend.jvm.Fir2IrJvmSpecialAnnotationSymbolProvider;
+import org.jetbrains.kotlin.fir.backend.jvm.FirJvmKotlinMangler;
 import org.jetbrains.kotlin.fir.builder.BodyBuildingMode;
 import org.jetbrains.kotlin.fir.builder.PsiHandlingMode;
 import org.jetbrains.kotlin.fir.builder.RawFirBuilder;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
+import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
+import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.resolve.transformers.FirTotalResolveProcessor;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
+import org.jetbrains.kotlin.fir.signaturer.FirBasedSignatureComposer;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
+import org.jetbrains.kotlin.ir.IrBuiltIns;
+import org.jetbrains.kotlin.ir.backend.jvm.serialization.JvmDescriptorMangler;
+import org.jetbrains.kotlin.ir.backend.jvm.serialization.JvmIrMangler;
+import org.jetbrains.kotlin.ir.declarations.impl.IrFactoryImpl;
+import org.jetbrains.kotlin.ir.declarations.impl.IrModuleFragmentImpl;
+import org.jetbrains.kotlin.ir.util.NameProvider;
+import org.jetbrains.kotlin.ir.util.SymbolTable;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.platform.TargetPlatform;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
@@ -217,8 +235,11 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 cus.put(sourceFile, firFile);
             }
 
+            List<FirFile> firFiles = new ArrayList<>(cus.values());
             FirTotalResolveProcessor firTotalResolveProcessor = new FirTotalResolveProcessor(firSession);
-            firTotalResolveProcessor.process(new ArrayList<>(cus.values()));
+            firTotalResolveProcessor.process(firFiles);
+
+            convertFirToIr(firFiles, firSession, languageVersionSettings);
 
             return cus;
         } finally {
@@ -233,6 +254,82 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 MessageCollector.Companion.getNONE());
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
         return compilerConfiguration;
+    }
+
+    private void convertFirToIr(List<FirFile> firFiles, FirSession firSession, LanguageVersionSettings languageVersionSettings) {
+        FirJvmKotlinMangler firMangler = new FirJvmKotlinMangler(firSession);
+        FirBasedSignatureComposer firBasedSignatureComposer = new FirBasedSignatureComposer(firMangler);
+
+        JvmDescriptorMangler descriptorMangler = new JvmDescriptorMangler(null);
+        JvmIdSignatureDescriptor idSignatureDescriptor = new JvmIdSignatureDescriptor(descriptorMangler);
+        SymbolTable symbolTable = new SymbolTable(idSignatureDescriptor, IrFactoryImpl.INSTANCE, NameProvider.DEFAULT.INSTANCE);
+        Fir2IrComponentsStorage components = new Fir2IrComponentsStorage(
+                firSession,
+                new ScopeSession(),
+                symbolTable,
+                IrFactoryImpl.INSTANCE,
+                firBasedSignatureComposer,
+                Fir2IrExtensions.Default.INSTANCE
+        );
+
+        FirModuleDescriptor firModuleDescriptor = new FirModuleDescriptor(firSession);
+        Fir2IrConverter fir2IrConverter = new Fir2IrConverter(firModuleDescriptor, components);
+        components.setConverter(fir2IrConverter);
+
+        Fir2IrClassifierStorage fir2IrClassifierStorage = new Fir2IrClassifierStorage(components);
+        components.setClassifierStorage(fir2IrClassifierStorage);
+
+        DelegatedMemberGenerator delegatedMemberGenerator = new DelegatedMemberGenerator(components);
+        components.setDelegatedMemberGenerator(delegatedMemberGenerator);
+
+        Fir2IrDeclarationStorage fir2IrDeclarationStorage = new Fir2IrDeclarationStorage(components, firModuleDescriptor);
+        components.setDeclarationStorage(fir2IrDeclarationStorage);
+
+        Fir2IrVisibilityConverter fir2IrVisibilityConverter = Fir2IrVisibilityConverter.Default.INSTANCE;
+        components.setVisibilityConverter(fir2IrVisibilityConverter);
+
+        Fir2IrTypeConverter fir2IrTypeConverter = new Fir2IrTypeConverter(components);
+        components.setTypeConverter(fir2IrTypeConverter);
+
+        IrBuiltIns irBuiltIns = new IrBuiltInsOverFir(
+                components,
+                languageVersionSettings,
+                firModuleDescriptor,
+                JvmIrMangler.INSTANCE,
+                languageVersionSettings.getFlag(AnalysisFlags.getBuiltInsFromSources())
+        );
+        components.setIrBuiltIns(irBuiltIns);
+
+        Fir2IrConversionScope conversionScope = new Fir2IrConversionScope();
+        Fir2IrVisitor fir2IrVisitor = new Fir2IrVisitor(components, conversionScope);
+        Fir2IrSpecialSymbolProvider fir2IrSpecialSymbolProvider = new Fir2IrJvmSpecialAnnotationSymbolProvider();
+
+        Fir2IrBuiltIns fir2IrBuiltIns = new Fir2IrBuiltIns(components, fir2IrSpecialSymbolProvider);
+        components.setBuiltIns(fir2IrBuiltIns);
+
+        AnnotationGenerator annotationGenerator = new AnnotationGenerator(components);
+        components.setAnnotationGenerator(annotationGenerator);
+
+        FakeOverrideGenerator fakeOverrideGenerator = new FakeOverrideGenerator(components, conversionScope);
+        components.setFakeOverrideGenerator(fakeOverrideGenerator);
+
+        CallAndReferenceGenerator callAndReferenceGenerator = new CallAndReferenceGenerator(components, fir2IrVisitor, conversionScope);
+        components.setCallGenerator(callAndReferenceGenerator);
+
+        FirIrProvider firIrProvider = new FirIrProvider(components);
+        components.setIrProviders(Collections.singletonList(firIrProvider));
+
+        Fir2IrExtensions fir2IrExtensions = Fir2IrExtensions.Default.INSTANCE;
+        fir2IrExtensions.registerDeclarations(symbolTable);
+
+        IrModuleFragmentImpl irModuleFragment = new IrModuleFragmentImpl(firModuleDescriptor, irBuiltIns, Collections.emptyList());
+        fir2IrConverter.runSourcesConversion(
+                firFiles,
+                irModuleFragment,
+                Collections.emptyList(),
+                fir2IrVisitor,
+                fir2IrExtensions
+        );
     }
 
     @Override
