@@ -921,6 +921,7 @@ public interface JavaType {
                     thrownExceptions, annotations, null);
         }
 
+        @JsonCreator
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                       @Nullable JavaType returnType, @Nullable List<String> parameterNames,
                       @Nullable List<JavaType> parameterTypes, @Nullable List<FullyQualified> thrownExceptions,
