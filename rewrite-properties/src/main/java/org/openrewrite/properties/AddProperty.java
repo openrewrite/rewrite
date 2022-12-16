@@ -15,6 +15,7 @@
  */
 package org.openrewrite.properties;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -55,6 +56,21 @@ public class AddProperty extends Recipe {
             example = "**/application-*.properties")
     @Nullable
     String fileMatcher;
+
+    public AddProperty(String property, String value, @Nullable String fileMatcher) {
+        this.property = property;
+        this.value = value;
+        this.delimiter = null;
+        this.fileMatcher = fileMatcher;
+    }
+
+    @JsonCreator
+    public AddProperty(String property, String value, @Nullable String delimiter, @Nullable String fileMatcher) {
+        this.property = property;
+        this.value = value;
+        this.delimiter = delimiter;
+        this.fileMatcher = fileMatcher;
+    }
 
     @Override
     public String getDisplayName() {
