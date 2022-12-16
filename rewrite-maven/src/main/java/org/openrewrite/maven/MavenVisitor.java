@@ -222,19 +222,17 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     @Nullable
     public ResolvedDependency findDependency(Xml.Tag tag) {
         Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
-        for (Scope scope : Scope.values()) {
-            if (dependencies.containsKey(scope)) {
-                for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
-                    Dependency req = resolvedDependency.getRequested();
-                    String reqGroup = req.getGroupId();
-                    String reqVersion = req.getVersion();
-                    if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                            req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                            (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null))) &&
-                            (req.getClassifier() == null || req.getClassifier().equals(tag.getChildValue("classifier").orElse(null))) &&
-                            scope == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
-                        return resolvedDependency;
-                    }
+        Scope scope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
+        if (dependencies.containsKey(scope)) {
+            for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
+                Dependency req = resolvedDependency.getRequested();
+                String reqGroup = req.getGroupId();
+                String reqVersion = req.getVersion();
+                if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
+                        req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
+                        (reqVersion == null || reqVersion.equals(tag.getChildValue("version").orElse(null))) &&
+                        (req.getClassifier() == null || req.getClassifier().equals(tag.getChildValue("classifier").orElse(null)))) {
+                    return resolvedDependency;
                 }
             }
         }
