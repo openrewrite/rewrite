@@ -17,6 +17,7 @@ package org.openrewrite.xml.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Xml;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
@@ -87,6 +88,7 @@ class FindTagsTest implements RewriteTest {
 
     @Test
     void staticFind() {
+        //noinspection ConstantConditions
         rewriteRun(
           xml(
             """
@@ -96,7 +98,9 @@ class FindTagsTest implements RewriteTest {
                 </dependency>
             </dependencies>
             """,
-            spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "/dependencies/dependency")).isNotEmpty())
+            spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "/dependencies/dependency"))
+              .isNotEmpty()
+              .allMatch(tag -> tag instanceof Xml.Tag))
           )
         );
     }

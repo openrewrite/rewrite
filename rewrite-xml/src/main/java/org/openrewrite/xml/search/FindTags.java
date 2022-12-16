@@ -26,6 +26,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Function;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -71,7 +72,7 @@ public class FindTags extends Recipe {
                 }
                 return super.visitTag(tag, ctx);
             }
-        }, x, new HashSet<>());
+        }, x, new HashSet<>(), Xml.Tag.class, Function.identity());
     }
 
     /**
