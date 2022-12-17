@@ -7,7 +7,6 @@ plugins {
 
 dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
-    testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
     implementation("de.danielbechler:java-object-diff:latest.release")
     implementation("org.apache.ant:ant:latest.release")
@@ -43,4 +42,8 @@ tasks.withType<ShadowJar> {
         from("$rootDir/LICENSE")
         from("$rootDir/NOTICE")
     }
+}
+
+tasks.named<Test>("test").configure {
+    classpath = files(tasks.named<ShadowJar>("shadowJar"), sourceSets.test.get().output, configurations.testRuntimeClasspath)
 }
