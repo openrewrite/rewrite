@@ -15,19 +15,19 @@
  */
 package org.openrewrite.kotlin;
 
+import kotlin.Pair;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.kotlin.analyzer.AnalysisResult;
 import org.jetbrains.kotlin.backend.jvm.serialization.JvmIdSignatureDescriptor;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
-import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
-import org.jetbrains.kotlin.cli.jvm.compiler.JvmPackagePartProvider;
-import org.jetbrains.kotlin.cli.jvm.compiler.KotlinCoreEnvironment;
-import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
+import org.jetbrains.kotlin.cli.jvm.compiler.*;
 import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt;
+import org.jetbrains.kotlin.codegen.state.GenerationState;
 import org.jetbrains.kotlin.com.intellij.core.CoreProjectScopeBuilder;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.project.Project;
@@ -54,7 +54,6 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
-import org.jetbrains.kotlin.fir.resolve.transformers.FirTotalResolveProcessor;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.fir.signaturer.FirBasedSignatureComposer;
@@ -84,6 +83,7 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -95,6 +95,7 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
+import static org.jetbrains.kotlin.fir.pipeline.AnalyseKt.runResolution;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser<K.CompilationUnit> {
@@ -235,10 +236,12 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             }
 
             List<FirFile> firFiles = new ArrayList<>(cus.values());
-            FirTotalResolveProcessor firTotalResolveProcessor = new FirTotalResolveProcessor(firSession);
-            firTotalResolveProcessor.process(firFiles);
+            runResolution(firSession, firFiles);
 
             convertFirToIr(firFiles, firSession, languageVersionSettings);
+
+            AnalysisResult result = KotlinToJVMBytecodeCompiler.INSTANCE.analyze(kenv);
+            GenerationState generationState = KotlinToJVMBytecodeCompiler.INSTANCE.analyzeAndGenerate(kenv);
 
             return cus;
         } finally {
@@ -248,6 +251,11 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
+
+        // TODO: fix me. Adds the JDK location to resolve JavaTypes.
+        File javaHome = new File(System.getProperty("java.home"));
+        compilerConfiguration.put(JVMConfigurationKeys.JDK_HOME, javaHome);
+
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());

@@ -5,18 +5,25 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class CompilationUnitTest implements RewriteTest {
+public class ImportTest implements RewriteTest {
 
     @Test
-    void compilationUnit() {
+    void jdkImport() {
+        rewriteRun(
+          kotlin(
+            """
+                  import java.util.ArrayList
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinImport() {
         rewriteRun(
           kotlin(
             """
                   import kotlin.collections.List
-                  
-                  fun method(list: List<Int>): Int {
-                    return 0
-                  }
               """
           )
         );
