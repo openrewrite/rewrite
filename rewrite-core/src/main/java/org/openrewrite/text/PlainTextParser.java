@@ -39,6 +39,7 @@ public class PlainTextParser implements Parser<PlainText> {
             Path path = source.getRelativePath(relativeTo);
             try {
                 EncodingDetectingInputStream is = source.getSource(ctx);
+                String sourceStr = is.readFully();
                 PlainText plainText = new PlainText(randomId(),
                         path,
                         Markers.EMPTY,
@@ -46,7 +47,7 @@ public class PlainTextParser implements Parser<PlainText> {
                         is.isCharsetBomMarked(),
                         source.getFileAttributes(),
                         null,
-                        is.readFully());
+                        sourceStr);
                 plainTexts.add(plainText);
                 parsingListener.parsed(source, plainText);
             } catch (Throwable t) {
