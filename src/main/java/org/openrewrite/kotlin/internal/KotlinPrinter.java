@@ -16,8 +16,35 @@
 package org.openrewrite.kotlin.internal;
 
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.tree.K;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
+    private final KotlinJavaPrinter delegate = new KotlinJavaPrinter();
 
+    @Override
+    public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
+        if (!(tree instanceof K)) {
+            // re-route printing to the java printer
+            return delegate.visit(tree, p);
+        } else {
+            return super.visit(tree, p);
+        }
+    }
+
+    private class KotlinJavaPrinter extends JavaPrinter<P> {
+        @Override
+        public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
+            if (tree instanceof K) {
+                // re-route printing back up to groovy
+                return KotlinJavaPrinter.this.visit(tree, p);
+            } else {
+                return super.visit(tree, p);
+            }
+        }
+    }
 }

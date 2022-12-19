@@ -16,11 +16,14 @@
 package org.openrewrite.kotlin;
 
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KLeftPadded;
+import org.openrewrite.kotlin.tree.KRightPadded;
+import org.openrewrite.kotlin.tree.KSpace;
 
 public class KotlinVisitor<P> extends JavaVisitor<P> {
 
@@ -41,6 +44,9 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public J visitCompilationUnit(K.CompilationUnit cu, P p) {
         K.CompilationUnit c = cu;
+        c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withStatements(ListUtils.map(c.getStatements(), e -> visitAndCast(e, p)));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;
     }
@@ -48,5 +54,17 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         throw new UnsupportedOperationException("Kotlin has a different structure for its compilation unit. See K.CompilationUnit.");
+    }
+
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
+        return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, KLeftPadded.Location loc, P p) {
+        return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public Space visitSpace(Space space, KSpace.Location loc, P p) {
+        return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }
 }

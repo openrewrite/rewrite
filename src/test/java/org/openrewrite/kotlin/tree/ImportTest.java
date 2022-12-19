@@ -43,4 +43,15 @@ public class ImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void wildCard() {
+        rewriteRun(
+          kotlin(
+            """
+                  import kotlin.collections.*
+              """
+          )
+        );
+    }
 }

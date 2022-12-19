@@ -39,4 +39,17 @@ public class CompilationUnitTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void mixedImports() {
+        rewriteRun(
+          kotlin(
+            """
+              val a = "hello"
+              import java.util.List
+              List l = null
+              """
+          )
+        );
+    }
 }
