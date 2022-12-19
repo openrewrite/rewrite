@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,27 +17,30 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.fir.FirElement;
-import org.jetbrains.kotlin.fir.FirPackageDirective;
-import org.jetbrains.kotlin.fir.declarations.FirClass;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirImport;
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction;
-import org.jetbrains.kotlin.fir.expressions.FirBlock;
 import org.jetbrains.kotlin.fir.expressions.FirStatement;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinTypeMapping;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -73,11 +76,10 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
 
     @Override
     public K visitFile(@NotNull FirFile file, ExecutionContext ctx) {
-        // TODO: statement order is not preserved in the FirFile; check if the order is preserved in the ListAstTree
-        // Implement visits
-//        visitPackageDirective(file.getPackageDirective(), ctx);
-//        file.getImports().forEach(i -> visitImport(i, ctx));
-//        file.getDeclarations().forEach(s -> visitDeclaration(s, ctx));
+        List<? extends FirElement> statements = Stream.of(file.getImports(), file.getDeclarations())
+                .flatMap(Collection::stream)
+                .sorted(Comparator.comparingInt(it -> it.getSource().getStartOffset()))
+                .collect(Collectors.toList());
 
         return new K.CompilationUnit(
                 randomId(),
@@ -93,5 +95,15 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
                 emptyList(),
                 Space.EMPTY
         );
+    }
+
+    @Override
+    public K visitImport(@NotNull FirImport firImport, ExecutionContext data) {
+        return super.visitImport(firImport, data);
+    }
+
+    @Override
+    public K visitStatement(@NotNull FirStatement statement, ExecutionContext data) {
+        return super.visitStatement(statement, data);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,19 +15,16 @@
  */
 package org.openrewrite.kotlin;
 
-import kotlin.Pair;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.kotlin.analyzer.AnalysisResult;
 import org.jetbrains.kotlin.backend.jvm.serialization.JvmIdSignatureDescriptor;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.*;
 import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt;
-import org.jetbrains.kotlin.codegen.state.GenerationState;
 import org.jetbrains.kotlin.com.intellij.core.CoreProjectScopeBuilder;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.project.Project;
@@ -95,7 +92,6 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
-import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.fir.pipeline.AnalyseKt.runResolution;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
