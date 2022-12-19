@@ -46,6 +46,9 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         K.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        if (c.getPadding().getPackageDeclaration() != null) {
+            c = c.getPadding().withPackageDeclaration(visitRightPadded(c.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, p));
+        }
         c = c.withStatements(ListUtils.map(c.getStatements(), e -> visitAndCast(e, p)));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;

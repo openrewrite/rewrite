@@ -37,10 +37,10 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -85,7 +85,14 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
             Space prefix = whitespace();
             cursor += "package".length();
-            // TODO:
+            Space space = whitespace();
+            pkg = JRightPadded.build(new J.Package(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    TypeTree.build(file.getPackageDirective().getPackageFqName().asString())
+                            .withPrefix(space),
+                    emptyList()));
         }
 
         List<JRightPadded<Statement>> statements = Stream.of(file.getImports(), file.getDeclarations())

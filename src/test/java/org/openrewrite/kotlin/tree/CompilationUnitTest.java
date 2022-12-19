@@ -23,18 +23,11 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 public class CompilationUnitTest implements RewriteTest {
 
     @Test
-    void compilationUnit() {
+    void packageDecl() {
         rewriteRun(
           kotlin(
             """
-                  import kotlin.collections.List
-                  
-                  fun method(list: List<Int>): Int {
-                    val l: ArrayList<Int> = ArrayList()
-                    l.add(0)
-                    return 0
-                  }
-                  import java.util.ArrayList
+              package kotlin
               """
           )
         );
@@ -45,9 +38,10 @@ public class CompilationUnitTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val a = "hello"
-              import java.util.List
-              List l = null
+              import kotlin.collections.List
+              val l1: List<Int> = null
+              import java.util.ArrayList
+              val l2: ArrayList<Int> = null
               """
           )
         );
