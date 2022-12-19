@@ -95,6 +95,7 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
+import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.fir.pipeline.AnalyseKt.runResolution;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -181,9 +182,12 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             CoreProjectScopeBuilder coreProjectScopeBuilder = new CoreProjectScopeBuilder(project, fileIndexFacade);
             GlobalSearchScope globalScope = coreProjectScopeBuilder.buildAllScope();
 
+            // TODO: Fix me. Hardcoded for main.
             Name name = Name.identifier("main");
 
             DependencyListForCliModule.Builder dependencyListForCliModuleBuilder = new DependencyListForCliModule.Builder(name, targetPlatform, JvmPlatformAnalyzerServices.INSTANCE);
+            // Class path dependencies may be added here:
+//            dependencyListForCliModuleBuilder.dependencies();
             DependencyListForCliModule dependencyListForCliModule = dependencyListForCliModuleBuilder.build();
 
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
@@ -239,9 +243,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             runResolution(firSession, firFiles);
 
             convertFirToIr(firFiles, firSession, languageVersionSettings);
-
-            AnalysisResult result = KotlinToJVMBytecodeCompiler.INSTANCE.analyze(kenv);
-            GenerationState generationState = KotlinToJVMBytecodeCompiler.INSTANCE.analyzeAndGenerate(kenv);
 
             return cus;
         } finally {
