@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
@@ -20,14 +21,16 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class CompilationUnitTest implements RewriteTest {
+@SuppressWarnings("GrUnnecessaryPublicModifier")
+class ClassDeclarationTest implements RewriteTest {
 
     @Test
-    void packageDecl() {
+    void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
           kotlin(
             """
-              package kotlin
+              class A {}
+              class B {}
               """
           )
         );

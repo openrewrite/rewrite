@@ -17,9 +17,9 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.fir.FirElement;
+import org.jetbrains.kotlin.fir.FirPackageDirective;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirImport;
-import org.jetbrains.kotlin.fir.declarations.FirResolvedImport;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -34,11 +34,7 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -46,8 +42,7 @@ import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
 
-// todo: find visitor with type attribution and replace FirVisitor.
-public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
+public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     private final Path sourcePath;
 
     @Nullable
@@ -71,7 +66,7 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
     }
 
     @Override
-    public K visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
+    public J visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
         if (firElement instanceof FirImport) {
             return visitImport((FirImport) firElement, ctx);
         } else {
@@ -80,30 +75,14 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
     }
 
     @Override
-    public K visitFile(@NotNull FirFile file, ExecutionContext ctx) {
-        JRightPadded<J.Package> pkg = null;
+    public J visitFile(@NotNull FirFile file, ExecutionContext ctx) {
+        J.Package pkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
-            Space prefix = whitespace();
-            cursor += "package".length();
-            Space space = whitespace();
-            pkg = JRightPadded.build(new J.Package(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    TypeTree.build(file.getPackageDirective().getPackageFqName().asString())
-                            .withPrefix(space),
-                    emptyList()));
+            pkg = (J.Package) visitPackageDirective(file.getPackageDirective(), ctx);
         }
-
-        List<JRightPadded<Statement>> statements = Stream.of(file.getImports(), file.getDeclarations())
-                .flatMap(Collection::stream)
-                .sorted(Comparator.comparingInt(it -> it.getSource().getStartOffset()))
-                .map(this::convertTopLevelStatement)
-                .collect(Collectors.toList());
 
         return new K.CompilationUnit(
                 randomId(),
-                null,
                 Space.EMPTY,
                 Markers.EMPTY,
                 sourcePath,
@@ -111,38 +90,44 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
                 charset.name(),
                 charsetBomMarked,
                 null,
-                pkg,
-                statements,
+                pkg == null ? null : maybeSemicolon(pkg),
+                file.getImports().stream().map(i -> maybeSemicolon((J.Import) visitImport(i, ctx))).collect(Collectors.toList()),
+                emptyList(),
                 Space.EMPTY
         );
     }
 
-    private JRightPadded<Statement> convertTopLevelStatement(FirElement element) {
-        Statement statement = null;
-        if (element instanceof FirResolvedImport) {
-            FirResolvedImport firResolvedImport = (FirResolvedImport) element;
+    @Override
+    public J visitImport(@NotNull FirImport firImport, ExecutionContext data) {
+        Space prefix = sourceBefore("import");
+        JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
 
-            Space prefix = sourceBefore("import");
-            JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
-
-            J.FieldAccess qualid;
-            if (firResolvedImport.getImportedFqName() == null) {
-                throw new IllegalStateException("implement me.");
-            } else {
-                Space space = whitespace();
-                String packageName = firResolvedImport.isAllUnder() ?
-                        firResolvedImport.getImportedFqName().asString() + ".*" :
-                        firResolvedImport.getImportedFqName().asString();
-                qualid = TypeTree.build(packageName).withPrefix(space);
-            }
-            statement = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid);
-        }
-
-        if (statement == null) {
+        J.FieldAccess qualid;
+        if (firImport.getImportedFqName() == null) {
             throw new IllegalStateException("implement me.");
+        } else {
+            Space space = whitespace();
+            String packageName = firImport.isAllUnder() ?
+                    firImport.getImportedFqName().asString() + ".*" :
+                    firImport.getImportedFqName().asString();
+            qualid = TypeTree.build(packageName).withPrefix(space);
         }
+        return new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid);
+    }
 
-        return maybeSemicolon(statement);
+    @Override
+    public J visitPackageDirective(@NotNull FirPackageDirective packageDirective, ExecutionContext data) {
+        Space pkgPrefix = whitespace();
+        cursor += "package".length();
+        Space space = whitespace();
+
+        return new J.Package(
+                randomId(),
+                pkgPrefix,
+                Markers.EMPTY,
+                TypeTree.build(packageDirective.getPackageFqName().asString())
+                        .withPrefix(space),
+                emptyList());
     }
 
     private <K2 extends J> JRightPadded<K2> maybeSemicolon(K2 k) {
@@ -167,6 +152,10 @@ public class KotlinParserVisitor extends FirVisitor<K, ExecutionContext> {
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
         return new JLeftPadded<>(left, tree, Markers.EMPTY);
+    }
+
+    private <T> JRightPadded<T> padRight(T tree, Space right) {
+        return new JRightPadded<>(tree, right, Markers.EMPTY);
     }
 
     private int positionOfNext(String untilDelim) {

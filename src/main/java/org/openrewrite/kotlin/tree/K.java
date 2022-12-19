@@ -34,7 +34,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public interface K extends J {
     @SuppressWarnings("unchecked")
@@ -77,11 +76,6 @@ public interface K extends J {
         @With
         @Getter
         UUID id;
-
-        @With
-        @Getter
-        @Nullable
-        String shebang;
 
         @With
         @Getter
@@ -136,37 +130,23 @@ public interface K extends J {
             return getPadding().withPackageDeclaration(JRightPadded.withElement(this.packageDeclaration, packageDeclaration));
         }
 
-        List<JRightPadded<Statement>> statements;
+        List<JRightPadded<Import>> imports;
 
-        public List<Statement> getStatements() {
-            return JRightPadded.getElements(statements);
+        public List<Import> getImports() {
+            return JRightPadded.getElements(imports);
         }
 
-        public K.CompilationUnit withStatements(List<Statement> statements) {
-            return getPadding().withStatements(JRightPadded.withElements(this.statements, statements));
+        public K.CompilationUnit withImports(List<Import> imports) {
+            return getPadding().withImports(JRightPadded.withElements(this.imports, imports));
         }
 
         @With
         @Getter
+        List<ClassDeclaration> classes;
+
+        @With
+        @Getter
         Space eof;
-
-        @Transient
-        public List<Import> getImports() {
-            return statements.stream()
-                    .map(JRightPadded::getElement)
-                    .filter(J.Import.class::isInstance)
-                    .map(J.Import.class::cast)
-                    .collect(Collectors.toList());
-        }
-
-        @Transient
-        public List<ClassDeclaration> getClasses() {
-            return statements.stream()
-                    .map(JRightPadded::getElement)
-                    .filter(J.ClassDeclaration.class::isInstance)
-                    .map(J.ClassDeclaration.class::cast)
-                    .collect(Collectors.toList());
-        }
 
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitJavaSourceFile(this, p);
@@ -218,36 +198,19 @@ public interface K extends J {
             }
 
             public K.CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
-                return t.packageDeclaration == packageDeclaration ? t :
-                        new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes,
-                                t.charsetName, t.charsetBomMarked, t.checksum, packageDeclaration, t.statements, t.eof);
-
+                return t.packageDeclaration == packageDeclaration ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
+                        packageDeclaration, t.imports, t.classes, t.eof);
             }
 
-            @Transient
             @Override
             public List<JRightPadded<Import>> getImports() {
-                //noinspection unchecked
-                return t.statements.stream()
-                        .filter(s -> s.getElement() instanceof J.Import)
-                        .map(s -> (JRightPadded<J.Import>) (Object) s)
-                        .collect(Collectors.toList());
+                return t.imports;
             }
 
             @Override
             public K.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
-                // TODO implement me!
-                return t;
-//                return t.imports == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
-            }
-
-            public List<JRightPadded<Statement>> getStatements() {
-                return t.statements;
-            }
-
-            public K.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
-                return t.statements == statements ? t : new K.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath,
-                        t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+                return t.imports == imports ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
+                        t.packageDeclaration, imports, t.classes, t.eof);
             }
         }
     }
