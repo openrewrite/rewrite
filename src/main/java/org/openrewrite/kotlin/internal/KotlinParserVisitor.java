@@ -16,10 +16,13 @@
 package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
+import org.jetbrains.kotlin.fir.declarations.FirClass;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirImport;
+import org.jetbrains.kotlin.fir.declarations.FirRegularClass;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -34,6 +37,7 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -67,19 +71,24 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
 
     @Override
     public J visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
-        if (firElement instanceof FirImport) {
-            return visitImport((FirImport) firElement, ctx);
-        } else {
-            throw new IllegalStateException("Implement me.");
-        }
+        throw new IllegalStateException("Implement me.");
     }
 
     @Override
     public J visitFile(@NotNull FirFile file, ExecutionContext ctx) {
-        J.Package pkg = null;
+        JRightPadded<J.Package> pkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
-            pkg = (J.Package) visitPackageDirective(file.getPackageDirective(), ctx);
+            pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
         }
+
+        List<JRightPadded<J.Import>> imports = file.getImports().stream()
+                .map(it -> maybeSemicolon((J.Import) visitImport(it, ctx)))
+                .collect(Collectors.toList());
+
+        List<J.ClassDeclaration> classes = file.getDeclarations().stream()
+                .filter(it -> it instanceof FirClass)
+                .map(it -> (J.ClassDeclaration) visitClass((FirClass) it, ctx))
+                .collect(Collectors.toList());
 
         return new K.CompilationUnit(
                 randomId(),
@@ -90,10 +99,70 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
                 charset.name(),
                 charsetBomMarked,
                 null,
-                pkg == null ? null : maybeSemicolon(pkg),
-                file.getImports().stream().map(i -> maybeSemicolon((J.Import) visitImport(i, ctx))).collect(Collectors.toList()),
-                emptyList(),
+                pkg,
+                imports,
+                classes,
                 Space.EMPTY
+        );
+    }
+
+    @Override
+    public J visitClass(@NotNull FirClass klass, ExecutionContext data) {
+        if (!(klass instanceof FirRegularClass)) {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        FirRegularClass firRegularClass = (FirRegularClass) klass;
+        Space prefix = whitespace();
+
+        List<J.Annotation> kindAnnotations = emptyList(); // TODO
+
+        J.ClassDeclaration.Kind kind;
+        ClassKind classKind = klass.getClassKind();
+        if (ClassKind.ENUM_CLASS == classKind) {
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("enum"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Enum);
+        } else if (ClassKind.ANNOTATION_CLASS == classKind) {
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("@interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Annotation);
+        } else if (ClassKind.INTERFACE == classKind) {
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Interface);
+        } else if (ClassKind.CLASS == classKind) {
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        // TODO: add type mapping
+        J.Identifier name = new J.Identifier(randomId(), sourceBefore(firRegularClass.getName().asString()),
+                Markers.EMPTY, firRegularClass.getName().asString(), null, null);
+
+        // TODO
+        JLeftPadded<TypeTree> extendings = null;
+
+        // TODO: fix: super type references are resolved as error kind.
+//        if (classKind == ClassKind.CLASS) {
+//            System.out.println();
+//        }
+        JContainer<TypeTree> implementings = null;
+
+        Space bodyPrefix = sourceBefore("{");
+        // TODO
+        J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                emptyList(), sourceBefore("}"));
+
+        return new J.ClassDeclaration(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                emptyList(), // TODO
+                emptyList(), // TODO
+                kind,
+                name, // TODO
+                null, // TODO
+                null, // TODO
+                extendings, // TODO
+                implementings,
+                body, // TODO
+                null // TODO
         );
     }
 

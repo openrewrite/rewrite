@@ -35,4 +35,17 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void classImplements() {
+        rewriteRun(
+          kotlin(
+            """
+              interface A {}
+              interface B {}
+              class C : A, B {}
+              """
+          )
+        );
+    }
 }

@@ -92,6 +92,7 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
+import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.fir.pipeline.AnalyseKt.runResolution;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -238,8 +239,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             List<FirFile> firFiles = new ArrayList<>(cus.values());
             runResolution(firSession, firFiles);
 
-            convertFirToIr(firFiles, firSession, languageVersionSettings);
-
             return cus;
         } finally {
             disposable.dispose();
@@ -252,6 +251,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         // TODO: fix me. Adds the JDK location to resolve JavaTypes.
         File javaHome = new File(System.getProperty("java.home"));
         compilerConfiguration.put(JVMConfigurationKeys.JDK_HOME, javaHome);
+
+        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT,  true);
 
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
