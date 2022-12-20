@@ -48,26 +48,30 @@ configurations.all {
     }
 }
 
-//The bom version can also be set to a specific version or latest.release.
-val rewriteBomVersion = "latest.integration"
+val latest = if (project.hasProperty("releasing")) {
+    "latest.release"
+} else {
+    "latest.integration"
+}
 
 dependencies {
-    compileOnly("org.openrewrite:rewrite-test:latest.release")
+    compileOnly("org.openrewrite:rewrite-test")
     compileOnly("org.projectlombok:lombok:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")
     annotationProcessor("org.projectlombok:lombok:latest.release")
+    implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:${latest}"))
 
     implementation(platform(kotlin("bom", "1.7.22")))
     implementation(kotlin("compiler-embeddable"))
     implementation(kotlin("stdlib"))
 
-    implementation("org.openrewrite:rewrite-java:latest.release")
+    implementation("org.openrewrite:rewrite-java")
 
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 
-    testImplementation("org.openrewrite:rewrite-test:latest.release")
+    testImplementation("org.openrewrite:rewrite-test")
     testImplementation("org.assertj:assertj-core:latest.release")
 }
 

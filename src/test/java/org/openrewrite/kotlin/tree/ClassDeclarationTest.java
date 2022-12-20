@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
 
 @SuppressWarnings("GrUnnecessaryPublicModifier")
 class ClassDeclarationTest implements RewriteTest {
@@ -31,7 +32,8 @@ class ClassDeclarationTest implements RewriteTest {
             """
               class A {}
               class B {}
-              """
+            """,
+            isFullyParsed()
           )
         );
     }
@@ -44,7 +46,33 @@ class ClassDeclarationTest implements RewriteTest {
               interface A {}
               interface B {}
               class C : A, B {}
-              """
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void classExtends() {
+        rewriteRun(
+          kotlin(
+            """
+              public class Test {}
+              class A : Test() {}
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void modifierOrdering() {
+        rewriteRun(
+          kotlin(
+            """
+              public abstract class A {}
+            """,
+            isFullyParsed()
           )
         );
     }
