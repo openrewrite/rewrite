@@ -32,6 +32,7 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -212,6 +213,72 @@ public interface K extends J {
                 return t.imports == imports ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
                         t.packageDeclaration, imports, t.classes, t.eof);
             }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class Modifier implements J {
+        public static boolean hasModifier(Collection<K.Modifier> modifiers, K.Modifier.Type modifier) {
+            return modifiers.stream().anyMatch(m -> m.getType() == modifier);
+        }
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        K.Modifier.Type type;
+
+        @With
+        @Getter
+        List<Annotation> annotations;
+
+        @Override
+        public String toString() {
+            return type.toString().toLowerCase();
+        }
+
+        /**
+         * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
+         * <a href="https://kotlinlang.org/docs/coding-conventions.html#modifiers-order">KLS</a>.
+         */
+        public enum Type {
+            // TODO: trim as needed.
+            Public,
+            Protected,
+            Private,
+            Internal,
+            Expect,
+            Actual,
+            Final,
+            Open,
+            Abstract,
+            Sealed,
+            Const,
+            External,
+            Override,
+            LateInit,
+            TailRec,
+            Vararg,
+            Suspend,
+            Inner,
+            Enum,
+            Annotation,
+            Fun,
+            Companion,
+            Inline,
+            Value,
+            Infix,
+            Operator,
+            Data
         }
     }
 }
