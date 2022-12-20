@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
@@ -24,6 +26,10 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirImport;
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
+import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
+import org.jetbrains.kotlin.psi.KtDeclarationModifierList;
+import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
+import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -38,6 +44,7 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -116,6 +123,16 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
         FirRegularClass firRegularClass = (FirRegularClass) klass;
         Space prefix = whitespace();
 
+        // Not used until it's possible to handle K.Modifiers.
+        List<K.Modifier> modifiers = emptyList();
+        if (((KtRealPsiSourceElement) firRegularClass.getSource()) != null) {
+            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) firRegularClass.getSource()).getPsi());
+            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+                modifiers = getModifiers(modifierList);
+            }
+        }
+
         List<J.Annotation> kindAnnotations = emptyList(); // TODO
 
         J.ClassDeclaration.Kind kind;
@@ -172,6 +189,115 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
                 body, // TODO
                 null // TODO
         );
+    }
+
+    private List<K.Modifier> getModifiers(KtDeclarationModifierList modifierList) {
+        List<K.Modifier> modifiers = new ArrayList<>();
+        PsiElement current = modifierList.getFirstChild();
+        while (current.getNextSibling() != null) {
+            if (current.getNode().getElementType() instanceof KtModifierKeywordToken) {
+                KtModifierKeywordToken token = (KtModifierKeywordToken) current.getNode().getElementType();
+                List<J.Annotation> annotations = new ArrayList<>(); // TODO
+                K.Modifier modifier = mapModifier(token, annotations);
+                modifiers.add(modifier);
+            }
+            current = current.getNextSibling();
+        }
+        return modifiers;
+    }
+
+    // TODO: confirm this works for all types of kotlin modifiers.
+    private K.Modifier mapModifier(KtModifierKeywordToken mod, List<J.Annotation> annotations) {
+        Space modFormat = whitespace();
+        cursor += mod.getValue().length();
+        K.Modifier.Type type;
+        // Ordered based on kotlin requirements.
+        switch (mod.getValue()) {
+            case "public":
+                type = K.Modifier.Type.Public;
+                break;
+            case "protected":
+                type = K.Modifier.Type.Protected;
+                break;
+            case "private":
+                type = K.Modifier.Type.Private;
+                break;
+            case "internal":
+                type = K.Modifier.Type.Internal;
+                break;
+            case "expect":
+                type = K.Modifier.Type.Expect;
+                break;
+            case "actual":
+                type = K.Modifier.Type.Actual;
+                break;
+            case "final":
+                type = K.Modifier.Type.Final;
+                break;
+            case "open":
+                type = K.Modifier.Type.Open;
+                break;
+            case "abstract":
+                type = K.Modifier.Type.Abstract;
+                break;
+            case "sealed":
+                type = K.Modifier.Type.Sealed;
+                break;
+            case "const":
+                type = K.Modifier.Type.Const;
+                break;
+            case "external":
+                type = K.Modifier.Type.External;
+                break;
+            case "override":
+                type = K.Modifier.Type.Override;
+                break;
+            case "lateinit":
+                type = K.Modifier.Type.LateInit;
+                break;
+            case "tailrec":
+                type = K.Modifier.Type.TailRec;
+                break;
+            case "vararg":
+                type = K.Modifier.Type.Vararg;
+                break;
+            case "suspend":
+                type = K.Modifier.Type.Suspend;
+                break;
+            case "inner":
+                type = K.Modifier.Type.Inner;
+                break;
+            case "enum":
+                type = K.Modifier.Type.Enum;
+                break;
+            case "annotation":
+                type = K.Modifier.Type.Annotation;
+                break;
+            case "fun":
+                type = K.Modifier.Type.Fun;
+                break;
+            case "companion":
+                type = K.Modifier.Type.Companion;
+                break;
+            case "inline":
+                type = K.Modifier.Type.Inline;
+                break;
+            case "value":
+                type = K.Modifier.Type.Value;
+                break;
+            case "infix":
+                type = K.Modifier.Type.Infix;
+                break;
+            case "operator":
+                type = K.Modifier.Type.Operator;
+                break;
+            case "data":
+                type = K.Modifier.Type.Data;
+                break;
+            default:
+                throw new IllegalArgumentException("Unexpected modifier " + mod);
+        }
+        return new K.Modifier(randomId(), modFormat, Markers.EMPTY, type, annotations);
     }
 
     @Override
