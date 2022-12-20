@@ -137,13 +137,10 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
 
         J.ClassDeclaration.Kind kind;
         ClassKind classKind = klass.getClassKind();
-        if (ClassKind.ENUM_CLASS == classKind) {
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("enum"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Enum);
-        } else if (ClassKind.ANNOTATION_CLASS == classKind) {
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("@interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Annotation);
-        } else if (ClassKind.INTERFACE == classKind) {
+        if (ClassKind.INTERFACE == classKind) {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Interface);
-        } else if (ClassKind.CLASS == classKind) {
+        } else if (ClassKind.CLASS == classKind || ClassKind.ENUM_CLASS == classKind || ClassKind.ANNOTATION_CLASS == classKind) {
+            // Enums and Interfaces are modifiers in kotlin and require the modifier prefix to preserve source code.
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         } else {
             throw new IllegalStateException("Implement me.");
@@ -153,7 +150,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
         J.Identifier name = new J.Identifier(randomId(), sourceBefore(firRegularClass.getName().asString()),
                 Markers.EMPTY, firRegularClass.getName().asString(), null, null);
 
-        // TODO
+        // TODO: fix: super type references are resolved as error kind.
         JLeftPadded<TypeTree> extendings = null;
 
         // TODO: fix: super type references are resolved as error kind.
@@ -194,7 +191,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     private List<K.Modifier> getModifiers(KtDeclarationModifierList modifierList) {
         List<K.Modifier> modifiers = new ArrayList<>();
         PsiElement current = modifierList.getFirstChild();
-        while (current.getNextSibling() != null) {
+        while (current != null) {
             if (current.getNode().getElementType() instanceof KtModifierKeywordToken) {
                 KtModifierKeywordToken token = (KtModifierKeywordToken) current.getNode().getElementType();
                 List<J.Annotation> annotations = new ArrayList<>(); // TODO

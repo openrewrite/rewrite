@@ -54,19 +54,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
             String kind = "";
-            switch (classDecl.getKind()) {
-                case Class:
-                    kind = "class";
-                    break;
-                case Enum:
-                    kind = "enum";
-                    break;
-                case Interface:
-                    kind = "interface";
-                    break;
-                case Annotation:
-                    kind = "@interface";
-                    break;
+            if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Class || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Annotation) {
+                kind = "class";
+            } else if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
+                kind = "interface";
+            } else {
+                throw new IllegalStateException("Implement me.");
             }
 
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
@@ -80,6 +73,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(kind);
             visit(classDecl.getName(), p);
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            // TODO: requires extends and implements
             visitLeftPadded(":", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
             visitContainer(":", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
             if (!classDecl.getBody().getMarkers().findFirst(EmptyBody.class).isPresent()) {

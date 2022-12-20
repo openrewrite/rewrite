@@ -66,6 +66,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Disabled("Fix type attribution on super types.")
     @Test
     void classExtends() {
         rewriteRun(
@@ -85,6 +86,32 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
               public abstract class A
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Disabled("Requires supporting Kotlin modifiers.")
+    @Test
+    void annotationClass() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Disabled("Requires supporting Kotlin modifiers.")
+    @Test
+    void enumClass() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class A
             """,
             isFullyParsed()
           )
