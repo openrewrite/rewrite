@@ -16,6 +16,7 @@
 
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -39,13 +40,26 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void empty() {
+        rewriteRun(
+          kotlin(
+            """
+              class A
+              class B
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Disabled("Fix type attribution on super types.")
+    @Test
     void classImplements() {
         rewriteRun(
           kotlin(
             """
-              interface A {}
-              interface B {}
-              class C : A, B {}
+              interface A
+              class C : A
             """,
             isFullyParsed()
           )
@@ -57,8 +71,8 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              public class Test {}
-              class A : Test() {}
+              class A {}
+              class B : A() {}
             """,
             isFullyParsed()
           )
@@ -70,7 +84,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              public abstract class A {}
+              public abstract class A
             """,
             isFullyParsed()
           )

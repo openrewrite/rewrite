@@ -20,7 +20,11 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.KotlinVisitor;
+import org.openrewrite.kotlin.marker.EmptyBody;
 import org.openrewrite.kotlin.tree.K;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
@@ -45,6 +49,44 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             } else {
                 return super.visit(tree, p);
             }
+        }
+
+        @Override
+        public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
+            String kind = "";
+            switch (classDecl.getKind()) {
+                case Class:
+                    kind = "class";
+                    break;
+                case Enum:
+                    kind = "enum";
+                    break;
+                case Interface:
+                    kind = "interface";
+                    break;
+                case Annotation:
+                    kind = "@interface";
+                    break;
+            }
+
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(classDecl.getLeadingAnnotations(), p);
+            for (J.Modifier m : classDecl.getModifiers()) {
+                visitModifier(m, p);
+            }
+            visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
+            visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
+            p.append(kind);
+            visit(classDecl.getName(), p);
+            visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            visitLeftPadded(":", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
+            visitContainer(":", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
+            if (!classDecl.getBody().getMarkers().findFirst(EmptyBody.class).isPresent()) {
+                visit(classDecl.getBody(), p);
+            }
+            afterSyntax(classDecl, p);
+            return classDecl;
         }
     }
 }

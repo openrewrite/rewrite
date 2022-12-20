@@ -31,6 +31,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinTypeMapping;
+import org.openrewrite.kotlin.marker.EmptyBody;
 import org.openrewrite.kotlin.marker.Semicolon;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
@@ -139,15 +140,22 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
         JLeftPadded<TypeTree> extendings = null;
 
         // TODO: fix: super type references are resolved as error kind.
-//        if (classKind == ClassKind.CLASS) {
-//            System.out.println();
-//        }
         JContainer<TypeTree> implementings = null;
 
-        Space bodyPrefix = sourceBefore("{");
-        // TODO
+        Space bodyPrefix = whitespace();
+        EmptyBody emptyBody = null;
+        if (source.substring(cursor).isEmpty() || !source.substring(cursor).startsWith("{")) {
+            emptyBody = new EmptyBody(randomId());
+        } else {
+            cursor++; // Increment past the `{`
+        }
+
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                 emptyList(), sourceBefore("}"));
+
+        if (emptyBody != null) {
+            body = body.withMarkers(body.getMarkers().addIfAbsent(emptyBody));
+        }
 
         return new J.ClassDeclaration(
                 randomId(),
