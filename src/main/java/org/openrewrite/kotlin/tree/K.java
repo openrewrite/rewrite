@@ -219,7 +219,7 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Modifier implements J {
+    final class Modifier implements K {
         public static boolean hasModifier(Collection<K.Modifier> modifiers, K.Modifier.Type modifier) {
             return modifiers.stream().anyMatch(m -> m.getType() == modifier);
         }

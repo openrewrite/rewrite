@@ -17,7 +17,10 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.*;
+import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
@@ -27,9 +30,10 @@ import org.jetbrains.kotlin.fir.declarations.FirImport;
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
-import org.jetbrains.kotlin.psi.KtDeclarationModifierList;
+import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
+import org.jetbrains.kotlin.psi.stubs.elements.KtAnnotationEntryElementType;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -115,7 +119,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitClass(@NotNull FirClass klass, ExecutionContext data) {
+    public J visitClass(@NotNull FirClass klass, ExecutionContext ctx) {
         if (!(klass instanceof FirRegularClass)) {
             throw new IllegalStateException("Implement me.");
         }
@@ -124,8 +128,8 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
         Space prefix = whitespace();
 
         // Not used until it's possible to handle K.Modifiers.
-        List<K.Modifier> modifiers = emptyList();
-        if (((KtRealPsiSourceElement) firRegularClass.getSource()) != null) {
+        List<J> modifiers = emptyList();
+        if (firRegularClass.getSource() != null) {
             PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) firRegularClass.getSource()).getPsi());
             if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
                 KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
@@ -133,7 +137,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
             }
         }
 
-        List<J.Annotation> kindAnnotations = emptyList(); // TODO
+        List<J.Annotation> kindAnnotations = emptyList(); // TODO: the last annotations in modifiersAndAnnotations should be added to the class.
 
         J.ClassDeclaration.Kind kind;
         ClassKind classKind = klass.getClassKind();
@@ -188,18 +192,30 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
         );
     }
 
-    private List<K.Modifier> getModifiers(KtDeclarationModifierList modifierList) {
-        List<K.Modifier> modifiers = new ArrayList<>();
+    // TODO: parse comments.
+    private List<J> getModifiers(KtDeclarationModifierList modifierList) {
+        List<J> modifiers = new ArrayList<>();
         PsiElement current = modifierList.getFirstChild();
+        List<J.Annotation> annotations = new ArrayList<>();
         while (current != null) {
-            if (current.getNode().getElementType() instanceof KtModifierKeywordToken) {
-                KtModifierKeywordToken token = (KtModifierKeywordToken) current.getNode().getElementType();
-                List<J.Annotation> annotations = new ArrayList<>(); // TODO
+            IElementType elementType = current.getNode().getElementType();
+            if (elementType instanceof KtModifierKeywordToken) {
+                KtModifierKeywordToken token = (KtModifierKeywordToken) elementType;
                 K.Modifier modifier = mapModifier(token, annotations);
+                annotations = new ArrayList<>();
                 modifiers.add(modifier);
+            } else if (elementType instanceof KtAnnotationEntryElementType) {
+                ASTNode astNode = current.getNode();
+                if (astNode instanceof CompositeElement) {
+                    J.Annotation annotation = mapAnnotation((CompositeElement) astNode);
+                    annotations.add(annotation);
+                } else {
+                    throw new IllegalStateException("Implement me.");
+                }
             }
             current = current.getNextSibling();
         }
+        modifiers.addAll(annotations);
         return modifiers;
     }
 
@@ -295,6 +311,12 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
                 throw new IllegalArgumentException("Unexpected modifier " + mod);
         }
         return new K.Modifier(randomId(), modFormat, Markers.EMPTY, type, annotations);
+    }
+
+    // TODO: parse annotation composite and create J.Annotation.
+    private J.Annotation mapAnnotation(CompositeElement compositeElement) {
+        Space prefix = whitespace();
+        return new J.Annotation(randomId(), prefix, Markers.EMPTY, null, JContainer.empty());
     }
 
     @Override

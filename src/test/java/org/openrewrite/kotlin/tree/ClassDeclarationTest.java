@@ -117,4 +117,24 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotation() {
+        rewriteRun(
+          kotlin(
+            """
+              public @Deprecated("message 0") abstract @Suppress("") class Test
+            
+              @Deprecated("message 1") 
+              @Suppress("")
+              class A
+            
+              @Suppress("")
+              @Deprecated("message 2")
+              class B
+            """,
+            isFullyParsed()
+          )
+        );
+    }
 }
