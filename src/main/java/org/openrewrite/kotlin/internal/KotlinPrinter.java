@@ -19,13 +19,13 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JContainer;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.EmptyBody;
+import org.openrewrite.kotlin.marker.VariableTypeConstraint;
 import org.openrewrite.kotlin.tree.K;
+
+import java.util.Optional;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter delegate = new KotlinJavaPrinter();
@@ -81,6 +81,34 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(classDecl, p);
             return classDecl;
+        }
+
+        @Override
+        public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
+            beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(multiVariable.getLeadingAnnotations(), p);
+            for (J.Modifier m : multiVariable.getModifiers()) {
+                visitModifier(m, p);
+            }
+
+            visit(multiVariable.getTypeExpression(), p);
+
+            J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(0);
+            beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
+            visit(variable.getName(), p);
+
+            Optional<VariableTypeConstraint> variableTypeConstraintOptional = variable.getMarkers().findFirst(VariableTypeConstraint.class);
+            if (variableTypeConstraintOptional.isPresent()) {
+                p.append(":");
+                super.visit(variableTypeConstraintOptional.get().getType(), p);
+            }
+
+            visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+            afterSyntax(variable, p);
+
+            afterSyntax(multiVariable, p);
+            return multiVariable;
         }
     }
 }

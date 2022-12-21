@@ -24,10 +24,12 @@ import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
-import org.jetbrains.kotlin.fir.declarations.FirClass;
-import org.jetbrains.kotlin.fir.declarations.FirFile;
-import org.jetbrains.kotlin.fir.declarations.FirImport;
-import org.jetbrains.kotlin.fir.declarations.FirRegularClass;
+import org.jetbrains.kotlin.fir.declarations.*;
+import org.jetbrains.kotlin.fir.expressions.FirConstExpression;
+import org.jetbrains.kotlin.fir.types.FirQualifierPart;
+import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
+import org.jetbrains.kotlin.fir.types.FirTypeRef;
+import org.jetbrains.kotlin.fir.types.FirUserTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.psi.*;
@@ -42,6 +44,7 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinTypeMapping;
 import org.openrewrite.kotlin.marker.EmptyBody;
+import org.openrewrite.kotlin.marker.VariableTypeConstraint;
 import org.openrewrite.kotlin.marker.Semicolon;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
@@ -82,25 +85,32 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
-        throw new IllegalStateException("Implement me.");
-    }
-
-    @Override
-    public J visitFile(@NotNull FirFile file, ExecutionContext ctx) {
+    public J visitFile(@NotNull FirFile file, ExecutionContext executionContext) {
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
-            pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
+            pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), executionContext));
         }
 
         List<JRightPadded<J.Import>> imports = file.getImports().stream()
-                .map(it -> maybeSemicolon((J.Import) visitImport(it, ctx)))
+                .map(it -> maybeSemicolon((J.Import) visitImport(it, executionContext)))
                 .collect(Collectors.toList());
 
-        List<J.ClassDeclaration> classes = file.getDeclarations().stream()
-                .filter(it -> it instanceof FirClass)
-                .map(it -> (J.ClassDeclaration) visitClass((FirClass) it, ctx))
-                .collect(Collectors.toList());
+
+        List<JRightPadded<Statement>> statements = new ArrayList<>(file.getDeclarations().size());
+        for (FirDeclaration declaration : file.getDeclarations()) {
+            Statement statement = null;
+            if (declaration instanceof FirClass) {
+                statement = (Statement) visitClass((FirClass) declaration, ctx);
+            } else if (declaration instanceof FirProperty) {
+                statement = (Statement) visitProperty((FirProperty) declaration, ctx);
+            } else {
+                throw new IllegalStateException("Implement me.");
+            }
+
+            if (statement != null) {
+                statements.add(JRightPadded.build(statement));
+            }
+        }
 
         return new K.CompilationUnit(
                 randomId(),
@@ -113,13 +123,13 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
                 null,
                 pkg,
                 imports,
-                classes,
+                statements,
                 Space.EMPTY
         );
     }
 
     @Override
-    public J visitClass(@NotNull FirClass klass, ExecutionContext ctx) {
+    public J visitClass(@NotNull FirClass klass, ExecutionContext executionContext) {
         if (!(klass instanceof FirRegularClass)) {
             throw new IllegalStateException("Implement me.");
         }
@@ -180,7 +190,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
                 prefix,
                 Markers.EMPTY,
                 emptyList(), // TODO
-                emptyList(), // TODO
+                emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
                 kind,
                 name, // TODO
                 null, // TODO
@@ -191,6 +201,254 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
                 null // TODO
         );
     }
+
+    @Override
+    public <T> J visitConstExpression(@NotNull FirConstExpression<T> constExpression, ExecutionContext data) {
+        Space prefix = whitespace();
+        Object value = constExpression.getValue();
+        String valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
+        JavaType.Primitive type = null; // TODO: add type mapping.
+
+        return new J.Literal(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                value,
+                valueSource,
+                null,
+                type);
+    }
+
+    @Override
+    public J visitImport(@NotNull FirImport firImport, ExecutionContext executionContext) {
+        Space prefix = sourceBefore("import");
+        JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
+
+        J.FieldAccess qualid;
+        if (firImport.getImportedFqName() == null) {
+            throw new IllegalStateException("implement me.");
+        } else {
+            Space space = whitespace();
+            String packageName = firImport.isAllUnder() ?
+                    firImport.getImportedFqName().asString() + ".*" :
+                    firImport.getImportedFqName().asString();
+            qualid = TypeTree.build(packageName).withPrefix(space);
+        }
+        return new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid);
+    }
+
+    @Override
+    public J visitPackageDirective(@NotNull FirPackageDirective packageDirective, ExecutionContext executionContext) {
+        Space pkgPrefix = whitespace();
+        cursor += "package".length();
+        Space space = whitespace();
+
+        return new J.Package(
+                randomId(),
+                pkgPrefix,
+                Markers.EMPTY,
+                TypeTree.build(packageDirective.getPackageFqName().asString())
+                        .withPrefix(space),
+                emptyList());
+    }
+
+    @Override
+    public J visitProperty(@NotNull FirProperty property, ExecutionContext executionContext) {
+        Space prefix = whitespace();
+
+        List<J> modifiers = emptyList();
+        if (property.getSource() != null) {
+            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) property.getSource()).getPsi());
+            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+                modifiers = getModifiers(modifierList);
+            }
+        }
+
+        List<J.Annotation> annotations = emptyList(); // TODO: the last annotations in modifiers should be added.
+
+        boolean isVal = property.isVal();
+        J.Identifier typeExpression = new J.Identifier(
+                randomId(),
+                isVal ? sourceBefore("val") : sourceBefore("var"),
+                Markers.EMPTY,
+                isVal ? "val" : "var",
+                null,
+                null);
+
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
+        Space namePrefix = sourceBefore(property.getName().asString());
+
+        J.Identifier name = new J.Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                property.getName().asString(),
+                null, // TODO: add type mapping and set type
+                null); // TODO: add type mapping and set variable type
+
+        TypeTree typeConstraint = null;
+        if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+            FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
+            if (typeRef.getDelegatedTypeRef() == null) {
+                typeConstraint = null;
+            } else {
+                typeConstraint = (TypeTree) visitTypeRef(typeRef.getDelegatedTypeRef(), ctx);
+            }
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
+        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
+
+        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
+                new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        namePrefix,
+                        typeConstraint == null ? Markers.EMPTY : Markers.EMPTY.addIfAbsent(new VariableTypeConstraint(randomId(), typeConstraint)),
+                        name,
+                        dimensionsAfterName,
+                        property.getInitializer() != null ? padLeft(sourceBefore("="), (Expression) visitExpression(property.getInitializer(), ctx)) : null,
+                        null // TODO: add type mapping
+                )
+        );
+        vars.add(namedVariable);
+
+        return new J.VariableDeclarations(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
+                typeExpression,
+                null,
+                dimensionsAfterName,
+                vars);
+    }
+
+    @Override
+    public J visitTypeRef(@NotNull FirTypeRef typeRef, ExecutionContext executionContext) {
+        sourceBefore(":"); // increment passed the ":"
+
+        JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
+        if (typeRef instanceof FirUserTypeRef) {
+            FirUserTypeRef userTypeRef = (FirUserTypeRef) typeRef;
+            if (userTypeRef.getQualifier().size() == 1) {
+                FirQualifierPart part = userTypeRef.getQualifier().get(0);
+                Space prefix = sourceBefore(part.getName().asString());
+                J.Identifier ident = new J.Identifier(randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        part.getName().asString(),
+                        type,
+                        null);
+                if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
+                    throw new IllegalStateException("Return parameterized type.");
+                } else {
+                    return ident.withPrefix(prefix);
+                }
+            } else {
+                throw new IllegalStateException("Implement me.");
+            }
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
+    }
+
+    @Override
+    public J visitElement(@NotNull FirElement firElement, ExecutionContext executionContext) {
+        if (firElement instanceof FirConstExpression) {
+            return visitConstExpression((FirConstExpression<? extends Object>) firElement, ctx);
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
+    }
+
+    private <K2 extends J> JRightPadded<K2> maybeSemicolon(K2 k) {
+        int saveCursor = cursor;
+        Space beforeSemi = whitespace();
+        Semicolon semicolon = null;
+        if (cursor < source.length() && source.charAt(cursor) == ';') {
+            semicolon = new Semicolon(randomId());
+            cursor++;
+        } else {
+            beforeSemi = EMPTY;
+            cursor = saveCursor;
+        }
+
+        JRightPadded<K2> padded = JRightPadded.build(k).withAfter(beforeSemi);
+        if (semicolon != null) {
+            padded = padded.withMarkers(padded.getMarkers().add(semicolon));
+        }
+
+        return padded;
+    }
+
+    private <T> JLeftPadded<T> padLeft(Space left, T tree) {
+        return new JLeftPadded<>(left, tree, Markers.EMPTY);
+    }
+
+    private <T> JRightPadded<T> padRight(T tree, Space right) {
+        return new JRightPadded<>(tree, right, Markers.EMPTY);
+    }
+
+    private int positionOfNext(String untilDelim) {
+        boolean inMultiLineComment = false;
+        boolean inSingleLineComment = false;
+
+        int delimIndex = cursor;
+        for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
+            if (inSingleLineComment) {
+                if (source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
+            } else {
+                if (source.length() - untilDelim.length() > delimIndex + 1) {
+                    switch (source.substring(delimIndex, delimIndex + 2)) {
+                        case "//":
+                            inSingleLineComment = true;
+                            delimIndex++;
+                            break;
+                        case "/*":
+                            inMultiLineComment = true;
+                            delimIndex++;
+                            break;
+                        case "*/":
+                            inMultiLineComment = false;
+                            delimIndex = delimIndex + 2;
+                            break;
+                    }
+                }
+
+                if (!inMultiLineComment && !inSingleLineComment) {
+                    if (source.startsWith(untilDelim, delimIndex)) {
+                        break; // found it!
+                    }
+                }
+            }
+        }
+
+        return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
+    }
+
+    private Space sourceBefore(String untilDelim) {
+        int delimIndex = positionOfNext(untilDelim);
+        if (delimIndex < 0) {
+            return EMPTY; // unable to find this delimiter
+        }
+
+        String prefix = source.substring(cursor, delimIndex);
+        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
+        return Space.format(prefix);
+    }
+
+    private Space whitespace() {
+        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
+        cursor += prefix.length();
+        return format(prefix);
+    }
+
 
     // TODO: parse comments.
     private List<J> getModifiers(KtDeclarationModifierList modifierList) {
@@ -317,122 +575,5 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     private J.Annotation mapAnnotation(CompositeElement compositeElement) {
         Space prefix = whitespace();
         return new J.Annotation(randomId(), prefix, Markers.EMPTY, null, JContainer.empty());
-    }
-
-    @Override
-    public J visitImport(@NotNull FirImport firImport, ExecutionContext data) {
-        Space prefix = sourceBefore("import");
-        JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
-
-        J.FieldAccess qualid;
-        if (firImport.getImportedFqName() == null) {
-            throw new IllegalStateException("implement me.");
-        } else {
-            Space space = whitespace();
-            String packageName = firImport.isAllUnder() ?
-                    firImport.getImportedFqName().asString() + ".*" :
-                    firImport.getImportedFqName().asString();
-            qualid = TypeTree.build(packageName).withPrefix(space);
-        }
-        return new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid);
-    }
-
-    @Override
-    public J visitPackageDirective(@NotNull FirPackageDirective packageDirective, ExecutionContext data) {
-        Space pkgPrefix = whitespace();
-        cursor += "package".length();
-        Space space = whitespace();
-
-        return new J.Package(
-                randomId(),
-                pkgPrefix,
-                Markers.EMPTY,
-                TypeTree.build(packageDirective.getPackageFqName().asString())
-                        .withPrefix(space),
-                emptyList());
-    }
-
-    private <K2 extends J> JRightPadded<K2> maybeSemicolon(K2 k) {
-        int saveCursor = cursor;
-        Space beforeSemi = whitespace();
-        Semicolon semicolon = null;
-        if (cursor < source.length() && source.charAt(cursor) == ';') {
-            semicolon = new Semicolon(randomId());
-            cursor++;
-        } else {
-            beforeSemi = EMPTY;
-            cursor = saveCursor;
-        }
-
-        JRightPadded<K2> padded = JRightPadded.build(k).withAfter(beforeSemi);
-        if (semicolon != null) {
-            padded = padded.withMarkers(padded.getMarkers().add(semicolon));
-        }
-
-        return padded;
-    }
-
-    private <T> JLeftPadded<T> padLeft(Space left, T tree) {
-        return new JLeftPadded<>(left, tree, Markers.EMPTY);
-    }
-
-    private <T> JRightPadded<T> padRight(T tree, Space right) {
-        return new JRightPadded<>(tree, right, Markers.EMPTY);
-    }
-
-    private int positionOfNext(String untilDelim) {
-        boolean inMultiLineComment = false;
-        boolean inSingleLineComment = false;
-
-        int delimIndex = cursor;
-        for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
-            if (inSingleLineComment) {
-                if (source.charAt(delimIndex) == '\n') {
-                    inSingleLineComment = false;
-                }
-            } else {
-                if (source.length() - untilDelim.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
-                            break;
-                    }
-                }
-
-                if (!inMultiLineComment && !inSingleLineComment) {
-                    if (source.startsWith(untilDelim, delimIndex)) {
-                        break; // found it!
-                    }
-                }
-            }
-        }
-
-        return delimIndex > source.length() - untilDelim.length() ? -1 : delimIndex;
-    }
-
-    private Space sourceBefore(String untilDelim) {
-        int delimIndex = positionOfNext(untilDelim);
-        if (delimIndex < 0) {
-            return EMPTY; // unable to find this delimiter
-        }
-
-        String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
-    }
-
-    private Space whitespace() {
-        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
-        cursor += prefix.length();
-        return format(prefix);
     }
 }

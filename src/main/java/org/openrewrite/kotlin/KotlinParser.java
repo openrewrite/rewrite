@@ -92,7 +92,7 @@ import java.util.regex.Pattern;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
-import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
+import static org.jetbrains.kotlin.config.JVMConfigurationKeys.*;
 import static org.jetbrains.kotlin.fir.pipeline.AnalyseKt.runResolution;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
@@ -218,7 +218,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             RawFirBuilder rawFirBuilder = new RawFirBuilder(
                     firSession,
                     new FirKotlinScopeProvider(),
-                    PsiHandlingMode.IDE,
+                    PsiHandlingMode.COMPILER,
                     BodyBuildingMode.NORMAL
             );
 
@@ -239,6 +239,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             List<FirFile> firFiles = new ArrayList<>(cus.values());
             runResolution(firSession, firFiles);
 
+            convertFirToIr(firFiles, firSession, languageVersionSettings);
             return cus;
         } finally {
             disposable.dispose();
