@@ -92,7 +92,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitFile(@NotNull FirFile file, ExecutionContext ctx) {
+    public J visitFile(FirFile file, ExecutionContext ctx) {
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
             pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
@@ -134,7 +134,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitClass(@NotNull FirClass klass, ExecutionContext ctx) {
+    public J visitClass(FirClass klass, ExecutionContext ctx) {
         if (!(klass instanceof FirRegularClass)) {
             throw new IllegalStateException("Implement me.");
         }
@@ -213,7 +213,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public <T> J visitConstExpression(@NotNull FirConstExpression<T> constExpression, ExecutionContext ctx) {
+    public <T> J visitConstExpression(FirConstExpression<T> constExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
         Object value = constExpression.getValue();
         String valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
@@ -230,12 +230,12 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitFunctionCall(@NotNull FirFunctionCall functionCall, ExecutionContext data) {
+    public J visitFunctionCall(FirFunctionCall functionCall, ExecutionContext data) {
         throw new IllegalStateException("how is a new class identified?");
     }
 
     @Override
-    public J visitImport(@NotNull FirImport firImport, ExecutionContext ctx) {
+    public J visitImport(FirImport firImport, ExecutionContext ctx) {
         Space prefix = sourceBefore("import");
         JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
 
@@ -253,7 +253,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitPackageDirective(@NotNull FirPackageDirective packageDirective, ExecutionContext ctx) {
+    public J visitPackageDirective(FirPackageDirective packageDirective, ExecutionContext ctx) {
         Space pkgPrefix = whitespace();
         cursor += "package".length();
         Space space = whitespace();
@@ -268,7 +268,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitProperty(@NotNull FirProperty property, ExecutionContext ctx) {
+    public J visitProperty(FirProperty property, ExecutionContext ctx) {
         Space prefix = whitespace();
 
         List<J> modifiers = emptyList();
@@ -343,7 +343,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitResolvedTypeRef(@NotNull FirResolvedTypeRef resolvedTypeRef, ExecutionContext ctx) {
+    public J visitResolvedTypeRef(FirResolvedTypeRef resolvedTypeRef, ExecutionContext ctx) {
         String name = ((KtRealPsiSourceElement) resolvedTypeRef.getSource()).getPsi().getText();
         Space prefix = sourceBefore(name);
 
@@ -357,7 +357,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitTypeParameter(@NotNull FirTypeParameter typeParameter, ExecutionContext ctx) {
+    public J visitTypeParameter(FirTypeParameter typeParameter, ExecutionContext ctx) {
         if (!typeParameter.getAnnotations().isEmpty()) {
             throw new IllegalStateException("Implement me.");
         }
@@ -378,13 +378,13 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitTypeProjectionWithVariance(@NotNull FirTypeProjectionWithVariance typeProjectionWithVariance, ExecutionContext ctx) {
+    public J visitTypeProjectionWithVariance(FirTypeProjectionWithVariance typeProjectionWithVariance, ExecutionContext ctx) {
         // TODO: Temp. sort out how type references work and why FirTypeProjectionWithVariance contain variance even when not specified in code. I.E., Int.
         return visitResolvedTypeRef((FirResolvedTypeRef) typeProjectionWithVariance.getTypeRef(), ctx);
     }
 
     @Override
-    public J visitUserTypeRef(@NotNull FirUserTypeRef userTypeRef, ExecutionContext data) {
+    public J visitUserTypeRef(FirUserTypeRef userTypeRef, ExecutionContext data) {
         sourceBefore(":"); // increment passed the ":"
 
         JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
@@ -419,7 +419,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
+    public J visitElement(FirElement firElement, ExecutionContext ctx) {
         if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<? extends Object>) firElement, ctx);
         } else if (firElement instanceof FirFunctionCall) {
