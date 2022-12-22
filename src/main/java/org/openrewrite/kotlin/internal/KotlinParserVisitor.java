@@ -24,18 +24,19 @@ import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
+import org.jetbrains.kotlin.fir.UtilsKt;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.FirConstExpression;
-import org.jetbrains.kotlin.fir.types.FirQualifierPart;
-import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
-import org.jetbrains.kotlin.fir.types.FirTypeRef;
-import org.jetbrains.kotlin.fir.types.FirUserTypeRef;
+import org.jetbrains.kotlin.fir.expressions.FirFunctionCall;
+import org.jetbrains.kotlin.fir.types.*;
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jetbrains.kotlin.psi.stubs.elements.KtAnnotationEntryElementType;
+import org.jetbrains.kotlin.types.typeUtil.TypeUtilsKt;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -53,8 +54,12 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
@@ -74,6 +79,8 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
 
     private int cursor = 0;
 
+    private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
+
     public KotlinParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
@@ -85,14 +92,14 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitFile(@NotNull FirFile file, ExecutionContext executionContext) {
+    public J visitFile(@NotNull FirFile file, ExecutionContext ctx) {
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
-            pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), executionContext));
+            pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
         }
 
         List<JRightPadded<J.Import>> imports = file.getImports().stream()
-                .map(it -> maybeSemicolon((J.Import) visitImport(it, executionContext)))
+                .map(it -> maybeSemicolon((J.Import) visitImport(it, ctx)))
                 .collect(Collectors.toList());
 
 
@@ -107,9 +114,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
                 throw new IllegalStateException("Implement me.");
             }
 
-            if (statement != null) {
-                statements.add(JRightPadded.build(statement));
-            }
+            statements.add(JRightPadded.build(statement));
         }
 
         return new K.CompilationUnit(
@@ -129,7 +134,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitClass(@NotNull FirClass klass, ExecutionContext executionContext) {
+    public J visitClass(@NotNull FirClass klass, ExecutionContext ctx) {
         if (!(klass instanceof FirRegularClass)) {
             throw new IllegalStateException("Implement me.");
         }
@@ -163,6 +168,11 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
         // TODO: add type mapping
         J.Identifier name = new J.Identifier(randomId(), sourceBefore(firRegularClass.getName().asString()),
                 Markers.EMPTY, firRegularClass.getName().asString(), null, null);
+
+        JContainer<J.TypeParameter> typeParams = firRegularClass.getTypeParameters().isEmpty() ? null : JContainer.build(
+                sourceBefore("<"),
+                convertAll(firRegularClass.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx),
+                Markers.EMPTY);
 
         // TODO: fix: super type references are resolved as error kind.
         JLeftPadded<TypeTree> extendings = null;
@@ -203,7 +213,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public <T> J visitConstExpression(@NotNull FirConstExpression<T> constExpression, ExecutionContext data) {
+    public <T> J visitConstExpression(@NotNull FirConstExpression<T> constExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
         Object value = constExpression.getValue();
         String valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
@@ -220,7 +230,12 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitImport(@NotNull FirImport firImport, ExecutionContext executionContext) {
+    public J visitFunctionCall(@NotNull FirFunctionCall functionCall, ExecutionContext data) {
+        throw new IllegalStateException("how is a new class identified?");
+    }
+
+    @Override
+    public J visitImport(@NotNull FirImport firImport, ExecutionContext ctx) {
         Space prefix = sourceBefore("import");
         JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
 
@@ -238,7 +253,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitPackageDirective(@NotNull FirPackageDirective packageDirective, ExecutionContext executionContext) {
+    public J visitPackageDirective(@NotNull FirPackageDirective packageDirective, ExecutionContext ctx) {
         Space pkgPrefix = whitespace();
         cursor += "package".length();
         Space space = whitespace();
@@ -253,7 +268,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitProperty(@NotNull FirProperty property, ExecutionContext executionContext) {
+    public J visitProperty(@NotNull FirProperty property, ExecutionContext ctx) {
         Space prefix = whitespace();
 
         List<J> modifiers = emptyList();
@@ -293,7 +308,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
             if (typeRef.getDelegatedTypeRef() == null) {
                 typeConstraint = null;
             } else {
-                typeConstraint = (TypeTree) visitTypeRef(typeRef.getDelegatedTypeRef(), ctx);
+                typeConstraint = (TypeTree) visitElement(typeRef.getDelegatedTypeRef(), ctx);
             }
         } else {
             throw new IllegalStateException("Implement me.");
@@ -328,28 +343,75 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitTypeRef(@NotNull FirTypeRef typeRef, ExecutionContext executionContext) {
+    public J visitResolvedTypeRef(@NotNull FirResolvedTypeRef resolvedTypeRef, ExecutionContext ctx) {
+        String name = ((KtRealPsiSourceElement) resolvedTypeRef.getSource()).getPsi().getText();
+        Space prefix = sourceBefore(name);
+
+        JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
+        return new J.Identifier(randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                name,
+                type,
+                null);
+    }
+
+    @Override
+    public J visitTypeParameter(@NotNull FirTypeParameter typeParameter, ExecutionContext ctx) {
+        if (!typeParameter.getAnnotations().isEmpty()) {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        Space prefix = whitespace();
+        List<J.Annotation> annotations = emptyList();
+
+        Expression name = buildName(typeParameter.getName().asString())
+                .withPrefix(sourceBefore(typeParameter.getName().asString()));
+
+        // TODO: add support for bounds. Bounds often exist regardless of if bounds are specified.
+        JContainer<TypeTree> bounds = JContainer.empty();
+//        JContainer<TypeTree> bounds = typeParameter.getBounds().isEmpty() ? null :
+//                JContainer.build(whitespace(),
+//                        convertAll(typeParameter.getBounds(), t -> sourceBefore(","), noDelim, ctx), Markers.EMPTY);
+
+        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, annotations, name, bounds);
+    }
+
+    @Override
+    public J visitTypeProjectionWithVariance(@NotNull FirTypeProjectionWithVariance typeProjectionWithVariance, ExecutionContext ctx) {
+        // TODO: Temp. sort out how type references work and why FirTypeProjectionWithVariance contain variance even when not specified in code. I.E., Int.
+        return visitResolvedTypeRef((FirResolvedTypeRef) typeProjectionWithVariance.getTypeRef(), ctx);
+    }
+
+    @Override
+    public J visitUserTypeRef(@NotNull FirUserTypeRef userTypeRef, ExecutionContext data) {
         sourceBefore(":"); // increment passed the ":"
 
         JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
-        if (typeRef instanceof FirUserTypeRef) {
-            FirUserTypeRef userTypeRef = (FirUserTypeRef) typeRef;
-            if (userTypeRef.getQualifier().size() == 1) {
-                FirQualifierPart part = userTypeRef.getQualifier().get(0);
-                Space prefix = sourceBefore(part.getName().asString());
-                J.Identifier ident = new J.Identifier(randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        part.getName().asString(),
-                        type,
-                        null);
-                if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
-                    throw new IllegalStateException("Return parameterized type.");
-                } else {
-                    return ident.withPrefix(prefix);
+        if (userTypeRef.getQualifier().size() == 1) {
+            FirQualifierPart part = userTypeRef.getQualifier().get(0);
+            Space prefix = sourceBefore(part.getName().asString());
+            J.Identifier ident = new J.Identifier(randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    part.getName().asString(),
+                    type,
+                    null);
+            if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
+                List<JRightPadded<Expression>> parameters = new ArrayList<>(part.getTypeArgumentList().getTypeArguments().size());
+                for (FirTypeProjection typeArgument : part.getTypeArgumentList().getTypeArguments()) {
+                    parameters.add(JRightPadded.build((Expression) visitElement(typeArgument, ctx)));
                 }
+
+                return new J.ParameterizedType(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        ident,
+                        JContainer.build(parameters)
+                );
             } else {
-                throw new IllegalStateException("Implement me.");
+                return ident.withPrefix(prefix);
             }
         } else {
             throw new IllegalStateException("Implement me.");
@@ -357,12 +419,93 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
     }
 
     @Override
-    public J visitElement(@NotNull FirElement firElement, ExecutionContext executionContext) {
+    public J visitElement(@NotNull FirElement firElement, ExecutionContext ctx) {
         if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<? extends Object>) firElement, ctx);
+        } else if (firElement instanceof FirFunctionCall) {
+            return visitFunctionCall((FirFunctionCall) firElement, ctx);
+        } else if (firElement instanceof FirImplicitNullableAnyTypeRef) {
+            return visitResolvedTypeRef((FirResolvedTypeRef) firElement, ctx);
+        } else if (firElement instanceof FirTypeParameter) {
+            return visitTypeParameter((FirTypeParameter) firElement, ctx);
+        } else if (firElement instanceof FirTypeProjectionWithVariance) {
+            return visitTypeProjectionWithVariance((FirTypeProjectionWithVariance) firElement, ctx);
+        } else if (firElement instanceof FirUserTypeRef) {
+            return visitUserTypeRef((FirUserTypeRef) firElement, ctx);
         } else {
             throw new IllegalStateException("Implement me.");
         }
+    }
+
+    private final Function<FirElement, Space> commaDelim = ignored -> sourceBefore(",");
+    private final Function<FirElement, Space> noDelim = ignored -> EMPTY;
+
+    private void cursor(int n) {
+        cursor = n;
+    }
+
+    private int endPos(FirElement t) {
+        return ((KtRealPsiSourceElement) t.getSource()).getEndOffset();
+    }
+
+    private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
+        String[] parts = fullyQualifiedName.split("\\.");
+
+        String fullName = "";
+        Expression expr = null;
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+            if (i == 0) {
+                fullName = part;
+                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, part, null, null);
+            } else {
+                fullName += "." + part;
+
+                int endOfPrefix = indexOfNextNonWhitespace(0, part);
+                Space identFmt = endOfPrefix > 0 ? format(part.substring(0, endOfPrefix)) : EMPTY;
+
+                Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
+                //noinspection ResultOfMethodCallIgnored
+                whitespaceSuffix.matches();
+                Space namePrefix = i == parts.length - 1 ? Space.EMPTY : format(whitespaceSuffix.group(1));
+
+                expr = new J.FieldAccess(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        expr,
+                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, part.trim(), null, null)),
+                        (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
+                                JavaType.ShallowClass.build(fullName) :
+                                null
+                );
+            }
+        }
+
+        //noinspection unchecked,ConstantConditions
+        return (T) expr;
+    }
+
+    private <J2 extends J> JRightPadded<J2> convert(FirElement t, Function<FirElement, Space> suffix, ExecutionContext ctx) {
+        J2 j = (J2) visitElement(t, ctx);
+        @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
+                new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
+        cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
+        return rightPadded;
+    }
+
+    private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends FirElement> elements,
+                                                             Function<FirElement, Space> innerSuffix,
+                                                             Function<FirElement, Space> suffix,
+                                                             ExecutionContext ctx) {
+        if (elements.isEmpty()) {
+            return emptyList();
+        }
+        List<JRightPadded<J2>> converted = new ArrayList<>(elements.size());
+        for (int i = 0; i < elements.size(); i++) {
+            converted.add(convert(elements.get(i), i == elements.size() - 1 ? suffix : innerSuffix, ctx));
+        }
+        return converted;
     }
 
     private <K2 extends J> JRightPadded<K2> maybeSemicolon(K2 k) {

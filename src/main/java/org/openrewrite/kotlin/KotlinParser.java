@@ -218,7 +218,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             RawFirBuilder rawFirBuilder = new RawFirBuilder(
                     firSession,
                     new FirKotlinScopeProvider(),
-                    PsiHandlingMode.COMPILER,
+                    PsiHandlingMode.IDE,
                     BodyBuildingMode.NORMAL
             );
 
@@ -239,7 +239,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             List<FirFile> firFiles = new ArrayList<>(cus.values());
             runResolution(firSession, firFiles);
 
-            convertFirToIr(firFiles, firSession, languageVersionSettings);
+//            convertFirToIr(firFiles, firSession, languageVersionSettings);
             return cus;
         } finally {
             disposable.dispose();

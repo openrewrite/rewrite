@@ -35,4 +35,13 @@ public class VariableDeclarationTest implements RewriteTest {
           kotlin("val a: Int = 1")
         );
     }
+
+    @Test
+    void parameterizedType() {
+        rewriteRun(
+          kotlin("""
+            val a: Array<Int> = Array<Int>(1){1}
+          """)
+        );
+    }
 }
