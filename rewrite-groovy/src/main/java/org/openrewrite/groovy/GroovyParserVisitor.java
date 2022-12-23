@@ -1383,9 +1383,20 @@ public class GroovyParserVisitor {
                 }
                 select = JRightPadded.build(selectExpr).withAfter(afterSelect);
             }
+            // Closure invocations that are written as closure.call() and closure() are parsed into identical MethodCallExpression
+            // closure() has implicitThis set to false
+            // So the "select" that was just parsed _may_ have actually been the method name
+            J.Identifier name;
+            if(call.getMethodAsString().equals(source.substring(cursor, cursor + call.getMethodAsString().length()))) {
+                name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
+                        call.getMethodAsString(), null, null);
 
-            J.Identifier name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
-                    call.getMethodAsString(), null, null);
+            } else if(select != null && select.getElement() instanceof J.Identifier) {
+                name = (J.Identifier) select.getElement();
+                select = null;
+            } else {
+                throw new IllegalArgumentException("Unable to parse method call");
+            }
 
             if (call.isSpreadSafe()) {
                 name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));

@@ -230,4 +230,17 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2552")
+    @Test
+    void closureInvocation() {
+        rewriteRun(
+          groovy(
+            """
+                def closure = {}
+                closure()
+                closure.call()
+            """)
+        );
+    }
 }
