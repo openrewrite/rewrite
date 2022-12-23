@@ -19,15 +19,12 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.EmptyBody;
 import org.openrewrite.kotlin.marker.MethodClassifier;
 import org.openrewrite.kotlin.marker.PropertyClassifier;
 import org.openrewrite.kotlin.tree.K;
-
-import java.util.Optional;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter delegate = new KotlinJavaPrinter();
