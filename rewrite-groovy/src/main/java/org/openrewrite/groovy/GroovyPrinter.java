@@ -73,6 +73,10 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     public J visitGString(G.GString gString, PrintOutputCapture<P> p) {
         beforeSyntax(gString, GSpace.Location.GSTRING, p);
         String delimiter = gString.getDelimiter();
+        if(delimiter == null) {
+            // For backwards compatibility with ASTs before we collected this field
+            delimiter = "\"";
+        }
         p.out.append(delimiter);
         visit(gString.getStrings(), p);
         if("$/".equals(delimiter)) {
