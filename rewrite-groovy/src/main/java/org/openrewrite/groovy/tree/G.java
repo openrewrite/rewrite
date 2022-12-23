@@ -576,6 +576,7 @@ public interface G extends J {
         UUID id;
         Space prefix;
         Markers markers;
+        String delimiter;
         List<J> strings;
 
         @Nullable

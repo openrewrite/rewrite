@@ -72,9 +72,14 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitGString(G.GString gString, PrintOutputCapture<P> p) {
         beforeSyntax(gString, GSpace.Location.GSTRING, p);
-        p.out.append('"');
+        String delimiter = gString.getDelimiter();
+        p.out.append(delimiter);
         visit(gString.getStrings(), p);
-        p.out.append('"');
+        if("$/".equals(delimiter)) {
+            p.out.append("/$");
+        } else {
+            p.out.append(delimiter);
+        }
         afterSyntax(gString, p);
         return gString;
     }

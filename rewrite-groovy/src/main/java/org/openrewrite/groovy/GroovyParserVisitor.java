@@ -72,6 +72,7 @@ public class GroovyParserVisitor {
     private int cursor = 0;
 
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
+    @SuppressWarnings("RegExpSimplifiable")
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
@@ -323,7 +324,7 @@ public class GroovyParserVisitor {
             }
         }
 
-        private void visitEnumField(FieldNode fieldNode) {
+        private void visitEnumField(@SuppressWarnings("unused") FieldNode fieldNode) {
             // Requires refactoring visitClass to use a similar pattern as Java11ParserVisitor.
             // Currently, each field is visited one at a time, so we cannot construct the EnumValueSet.
             throw new UnsupportedOperationException("enum fields are not implemented.");
@@ -566,11 +567,11 @@ public class GroovyParserVisitor {
             int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
-            OmitParentheses omitParentheses = null;
+            org.openrewrite.java.marker.OmitParentheses omitParentheses = null;
             if (source.charAt(cursor) == '(') {
                 cursor++;
             } else {
-                omitParentheses = new OmitParentheses(randomId());
+                omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
                 beforeOpenParen = EMPTY;
                 cursor = saveCursor;
             }
@@ -632,7 +633,7 @@ public class GroovyParserVisitor {
                     after = whitespace();
                     if (source.charAt(cursor) == ')') {
                         // the next argument will have an OmitParentheses marker
-                        omitParentheses = new OmitParentheses(randomId());
+                        omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
                     }
                     cursor++;
                 }
@@ -1051,17 +1052,18 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.Short;
             } else if (type == ClassHelper.STRING_TYPE) {
                 jType = JavaType.Primitive.String;
-                if (source.startsWith("/", cursor)) {
-                    text = "/" + text + "/";
-                } else if (source.startsWith("\"\"\"", cursor)) {
-                    text = "\"\"\"" + text + "\"\"\"";
-                } else if (source.startsWith("'''", cursor)) {
-                    text = "'''" + text + "'''";
-                } else if (source.startsWith("'", cursor)) {
-                    text = "'" + text + "'";
-                } else if (source.startsWith("\"", cursor)) {
-                    text = "\"" + text + "\"";
+                // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
+                int length = sourceLengthOfNext(expression);
+                text = source.substring(cursor, cursor + length);
+                int delimiterLength = 0;
+                if(text.startsWith("$/")) {
+                    delimiterLength = 2;
+                } else if(text.startsWith("\"\"\"") || text.startsWith("'''")) {
+                    delimiterLength = 3;
+                } else if(text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
+                    delimiterLength = 1;
                 }
+                value = text.substring(delimiterLength, text.length() - delimiterLength);
             } else if (expression.isNullExpression()) {
                 text = "null";
                 jType = JavaType.Primitive.Null;
@@ -1259,39 +1261,70 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitGStringExpression(GStringExpression gstring) {
-            Space fmt = sourceBefore("\"");
+            Space fmt = whitespace();
+            String delimiter;
+            if(source.startsWith("\"\"\"", cursor)) {
+                delimiter = "\"\"\"";
+            } else if(source.startsWith("/", cursor)) {
+                delimiter = "/";
+            } else if(source.startsWith("$/", cursor)) {
+                delimiter = "$/";
+            } else {
+                delimiter = "\"";
+            }
+            cursor += delimiter.length();
 
-            List<J> strings = new ArrayList<>(gstring.getStrings().size());
-            int valueIndex = 0;
-            for (ConstantExpression string : gstring.getStrings()) {
-                if (string.getValue().equals("")) {
-                    if (source.charAt(cursor) != '$') {
-                        // Sometimes there are empty constant expressions which do not, apparently, correspond to anything
-                        continue;
-                    }
-                    boolean inCurlies = source.charAt(cursor + 1) == '{';
+            NavigableMap<LineColumn, org.codehaus.groovy.ast.expr.Expression> sortedByPosition = new TreeMap<>();
+            for (org.codehaus.groovy.ast.expr.ConstantExpression e : gstring.getStrings()) {
+                // There will always be constant expressions before and after any values
+                // No need to represent these empty strings
+                if(!e.getText().isEmpty()) {
+                    sortedByPosition.put(pos(e), e);
+                }
+            }
+            for(org.codehaus.groovy.ast.expr.Expression e : gstring.getValues()) {
+                sortedByPosition.put(pos(e), e);
+            }
+            List<org.codehaus.groovy.ast.expr.Expression> rawExprs = new ArrayList<>(sortedByPosition.values());
+            List<J> strings = new ArrayList<>(rawExprs.size());
+            for (int i = 0; i < rawExprs.size(); i++ ) {
+                org.codehaus.groovy.ast.expr.Expression e = rawExprs.get(i);
+                if (source.charAt(cursor) == '$') {
+                    cursor++;
+                    boolean inCurlies = source.charAt(cursor) == '{';
                     if (inCurlies) {
-                        cursor += 2; // skip ${
-                    } else {
-                        cursor += 1; // skip $
+                        cursor++;
                     }
-                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(gstring.getValue(valueIndex++)), inCurlies));
+                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e), inCurlies));
                     if (inCurlies) {
-                        cursor++; // skip }
+                        cursor++;
                     }
-                } else {
-                    // If this string begins with any character that can open a string, such as "/"
-                    // then visitConstantExpression will misinterpret it.
-                    // There's no easy way for visitConstantExpression to know otherwise, so it has to be handled here
-                    String value = (String) string.getValue();
+                } else if (e instanceof ConstantExpression) {
+                    ConstantExpression cs = (ConstantExpression) e;
+                    // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
+                    // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
+                    // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
+                    int length = sourceLengthOfNext(cs);
+                    if(i == 0 || i == rawExprs.size() -1) {
+                        // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
+                        length -= delimiter.length();
+                    }
+                    // The line/column numbers incorrectly indicate that the following expression's opening "$" is part of this expression
+                    if(i < rawExprs.size() - 1) {
+                        length--;
+                    }
+                    String value = source.substring(cursor, cursor + length);
                     strings.add(new J.Literal(randomId(), EMPTY, Markers.EMPTY, value, value, null, JavaType.Primitive.String));
                     cursor += value.length();
+                } else {
+                    // Everything should be handled already by the other two code paths, but just in case
+                    strings.add(visit(e));
                 }
             }
 
-            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, strings,
+            queue.add(new G.GString(randomId(), fmt, Markers.EMPTY, delimiter, strings,
                     typeMapping.type(gstring.getType())));
-            cursor++; // skip "
+            cursor += delimiter.length();
         }
 
         @Override
@@ -1611,6 +1644,7 @@ public class GroovyParserVisitor {
             JLeftPadded<J.Block> finallyy = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
                     padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
 
+            //noinspection ConstantConditions
             queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finallyy));
 
         }
@@ -1886,6 +1920,47 @@ public class GroovyParserVisitor {
         String prefix = source.substring(cursor, delimIndex);
         cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
         return Space.format(prefix);
+    }
+
+    /**
+     * Strings in ConstantExpression have already replaced character sequences like "\n", so its value does not match
+     * the source code.
+     */
+    private String valueWithEscapes(ConstantExpression stringLiteral) {
+        String delimiter = "";
+        return delimiter;
+    }
+
+    /**
+     * Gets the length in characters of the AST node.
+     * cursor is presumed to point at the beginning of the node.
+     */
+    private int sourceLengthOfNext(ASTNode node) {
+        if (!appearsInSource(node)) {
+            return 0;
+        }
+        int lineCount = node.getLastLineNumber() - node.getLineNumber();
+        if(lineCount == 0) {
+            return node.getLastColumnNumber() - node.getColumnNumber();
+        }
+        int linesSoFar = 0;
+        int length = 0;
+        int finalLineChars = 0;
+        while(true) {
+            char c = source.charAt(cursor + length);
+            if(c == '\n') {
+                linesSoFar++;
+            }
+            if(linesSoFar == lineCount) {
+                finalLineChars++;
+            }
+
+            length++;
+
+            if(finalLineChars == node.getLastColumnNumber()) {
+                return length;
+            }
+        }
     }
 
     private TypeTree visitTypeTree(ClassNode classNode) {
