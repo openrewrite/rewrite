@@ -118,6 +118,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Disabled("Requires support for annotation parameters.")
     @Test
     void annotation() {
         rewriteRun(

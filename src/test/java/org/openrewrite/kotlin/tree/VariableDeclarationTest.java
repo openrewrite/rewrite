@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -36,6 +37,7 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Disabled("Requires support for type parameters and method invociations")
     @Test
     void parameterizedType() {
         rewriteRun(
