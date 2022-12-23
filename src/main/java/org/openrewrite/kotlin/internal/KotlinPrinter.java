@@ -98,9 +98,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             visit(method.getName(), p);
-            if (!method.getMarkers().findFirst(CompactConstructor.class).isPresent()) {
-                visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
-            }
+            visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
             visit(method.getBody(), p);
             afterSyntax(method, p);
             return method;
