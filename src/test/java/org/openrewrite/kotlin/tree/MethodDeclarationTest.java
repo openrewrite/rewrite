@@ -32,4 +32,18 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void methodDeclarationDeclaringType() {
+        rewriteRun(
+          kotlin(
+            """
+                  class A {
+                    fun method() {
+                    }
+                  }
+              """
+          )
+        );
+    }
 }

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
@@ -25,6 +24,7 @@ import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
 import org.jetbrains.kotlin.fir.declarations.*;
+import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
 import org.jetbrains.kotlin.fir.expressions.FirBlock;
 import org.jetbrains.kotlin.fir.expressions.FirConstExpression;
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall;
@@ -32,7 +32,6 @@ import org.jetbrains.kotlin.fir.expressions.FirStatement;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.fir.visitors.FirVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
@@ -211,8 +210,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             cursor = saveCursor;
         }
 
+        List<FirElement> membersMultiVariablesSeparated = new ArrayList<>(firRegularClass.getDeclarations().size());
+        for (FirDeclaration declaration : firRegularClass.getDeclarations()) {
+            if (declaration instanceof FirPrimaryConstructor) {
+                FirPrimaryConstructor primaryConstructor = (FirPrimaryConstructor) declaration;
+                // Note: the generated constructor contain flags generated = false and from source = true ...
+                continue;
+            }
+            membersMultiVariablesSeparated.add(declaration);
+        }
+
+
+        List<JRightPadded<Statement>> members = new ArrayList<>(membersMultiVariablesSeparated.size());
+        for (FirElement firElement : membersMultiVariablesSeparated) {
+            members.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));
+        }
+
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                emptyList(), emptyBody != null ? Space.EMPTY : sourceBefore("}"));
+                members, emptyBody != null ? Space.EMPTY : sourceBefore("}"));
 
         if (emptyBody != null) {
             body = body.withMarkers(body.getMarkers().addIfAbsent(emptyBody));
@@ -512,6 +527,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitElement(FirElement firElement, ExecutionContext ctx) {
         if (firElement instanceof FirBlock) {
             return visitBlock((FirBlock) firElement, ctx);
+        }  else if (firElement instanceof FirClass) {
+            return visitClass((FirClass) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<? extends Object>) firElement, ctx);
         } else if (firElement instanceof FirFunctionCall) {
