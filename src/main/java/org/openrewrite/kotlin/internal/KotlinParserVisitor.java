@@ -180,6 +180,7 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
         // TODO: fix: super type references are resolved as error kind.
         JContainer<TypeTree> implementings = null;
 
+        int saveCursor = cursor;
         Space bodyPrefix = whitespace();
         EmptyBody emptyBody = null;
         if (source.substring(cursor).isEmpty() || !source.substring(cursor).startsWith("{")) {
@@ -188,8 +189,12 @@ public class KotlinParserVisitor extends FirVisitor<J, ExecutionContext> {
             cursor++; // Increment past the `{`
         }
 
+        if (emptyBody != null) {
+            cursor = saveCursor;
+        }
+
         J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                emptyList(), sourceBefore("}"));
+                emptyList(), emptyBody != null ? Space.EMPTY : sourceBefore("}"));
 
         if (emptyBody != null) {
             body = body.withMarkers(body.getMarkers().addIfAbsent(emptyBody));

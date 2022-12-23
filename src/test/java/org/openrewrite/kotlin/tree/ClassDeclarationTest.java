@@ -80,6 +80,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Disabled("Requires support for modifiers.")
     @Test
     void modifierOrdering() {
         rewriteRun(
