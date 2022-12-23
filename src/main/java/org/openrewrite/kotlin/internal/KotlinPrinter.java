@@ -140,5 +140,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             afterSyntax(multiVariable, p);
             return multiVariable;
         }
+
+        protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
+            if (paddedStat != null) {
+                visit(paddedStat.getElement(), p);
+                visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
+                visitMarkers(paddedStat.getMarkers(), p);
+            }
+        }
     }
 }

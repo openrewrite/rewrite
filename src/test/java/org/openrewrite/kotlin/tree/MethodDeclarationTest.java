@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
 
 public class MethodDeclarationTest implements RewriteTest {
 
@@ -15,7 +16,8 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                   fun method() {
                   }
-              """
+              """,
+            isFullyParsed()
           )
         );
     }
@@ -28,7 +30,8 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                   fun method(l: List<Int>) {
                   }
-              """
+              """,
+            isFullyParsed()
           )
         );
     }
@@ -42,7 +45,8 @@ public class MethodDeclarationTest implements RewriteTest {
                     fun method() {
                     }
                   }
-              """
+              """,
+            isFullyParsed()
           )
         );
     }

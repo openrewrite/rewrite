@@ -20,20 +20,23 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
+import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
 
 public class VariableDeclarationTest implements RewriteTest {
 
     @Test
     void singleVariableDeclaration() {
         rewriteRun(
-          kotlin("val a = 1")
+          kotlin("val a = 1",
+            isFullyParsed())
         );
     }
 
     @Test
     void singleVariableDeclarationWithTypeConstraint() {
         rewriteRun(
-          kotlin("val a: Int = 1")
+          kotlin("val a: Int = 1",
+            isFullyParsed())
         );
     }
 
@@ -43,7 +46,8 @@ public class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin("""
             val a: Array<Int> = Array<Int>(1){1}
-          """)
+          """,
+            isFullyParsed())
         );
     }
 }
