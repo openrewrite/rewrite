@@ -17,14 +17,14 @@ package org.openrewrite.kotlin.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
 @With
-public class VariableTypeConstraint implements Marker {
+public class MethodClassifier implements Marker {
     UUID id;
-    TypeTree type;
+    Space prefix;
 }

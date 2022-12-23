@@ -19,10 +19,12 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.marker.CompactConstructor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.EmptyBody;
-import org.openrewrite.kotlin.marker.VariableTypeConstraint;
+import org.openrewrite.kotlin.marker.MethodClassifier;
+import org.openrewrite.kotlin.marker.PropertyClassifier;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.Optional;
@@ -84,6 +86,30 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
+            beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(method.getLeadingAnnotations(), p);
+            for (J.Modifier m : method.getModifiers()) {
+                visitModifier(m, p);
+            }
+
+            MethodClassifier methodClassifier = method.getMarkers().findFirst(MethodClassifier.class).orElse(null);
+            if (methodClassifier != null) {
+                p.append(methodClassifier.getPrefix().getWhitespace());
+                p.append("fun");
+            }
+
+            visit(method.getName(), p);
+            if (!method.getMarkers().findFirst(CompactConstructor.class).isPresent()) {
+                visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
+            }
+            visit(method.getBody(), p);
+            afterSyntax(method, p);
+            return method;
+        }
+
+        @Override
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
@@ -92,16 +118,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitModifier(m, p);
             }
 
-            visit(multiVariable.getTypeExpression(), p);
+            PropertyClassifier propertyClassifier = multiVariable.getMarkers().findFirst(PropertyClassifier.class).orElse(null);
+            if (propertyClassifier != null) {
+                boolean isVal = propertyClassifier.getClassifierType() == PropertyClassifier.ClassifierType.VAL;
+                p.append(propertyClassifier.getPrefix().getWhitespace());
+                p.append(isVal ? "val" : "var");
+            }
 
             J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(0);
             beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
             visit(variable.getName(), p);
 
-            Optional<VariableTypeConstraint> variableTypeConstraintOptional = variable.getMarkers().findFirst(VariableTypeConstraint.class);
-            if (variableTypeConstraintOptional.isPresent()) {
+            if (multiVariable.getTypeExpression() != null) {
                 p.append(":");
-                super.visit(variableTypeConstraintOptional.get().getType(), p);
+                visit(multiVariable.getTypeExpression(), p);
             }
 
             visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
