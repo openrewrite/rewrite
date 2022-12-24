@@ -26,7 +26,6 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.function.Function;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -64,15 +63,17 @@ public class FindTags extends Recipe {
 
     public static Set<Xml.Tag> find(Xml x, String xPath) {
         XPathMatcher matcher = new XPathMatcher(xPath);
-        return TreeVisitor.collect(new XmlVisitor<ExecutionContext>() {
+        Set<Xml.Tag> ts = new HashSet<>();
+        new XmlVisitor<Set<Xml.Tag>>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> ts) {
                 if (matcher.matches(getCursor())) {
-                    return SearchResult.found(tag);
+                    ts.add(tag);
                 }
-                return super.visitTag(tag, ctx);
+                return super.visitTag(tag, ts);
             }
-        }, x, new HashSet<>(), Xml.Tag.class, Function.identity());
+        }.visit(x, ts);
+        return ts;
     }
 
     /**

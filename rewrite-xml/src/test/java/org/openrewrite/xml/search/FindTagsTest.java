@@ -104,4 +104,55 @@ class FindTagsTest implements RewriteTest {
           )
         );
     }
+
+
+    @Test
+    void findRelativeTags() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTags("//configuration/agent")),
+          xml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-maven-plugin</artifactId>
+                              <configuration>
+                                  <agent>some/directory/here.jar</agent>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+            """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.springframework.boot</groupId>
+                              <artifactId>spring-boot-maven-plugin</artifactId>
+                              <configuration>
+                                  <!--~~>--><agent>some/directory/here.jar</agent>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+            """,
+            spec -> spec.beforeRecipe(xml -> assertThat(FindTags.find(xml, "//configuration/agent"))
+              .hasSize(1))
+
+          )
+        );
+    }
 }
