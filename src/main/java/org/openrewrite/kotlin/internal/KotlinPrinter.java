@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -24,7 +25,13 @@ import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.EmptyBody;
 import org.openrewrite.kotlin.marker.MethodClassifier;
 import org.openrewrite.kotlin.marker.PropertyClassifier;
+import org.openrewrite.kotlin.marker.Semicolon;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KSpace;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
+
+import java.util.List;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter delegate = new KotlinJavaPrinter();
@@ -130,8 +137,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
-            afterSyntax(variable, p);
 
+            visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);
             afterSyntax(multiVariable, p);
             return multiVariable;
         }
@@ -143,5 +150,28 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitMarkers(paddedStat.getMarkers(), p);
             }
         }
+
+        @Override
+        public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+            if (marker instanceof Semicolon) {
+                p.out.append(';');
+            }
+            return super.visitMarker(marker, p);
+        }
+    }
+
+    @Override
+    public Space visitSpace(Space space, KSpace.Location loc, PrintOutputCapture<P> p) {
+        return delegate.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
+    public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
+        return delegate.visitSpace(space, loc, p);
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
+        return delegate.visitMarker(marker, p);
     }
 }

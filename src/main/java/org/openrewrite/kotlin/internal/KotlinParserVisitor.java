@@ -144,7 +144,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
         for (FirElement firElement : firStatements) {
-            statements.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));
+            statements.add(JRightPadded.build((Statement) visitElement(firElement, ctx)));
         }
 
         return new J.Block(
