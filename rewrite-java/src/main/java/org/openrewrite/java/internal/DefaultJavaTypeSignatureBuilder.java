@@ -117,8 +117,6 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         String baseType = signature(pt.getType());
         StringBuilder s = new StringBuilder(baseType);
 
-//        System.out.println(baseType + "|" + System.identityHashCode(type));
-
         StringJoiner typeParameters = new StringJoiner(", ", "<", ">");
         for (JavaType typeParameter : pt.getTypeParameters()) {
             typeParameters.add(signature(typeParameter));

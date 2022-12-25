@@ -13,7 +13,6 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation(project(":rewrite-java-tck"))
 }
 
 java {
@@ -21,13 +20,6 @@ java {
         languageVersion.set(JavaLanguageVersion.of(11))
     }
 }
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-}
-
 
 tasks.withType<JavaCompile> {
     sourceCompatibility = JavaVersion.VERSION_11.toString()
@@ -55,4 +47,22 @@ tasks.withType<Javadoc> {
         "**/ReloadableJava11TypeMapping**",
         "**/ReloadableJava11TypeSignatureBuilder**"
     )
+}
+
+val testTask = tasks.register<Test>("compatibilityTest") {
+    description = "Test parser compatibility."
+    group = "verification"
+    useJUnitPlatform {
+        excludeTags("java17")
+    }
+    jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+    val tckSourceSet = project(":rewrite-java-tck").sourceSets.getByName("main")
+    testClassesDirs = tckSourceSet.output.classesDirs
+    classpath = tckSourceSet.runtimeClasspath
+            .plus(sourceSets.getByName("test").runtimeClasspath)
+            .plus(sourceSets.getByName("main").output.classesDirs)
+    shouldRunAfter(tasks.test)
+}
+tasks.test {
+    dependsOn(testTask)
 }

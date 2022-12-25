@@ -28,14 +28,11 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Iterator;
-import java.util.Objects;
 
 import static java.util.Collections.singletonList;
 
 @Disabled
 public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
-
-    @SuppressWarnings("ConstantConditions")
     private static final String goat = StringUtils.readFully(GroovyTypeSignatureBuilderTest.class.getResourceAsStream("/GroovyTypeGoat.groovy"));
 
     private static final CompiledGroovySource cu = GroovyParser.builder()

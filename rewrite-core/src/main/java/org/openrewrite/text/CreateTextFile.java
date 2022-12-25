@@ -24,6 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Incubating(since = "7.12.0")
 @Value
@@ -59,26 +60,32 @@ public class CreateTextFile extends Recipe {
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         Path path = Paths.get(relativeFileName);
-        SourceFile matchingFile = null;
+        AtomicReference<SourceFile> matchingFile = new AtomicReference<>();
 
         for (SourceFile sourceFile : before) {
             if (path.toString().equals(sourceFile.getSourcePath().toString())) {
-                matchingFile = sourceFile;
+                matchingFile.set(sourceFile);
             }
         }
 
         // return early if file exists and there's no explicit permission to overwrite
-        if (matchingFile != null && !Boolean.TRUE.equals(overwriteExisting)) {
-            return before;
+        if (matchingFile.get() != null) {
+            if (!Boolean.TRUE.equals(overwriteExisting)) {
+                return before;
+            }
+            if (matchingFile.get() instanceof PlainText && ((PlainText) matchingFile.get()).getText().equals(fileContents)) {
+                return before;
+            }
         }
 
-        PlainText brandNewFile = createNewFile(relativeFileName, fileContents);
+        PlainText newFile = createNewFile(relativeFileName, fileContents);
 
-        if (matchingFile != null) {
-            brandNewFile = brandNewFile.withId(matchingFile.getId());
+        if (matchingFile.get() != null) {
+            return ListUtils.map(before, sourceFile -> sourceFile == matchingFile.get() ?
+                    newFile.withId(matchingFile.get().getId()) : sourceFile);
         }
 
-        return ListUtils.concat(before, brandNewFile);
+        return ListUtils.concat(before, newFile);
     }
 
     public static PlainText createNewFile(String relativeFilePath, String fileContents) {

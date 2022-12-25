@@ -82,6 +82,7 @@ public class FindProperties extends Recipe {
             @Override
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
                 if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
+                    //noinspection deprecation
                     entry = entry.withValue(entry.getValue().withMarkers(entry.getValue().getMarkers().searchResult()));
                 }
                 return super.visitEntry(entry, ctx);

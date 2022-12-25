@@ -75,7 +75,7 @@ public class Java11Parser implements JavaParser {
             }
 
             ClassLoader appClassLoader = Java11Parser.class.getClassLoader();
-            moduleClassLoader = new Java11UnrestrictedClassLoader(appClassLoader);
+            moduleClassLoader = new JavaUnrestrictedClassLoader(appClassLoader);
         }
 
         @Override

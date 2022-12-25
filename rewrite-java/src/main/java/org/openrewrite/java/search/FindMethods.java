@@ -34,8 +34,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.openrewrite.TreeVisitor.collect;
-
 /**
  * Finds matching method invocations.
  */
@@ -105,7 +103,7 @@ public class FindMethods extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType())) {
                     if (!flowEnabled) {
-                        m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
+                        m = m.withReference(SearchResult.found(m.getReference()));
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(memberRef)));
                     }
@@ -160,20 +158,54 @@ public class FindMethods extends Recipe {
         };
     }
 
-    /**
-     * @param j             The subtree to search.
-     * @param methodPattern A method pattern. See {@link MethodMatcher} for details about this syntax.
-     * @return A set of {@link J.MethodInvocation} and {@link J.MemberReference} representing calls to this method.
-     */
     public static Set<J> find(J j, String methodPattern) {
+        return find(j, methodPattern, false);
+    }
+
+    /**
+     * @param j              The subtree to search.
+     * @param methodPattern  A method pattern. See {@link MethodMatcher} for details about this syntax.
+     * @param matchOverrides Whether to match overrides.
+     * @return A set of {@link J.MethodInvocation}, {@link J.MemberReference}, and {@link J.NewClass} representing calls to this method.
+     */
+    public static Set<J> find(J j, String methodPattern, boolean matchOverrides) {
         return TreeVisitor.collect(
                         new FindMethods(methodPattern, null, null).getVisitor(),
                         j,
                         new HashSet<>()
                 )
                 .stream()
-                .filter(t -> t instanceof J.MethodInvocation || t instanceof J.MethodDeclaration)
+                .filter(t -> t instanceof J.MethodInvocation || t instanceof J.MemberReference || t instanceof J.NewClass)
                 .map(t -> (J) t)
+                .collect(Collectors.toSet());
+    }
+
+    public static Set<J.MethodDeclaration> findDeclaration(J j, String methodPattern) {
+        return findDeclaration(j, methodPattern, false);
+    }
+
+    public static Set<J.MethodDeclaration> findDeclaration(J j, String methodPattern, boolean matchOverrides) {
+        return TreeVisitor.collect(
+                        new JavaIsoVisitor<ExecutionContext>() {
+                            final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
+
+                            @Override
+                            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                                J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                                if (enclosingClass != null && methodMatcher.matches(method, getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class))) {
+                                    return SearchResult.found(method);
+                                } else if (methodMatcher.matches(method.getMethodType())) {
+                                    return SearchResult.found(method);
+                                }
+                                return super.visitMethodDeclaration(method, p);
+                            }
+                        },
+                        j,
+                        new HashSet<>()
+                )
+                .stream()
+                .filter(J.MethodDeclaration.class::isInstance)
+                .map(J.MethodDeclaration.class::cast)
                 .collect(Collectors.toSet());
     }
 }

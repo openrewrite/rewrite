@@ -19,14 +19,10 @@ dependencies {
 
     implementation("io.micrometer:micrometer-core:1.9.+")
 
-    testImplementation("org.jetbrains.kotlin:kotlin-reflect")
-    testImplementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation(project(":rewrite-java-tck"))
 }
 
 java {
@@ -59,4 +55,22 @@ tasks.withType<Javadoc>().configureEach {
     executable = javaToolchains.javadocToolFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     }.get().executablePath.toString()
+}
+
+val testTask = tasks.register<Test>("compatibilityTest") {
+    description = "Test parser compatibility."
+    group = "verification"
+    useJUnitPlatform {
+        excludeTags("java11", "java17")
+    }
+    jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+    val tckSourceSet = project(":rewrite-java-tck").sourceSets.getByName("main")
+    testClassesDirs = tckSourceSet.output.classesDirs
+    classpath = tckSourceSet.runtimeClasspath
+            .plus(sourceSets.getByName("test").runtimeClasspath)
+            .plus(sourceSets.getByName("main").output.classesDirs)
+    shouldRunAfter(tasks.test)
+}
+tasks.test {
+    dependsOn(testTask)
 }

@@ -17,8 +17,6 @@ repositories {
 dependencies {
     api(project(":rewrite-groovy"))
     compileOnly(project(":rewrite-test"))
-    compileOnly(platform(kotlin("bom")))
-    compileOnly(kotlin("stdlib"))
     implementation(project(":rewrite-properties"))
 
     compileOnly("org.gradle:gradle-base-services:latest.release")

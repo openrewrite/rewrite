@@ -16,10 +16,9 @@
 package org.openrewrite
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.marker.SearchResult
 import org.openrewrite.test.RecipeSpec
 import org.openrewrite.test.RewriteTest
-import org.openrewrite.test.SourceSpec
-import org.openrewrite.test.SourceSpecs
 import org.openrewrite.test.SourceSpecs.text
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.PlainTextVisitor
@@ -79,7 +78,7 @@ class ApplicabilityTest : RewriteTest {
     fun contains(s: String) = object : PlainTextVisitor<ExecutionContext>() {
         override fun visitText(text: PlainText, p: ExecutionContext): PlainText =
             if (text.text.contains(s)) {
-                text.withMarkers(text.markers.searchResult())
+                SearchResult.found(text)
             } else text
     }
 }
