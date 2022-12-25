@@ -13,7 +13,6 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation(project(":rewrite-java-tck"))
 }
 
 tasks.withType<JavaCompile> {
@@ -43,3 +42,20 @@ tasks.withType<Javadoc> {
         "**/ReloadableJava17TypeSignatureBuilder**"
     )
 }
+
+val testTask = tasks.register<Test>("compatibilityTest") {
+    description = "Test parser compatibility."
+    group = "verification"
+    useJUnitPlatform()
+    jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+    val tckSourceSet = project(":rewrite-java-tck").sourceSets.getByName("main")
+    testClassesDirs = tckSourceSet.output.classesDirs
+    classpath = tckSourceSet.runtimeClasspath
+            .plus(sourceSets.getByName("test").runtimeClasspath)
+            .plus(sourceSets.getByName("main").output.classesDirs)
+    shouldRunAfter(tasks.test)
+}
+tasks.test {
+    dependsOn(testTask)
+}
+

@@ -104,11 +104,19 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     protected boolean noTrim = false;
 
+    /**
+     * @param sourcePath The source path after the recipe is run.
+     * @return This source spec.
+     */
     public SourceSpec<T> path(Path sourcePath) {
         this.sourcePath = sourcePath;
         return this;
     }
 
+    /**
+     * @param sourcePath The source path after the recipe is run.
+     * @return This source spec.
+     */
     public SourceSpec<T> path(String sourcePath) {
         this.sourcePath = Paths.get(sourcePath);
         return this;

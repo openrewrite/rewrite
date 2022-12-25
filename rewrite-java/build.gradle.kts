@@ -2,7 +2,6 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-// run manually with -x compileKotlin when you need to regenerate
 tasks.register<JavaExec>("generateAntlrSources") {
     mainClass.set("org.antlr.v4.Tool")
 
@@ -46,6 +45,7 @@ dependencies {
         isTransitive = false
     }
     testImplementation(project(":rewrite-test"))
+    testImplementation(project(":rewrite-java-test"))
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")

@@ -14,9 +14,6 @@ dependencies {
     api("org.junit.jupiter:junit-jupiter-api:latest.release")
     api("org.junit.jupiter:junit-jupiter-params:latest.release")
 
-    compileOnly(platform("org.jetbrains.kotlin:kotlin-bom"))
-    compileOnly("org.jetbrains.kotlin:kotlin-reflect")
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.assertj:assertj-core:latest.release")
 
@@ -32,6 +29,4 @@ dependencies {
 
     // FindRepeatableAnnotationsTest
     implementation("org.mapstruct:mapstruct:latest.release")
-
-    testRuntimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
 }

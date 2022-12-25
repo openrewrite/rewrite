@@ -74,8 +74,7 @@ public class Java17Parser implements JavaParser {
             }
 
             ClassLoader appClassLoader = Java17Parser.class.getClassLoader();
-            moduleClassLoader = new Java17UnrestrictedClassLoader(appClassLoader);
-
+            moduleClassLoader = new JavaUnrestrictedClassLoader(appClassLoader);
         }
 
         @Override

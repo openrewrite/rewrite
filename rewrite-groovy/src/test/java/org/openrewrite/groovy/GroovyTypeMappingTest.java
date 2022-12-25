@@ -32,7 +32,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Disabled
 class GroovyTypeMappingTest implements JavaTypeMappingTest {
-    @SuppressWarnings("ConstantConditions")
     private static final String goat = StringUtils.readFully(GroovyTypeMappingTest.class.getResourceAsStream("/GroovyTypeGoat.groovy"));
 
     @Override
@@ -54,6 +53,7 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
         );
     }
 
+    @SuppressWarnings("GroovyUnusedAssignment")
     @Test
     void noDuplicateSignatures() {
         Statement cu = GroovyParser.builder().build()

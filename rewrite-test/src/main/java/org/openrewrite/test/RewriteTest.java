@@ -31,6 +31,7 @@ import org.openrewrite.scheduling.DirectScheduler;
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -277,6 +278,9 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
+        // to prevent a CME inside the next loop
+        expectedNewSources = new CopyOnWriteArrayList<>(expectedNewSources);
+
         nextSourceSpec:
         for (SourceSpec<?> sourceSpec : expectedNewSources) {
             assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
@@ -345,16 +349,19 @@ public interface RewriteTest extends SourceSpecs {
 
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
+            SourceSpec<?> sourceSpec = specForSourceFile.getValue();
             for (Result result : recipeRun.getResults()) {
                 if (result.getBefore() == specForSourceFile.getKey()) {
                     if (result.getAfter() != null) {
-                        String expectedAfter = specForSourceFile.getValue().after == null ? null :
-                                specForSourceFile.getValue().after.apply(result.getAfter().printAll(out.clone()));
+                        String expectedAfter = sourceSpec.after == null ? null :
+                                sourceSpec.after.apply(result.getAfter().printAll(out.clone()));
                         if (expectedAfter != null) {
                             String actual = result.getAfter().printAll(out.clone());
-                            String expected = trimIndentPreserveCRLF(expectedAfter);
+                            String expected = sourceSpec.noTrim ?
+                                    expectedAfter :
+                                    trimIndentPreserveCRLF(expectedAfter);
                             assertThat(actual).isEqualTo(expected);
-                            specForSourceFile.getValue().eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
+                            sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
                             if (result.diff().isEmpty() && !(result.getAfter() instanceof Remote)) {
                                 fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
@@ -366,13 +373,13 @@ public interface RewriteTest extends SourceSpecs {
                                     .isEqualTo(result.getBefore().printAll(out.clone()));
                         }
                     } else if (result.getAfter() == null) {
-                        if (specForSourceFile.getValue().after == null) {
+                        if (sourceSpec.after == null) {
                             // If the source spec was not expecting a change (spec.after == null) but the file has been
                             // deleted, assert failure.
                             assert result.getBefore() != null;
                             fail("The recipe deleted a source file \"" + result.getBefore().getSourcePath() + "\" that was not expected to change");
                         } else {
-                            String expected = specForSourceFile.getValue().after.apply(null);
+                            String expected = sourceSpec.after.apply(null);
                             if (expected != null) {
                                 // The spec expected the file to be changed, not deleted.
                                 assert result.getBefore() != null;
@@ -385,15 +392,19 @@ public interface RewriteTest extends SourceSpecs {
 
 
                     //noinspection unchecked
-                    ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(result.getAfter());
+                    ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
                     continue nextSourceFile;
                 }
             }
 
             // if we get here, there was no result.
-            if (specForSourceFile.getValue().after != null) {
-                String before = trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
-                String expected = trimIndentPreserveCRLF(specForSourceFile.getValue().after.apply(null));
+            if (sourceSpec.after != null) {
+                String before = sourceSpec.noTrim ?
+                        specForSourceFile.getKey().printAll(out.clone()) :
+                        trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
+                String expected = sourceSpec.noTrim ?
+                        sourceSpec.after.apply(null) :
+                        trimIndentPreserveCRLF(sourceSpec.after.apply(null));
                 assertThat(expected)
                         .as("To assert that a Recipe makes no change, supply only \"before\" source.")
                         .isNotEqualTo(before);
@@ -403,7 +414,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             //noinspection unchecked
-            ((Consumer<SourceFile>) specForSourceFile.getValue().afterRecipe).accept(specForSourceFile.getKey());
+            ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(specForSourceFile.getKey());
         }
         SoftAssertions newFilesGenerated = new SoftAssertions();
         for (SourceSpec<?> expectedNewSource : expectedNewSources) {

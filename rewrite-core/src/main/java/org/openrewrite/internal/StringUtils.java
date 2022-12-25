@@ -231,7 +231,10 @@ public class StringUtils {
         return string == null || string.isEmpty();
     }
 
-    public static String readFully(InputStream inputStream) {
+    public static String readFully(@Nullable InputStream inputStream) {
+        if (inputStream == null) {
+            return "";
+        }
         return readFully(inputStream, StandardCharsets.UTF_8);
     }
 
@@ -263,7 +266,7 @@ public class StringUtils {
             return value;
         }
         return Character.toUpperCase(value.charAt(0)) +
-                value.substring(1);
+               value.substring(1);
     }
 
     public static String uncapitalize(String value) {

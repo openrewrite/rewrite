@@ -17,9 +17,9 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.FindAnnotations;
-import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -28,6 +28,7 @@ import java.text.RuleBasedCollator;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -51,9 +52,10 @@ public class ExtractInterface {
             String pkg = cu.getPackageDeclaration() == null ? "" :
                     Arrays.stream(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
                             .map(subpackage -> "..")
-                            .collect(Collectors.joining("/", "", "/"));
+                            .collect(Collectors.joining("/", "../", "/"));
 
-            JavaSourceFile c = super.visitJavaSourceFile(cu, p);
+            JavaSourceFile c = super.visitJavaSourceFile(cu, p)
+                    .withId(Tree.randomId());
 
             String interfacePkg = JavaType.ShallowClass.build(fullyQualifiedInterfaceName).getPackageName();
             if (!interfacePkg.isEmpty()) {
@@ -65,7 +67,8 @@ public class ExtractInterface {
             }
 
             c = (JavaSourceFile) c.withSourcePath(cu.getSourcePath()
-                    .resolve(pkg + fullyQualifiedInterfaceName.replace('.', '/') + ".java"));
+                    .resolve(pkg + fullyQualifiedInterfaceName.replace('.', '/') + ".java")
+                    .normalize());
 
             return c;
         }

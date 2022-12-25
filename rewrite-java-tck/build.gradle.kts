@@ -1,21 +1,29 @@
 plugins {
     id("org.openrewrite.build.language-library")
+    id("org.openrewrite.build.java8-text-blocks")
 }
 
 dependencies {
-    implementation(project(":rewrite-java"))
-    implementation(project(":rewrite-test"))
-
     implementation("org.assertj:assertj-core:latest.release")
-    implementation(platform("org.jetbrains.kotlin:kotlin-bom"))
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-    runtimeOnly("junit:junit:4.13.2") {
-        because("Used for RemoveUnneededAssertionTest")
-    }
+    implementation(project(":rewrite-java"))
+    implementation(project(":rewrite-java-test"))
+    implementation(project(":rewrite-test"))
 }
 
 tasks.withType<Javadoc> {
     isFailOnError = false
     exclude("org/openrewrite/java/**")
+}
+
+tasks.withType<JavaCompile> {
+    sourceCompatibility = JavaVersion.VERSION_17.toString()
+    targetCompatibility = JavaVersion.VERSION_17.toString()
+
+    options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+}
+
+configurations.all {
+    if (isCanBeConsumed) {
+        attributes.attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 8)
+    }
 }

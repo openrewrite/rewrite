@@ -25,6 +25,7 @@ import org.openrewrite.json.JsonIsoVisitor;
 import org.openrewrite.json.JsonPathMatcher;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonKey;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -55,7 +56,7 @@ public class FindKey extends Recipe {
             public Json.Member visitMember(Json.Member member, ExecutionContext executionContext) {
                 Json.Member m = super.visitMember(member, executionContext);
                 if (matcher.matches(getCursor())) {
-                    m = m.withKey(m.getKey().withMarkers(m.getKey().getMarkers().searchResult()));
+                    return m.withKey(SearchResult.found(m.getKey()));
                 }
                 return m;
             }

@@ -19,6 +19,7 @@ include(
     "rewrite-hcl",
     "rewrite-java",
     "rewrite-java-tck",
+    "rewrite-java-test",
     "rewrite-java-17",
     "rewrite-json",
     "rewrite-maven",
