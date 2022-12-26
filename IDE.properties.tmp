@@ -1,17 +1,41 @@
-rewrite-benchmarks
-rewrite-bom
+########################################################
+# If you are only working on a subset of the modules in this project, you can optimize your
+# IDE to only load those modules. Copy `IDE.properties.tmp` to `IDE.properties` and comment out
+# any lines that correspond to modules you do not want to work on. This will cause Gradle to
+# swap those project dependencies for binary dependencies resolved from either Maven local or
+# the OSS snapshots repository, and speed up your IDE.
+########################################################
+
+# To work on the core module like recipe lifecycle, semver semantics, etc. or
+# to work on the RewriteTest unit testing harness.
+
 rewrite-core
+rewrite-test
+
+# To work on Java recipes, you generally only need rewrite-java and rewrite-java-test.
+# The former is where the recipe logic lives, and the latter is where the tests live.
+# rewrite-java-tck and rewrite-java-17 are only needed if you intend to work on the
+# language parser.
+
+rewrite-java
+rewrite-java-test
+rewrite-java-tck
+rewrite-java-17
+
+# Other language modules
+
 rewrite-gradle
 rewrite-groovy
 rewrite-hcl
-rewrite-java
-rewrite-java-tck
-rewrite-java-test
-rewrite-java-17
 rewrite-json
 rewrite-maven
 rewrite-properties
 rewrite-protobuf
-rewrite-test
 rewrite-xml
 rewrite-yaml
+
+# These aren't depended on by any other modules, so if you comment them out
+# there is no need for a binary dependency substitution rule.
+
+rewrite-benchmarks
+rewrite-bom
