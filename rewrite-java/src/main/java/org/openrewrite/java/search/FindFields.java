@@ -89,7 +89,7 @@ public class FindFields extends Recipe {
                 JavaType.Variable varType = memberRef.getVariableType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
                         varType.getName().equals(fieldName)) {
-                    m = m.withReference(m.getReference().withMarkers(m.getReference().getMarkers().searchResult()));
+                    m = m.withReference(SearchResult.found(m.getReference()));
                 }
                 return m;
             }

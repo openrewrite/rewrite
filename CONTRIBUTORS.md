@@ -8,12 +8,8 @@ NOTE: windows-style users should ensure that they configure `core.autocrlf = fal
 
 ### CLI Environment Configuration:
 
-* [JDK](https://adoptopenjdk.net/) version: 11
-    * JDK language & bytecode level: 1.8
+* [JDK](https://adoptium.net/) version: 17
 * [Gradle](https://gradle.org/) version: Defined in wrapper
-* [Kotlin](https://kotlinlang.org/) version: 1.5
-    * Kotlin language level: 1.5
-    * Kotlin JVM bytecode level: 1.8
 
 ### IDE Configuration
 
@@ -21,7 +17,7 @@ We use [IntelliJ IDEA](https://www.jetbrains.com/idea/) to develop this project.
 Other IDEs or versions of this IDE can be made to work.
 These are one set of versions we know works:
 
-* IDEA version:  2021.1.3
+* IDEA version:  2022.2.3
 
 You must set the `-parameters` compiler flag to run Rewrite tests.
 If your system does not have UTF-8 as its default character encoding (e.g., Windows) you must also add `-encoding utf8`.

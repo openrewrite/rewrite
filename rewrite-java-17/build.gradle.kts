@@ -16,9 +16,6 @@ dependencies {
 }
 
 tasks.withType<JavaCompile> {
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-    targetCompatibility = JavaVersion.VERSION_17.toString()
-
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(
         listOf(

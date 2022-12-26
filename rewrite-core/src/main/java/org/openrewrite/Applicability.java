@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 
 @Incubating(since = "7.25.0")
 public class Applicability {
@@ -26,7 +27,7 @@ public class Applicability {
             public Tree visit(@Nullable Tree tree, P p) {
                 Tree t2 = v.visit(tree, p);
                 return tree == t2 && tree != null ?
-                        ((SourceFile) tree).withMarkers(((SourceFile) tree).getMarkers().searchResult()) :
+                        SearchResult.found(tree) :
                         tree;
             }
         };

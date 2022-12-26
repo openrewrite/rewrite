@@ -169,7 +169,6 @@ public class Result {
         return diff(relativeTo, null);
     }
 
-    @Incubating(since = "7.31.0")
     public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter) {
         return diff(relativeTo, markerPrinter, false);
     }

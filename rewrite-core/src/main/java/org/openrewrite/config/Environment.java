@@ -97,7 +97,6 @@ public class Environment {
         return activateRecipes(Arrays.asList(activeRecipes));
     }
 
-    @Incubating(since = "7.0.0")
     public Recipe activateAll() {
         Recipe root = new CompositeRecipe();
         listRecipes().forEach(root::doNext);

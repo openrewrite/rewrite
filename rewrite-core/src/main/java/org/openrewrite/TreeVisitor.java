@@ -145,7 +145,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
      *
      * @param recipe The recipe whose visitor to run.
      */
-    @Incubating(since = "7.0.0")
     protected void doAfterVisit(Recipe recipe) {
         //noinspection unchecked
         afterVisit.add((TreeVisitor<T, P>) recipe.getVisitor());
@@ -359,7 +358,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return (T2) visit(tree, p);
     }
 
-    @Incubating(since = "7.2.0")
     public Markers visitMarkers(Markers markers, P p) {
         return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }

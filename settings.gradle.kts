@@ -2,7 +2,7 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             if (requested.id.namespace!!.startsWith("org.openrewrite.build")) {
-                useVersion("latest.release")
+                useVersion("1.4.0")
             }
         }
     }

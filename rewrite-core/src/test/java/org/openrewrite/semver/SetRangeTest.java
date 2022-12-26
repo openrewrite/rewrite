@@ -24,6 +24,7 @@ class SetRangeTest {
     void exclusiveRange() {
         SetRange setRange = SetRange.build("(1,2)", null).getValue();
 
+        assertThat(setRange).isNotNull();
         assertThat(setRange.isValid(null, "0.1")).isFalse();
         assertThat(setRange.isValid(null, "1")).isFalse();
         assertThat(setRange.isValid(null, "1.0")).isFalse();
@@ -37,6 +38,7 @@ class SetRangeTest {
     void inclusiveRange() {
         SetRange setRange = SetRange.build("[1,2]", null).getValue();
 
+        assertThat(setRange).isNotNull();
         assertThat(setRange.isValid(null, "0.1")).isFalse();
         assertThat(setRange.isValid(null, "1")).isTrue();
         assertThat(setRange.isValid(null, "1.0")).isTrue();
@@ -50,6 +52,7 @@ class SetRangeTest {
     void inclusiveLowOnly() {
         SetRange setRange = SetRange.build("[1,2)", null).getValue();
 
+        assertThat(setRange).isNotNull();
         assertThat(setRange.isValid(null, "0.1")).isFalse();
         assertThat(setRange.isValid(null, "1")).isTrue();
         assertThat(setRange.isValid(null, "1.0")).isTrue();
@@ -63,6 +66,7 @@ class SetRangeTest {
     void inclusiveHighOnly() {
         SetRange setRange = SetRange.build("(1,2]", null).getValue();
 
+        assertThat(setRange).isNotNull();
         assertThat(setRange.isValid(null, "0.1")).isFalse();
         assertThat(setRange.isValid(null, "1")).isFalse();
         assertThat(setRange.isValid(null, "1.0")).isFalse();
@@ -76,6 +80,7 @@ class SetRangeTest {
     void inclusiveLowUnqualifiedHigh() {
         SetRange setRange = SetRange.build("[1,)", null).getValue();
 
+        assertThat(setRange).isNotNull();
         assertThat(setRange.isValid(null, "0")).isFalse();
         assertThat(setRange.isValid(null, "1")).isTrue();
         assertThat(setRange.isValid(null, "1.0")).isTrue();
@@ -87,6 +92,7 @@ class SetRangeTest {
     void inclusiveHighUnqualifiedLow() {
         SetRange setRange = SetRange.build("(,9999]", null).getValue();
 
+        assertThat(setRange).isNotNull();
         assertThat(setRange.isValid(null, "1")).isTrue();
         assertThat(setRange.isValid(null, "1.0")).isTrue();
         assertThat(setRange.isValid(null, "2.0")).isTrue();

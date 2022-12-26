@@ -173,7 +173,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeSourceCompatibility_JavaPluginExtension() {
+    void changeSourceCompatibilityJavaPluginExtension() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
           buildGradle(
@@ -200,7 +200,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeTargetCompatibility_JavaPluginExtension() {
+    void changeTargetCompatibilityJavaPluginExtension() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
           buildGradle(
@@ -227,7 +227,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeSourceCompatibility_CompileJava() {
+    void changeSourceCompatibilityCompileJava() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
           buildGradle(
@@ -254,7 +254,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeTargetCompatibility_CompileJava() {
+    void changeTargetCompatibilityCompileJava() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
           buildGradle(
@@ -281,7 +281,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeSourceCompatibility_TasksNamedCompileJava() {
+    void changeSourceCompatibilityTasksNamedCompileJava() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
           buildGradle(
@@ -308,7 +308,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeTargetCompatibility_TasksNamedCompileJava() {
+    void changeTargetCompatibilityTasksNamedCompileJava() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
           buildGradle(
@@ -335,7 +335,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeSourceCompatibility_TasksWithTypeJavaCompile() {
+    void changeSourceCompatibilityTasksWithTypeJavaCompile() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
           buildGradle(
@@ -362,7 +362,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeTargetCompatibility_TasksWithTypeJavaCompile() {
+    void changeTargetCompatibilityTasksWithTypeJavaCompile() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
           buildGradle(
@@ -389,7 +389,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeSourceCompatibility_JavaPluginExtensionFieldAccess() {
+    void changeSourceCompatibilityJavaPluginExtensionFieldAccess() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
           buildGradle(
@@ -412,7 +412,7 @@ abstract class BaseTest implements RewriteTest {
     }
 
     @Test
-    void changeTargetCompatibility_JavaPluginExtensionFieldAccess() {
+    void changeTargetCompatibilityJavaPluginExtensionFieldAccess() {
         rewriteRun(
           spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
           buildGradle(

@@ -67,7 +67,6 @@ public class PrintOutputCapture<P> implements Cloneable {
         return new PrintOutputCapture<>(p, markerPrinter);
     }
 
-    @Incubating(since = "7.31.0")
     public interface MarkerPrinter {
         MarkerPrinter DEFAULT = new MarkerPrinter() {
             @Override
