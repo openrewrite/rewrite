@@ -23,8 +23,15 @@ import org.openrewrite.text.ChangeText;
 import java.util.HashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class RecipeBasicsTest {
+
+    @Test
+    void recipeDoNextWithItself() {
+        Recipe r = Recipe.noop();
+        assertThrows(IllegalArgumentException.class, () -> r.doNext(r));
+    }
 
     @Test
     void cloneRecipe() throws JsonMappingException {

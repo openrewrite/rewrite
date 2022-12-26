@@ -45,8 +45,8 @@ public class JavaFiles {
 
         sourceFiles = new ArrayList<>(1_000);
         for (int i = 0; i < 1_000; i++) {
-            Files.write(test.resolve("Test" + i + ".java"),
-                    ("package test; class Test" + i + " {}").getBytes());
+            Files.writeString(test.resolve("Test" + i + ".java"),
+                    "package test; class Test" + i + " {}");
         }
     }
 

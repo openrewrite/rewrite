@@ -1,0 +1,234 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.marker;
+
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.RepositoryCache;
+import org.eclipse.jgit.transport.TagOpt;
+import org.eclipse.jgit.transport.URIish;
+import org.eclipse.jgit.util.FS;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.openrewrite.Tree.randomId;
+
+@Disabled("How to deal with FS signer information not matching?")
+@SuppressWarnings("ConstantConditions")
+class GitProvenanceTest {
+
+    private static Stream<String> remotes() {
+        return Stream.of(
+          "ssh://git@github.com/openrewrite/rewrite.git",
+          "https://github.com/openrewrite/rewrite.git",
+          "file:///openrewrite/rewrite.git",
+          "http://localhost:7990/scm/openrewrite/rewrite.git",
+          "git@github.com:openrewrite/rewrite.git"
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("remotes")
+    void getOrganizationName(String remote) {
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getOrganizationName())
+          .isEqualTo("openrewrite");
+    }
+
+    @ParameterizedTest
+    @MethodSource("remotes")
+    void getRepositoryName(String remote) {
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getRepositoryName())
+          .isEqualTo("rewrite");
+    }
+
+    @Test
+    void localBranchPresent(@TempDir Path projectDir) throws GitAPIException {
+        try (Git g = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
+            GitProvenance git = GitProvenance.fromProjectDirectory(projectDir, null);
+            assertThat(git).isNotNull();
+            assertThat(git.getBranch()).isEqualTo("main");
+        }
+    }
+
+    @Test
+    void detachedHead(@TempDir Path projectDir) throws GitAPIException, IOException, URISyntaxException {
+        try (Git git = initGitWithOneCommit(projectDir)) {
+            git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
+            assertThat(GitProvenance.fromProjectDirectory(projectDir, null).getBranch())
+              .isEqualTo("main");
+        }
+    }
+
+    @Test
+    void detachedHeadJenkinsLocalBranch(@TempDir Path projectDir) throws GitAPIException, IOException, URISyntaxException {
+        try (Git git = initGitWithOneCommit(projectDir)) {
+            git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
+            assertThat(
+              GitProvenance.fromProjectDirectory(
+                projectDir,
+                new JenkinsBuildEnvironment(
+                  randomId(), "1", "1", "https://jenkins/job/1",
+                  "https://jenkins", "job", "main", "origin/main"
+                )
+              ).getBranch()
+            ).isEqualTo("main");
+        }
+    }
+
+    @Test
+    void detachedHeadJenkinsNoLocalBranch(@TempDir Path projectDir) throws GitAPIException, IOException, URISyntaxException {
+        try (Git git = initGitWithOneCommit(projectDir)) {
+            git.checkout().setName(git.getRepository().resolve(Constants.HEAD).getName()).call();
+            assertThat(
+              GitProvenance.fromProjectDirectory(
+                projectDir,
+                new JenkinsBuildEnvironment(randomId(), "1", "1", "https://jenkins/job/1",
+                  "https://jenkins", "job", null, "origin/main")
+              ).getBranch()
+            ).isEqualTo("main");
+        }
+    }
+
+    private Git initGitWithOneCommit(Path projectDir) throws GitAPIException, IOException, URISyntaxException {
+        var git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call();
+        Files.writeString(projectDir.resolve("test.txt"), "hi");
+        git.add().addFilepattern("*").call();
+        git.commit().setMessage("init").setSign(false).call();
+        git.remoteAdd().setName("origin").setUri(new URIish("git@github.com:openrewrite/doesnotexist.git")).call();
+
+        // origins are still present in .git/config on Jenkins
+        var config = git.getRepository().getConfig();
+        config.setString(CONFIG_BRANCH_SECTION, "main", "remote", "origin");
+        config.setString(CONFIG_BRANCH_SECTION, "main", "merge", "refs/heads/main");
+        config.save();
+
+        return git;
+    }
+
+    @Test
+    void detachedHeadBehindBranchHead(@TempDir Path projectDir) throws GitAPIException {
+        try (Git git = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
+            Files.writeString(projectDir.resolve("test.txt"), "hi");
+            git.add().addFilepattern("*").call();
+            git.commit().setMessage("init").setSign(false).call();
+            var commit1 = git.getRepository().resolve(Constants.HEAD).getName();
+
+            Files.writeString(projectDir.resolve("test.txt"), "hi");
+            git.add().addFilepattern("*").call();
+            git.commit().setMessage("init").setSign(false).call();
+
+            assertThat(git.getRepository().resolve(Constants.HEAD).getName()).isNotEqualTo(commit1);
+
+            git.checkout().setName(commit1).call();
+
+            assertThat(GitProvenance.fromProjectDirectory(projectDir, null).getBranch())
+              .isEqualTo("main");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Test
+    void shallowCloneDetachedHead(@TempDir Path projectDir) throws IOException, GitAPIException {
+        var remoteDir = projectDir.resolve("remote");
+        var fileKey = RepositoryCache.FileKey.exact(remoteDir.toFile(), FS.DETECTED);
+        // push an initial commit to the remote
+        var cloneDir = projectDir.resolve("clone1");
+        try (var remoteRepo = fileKey.open(false)) {
+            remoteRepo.create(true);
+            try (Git git = Git.cloneRepository().setURI(remoteRepo.getDirectory().getAbsolutePath()).setDirectory(cloneDir.toFile()).call()) {
+                Files.writeString(projectDir.resolve("test.txt"), "hi");
+                git.add().addFilepattern("*").call();
+                git.commit().setMessage("init").setSign(false).call();
+
+                runCommand(cloneDir, "git push -u origin main");
+                var commit = git.getRepository().resolve(Constants.HEAD).getName();
+
+                // shallow clone the remote to another directory
+                runCommand(projectDir, "git clone file:///${remoteRepo.getDirectory().getAbsolutePath()} shallowClone --depth 1 --branch main");
+                try (var git2 = Git.open(projectDir.resolve("shallowClone").toFile())) {
+                    // creates detached head
+                    git2.checkout().setName(commit).call();
+
+                    assumeTrue(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null) != null);
+                    assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null).getBranch())
+                      .isEqualTo(null);
+                }
+            }
+        }
+    }
+
+    @Test
+    void noLocalBranchDeriveFromRemote(@TempDir Path projectDir) throws IOException, GitAPIException, URISyntaxException {
+        var remoteDir = projectDir.resolve("remote");
+        var fileKey = RepositoryCache.FileKey.exact(remoteDir.toFile(), FS.DETECTED);
+        try (var remoteRepo = fileKey.open(false)) {
+            remoteRepo.create(true);
+
+            // push an initial commit to the remote
+            var cloneDir = projectDir.resolve("clone1");
+            try (Git gitSetup = Git.cloneRepository().setURI(remoteRepo.getDirectory().getAbsolutePath()).setDirectory(cloneDir.toFile()).call()) {
+                Files.writeString(projectDir.resolve("test.txt"), "hi");
+                gitSetup.add().addFilepattern("*").call();
+                var commit = gitSetup.commit().setMessage("init").setSign(false).call();
+                gitSetup.push().add("master").setRemote("origin").call();
+
+                //Now create new workspace directory, git init and then fetch from remote.
+                var workspaceDir = projectDir.resolve("workspace");
+                try (Git git = Git.init().setDirectory(workspaceDir.toFile()).call()) {
+                    git.remoteAdd().setName("origin").setUri(new URIish(remoteRepo.getDirectory().getAbsolutePath())).call();
+                    git.fetch().setRemote("origin").setForceUpdate(true).setTagOpt(TagOpt.FETCH_TAGS).setRefSpecs("+refs/heads/*:refs/remotes/origin/*").call();
+                    git.checkout().setName(commit.getName()).call();
+                }
+            }
+        }
+
+        assumeTrue(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null) != null);
+        assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null).getBranch())
+          .isEqualTo("master");
+    }
+
+    void runCommand(Path workingDir, String command) {
+        //noinspection ResultOfMethodCallIgnored
+        workingDir.toFile().mkdirs();
+        try {
+            new ProcessBuilder(command.split(" "))
+              .directory(workingDir.toFile())
+              .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+              .redirectError(ProcessBuilder.Redirect.INHERIT)
+              .start()
+              .waitFor(5, TimeUnit.SECONDS);
+        } catch (InterruptedException | IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

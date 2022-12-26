@@ -331,7 +331,7 @@ public class CategoryTree<G> {
 
     void addRecipe(G group, RecipeDescriptor recipe) {
         if (!recipe.getName().contains(".")) {
-            throw new IllegalArgumentException("Expected recipe with name '" + recipe.getName() + "' to have" +
+            throw new IllegalArgumentException("Expected recipe with name '" + recipe.getName() + "' to have " +
                                                "a package, but it did not.");
         }
         String category = recipe.getName().substring(0, recipe.getName().lastIndexOf('.'));

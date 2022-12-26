@@ -32,6 +32,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -43,8 +44,12 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
-    static Recipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(visitor);
+    static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
+        return new AdHocRecipe(null, null, null, visitor, null);
+    }
+
+    static AdHocRecipe toRecipe() {
+        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null);
     }
 
     static Recipe fromRuntimeClasspath(String recipe) {

@@ -18,7 +18,9 @@ classDiagram
 `rewrite-java-8` ..> `rewrite-java-tck` : `compatibilityTest classpath`
 `rewrite-groovy` ..> `rewrite-java-test` : testImplementation
 `rewrite-java` ..> `rewrite-java-test` : testImplementation
-note for `rewrite-java` "For Java Reflection type mapping"
 `rewrite-java-tck` ..> `rewrite-java-17`: testRuntimeOnly
-note for `rewrite-java-tck` "Bound to the latest current language level"
 ```
+
+* The `testRuntimeOnly` dependency that `rewrite-java-tck` has on `rewrite-java-17` allows us to run these tests in the IDE.
+* The `rewrite-java` dependency on `rewrite-java-test` is for testing the Java Reflection type mapping.
+* `rewrite-java-tck` should be bound to the latest language level supported at any given time.

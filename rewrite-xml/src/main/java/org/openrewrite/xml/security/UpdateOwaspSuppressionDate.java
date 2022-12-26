@@ -64,7 +64,7 @@ public class UpdateOwaspSuppressionDate extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsOwaspSuppressionsFile();
+        return new IsOwaspSuppressionsFile().getVisitor();
     }
 
     @Override

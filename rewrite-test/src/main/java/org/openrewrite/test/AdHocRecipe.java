@@ -15,26 +15,64 @@
  */
 package org.openrewrite.test;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 
+import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class AdHocRecipe extends Recipe {
-    private final Supplier<TreeVisitor<?, ExecutionContext>> treeVisitorSupplier;
+    @With
+    @Nullable
+    @Language("markdown")
+    String displayName;
 
-    public AdHocRecipe(Supplier<TreeVisitor<?, ExecutionContext>> treeVisitorSupplier) {
-        this.treeVisitorSupplier = treeVisitorSupplier;
+    @With
+    @Nullable
+    String name;
+
+    @With
+    @Nullable
+    Boolean causesAnotherCycle;
+
+    @With
+    Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
+
+    @Nullable
+    @With
+    BiFunction<List<SourceFile>, ExecutionContext, List<SourceFile>> visit;
+
+    public String getDisplayName() {
+        return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
+    }
+
+    public String getName() {
+        return StringUtils.isBlank(name) ? super.getName() : name;
     }
 
     @Override
-    public String getDisplayName() {
-        return "Ad hoc recipe";
+    public boolean causesAnotherCycle() {
+        return causesAnotherCycle == null ? super.causesAnotherCycle() : causesAnotherCycle;
+    }
+
+    @Override
+    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+        return visit == null ? before : visit.apply(before, ctx);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return treeVisitorSupplier.get();
+        return getVisitor.get();
     }
 }

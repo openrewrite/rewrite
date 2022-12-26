@@ -127,7 +127,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
         // is overwritten on disk with dependencies that don't exist.
         Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
         assertThat(localPom.getParent().toFile().mkdirs()).isTrue();
-        Files.write(localPom,
+        Files.writeString(localPom,
           //language=xml
           """
              <project>
@@ -135,7 +135,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
                <artifactId>bad-artifact</artifactId>
                <version>1</version>
              </project>
-            """.getBytes()
+            """
         );
 
         MavenRepository mavenLocal = new MavenRepository("local", localRepository.toUri().toString(), true, false, true, null, null, null);
@@ -185,7 +185,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
               """,
             spec -> spec.beforeRecipe(maven -> {
                 // make the local pom bad before running the recipe
-                Files.write(localPom,
+                Files.writeString(localPom,
                   //language=xml
                   """
                      <project>
@@ -205,7 +205,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
                          </dependency>
                        </dependencies>
                      </project>
-                    """.getBytes()
+                    """
                 );
             })
           )

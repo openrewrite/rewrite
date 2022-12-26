@@ -16,40 +16,56 @@
 package org.openrewrite.xml.security;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
 
-public class IsOwaspSuppressionsFile extends XmlIsoVisitor<ExecutionContext> {
-
-    private static final String MATCHER = "https://jeremylong.github.io/DependencyCheck/dependency-suppression(.*?).xsd";
+public class IsOwaspSuppressionsFile extends Recipe {
 
     @Override
-    public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-        Xml.Document doc = super.visitDocument(document, executionContext);
-        if (!doc.getSourcePath().equals(Paths.get("suppressions.xml")) || doc.getRoot() == null) {
-            return doc;
-        }
-        Xml.Tag root = doc.getRoot();
-        // root must be suppressions
-        if (!root.getName().equals("suppressions")) {
-            return doc;
-        }
-        // check that root xmlns matches
-        boolean isOwaspSuppressionFile = false;
-        for (Xml.Attribute attribute : root.getAttributes()) {
-            if (attribute.getKeyAsString().equals("xmlns")) {
-                if (attribute.getValueAsString().matches(MATCHER)) {
-                    isOwaspSuppressionFile = true;
+    public String getDisplayName() {
+        return "Find OWASP `suppressions.xml`";
+    }
+
+    @Override
+    public String getDescription() {
+        return "These files are used to suppress false positives in OWASP [Dependency Check](https://jeremylong.github.io/DependencyCheck).";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new XmlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                Xml.Document doc = super.visitDocument(document, executionContext);
+                if (!doc.getSourcePath().equals(Paths.get("suppressions.xml")) || doc.getRoot() == null) {
+                    return doc;
                 }
+                Xml.Tag root = doc.getRoot();
+
+                if (!root.getName().equals("suppressions")) {
+                    return doc;
+                }
+
+                // check that root xmlns matches
+                boolean isOwaspSuppressionFile = false;
+                for (Xml.Attribute attribute : root.getAttributes()) {
+                    if (attribute.getKeyAsString().equals("xmlns")) {
+                        if (attribute.getValueAsString().matches("https://jeremylong.github.io/DependencyCheck/dependency-suppression(.*?).xsd")) {
+                            isOwaspSuppressionFile = true;
+                        }
+                    }
+                }
+                if (isOwaspSuppressionFile) {
+                    return doc.withRoot(doc.getRoot().withMarkers(doc.getRoot().getMarkers().addIfAbsent(new SearchResult(Tree.randomId(), "Found it"))));
+                }
+                return doc;
             }
-        }
-        if (isOwaspSuppressionFile) {
-            return doc.withRoot(doc.getRoot().withMarkers(doc.getRoot().getMarkers().addIfAbsent(new SearchResult(Tree.randomId(), "Found it"))));
-        }
-        return doc;
+        };
     }
 }

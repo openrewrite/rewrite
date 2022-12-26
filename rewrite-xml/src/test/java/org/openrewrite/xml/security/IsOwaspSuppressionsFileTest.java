@@ -16,7 +16,6 @@
 package org.openrewrite.xml.security;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,7 +26,7 @@ class IsOwaspSuppressionsFileTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AdHocRecipe(IsOwaspSuppressionsFile::new));
+        spec.recipe(new IsOwaspSuppressionsFile());
     }
 
     @Test

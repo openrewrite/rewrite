@@ -171,6 +171,9 @@ public abstract class Recipe implements Cloneable {
      * @return This recipe.
      */
     public Recipe doNext(Recipe recipe) {
+        if (recipe == this) {
+            throw new IllegalArgumentException("Cannot add a recipe to itself.");
+        }
         recipeList.add(recipe);
         return this;
     }
@@ -216,7 +219,7 @@ public abstract class Recipe implements Cloneable {
      */
     @SuppressWarnings("unused")
     public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        if(applicableTests == null) {
+        if (applicableTests == null) {
             applicableTests = new ArrayList<>(1);
         }
         applicableTests.add(test);
@@ -252,7 +255,7 @@ public abstract class Recipe implements Cloneable {
      * @return A tree visitor that performs an applicability test.
      */
     public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        if(singleSourceApplicableTests == null) {
+        if (singleSourceApplicableTests == null) {
             singleSourceApplicableTests = new ArrayList<>(1);
         }
         singleSourceApplicableTests.add(test);
@@ -269,7 +272,7 @@ public abstract class Recipe implements Cloneable {
      * Note that here, as throughout OpenRewrite, we use referential equality to detect that a change has occured.
      * To indicate to rewrite that the recipe has made changes a different instance must be returned than the instance
      * passed in as "before".
-     *
+     * <p>
      * Currently, the list passed in as "before" is not immutable, but you should treat it as such anyway.
      *
      * @param before The set of source files to operate on.
@@ -303,7 +306,7 @@ public abstract class Recipe implements Cloneable {
     public Validated validate(ExecutionContext ctx) {
         Validated validated = validate();
 
-        for(Recipe recipe : recipeList) {
+        for (Recipe recipe : recipeList) {
             validated = validated.and(recipe.validate(ctx));
         }
         return validated;
@@ -326,7 +329,7 @@ public abstract class Recipe implements Cloneable {
                 logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), this.getClass().getName());
             }
         }
-        for(Recipe recipe : recipeList) {
+        for (Recipe recipe : recipeList) {
             validated = validated.and(recipe.validate());
         }
         return validated;

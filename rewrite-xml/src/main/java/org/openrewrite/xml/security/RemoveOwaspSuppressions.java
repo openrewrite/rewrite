@@ -53,7 +53,7 @@ public class RemoveOwaspSuppressions extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsOwaspSuppressionsFile();
+        return new IsOwaspSuppressionsFile().getVisitor();
     }
 
     private static class RemoveSuppressionsVisitor extends XmlIsoVisitor<ExecutionContext> {

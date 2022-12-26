@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.internal
+package org.openrewrite.semver;
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Test;
 
-class PropertyPlaceholderHelperTest {
+import static org.assertj.core.api.Assertions.assertThat;
+
+class DependencyMatcherTest {
 
     @Test
-    fun dashed() {
-        val helper = PropertyPlaceholderHelper("%%{", "}", null)
-        val s = helper.replacePlaceholders("%%{k1} %%{k2}") { k ->
-            when(k) {
-                "k1" -> "hi"
-                "k2" -> "jon"
-                else -> TODO()
-            }
-        }
-        assertThat(s).isEqualTo("hi jon")
+    void groupArtifact() {
+        assertThat(DependencyMatcher.build("org.springframework.boot:*").isValid()).isTrue();
     }
 }
