@@ -1,0 +1,17 @@
+rewrite-benchmarks
+rewrite-bom
+rewrite-core
+rewrite-gradle
+rewrite-groovy
+rewrite-hcl
+rewrite-java
+rewrite-java-tck
+rewrite-java-test
+rewrite-java-17
+rewrite-json
+rewrite-maven
+rewrite-properties
+rewrite-protobuf
+rewrite-test
+rewrite-xml
+rewrite-yaml

@@ -12,31 +12,63 @@ pluginManagement {
     }
 }
 
-include(
-    "rewrite-core",
-    "rewrite-gradle",
-    "rewrite-groovy",
-    "rewrite-hcl",
-    "rewrite-java",
-    "rewrite-java-tck",
-    "rewrite-java-test",
-    "rewrite-java-17",
-    "rewrite-json",
-    "rewrite-maven",
-    "rewrite-properties",
-    "rewrite-protobuf",
-    "rewrite-xml",
-    "rewrite-yaml",
-    "rewrite-test",
-    "rewrite-bom",
-    "rewrite-benchmarks"
+val allProjects = listOf(
+        "rewrite-benchmarks",
+        "rewrite-bom",
+        "rewrite-core",
+        "rewrite-gradle",
+        "rewrite-groovy",
+        "rewrite-hcl",
+        "rewrite-java",
+        "rewrite-java-tck",
+        "rewrite-java-test",
+        "rewrite-java-17",
+        "rewrite-json",
+        "rewrite-maven",
+        "rewrite-properties",
+        "rewrite-protobuf",
+        "rewrite-test",
+        "rewrite-xml",
+        "rewrite-yaml"
 )
 
-if(System.getProperty("idea.active") == null ||
+val includedProjects = file("IDE.properties").let {
+    if (it.exists()) {
+        val props = java.util.Properties()
+        props.load(it.reader())
+        allProjects.intersect(props.keys)
+    } else {
+        allProjects
+    }
+}.toSet()
+
+include(*allProjects.toTypedArray())
+
+allProjects.minus(includedProjects).forEach {
+    // sinkhole this project to a directory that intentionally doesn't exist, so that it
+    // can be efficiently substituted for a module dependency below
+    project(":$it").projectDir = file("sinkhole-$it")
+}
+
+gradle.allprojects {
+    configurations.all {
+        resolutionStrategy.dependencySubstitution {
+            allProjects
+                    .minus(includedProjects)
+                    .minus(arrayOf("rewrite-benchmarks", "rewrite-bom"))
+                    .forEach {
+                        substitute(project(":$it"))
+                                .using(module("org.openrewrite:$it:latest.integration"))
+                    }
+        }
+    }
+}
+
+if (System.getProperty("idea.active") == null ||
         System.getProperty("idea.sync.active") == null) {
     include(
-        "rewrite-java-8",
-        "rewrite-java-11"
+            "rewrite-java-8",
+            "rewrite-java-11"
     )
 }
 

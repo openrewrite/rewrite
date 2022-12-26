@@ -10,3 +10,4 @@ out/
 .settings/
 .DS_Store
 **/node_modules/
+IDE.properties
