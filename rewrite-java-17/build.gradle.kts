@@ -16,6 +16,10 @@ dependencies {
 }
 
 tasks.withType<JavaCompile> {
+    // allows --add-exports to in spite of the JDK's restrictions on this
+    sourceCompatibility = JavaVersion.VERSION_17.toString()
+    targetCompatibility = JavaVersion.VERSION_17.toString()
+
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(
         listOf(

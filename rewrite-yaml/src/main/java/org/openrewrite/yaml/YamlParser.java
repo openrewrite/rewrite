@@ -31,6 +31,7 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.YamlKey;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.events.*;
 import org.yaml.snakeyaml.parser.Parser;
 import org.yaml.snakeyaml.parser.ParserImpl;
@@ -120,7 +121,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 new InputStreamReader(new ByteArrayInputStream(yamlSourceWithVariablePlaceholders.toString()
                         .getBytes(StandardCharsets.UTF_8))))) {
             StreamReader streamReader = new StreamReader(reader);
-            Scanner scanner = new ScannerImpl(streamReader);
+            Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
 
             int lastEnd = 0;
