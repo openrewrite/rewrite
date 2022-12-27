@@ -64,7 +64,7 @@ gradle.allprojects {
     }
 }
 
-if (System.getProperty("idea.active") == null ||
+if (System.getProperty("idea.active") == null &&
         System.getProperty("idea.sync.active") == null) {
     include(
             "rewrite-java-8",

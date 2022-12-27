@@ -22,8 +22,8 @@ import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.transport.TagOpt;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.util.FS;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -42,7 +42,6 @@ import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.Tree.randomId;
 
-@Disabled("How to deal with FS signer information not matching?")
 @SuppressWarnings("ConstantConditions")
 class GitProvenanceTest {
 
@@ -174,14 +173,15 @@ class GitProvenanceTest {
                 var commit = git.getRepository().resolve(Constants.HEAD).getName();
 
                 // shallow clone the remote to another directory
-                runCommand(projectDir, "git clone file:///${remoteRepo.getDirectory().getAbsolutePath()} shallowClone --depth 1 --branch main");
+                runCommand(projectDir, "git clone file:///%s shallowClone --depth 1 --branch main"
+                  .formatted(remoteRepo.getDirectory().getAbsolutePath()));
                 try (var git2 = Git.open(projectDir.resolve("shallowClone").toFile())) {
                     // creates detached head
                     git2.checkout().setName(commit).call();
 
                     assumeTrue(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null) != null);
                     assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("shallowClone"), null).getBranch())
-                      .isEqualTo(null);
+                      .isEqualTo("main");
                 }
             }
         }
@@ -214,7 +214,7 @@ class GitProvenanceTest {
 
         assumeTrue(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null) != null);
         assertThat(GitProvenance.fromProjectDirectory(projectDir.resolve("workspace"), null).getBranch())
-          .isEqualTo("master");
+          .isEqualTo("main");
     }
 
     void runCommand(Path workingDir, String command) {

@@ -29,6 +29,7 @@ dependencies {
     implementation("org.yaml:snakeyaml:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
 
 tasks.withType<ShadowJar> {

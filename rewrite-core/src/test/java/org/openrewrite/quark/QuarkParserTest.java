@@ -17,7 +17,6 @@ package org.openrewrite.quark;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
@@ -68,7 +67,6 @@ class QuarkParserTest implements RewriteTest {
         );
     }
 
-    @Disabled("How to deal with FS signer information not matching?")
     @Test
     void renameQuark(@TempDir Path tempDir) {
         rewriteRun(
