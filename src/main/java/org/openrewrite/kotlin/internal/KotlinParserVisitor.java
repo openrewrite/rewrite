@@ -19,6 +19,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.jetbrains.kotlin.com.intellij.psi.PsiRecursiveElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.*;
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.descriptors.ClassKind;
@@ -29,6 +30,7 @@ import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition;
 import org.jetbrains.kotlin.fir.expressions.impl.FirNoReceiverExpression;
+import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
@@ -232,7 +234,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    members, emptyBody != null ? Space.EMPTY : sourceBefore("}"));
+                    members, sourceBefore("}"));
         }
 
         return new J.ClassDeclaration(
@@ -557,30 +559,47 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitVariableAssignment(FirVariableAssignment variableAssignment, ExecutionContext ctx) {
+        Space prefix = whitespace();
+        return new J.Assignment(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                convert(variableAssignment.getLValue(), ctx),
+                padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
+                null); // TODO
+    }
+
+    @Override
     public J visitWhenBranch(FirWhenBranch whenBranch, ExecutionContext ctx) {
         Space prefix = whitespace();
         if (source.substring(cursor).startsWith("when")) {
             throw new IllegalStateException("Implement me.");
         } else if (source.substring(cursor).startsWith("if")) {
             skip("if");
-        } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition)) {
+        } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
+                whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
             throw new IllegalStateException("Implement me.");
         }
 
+        boolean singleExpression = whenBranch.getResult() instanceof FirSingleExpressionBlock;
         if (whenBranch.getCondition() instanceof FirElseIfTrueCondition) {
-            return visitBlock(whenBranch.getResult(), ctx);
+            FirElement result = singleExpression ? ((FirSingleExpressionBlock) whenBranch.getResult()).getStatement() : whenBranch.getResult();
+            J j = visitElement(result, ctx);
+            return j.withPrefix(prefix);
         } else {
             Space controlParenPrefix = whitespace();
             skip("(");
             J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<Expression>(randomId(), controlParenPrefix, Markers.EMPTY,
                         convert(whenBranch.getCondition(), t -> sourceBefore(")"), ctx));
 
+            FirElement result = singleExpression ? ((FirSingleExpressionBlock) whenBranch.getResult()).getStatement() : whenBranch.getResult();
             return new J.If(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     controlParentheses,
-                    JRightPadded.build(convert(whenBranch.getResult(), ctx)),
+                    JRightPadded.build(convert(result, ctx)),
                     null
             );
         }
@@ -589,58 +608,43 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitWhenExpression(FirWhenExpression whenExpression, ExecutionContext ctx) {
         // TODO: implement when expressions.
-        Space prefix = whitespace();
-        if (source.substring(cursor).startsWith("when")) {
-            throw new IllegalStateException("Implement me.");
-        } else if (source.substring(cursor).startsWith("if")) {
-            skip("if");
-        } else {
+        FirWhenBranch whenBranch = whenExpression.getBranches().get(0);
+        J firstElement = visitElement(whenBranch, ctx);
+        if (!(firstElement instanceof J.If)) {
             throw new IllegalStateException("Implement me.");
         }
 
-        FirWhenBranch whenBranch = whenExpression.getBranches().get(0);
-
-        Space controlParenPrefix = whitespace();
-        skip("(");
-        J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<>(randomId(), controlParenPrefix, Markers.EMPTY,
-                convert(whenBranch.getCondition(), t -> sourceBefore(")"), ctx));
-
-        J.If ifStatement = new J.If(randomId(),
-                prefix,
-                Markers.EMPTY,
-                controlParentheses,
-                JRightPadded.build(convert(whenBranch.getResult(), ctx)),
-                null
-        );
+        J.If ifStatement = (J.If) firstElement;
 
         List<J> elses = new ArrayList<>(whenExpression.getBranches().size() - 1);
         List<FirWhenBranch> branches = whenExpression.getBranches();
-        // Parse the rest of the branches.
         for (int i = 1; i < branches.size(); i++) {
             FirWhenBranch branch = branches.get(i);
 
             Space elsePrefix = sourceBefore("else");
             J j = visitWhenBranch(branch, ctx);
-            j = j.withPrefix(elsePrefix);
-            elses.add(j);
+            J.If.Else ifElse = new J.If.Else(
+                    randomId(),
+                    elsePrefix,
+                    Markers.EMPTY,
+                    JRightPadded.build((Statement) j)
+            );
+            elses.add(ifElse);
         }
 
         elses.add(0, ifStatement);
         J.If.Else ifElse = null;
-
-        // Convert the list of J's into a single J.If.Else.
         for (int i = elses.size() - 1; i >= 0; i--) {
             J j = elses.get(i);
-            if (j instanceof J.If) {
-                if (i == 0) {
-                    ifStatement = ifStatement.withElsePart(ifElse);
-                } else {
-                    J.If currentIf = (J.If) j;
-                    currentIf = currentIf.withElsePart(ifElse);
-                    ifElse = new J.If.Else(randomId(), j.getPrefix(), Markers.EMPTY, JRightPadded.build(currentIf));
+            if (j instanceof J.If.Else) {
+                if (((J.If.Else) j).getBody() instanceof J.If) {
+                    J.If addElse = (J.If) ((J.If.Else) j).getBody();
+                    addElse = addElse.withElsePart(ifElse);
+                    j = ((J.If.Else) j).withBody(addElse);
                 }
-            } else if (j instanceof J.Block) {
-                ifElse = new J.If.Else(randomId(), j.getPrefix(), Markers.EMPTY, JRightPadded.build((Statement) j));
+                ifElse = (J.If.Else) j;
+            } else if (j instanceof J.If) {
+                ifStatement = ((J.If) j).withElsePart(ifElse);
             }
         }
 
@@ -683,7 +687,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitUserTypeRef((FirUserTypeRef) firElement, ctx);
         } else if (firElement instanceof FirValueParameter) {
             return visitValueParameter((FirValueParameter) firElement, ctx);
-        } else if (firElement instanceof FirWhenBranch) {
+        } else if (firElement instanceof FirVariableAssignment) {
+            return visitVariableAssignment((FirVariableAssignment) firElement, ctx);
+        }  else if (firElement instanceof FirWhenBranch) {
             return visitWhenBranch((FirWhenBranch) firElement, ctx);
         } else if (firElement instanceof FirWhenExpression) {
             return visitWhenExpression((FirWhenExpression) firElement, ctx);

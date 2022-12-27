@@ -44,4 +44,23 @@ public class IfTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void singleLineIfElseStatements() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method() {
+                  var n: Int = 0
+                  if (n == 0)
+                      n = 1
+                  else if (n == 1)
+                      n = 2
+                  else
+                      n = 3
+              }
+              """
+          )
+        );
+    }
 }
