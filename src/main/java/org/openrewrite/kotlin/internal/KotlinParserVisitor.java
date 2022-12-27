@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.fir.FirPackageDirective;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
 import org.jetbrains.kotlin.fir.expressions.*;
+import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition;
 import org.jetbrains.kotlin.fir.expressions.impl.FirNoReceiverExpression;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.types.*;
@@ -559,36 +560,91 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitWhenBranch(FirWhenBranch whenBranch, ExecutionContext ctx) {
         Space prefix = whitespace();
         if (source.substring(cursor).startsWith("when")) {
-            skip("when");
+            throw new IllegalStateException("Implement me.");
         } else if (source.substring(cursor).startsWith("if")) {
             skip("if");
-        } else {
-            throw new IllegalStateException("Fix me.");
+        } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition)) {
+            throw new IllegalStateException("Implement me.");
         }
 
-        Space controlParenPrefix = whitespace();
-        skip("(");
-        J.ControlParentheses controlParentheses = new J.ControlParentheses<Expression>(randomId(), controlParenPrefix, Markers.EMPTY,
-                convert(whenBranch.getCondition(), t -> sourceBefore(")"), ctx));
-        return new J.If(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                controlParentheses,
-                JRightPadded.build(convert(whenBranch.getResult(), ctx)), // TODO
-                null // TODO
-        );
+        if (whenBranch.getCondition() instanceof FirElseIfTrueCondition) {
+            return visitBlock(whenBranch.getResult(), ctx);
+        } else {
+            Space controlParenPrefix = whitespace();
+            skip("(");
+            J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<Expression>(randomId(), controlParenPrefix, Markers.EMPTY,
+                        convert(whenBranch.getCondition(), t -> sourceBefore(")"), ctx));
+
+            return new J.If(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    controlParentheses,
+                    JRightPadded.build(convert(whenBranch.getResult(), ctx)),
+                    null
+            );
+        }
     }
 
     @Override
     public J visitWhenExpression(FirWhenExpression whenExpression, ExecutionContext ctx) {
         // TODO: implement when expressions.
-        if (whenExpression.getBranches().size() > 1) {
+        Space prefix = whitespace();
+        if (source.substring(cursor).startsWith("when")) {
+            throw new IllegalStateException("Implement me.");
+        } else if (source.substring(cursor).startsWith("if")) {
+            skip("if");
+        } else {
             throw new IllegalStateException("Implement me.");
         }
 
         FirWhenBranch whenBranch = whenExpression.getBranches().get(0);
-        return convert(whenBranch, ctx);
+
+        Space controlParenPrefix = whitespace();
+        skip("(");
+        J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<>(randomId(), controlParenPrefix, Markers.EMPTY,
+                convert(whenBranch.getCondition(), t -> sourceBefore(")"), ctx));
+
+        J.If ifStatement = new J.If(randomId(),
+                prefix,
+                Markers.EMPTY,
+                controlParentheses,
+                JRightPadded.build(convert(whenBranch.getResult(), ctx)),
+                null
+        );
+
+        List<J> elses = new ArrayList<>(whenExpression.getBranches().size() - 1);
+        List<FirWhenBranch> branches = whenExpression.getBranches();
+        // Parse the rest of the branches.
+        for (int i = 1; i < branches.size(); i++) {
+            FirWhenBranch branch = branches.get(i);
+
+            Space elsePrefix = sourceBefore("else");
+            J j = visitWhenBranch(branch, ctx);
+            j = j.withPrefix(elsePrefix);
+            elses.add(j);
+        }
+
+        elses.add(0, ifStatement);
+        J.If.Else ifElse = null;
+
+        // Convert the list of J's into a single J.If.Else.
+        for (int i = elses.size() - 1; i >= 0; i--) {
+            J j = elses.get(i);
+            if (j instanceof J.If) {
+                if (i == 0) {
+                    ifStatement = ifStatement.withElsePart(ifElse);
+                } else {
+                    J.If currentIf = (J.If) j;
+                    currentIf = currentIf.withElsePart(ifElse);
+                    ifElse = new J.If.Else(randomId(), j.getPrefix(), Markers.EMPTY, JRightPadded.build(currentIf));
+                }
+            } else if (j instanceof J.Block) {
+                ifElse = new J.If.Else(randomId(), j.getPrefix(), Markers.EMPTY, JRightPadded.build((Statement) j));
+            }
+        }
+
+        return ifStatement;
     }
 
     /**

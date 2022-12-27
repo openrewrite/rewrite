@@ -23,4 +23,25 @@ public class IfTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ifElse() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method() {
+                  val n: Int = 0
+                  if (n == 0) {
+                      val x = 0
+                  } else if (n == 1) {
+                      val x = 1
+                  } else {
+                      val x = 2
+                  }
+              }
+              """,
+            isFullyParsed()
+          )
+        );
+    }
 }
