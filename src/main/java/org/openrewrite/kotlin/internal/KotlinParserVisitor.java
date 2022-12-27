@@ -553,9 +553,72 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
     }
 
+    /**
+     * Note: both ValueParameter and Property implement FirVariable.
+     * Most of the code is the same, but the visits are separate until we can figure out how to handle the differences.
+     */
     @Override
     public J visitValueParameter(FirValueParameter valueParameter, ExecutionContext ctx) {
-        throw new IllegalStateException("Implement me.");
+        Space prefix = whitespace();
+
+        List<J> modifiers = emptyList();
+        if (valueParameter.getSource() != null) {
+            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) valueParameter.getSource()).getPsi());
+            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+                modifiers = getModifiers(modifierList);
+            }
+        }
+
+        List<J.Annotation> annotations = emptyList(); // TODO: the last annotations in modifiers should be added.
+
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
+        Space namePrefix = sourceBefore(valueParameter.getName().asString());
+
+        J.Identifier name = new J.Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                valueParameter.getName().asString(),
+                null, // TODO: add type mapping and set type
+                null); // TODO: add type mapping and set variable type
+
+        TypeTree typeExpression = null;
+        if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+            FirResolvedTypeRef typeRef = (FirResolvedTypeRef) valueParameter.getReturnTypeRef();
+            if (typeRef.getDelegatedTypeRef() != null) {
+                typeExpression = (TypeTree) visitElement(typeRef.getDelegatedTypeRef(), ctx);
+            }
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
+        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
+
+        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
+                new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        namePrefix,
+                        Markers.EMPTY,
+                        name,
+                        dimensionsAfterName,
+                        valueParameter.getInitializer() != null ? padLeft(sourceBefore("="), (Expression) visitExpression(valueParameter.getInitializer(), ctx)) : null,
+                        null // TODO: add type mapping
+                )
+        );
+        vars.add(namedVariable);
+
+        return new J.VariableDeclarations(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
+                typeExpression,
+                null,
+                dimensionsAfterName,
+                vars);
     }
 
     @Override
