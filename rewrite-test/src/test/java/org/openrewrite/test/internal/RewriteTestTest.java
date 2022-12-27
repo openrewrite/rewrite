@@ -16,7 +16,6 @@
 package org.openrewrite.test.internal;
 
 import lombok.EqualsAndHashCode;
-import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -44,12 +43,15 @@ public class RewriteTestTest implements RewriteTest {
     }
 }
 
-@Value
-@EqualsAndHashCode(callSuper = false)
+@SuppressWarnings("FieldCanBeLocal")
 @NonNullApi
 class RecipeWithNameOption extends Recipe {
     @Option
-    String name;
+    private final String name;
+
+    RecipeWithNameOption(String name) {
+        this.name = name;
+    }
 
     @Override
     public String getDisplayName() {
