@@ -96,7 +96,7 @@ public class MethodNameCasing extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                if(enclosingClass == null) {
+                if(enclosingClass == null || enclosingClass.getKind() != J.ClassDeclaration.Kind.Type.Class) {
                     return method;
                 }
                 if (containsValidModifiers(method) &&

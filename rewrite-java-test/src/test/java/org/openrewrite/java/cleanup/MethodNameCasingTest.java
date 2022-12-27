@@ -36,6 +36,34 @@ class MethodNameCasingTest implements RewriteTest {
         spec.recipe(new MethodNameCasing(false, false));
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2557")
+    @Test
+    void interfaceMethods() {
+        rewriteRun(
+          java(
+            """
+              interface Test {
+                  void getFoo_bar() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2557")
+    @Test
+    void annotationMethods() {
+        rewriteRun(
+          java(
+            """
+              @interface Test {
+                  String getFoo_bar();
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2424")
     @Test
     void correctMethodNameCasing() {
@@ -66,7 +94,7 @@ class MethodNameCasingTest implements RewriteTest {
           java(
             """
               class Test {
-                  public void getFoo_bar(){}
+                  public void getFoo_bar() {}
               }
               """
           )
