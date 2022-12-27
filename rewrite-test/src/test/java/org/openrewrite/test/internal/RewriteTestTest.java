@@ -15,6 +15,8 @@
  */
 package org.openrewrite.test.internal;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
@@ -49,7 +51,8 @@ class RecipeWithNameOption extends Recipe {
     @Option
     private final String name;
 
-    RecipeWithNameOption(String name) {
+    @JsonCreator
+    public RecipeWithNameOption(String name) {
         this.name = name;
     }
 
