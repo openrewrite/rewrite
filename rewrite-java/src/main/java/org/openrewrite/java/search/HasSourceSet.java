@@ -32,7 +32,7 @@ public class HasSourceSet extends Recipe {
     @Option(displayName = "Source set",
             description = "The source set to search for.",
             example = "main")
-    String name;
+    String sourceSet;
 
     @Override
     public String getDisplayName() {
@@ -52,7 +52,7 @@ public class HasSourceSet extends Recipe {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext p) {
                 if (cu.getMarkers().findFirst(JavaSourceSet.class)
-                        .filter(sourceSet -> sourceSet.getName().equals(name))
+                        .filter(sourceSet -> sourceSet.getName().equals(sourceSet))
                         .isPresent()) {
                     return SearchResult.found(cu);
                 }
