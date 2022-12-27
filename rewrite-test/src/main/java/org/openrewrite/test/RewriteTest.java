@@ -60,6 +60,46 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     /**
+     * Check that all recipes loadable from the runtime classpath containing the provided package name
+     * are configurable and run with an empty source file set.
+     *
+     * @param packageName The package name to scan for recipes in.
+     */
+    default void assertRecipesConfigure(String packageName) {
+        // soft assertions allow the entire stack trace to be displayed for each
+        // recipe that fails to configure
+        SoftAssertions softly = new SoftAssertions();
+        for (Recipe recipe : Environment.builder()
+                .scanRuntimeClasspath(packageName)
+                .build()
+                .listRecipes()) {
+            // scanRuntimeClasspath picks up all recipes in META-INF/rewrite regardless of whether their
+            // names start with the package we intend to filter on here
+            if (recipe.getName().startsWith(packageName)) {
+                softly.assertThatCode(() -> {
+                    try {
+                        rewriteRun(
+                                spec -> spec.recipe(recipe),
+                                new SourceSpecs[0]
+                        );
+                    } catch (Throwable t) {
+                        fail("Recipe " + recipe.getName() + " failed to configure", t);
+                    }
+                }).doesNotThrowAnyException();
+            }
+        }
+        softly.assertAll();
+    }
+
+    /**
+     * Check that all recipes loadable from the runtime classpath containing the test's package
+     * are configurable and run with an empty source file set.
+     */
+    default void assertRecipesConfigure() {
+        assertRecipesConfigure(getClass().getPackage().getName());
+    }
+
+    /**
      * @return always null, a method that better documents in code that a source file does not exist either
      * before or after a recipe run.
      */

@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.test;
+package org.openrewrite.test.internal;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.test.RewriteTest;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -35,10 +37,16 @@ public class RewriteTestTest implements RewriteTest {
           )
         ));
     }
+
+    @Test
+    void verifyAll() {
+        assertThrows(AssertionError.class, this::assertRecipesConfigure);
+    }
 }
 
 @Value
 @EqualsAndHashCode(callSuper = false)
+@NonNullApi
 class RecipeWithNameOption extends Recipe {
     @Option
     String name;
