@@ -35,6 +35,25 @@ class FallThroughTest implements RewriteTest {
     }
 
     @Test
+    void switchExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int test(int n) {
+                      return switch(n) {
+                         case 1 -> n+1;
+                         case 2 -> n+2;
+                         default -> n;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addBreakWhenPreviousCaseHasCodeButLacksBreak() {
         rewriteRun(
           java(
