@@ -20,6 +20,7 @@ import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -32,7 +33,6 @@ import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -119,6 +119,7 @@ public interface RewriteTest extends SourceSpecs {
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
             validateRecipeNameAndDescription(recipe);
+            validateRecipeOptions(recipe);
         }
 
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
@@ -466,6 +467,14 @@ public interface RewriteTest extends SourceSpecs {
             assertThat(recipe.getDisplayName().endsWith(".")).as("%s Display Name should not end with a period.", recipe.getName()).isFalse();
             assertThat(recipe.getDescription()).as("%s Description should not be null or empty", recipe.getName()).isNotEmpty();
             assertThat(recipe.getDescription().endsWith(".")).as("%s Description should end with a period.", recipe.getName()).isTrue();
+        }
+    }
+
+    default void validateRecipeOptions(Recipe recipe) {
+        for (OptionDescriptor option : recipe.getDescriptor().getOptions()) {
+            if (option.getName().equals("name")) {
+                fail("Recipe option `name` conflicts with the recipe's name. Please use a different field name for this option.");
+            }
         }
     }
 }
