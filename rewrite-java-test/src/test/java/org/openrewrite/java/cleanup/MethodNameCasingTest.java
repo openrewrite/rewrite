@@ -65,9 +65,9 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      public void getFoo_bar(){}
-                  }
+              class Test {
+                  public void getFoo_bar(){}
+              }
               """
           )
         );
@@ -214,10 +214,10 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void dontChange() {
-                      }
+              class Test {
+                  void dontChange() {
                   }
+              }
               """
           )
         );
@@ -228,31 +228,32 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class ParentClass {
-                      void _method() {
-                      }
+              class ParentClass {
+                  void _method() {
                   }
-              """, """
-                  class ParentClass {
-                      void method() {
-                      }
+              }
+              """,
+            """
+              class ParentClass {
+                  void method() {
                   }
+              }
               """
           ),
           java(
             """
-                  class Test extends ParentClass {
-                      @Override
-                      void _method() {
-                      }
+              class Test extends ParentClass {
+                  @Override
+                  void _method() {
                   }
+              }
               """,
             """
-                  class Test extends ParentClass {
-                      @Override
-                      void method() {
-                      }
+              class Test extends ParentClass {
+                  @Override
+                  void method() {
                   }
+              }
               """
           )
         );
@@ -263,12 +264,12 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void _method() {
-                      }
-                      void method() {
-                      }
+              class Test {
+                  void _method() {
                   }
+                  void method() {
+                  }
+              }
               """
           )
         );
@@ -279,22 +280,22 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class T {
+              class T {
+                  void _method(){}
+                  
+                  private static class M {
                       void _method(){}
-                      
-                      private static class M {
-                          void _method(){}
-                      }
                   }
+              }
               """,
             """
-                  class T {
+              class T {
+                  void method(){}
+                  
+                  private static class M {
                       void method(){}
-                      
-                      private static class M {
-                          void method(){}
-                      }
                   }
+              }
               """
           )
         );
