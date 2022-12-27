@@ -7,9 +7,6 @@ This project contains the source code for the Rewrite Java Technology Compatibil
 Dependency relationships between parser implementations and the TCK:
 
 ```mermaid
----
-title: Dependency relationships
----
 classDiagram
 `rewrite-java-tck` ..> `rewrite-java`: implementation
 `rewrite-java-tck` ..> `rewrite-java-test`: implementation
