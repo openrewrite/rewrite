@@ -33,7 +33,8 @@ public class BinaryTest implements RewriteTest {
                 var n = 0
                 n -= 5
               }
-              """
+              """,
+            isFullyParsed()
           )
         );
     }

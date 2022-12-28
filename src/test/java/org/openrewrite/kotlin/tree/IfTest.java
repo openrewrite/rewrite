@@ -59,7 +59,8 @@ public class IfTest implements RewriteTest {
                   else
                       n = 3
               }
-              """
+              """,
+            isFullyParsed()
           )
         );
     }

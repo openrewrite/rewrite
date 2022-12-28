@@ -227,7 +227,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 membersMultiVariablesSeparated.add(declaration);
             }
 
-
             List<JRightPadded<Statement>> members = new ArrayList<>(membersMultiVariablesSeparated.size());
             for (FirElement firElement : membersMultiVariablesSeparated) {
                 members.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));
@@ -303,6 +302,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 padLeft(opPrefix, op),
                 right,
                 type);
+    }
+
+    @Override
+    public J visitEnumEntry(@NotNull FirEnumEntry enumEntry, ExecutionContext data) {
+        return super.visitEnumEntry(enumEntry, data);
     }
 
     @Override
@@ -728,6 +732,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitClass((FirClass) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<? extends Object>) firElement, ctx);
+        } else if (firElement instanceof FirEnumEntry) {
+            return visitEnumEntry((FirEnumEntry) firElement, ctx);
         } else if (firElement instanceof FirFunctionCall) {
             return visitFunctionCall((FirFunctionCall) firElement, ctx);
         } else if (firElement instanceof FirImplicitNullableAnyTypeRef) {
