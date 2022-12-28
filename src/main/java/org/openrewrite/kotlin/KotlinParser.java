@@ -51,8 +51,9 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
+import org.jetbrains.kotlin.fir.resolve.providers.impl.FirProviderImpl;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
-import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
+import org.jetbrains.kotlin.fir.scopes.FirScopeProvider;
 import org.jetbrains.kotlin.fir.signaturer.FirBasedSignatureComposer;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.ir.IrBuiltIns;
@@ -205,7 +206,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     targetPlatform,
                     kenv.getConfiguration(),
                     projectEnvironment,
-                    AbstractProjectFileSearchScope.ANY.INSTANCE,
+                    projectEnvironment.getSearchScopeForProjectJavaSources(),
                     dependencyListForCliModule.getAnalyzerServices(),
                     firProjectSessionProvider,
                     Collections.emptyList(),
@@ -254,6 +255,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         compilerConfiguration.put(JVMConfigurationKeys.JDK_HOME, javaHome);
 
         compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT,  true);
+//        compilerConfiguration.put(RETAIN_OUTPUT_IN_MEMORY,  true);
+        compilerConfiguration.put(USE_PSI_CLASS_FILES_READING, true);
 
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :

@@ -44,6 +44,7 @@ import org.jetbrains.kotlin.psi.stubs.elements.KtAnnotationEntryElementType;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
@@ -130,6 +131,68 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 statements,
                 Space.EMPTY
         );
+    }
+
+    @Override
+    public J visitAnonymousFunction(FirAnonymousFunction anonymousFunction, ExecutionContext ctx) {
+        throw new IllegalStateException("Implement me.");
+    }
+
+    @Override
+    public J visitAnonymousFunctionExpression(FirAnonymousFunctionExpression anonymousFunctionExpression, ExecutionContext ctx) {
+        if (!anonymousFunctionExpression.getAnonymousFunction().isLambda()) {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        Space prefix = sourceBefore("{");
+        JavaType closureType = null; // TODO
+        List<JRightPadded<J>> paramExprs = emptyList();
+
+        if (!anonymousFunctionExpression.getAnonymousFunction().getHasExplicitParameterList()) {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        FirAnonymousFunction anonymousFunction = anonymousFunctionExpression.getAnonymousFunction();
+        paramExprs = new ArrayList<>(anonymousFunction.getValueParameters().size());
+        List<FirValueParameter> parameters = anonymousFunction.getValueParameters();
+        for (int i = 0; i < parameters.size(); i++) {
+            FirValueParameter p = parameters.get(i);
+            JavaType type = null; // TODO
+            J expr = visitElement(p, ctx);
+            JRightPadded<J> param = JRightPadded.build(expr);
+            if (i != parameters.size() - 1) {
+                param = param.withAfter(sourceBefore(","));
+            }
+            paramExprs.add(param);
+        }
+
+        J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
+        int saveCursor = cursor;
+        Space arrowPrefix = whitespace();
+        if (source.startsWith("->", cursor)) {
+            cursor += "->".length();
+            if (params.getParameters().isEmpty()) {
+                params = params.getPadding().withParams(singletonList(JRightPadded
+                        .build((J)new J.Empty(randomId(), EMPTY, Markers.EMPTY))
+                        .withAfter(arrowPrefix)));
+            } else {
+                params = params.getPadding().withParams(
+                        ListUtils.mapLast(params.getPadding().getParams(), param -> param.withAfter(arrowPrefix))
+                );
+            }
+        } else {
+            cursor = saveCursor;
+        }
+
+        J body = visitElement(anonymousFunction.getBody(), ctx);
+        return new J.Lambda(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                params,
+                EMPTY,
+                body,
+                closureType);
     }
 
     @Override
@@ -305,8 +368,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitEnumEntry(@NotNull FirEnumEntry enumEntry, ExecutionContext data) {
-        return super.visitEnumEntry(enumEntry, data);
+    public J visitEnumEntry(FirEnumEntry enumEntry, ExecutionContext ctx) {
+        throw new IllegalStateException("Implement me.");
     }
 
     @Override
@@ -428,8 +491,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitResolvedNamedReference(@NotNull FirResolvedNamedReference resolvedNamedReference, ExecutionContext ctx) {
+    public J visitResolvedNamedReference(FirResolvedNamedReference resolvedNamedReference, ExecutionContext ctx) {
         return convertToIdentifier(resolvedNamedReference.getName());
+    }
+
+    @Override
+    public J visitReturnExpression(FirReturnExpression returnExpression, ExecutionContext ctx) {
+        return visitElement(returnExpression.getResult(), ctx);
     }
 
     @Override
@@ -726,7 +794,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
      */
     @Override
     public J visitElement(FirElement firElement, ExecutionContext ctx) {
-        if (firElement instanceof FirBlock) {
+        if (firElement instanceof FirAnonymousFunction) {
+            return visitAnonymousFunction((FirAnonymousFunction) firElement, ctx);
+        } else if (firElement instanceof FirAnonymousFunctionExpression) {
+            return visitAnonymousFunctionExpression((FirAnonymousFunctionExpression) firElement, ctx);
+        } else if (firElement instanceof FirBlock) {
             return visitBlock((FirBlock) firElement, ctx);
         }  else if (firElement instanceof FirClass) {
             return visitClass((FirClass) firElement, ctx);
@@ -746,6 +818,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitPropertyAccessExpression((FirPropertyAccessExpression) firElement, ctx);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return visitResolvedNamedReference((FirResolvedNamedReference) firElement, ctx);
+        } else if (firElement instanceof FirReturnExpression) {
+            return visitReturnExpression((FirReturnExpression) firElement, ctx);
         } else if (firElement instanceof FirSimpleFunction) {
             return visitSimpleFunction((FirSimpleFunction) firElement, ctx);
         } else if (firElement instanceof FirTypeParameter) {
