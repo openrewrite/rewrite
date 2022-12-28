@@ -1641,7 +1641,7 @@ public class GroovyParserVisitor {
             J.Block body = visit(node.getTryStatement());
             List<J.Try.Catch> catches;
             if (node.getCatchStatements().isEmpty()) {
-                catches = null;
+                catches = emptyList();
             } else {
                 catches = new ArrayList<>(node.getCatchStatements().size());
                 for (CatchStatement catchStatement : node.getCatchStatements()) {
