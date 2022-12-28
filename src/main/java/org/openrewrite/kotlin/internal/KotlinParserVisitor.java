@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiRecursiveElementVisitor;
@@ -38,9 +39,11 @@ import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.psiUtil.KtPsiUtilKt;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jetbrains.kotlin.psi.stubs.elements.KtAnnotationEntryElementType;
+import org.jetbrains.kotlin.psi.stubs.elements.KtNameReferenceExpressionElementType;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -184,7 +187,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             cursor = saveCursor;
         }
 
-        J body = visitElement(anonymousFunction.getBody(), ctx);
+        saveCursor = cursor;
+        Space bodyPrefix = whitespace();
+        J body = null;
+        if (source.startsWith("{", cursor)) {
+            body = visitElement(anonymousFunction.getBody(), ctx);
+        } else if (anonymousFunction.getBody().getStatements().size() == 1) {
+            body = visitElement(anonymousFunction.getBody().getStatements().get(0), ctx);
+            // TODO: fix me. A J.Binary doesn't contain a postfix space and is not considered a Statement, which cannot be added to a J.Block.
+            sourceBefore("}");
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
         return new J.Lambda(
                 randomId(),
                 prefix,
@@ -340,31 +354,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             throw new IllegalStateException("Implement me.");
         }
 
-        Space prefix = whitespace();
-        Expression left = convert(equalityOperatorCall.getArgumentList().getArguments().get(0), ctx);
-
-        Space opPrefix = whitespace();
-        J.Binary.Type op;
-        switch ((FirOperation) equalityOperatorCall.getOperation()) {
-            case EQ:
-                skip("==");
-                op = J.Binary.Type.Equal;
-                break;
-            default:
-                throw new IllegalArgumentException("Unexpected binary tag " + (FirOperation) equalityOperatorCall.getOperation());
-        }
-
-        Expression right = convert(equalityOperatorCall.getArgumentList().getArguments().get(1), ctx);
-
-        JavaType type = null; // TODO
-        return new J.Binary(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                left,
-                padLeft(opPrefix, op),
-                right,
-                type);
+        J j = mapSourceElement(equalityOperatorCall.getSource());
+        // TODO: add type mapping..
+        return j;
     }
 
     @Override
@@ -374,7 +366,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionCall(FirFunctionCall functionCall, ExecutionContext ctx) {
-        throw new IllegalStateException("how is a new class identified?");
+        KtSourceElement sourceElement = functionCall.getSource();
+        if (sourceElement == null) {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        J j = mapSourceElement(sourceElement);
+        // TODO: add type mapping..
+        return j;
     }
 
     @Override
@@ -702,7 +701,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Markers.EMPTY,
                 convert(variableAssignment.getLValue(), ctx),
                 padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
-                null); // TODO
+                typeMapping.type(variableAssignment));
     }
 
     @Override
@@ -1105,6 +1104,75 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 throw new IllegalArgumentException("Unexpected modifier " + mod);
         }
         return new K.Modifier(randomId(), modFormat, Markers.EMPTY, type, annotations);
+    }
+
+    private J mapSourceElement(KtSourceElement sourceElement) {
+        if (sourceElement instanceof KtRealPsiSourceElement) {
+            PsiElement psiElement = ((KtRealPsiSourceElement) sourceElement).getPsi();
+            if (psiElement instanceof KtBinaryExpression) {
+                return mapBinaryExpression((KtBinaryExpression) psiElement);
+            } else {
+                throw new IllegalStateException("Implement me.");
+            }
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
+    }
+
+    private J mapBinaryExpression(KtBinaryExpression binaryExpression) {
+        Space prefix = whitespace();
+        Expression left = (Expression) mapExpression(binaryExpression.getLeft());
+        Space opPrefix = whitespace();
+        J.Binary.Type operator = mapBinaryOperator(binaryExpression.getOperationReference());
+        Expression right = (Expression) mapExpression(binaryExpression.getRight());
+        JavaType type = typeMapping.type(binaryExpression);
+        return new J.Binary(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                left,
+                padLeft(opPrefix, operator),
+                right,
+                type);
+    }
+
+    private J.Binary.Type mapBinaryOperator(KtOperationReferenceExpression operation) {
+        J.Binary.Type op;
+        switch (operation.getText()) {
+            case "==":
+                skip("==");
+                op = J.Binary.Type.Equal;
+                break;
+            case "*":
+                skip("*");
+                op = J.Binary.Type.Multiplication;
+                break;
+            default:
+                throw new IllegalArgumentException("Unexpected binary tag " + operation.getText());
+        }
+
+        return op;
+    }
+
+    private J mapExpression(KtExpression ktExpression) {
+        if (ktExpression instanceof KtNameReferenceExpression) {
+            return mapNameReferenceExpression((KtNameReferenceExpression) ktExpression);
+        } else if (ktExpression instanceof KtConstantExpression) {
+            return mapConstantExpression((KtConstantExpression) ktExpression);
+        }
+
+        throw new IllegalStateException("Implement me.");
+    }
+
+    private J mapConstantExpression(KtConstantExpression ktConstantExpression) {
+        String name = KtPsiUtil.getText(ktConstantExpression);
+        Space prefix = sourceBefore(name);
+        return new J.Identifier(randomId(), prefix, Markers.EMPTY, name, null, null); // TODO add types.
+    }
+    private J mapNameReferenceExpression(KtNameReferenceExpression nameReferenceExpression) {
+        Space prefix = sourceBefore(nameReferenceExpression.getReferencedName());
+        String name = nameReferenceExpression.getReferencedName();
+        return new J.Identifier(randomId(), prefix, Markers.EMPTY, name, null, null); // TODO add types.
     }
 
     private int positionOfNext(String untilDelim) {

@@ -31,10 +31,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     }
 
     public JavaType type(@Nullable Object type) {
-        if (type == null) {
+//        if (type == null) {
             return JavaType.Class.Unknown.getInstance();
-        }
+//        }
 
-        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+//        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 }

@@ -90,6 +90,28 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
+            beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
+            p.out.append('{');
+            visitMarkers(lambda.getParameters().getMarkers(), p);
+            visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+            if (!lambda.getParameters().getParameters().isEmpty()) {
+                visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
+                p.out.append("->");
+            }
+            if (lambda.getBody() instanceof J.Block) {
+                J.Block block = (J.Block) lambda.getBody();
+                visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+                visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            } else {
+                visit(lambda.getBody(), p);
+            }
+            p.out.append('}');
+            afterSyntax(lambda, p);
+            return lambda;
+        }
+
+        @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
             beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);

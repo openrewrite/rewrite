@@ -9,9 +9,9 @@ import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
 
 public class LambdaTest implements RewriteTest {
 
-    @Disabled("Requires function call and Convert PSI.")
+    @Disabled("Requires fix for whitespace at end of body.")
     @Test
-    void function() {
+    void binaryExpressionAsBody() {
         rewriteRun(
           kotlin("""
                 fun method() {
