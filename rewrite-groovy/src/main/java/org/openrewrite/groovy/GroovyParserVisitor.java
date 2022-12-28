@@ -202,6 +202,9 @@ public class GroovyParserVisitor {
             } else if (source.startsWith("@interface", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Annotation;
                 cursor += "@interface".length();
+            } else if(source.startsWith("enum", cursor)) {
+                kindType = J.ClassDeclaration.Kind.Type.Enum;
+                cursor += "enum".length();
             }
             assert kindType != null;
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);

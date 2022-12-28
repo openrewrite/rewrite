@@ -19,4 +19,5 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
     testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
+    testRuntimeOnly(project(":rewrite-java-17"))
 }
