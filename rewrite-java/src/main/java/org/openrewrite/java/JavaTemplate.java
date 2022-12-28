@@ -565,32 +565,31 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
-                if (StringUtils.isBlank(typeName)) {
-                    continue;
+                if (shouldAddImport(typeName)) {
+                    this.imports.add("import " + typeName + ";\n");
                 }
-                if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
-                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
-                } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
-                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
-                }
-                this.imports.add("import " + typeName + ";\n");
             }
             return this;
         }
 
         public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
-                if (StringUtils.isBlank(typeName)) {
-                    continue;
+                if (shouldAddImport(typeName)) {
+                    this.imports.add("import static " + typeName + ";\n");
                 }
-                if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
-                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
-                } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
-                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
-                }
-                this.imports.add("import static " + typeName + ";\n");
             }
             return this;
+        }
+
+        private boolean shouldAddImport(String typeName) {
+            if (StringUtils.isBlank(typeName)) {
+                return false;
+            } else if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
+                throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
+            } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
+                throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
+            }
+            return true;
         }
 
         public Builder javaParser(Supplier<JavaParser> javaParser) {

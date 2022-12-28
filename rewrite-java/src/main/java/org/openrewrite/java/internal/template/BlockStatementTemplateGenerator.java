@@ -361,11 +361,13 @@ public class BlockStatementTemplateGenerator {
                 } else {
                     after.append(">()");
                 }
-            }
-            else if (m.getSelect() == prior) {
+            } else if (m.getSelect() == prior) {
                 List<Comment> comments = new ArrayList<>(1);
                 comments.add(new TextComment(true, STOP_COMMENT, "", Markers.EMPTY));
                 after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor.getParentOrThrow()));
+                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                    after.append(";");
+                }
             }
         } else if(j instanceof J.Return) {
             before.insert(0, "return ");
