@@ -44,23 +44,23 @@ public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
     private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
     static final String EXPR_STATEMENT_PARAM = "" +
-            "class __P__ {" +
-            "  static native <T> T p();" +
-            "  static native <T> T[] arrp();" +
-            "  static native boolean booleanp();" +
-            "  static native byte bytep();" +
-            "  static native char charp();" +
-            "  static native double doublep();" +
-            "  static native int intp();" +
-            "  static native long longp();" +
-            "  static native short shortp();" +
-            "  static native float floatp();" +
-            "}";
+                                               "class __P__ {" +
+                                               "  static native <T> T p();" +
+                                               "  static native <T> T[] arrp();" +
+                                               "  static native boolean booleanp();" +
+                                               "  static native byte bytep();" +
+                                               "  static native char charp();" +
+                                               "  static native double doublep();" +
+                                               "  static native int intp();" +
+                                               "  static native long longp();" +
+                                               "  static native short shortp();" +
+                                               "  static native float floatp();" +
+                                               "}";
     private static final String METHOD_INVOCATION_STUBS = "" +
-            "class __M__ {" +
-            "  static native Object any(Object o);" +
-            "  static native <T> Object anyT();" +
-            "}";
+                                                          "class __M__ {" +
+                                                          "  static native Object any(Object o);" +
+                                                          "  static native <T> Object anyT();" +
+                                                          "}";
 
     private final Set<String> imports;
 
@@ -74,7 +74,7 @@ public class BlockStatementTemplateGenerator {
 
                     // for replaceBody()
                     if (cursor.getValue() instanceof J.MethodDeclaration &&
-                            location.equals(Space.Location.BLOCK_PREFIX)) {
+                        location.equals(Space.Location.BLOCK_PREFIX)) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
                         before.insert(0, m.printTrimmed(cursor.getParentOrThrow()).trim() + '{');
@@ -144,7 +144,7 @@ public class BlockStatementTemplateGenerator {
                     }
                 }
                 // Catch any trees having a STOP_COMMENT that are not an instance of `expected`
-                else if (tree != null && !js.isEmpty()){
+                else if (tree != null && !js.isEmpty()) {
                     //noinspection unchecked
                     J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree((J) tree);
                     if (trimmed != tree) {
@@ -182,7 +182,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Block) {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
-                J.ClassDeclaration c = (J.ClassDeclaration)parent;
+                J.ClassDeclaration c = (J.ClassDeclaration) parent;
                 if (c.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
                     enumClassDeclaration(prior, c, before, after, templated, cursor, false);
                 } else {
@@ -198,8 +198,8 @@ public class BlockStatementTemplateGenerator {
                         break;
                     } else if (statement instanceof J.VariableDeclarations) {
                         before.insert(0, "\n" +
-                                variable((J.VariableDeclarations) statement, true, cursor) +
-                                ";\n");
+                                         variable((J.VariableDeclarations) statement, true, cursor) +
+                                         ";\n");
                     }
                 }
 
@@ -212,9 +212,9 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 before.insert(0, m.withBody(null)
-                        .withLeadingAnnotations(emptyList())
-                        .withPrefix(Space.EMPTY)
-                        .printTrimmed(cursor).trim() + '{');
+                                         .withLeadingAnnotations(emptyList())
+                                         .withPrefix(Space.EMPTY)
+                                         .printTrimmed(cursor).trim() + '{');
             } else if (parent instanceof J.Block || parent instanceof J.Lambda) {
                 J.Block b = (J.Block) j;
 
@@ -224,8 +224,8 @@ public class BlockStatementTemplateGenerator {
                         break;
                     } else if (statement instanceof J.VariableDeclarations) {
                         before.insert(0, "\n" +
-                                variable((J.VariableDeclarations) statement, true, cursor) +
-                                ";\n");
+                                         variable((J.VariableDeclarations) statement, true, cursor) +
+                                         ";\n");
                     }
                 }
 
@@ -241,7 +241,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Assert) {
             before.insert(0, "assert ");
         } else if (j instanceof J.NewArray) {
-            J.NewArray n = (J.NewArray)j;
+            J.NewArray n = (J.NewArray) j;
             before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
             after.append("\n}");
         } else if (j instanceof J.NewClass) {
@@ -262,8 +262,8 @@ public class BlockStatementTemplateGenerator {
                 StringBuilder afterSegments = new StringBuilder();
                 beforeSegments.append(newClassString).append("(");
                 boolean priorFound = false;
-                for(Expression arg : n.getArguments()) {
-                    if(!priorFound) {
+                for (Expression arg : n.getArguments()) {
+                    if (!priorFound) {
                         if (referToSameElement(prior, arg)) {
                             priorFound = true;
                             continue;
@@ -282,7 +282,7 @@ public class BlockStatementTemplateGenerator {
                 }
                 before.insert(0, beforeSegments);
                 after.append(afterSegments);
-                if(next(cursor).getValue() instanceof J.Block) {
+                if (next(cursor).getValue() instanceof J.Block) {
                     after.append(";");
                 }
             } else {
@@ -294,19 +294,20 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.ForLoop) {
             J.ForLoop f = (J.ForLoop) j;
-            f = f.withBody(null).withPrefix(Space.EMPTY)
-                    .withControl(f.getControl().withCondition(null).withUpdate(emptyList()));
-            before.insert(0, f.printTrimmed(cursor).trim());
+            insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
+                    f.withBody(null).withPrefix(Space.EMPTY)
+                            .withControl(f.getControl().withCondition(null).withUpdate(emptyList()))
+                            .printTrimmed(cursor).trim()));
         } else if (j instanceof J.ForEachLoop.Control) {
-            J.ForEachLoop.Control c = (J.ForEachLoop.Control)j;
+            J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (c.getVariable() == prior) {
                 after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
             }
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;
             if (!referToSameElement(prior, f.getControl())) {
-                f = f.withBody(null).withPrefix(Space.EMPTY);
-                before.insert(0, f.printTrimmed(cursor).trim());
+                insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
+                        f.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()));
             }
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
@@ -320,21 +321,21 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Lambda) {
             J.Lambda l = (J.Lambda) j;
             if (l.getBody() instanceof Expression) {
-                before.insert(0,"return ");
+                before.insert(0, "return ");
                 after.append(";");
             }
             before.insert(0, l.withBody(null).withPrefix(Space.EMPTY).printTrimmed(cursor.getParentOrThrow()).trim() + "{ if(true) {");
 
             after.append("}\n");
             JavaType.Method mt = findSingleAbstractMethod(l.getType());
-            if(mt == null) {
+            if (mt == null) {
                 // Missing type information, but usually the Java compiler can soldier on anyway
                 after.append("return null;\n");
-            } else if(mt.getReturnType() != JavaType.Primitive.Void) {
+            } else if (mt.getReturnType() != JavaType.Primitive.Void) {
                 after.append("return ").append(valueOfType(mt.getReturnType())).append(";\n");
             }
             after.append("}");
-            if(next(cursor).getValue() instanceof J.Block) {
+            if (next(cursor).getValue() instanceof J.Block) {
                 after.append(";");
             }
         } else if (j instanceof J.VariableDeclarations) {
@@ -342,21 +343,21 @@ public class BlockStatementTemplateGenerator {
             // Skip appending ";" as variable declarations can appear in contexts such as try-with-resources,
             // where a semicolon is not always required.
             // When templating a declaration on its own, the semicolon should be included in the template string
-        } else if(j instanceof J.MethodInvocation) {
+        } else if (j instanceof J.MethodInvocation) {
             // If prior is an argument, wrap in __M__.any(prior)
             // If prior is a type parameter, wrap in __M__.anyT<prior>()
             // For anything else, ignore the invocation
             J.MethodInvocation m = (J.MethodInvocation) j;
-            if(m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+            if (m.getArguments().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
                 before.insert(0, "__M__.any(");
-                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(");");
                 } else {
                     after.append(")");
                 }
-            } else if(m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
+            } else if (m.getTypeParameters() != null && m.getTypeParameters().stream().anyMatch(tp -> referToSameElement(prior, tp))) {
                 before.insert(0, "__M__.anyT<");
-                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(">();");
                 } else {
                     after.append(">()");
@@ -365,39 +366,52 @@ public class BlockStatementTemplateGenerator {
                 List<Comment> comments = new ArrayList<>(1);
                 comments.add(new TextComment(true, STOP_COMMENT, "", Markers.EMPTY));
                 after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor.getParentOrThrow()));
-                if(cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
+                if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(";");
                 }
             }
-        } else if(j instanceof J.Return) {
+        } else if (j instanceof J.Return) {
             before.insert(0, "return ");
             after.append(";");
-        } else if(j instanceof J.If) {
-            J.If iff = (J.If)j;
-            if(referToSameElement(prior, iff.getIfCondition())) {
-                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
-                after.append(";");
+        } else if (j instanceof J.If) {
+            J.If iff = (J.If) j;
+            if (referToSameElement(prior, iff.getIfCondition())) {
+                insertControlWithBlock(iff.getThenPart(), before, after, () -> {
+                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                    after.append(";");
+                });
             }
         } else if (j instanceof J.WhileLoop) {
-            J.WhileLoop wl = (J.WhileLoop)j;
-            if(referToSameElement(prior, wl.getCondition())) {
-                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
-                after.append(";");
+            J.WhileLoop wl = (J.WhileLoop) j;
+            if (referToSameElement(prior, wl.getCondition())) {
+                insertControlWithBlock(wl.getBody(), before, after, () -> {
+                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                    after.append(";");
+                });
             }
-        } else if(j instanceof J.Assignment) {
-            J.Assignment as = (J.Assignment)j;
-            if(referToSameElement(prior, as.getAssignment())) {
+        } else if (j instanceof J.Assignment) {
+            J.Assignment as = (J.Assignment) j;
+            if (referToSameElement(prior, as.getAssignment())) {
                 before.insert(0, as.getVariable() + " = ");
                 after.append(";");
             }
-        }
-        else if (j instanceof J.EnumValue) {
-            J.EnumValue ev = (J.EnumValue)j;
+        } else if (j instanceof J.EnumValue) {
+            J.EnumValue ev = (J.EnumValue) j;
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
         }
         template(next(cursor), j, before, after, templated);
+    }
+
+    private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {
+        if (!(body instanceof J.Block)) {
+            before.insert(0, "{");
+        }
+        insertion.run();
+        if (!(body instanceof J.Block)) {
+            after.append("}");
+        }
     }
 
     // Enum class declarations are unique in that their EnumValue set must be the first statement
@@ -436,7 +450,7 @@ public class BlockStatementTemplateGenerator {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
                 // if the class is an enum then it's a nested enum and must be printed as a class.
-                J.ClassDeclaration cd = (J.ClassDeclaration)statement;
+                J.ClassDeclaration cd = (J.ClassDeclaration) statement;
                 boolean isNestedEnum = cd.getKind() != J.ClassDeclaration.Kind.Type.Enum && !isNestedClass;
                 classDeclaration(null, before, after, (J.ClassDeclaration) statement, templated, cursor, isNestedEnum);
             }
@@ -479,7 +493,7 @@ public class BlockStatementTemplateGenerator {
                 } else {
                     before.insert(0, '}');
                 }
-                J.ClassDeclaration cd = (J.ClassDeclaration)statement;
+                J.ClassDeclaration cd = (J.ClassDeclaration) statement;
                 if (cd.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
                     enumClassDeclaration(prior, cd, before, after, templated, cursor, true);
                 } else {
@@ -544,7 +558,7 @@ public class BlockStatementTemplateGenerator {
                 }
                 if (nv.getType() instanceof JavaType.Array) {
                     if (nv.getInitializer() instanceof J.NewArray && !((J.NewArray) nv.getInitializer()).getDimensions().isEmpty()) {
-                        J.NewArray na = (J.NewArray)nv.getInitializer();
+                        J.NewArray na = (J.NewArray) nv.getInitializer();
                         na.getDimensions().forEach(d -> varBuilder.append("[]"));
                     } else {
                         varBuilder.append("[]");
@@ -609,11 +623,11 @@ public class BlockStatementTemplateGenerator {
      */
     @Nullable
     private static JavaType.Method findSingleAbstractMethod(@Nullable JavaType javaType) {
-        if(javaType == null) {
+        if (javaType == null) {
             return null;
         }
         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(javaType);
-        if(fq == null) {
+        if (fq == null) {
             return null;
         }
         return fq.getMethods().stream().filter(method -> method.hasFlags(Flag.Abstract)).findAny().orElse(null);
@@ -664,7 +678,7 @@ public class BlockStatementTemplateGenerator {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                J.MethodInvocation mi = (J.MethodInvocation)super.visitMethodInvocation(method, integer);
+                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, integer);
                 if (stopCommentExists(mi.getName())) {
                     //noinspection ConstantConditions
                     return mi.getSelect();
