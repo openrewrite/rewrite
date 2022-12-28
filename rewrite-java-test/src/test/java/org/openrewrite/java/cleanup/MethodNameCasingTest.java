@@ -93,6 +93,50 @@ class MethodNameCasingTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2557")
+    @Test
+    void doNotRenameExplicitPublicInterfaceMethods() {
+        rewriteRun(
+          java(
+            """
+                  public interface Test {
+                      public void getFoo_bar(){}
+                  }
+              """
+          )
+        );
+    }
+
+
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2557")
+    @Test
+    void doNotRenameImplicitPublicInterfaceMethods() {
+        rewriteRun(
+          java(
+            """
+                  public interface Test {
+                      void getFoo_bar(){}
+                  }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2557")
+    @Test
+    void doNotRenameImplicitPublicInterfaceMethodsOnPackagePrivateInterface() {
+        rewriteRun(
+          java(
+            """
+                  interface Test {
+                      void getFoo_bar(){}
+                  }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1741")
     @Test
     void doNotApplyToTest() {

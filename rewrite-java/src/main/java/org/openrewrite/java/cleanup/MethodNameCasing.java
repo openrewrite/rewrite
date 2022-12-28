@@ -30,6 +30,7 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.VariableNameUtils;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.J.ClassDeclaration.Kind.Type;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -99,7 +100,7 @@ public class MethodNameCasing extends Recipe {
                 if(enclosingClass == null) {
                     return method;
                 }
-                if (containsValidModifiers(method) &&
+                if (containsValidModifiers(enclosingClass, method) &&
                         method.getMethodType() != null &&
                         enclosingClass.getType() != null &&
                         !method.isConstructor() &&
@@ -143,8 +144,10 @@ public class MethodNameCasing extends Recipe {
                 return super.visitMethodDeclaration(method, executionContext);
             }
 
-            private boolean containsValidModifiers(J.MethodDeclaration method) {
-                return !method.hasModifier(J.Modifier.Type.Public) || !Boolean.FALSE.equals(renamePublicMethods);
+            private boolean containsValidModifiers(J.ClassDeclaration enclosingClass, J.MethodDeclaration method) {
+                return !Boolean.FALSE.equals(renamePublicMethods)
+                    || (!enclosingClass.getKind().equals(Type.Interface)
+                    && !method.hasModifier(J.Modifier.Type.Public));
             }
 
             private boolean methodExists(JavaType.Method method, String newName) {
