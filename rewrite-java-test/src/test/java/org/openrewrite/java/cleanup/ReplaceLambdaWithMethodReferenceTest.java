@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -33,6 +34,22 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ReplaceLambdaWithMethodReference());
+    }
+
+    @Test
+    void dontSelectCastFromTypeVariable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Supplier;
+              class Test<T> {
+                  Supplier<T> test() {
+                        return () -> (T) this;
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1926")

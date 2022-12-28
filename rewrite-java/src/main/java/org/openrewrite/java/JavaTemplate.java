@@ -565,6 +565,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
+                if (StringUtils.isBlank(typeName)) {
+                    continue;
+                }
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
                 } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
@@ -577,6 +580,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
+                if (StringUtils.isBlank(typeName)) {
+                    continue;
+                }
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
                 } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {

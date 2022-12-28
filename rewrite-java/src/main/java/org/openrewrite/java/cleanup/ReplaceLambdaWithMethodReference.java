@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.*;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
 public class ReplaceLambdaWithMethodReference extends Recipe {
@@ -75,11 +74,11 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     }
                 } else if (body instanceof J.TypeCast) {
                     if (!(((J.TypeCast) body).getExpression() instanceof J.MethodInvocation)) {
-                        J j = ((J.TypeCast) body).getClazz();
+                        J.ControlParentheses<TypeTree> j = ((J.TypeCast) body).getClazz();
                         if (j != null) {
                             @SuppressWarnings("rawtypes")
                             J tree = ((J.ControlParentheses) j).getTree();
-                            if (tree instanceof J.Identifier) {
+                            if (tree instanceof J.Identifier && !(j.getType() instanceof JavaType.GenericTypeVariable)) {
                                 body = tree;
                                 code = "#{}.class::cast";
                             }
@@ -97,6 +96,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                             .javaParser(() -> JavaParser.fromJavaVersion()
                                     .dependsOn(stub)
                                     .build())
+                            .doBeforeParseTemplate(System.out::println)
                             .imports(fullyQualified == null ? "" : fullyQualified.getFullyQualifiedName())
                             .build();
                     return l.withTemplate(template, l.getCoordinates().replace(), identifier.getSimpleName());
