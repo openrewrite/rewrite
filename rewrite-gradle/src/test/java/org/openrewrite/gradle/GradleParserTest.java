@@ -27,6 +27,8 @@ public class GradleParserTest implements RewriteTest {
         rewriteRun(
           settingsGradle(
             """
+              import java.nio.file.Files
+
               plugins {
                   id 'com.gradle.enterprise' version '3.11.3'
               }
