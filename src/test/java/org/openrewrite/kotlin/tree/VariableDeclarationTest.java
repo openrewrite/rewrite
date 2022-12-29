@@ -50,4 +50,18 @@ public class VariableDeclarationTest implements RewriteTest {
             isFullyParsed())
         );
     }
+
+    @Test
+    void conditionalAssignment() {
+        rewriteRun(
+          kotlin("""
+            val latest = if (true) {
+                "latest.release"
+            } else {
+                "latest.integration"
+            }
+          """,
+            isFullyParsed())
+        );
+    }
 }

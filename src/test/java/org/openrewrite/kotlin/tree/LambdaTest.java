@@ -9,13 +9,26 @@ import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
 
 public class LambdaTest implements RewriteTest {
 
-    @Disabled("Requires fix for whitespace at end of body.")
     @Test
     void binaryExpressionAsBody() {
         rewriteRun(
           kotlin("""
                 fun method() {
                     val square = { number: Int -> number * number }
+                }
+              """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Disabled("Implement lambda type references.")
+    @Test
+    void invokedLambda() {
+        rewriteRun(
+          kotlin("""
+                fun invokeLambda(lambda: (Double) -> Boolean): Boolean {
+                    return lambda(1.0)
                 }
               """,
             isFullyParsed()

@@ -50,6 +50,7 @@ import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinTypeMapping;
 import org.openrewrite.kotlin.marker.EmptyBody;
@@ -187,18 +188,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             cursor = saveCursor;
         }
 
-        saveCursor = cursor;
-        Space bodyPrefix = whitespace();
-        J body = null;
-        if (source.startsWith("{", cursor)) {
-            body = visitElement(anonymousFunction.getBody(), ctx);
-        } else if (anonymousFunction.getBody().getStatements().size() == 1) {
-            body = visitElement(anonymousFunction.getBody().getStatements().get(0), ctx);
-            // TODO: fix me. A J.Binary doesn't contain a postfix space and is not considered a Statement, which cannot be added to a J.Block.
-            sourceBefore("}");
-        } else {
-            throw new IllegalStateException("Implement me.");
-        }
+        J body = visitElement(anonymousFunction.getBody(), ctx);
+
         return new J.Lambda(
                 randomId(),
                 prefix,
@@ -211,9 +202,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitBlock(FirBlock block, ExecutionContext ctx) {
+        int saveCursor = cursor;
         Space prefix = whitespace();
+        EmptyBody emptyBody = null;
+        if (source.startsWith("{", cursor)) {
+            skip("{");
+        } else {
+            cursor = saveCursor;
+            emptyBody = new EmptyBody(randomId());
+        }
 
-        skip("{");
         JRightPadded<Boolean> stat = new JRightPadded<>(false, EMPTY, Markers.EMPTY);
 
         List<FirStatement> firStatements = new ArrayList<>(block.getStatements().size());
@@ -223,16 +221,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
-        for (FirElement firElement : firStatements) {
-            statements.add(JRightPadded.build((Statement) visitElement(firElement, ctx)));
+        for (int i = 0; i < firStatements.size(); i++) {
+            FirElement firElement = firStatements.get(i);
+            J expr = visitElement(firElement, ctx);
+            if (i == firStatements.size() - 1 && (expr instanceof Expression)) {
+                expr = new J.Return(randomId(), expr.getPrefix(), Markers.EMPTY, expr.withPrefix(EMPTY));
+                expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+            }
+            statements.add(JRightPadded.build((Statement) expr));
         }
 
         return new J.Block(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                emptyBody == null ? Markers.EMPTY : Markers.EMPTY.addIfAbsent(emptyBody),
                 stat,
-                statements, // TODO
+                statements,
                 sourceBefore("}"));
     }
 
@@ -366,12 +370,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionCall(FirFunctionCall functionCall, ExecutionContext ctx) {
-        KtSourceElement sourceElement = functionCall.getSource();
-        if (sourceElement == null) {
-            throw new IllegalStateException("Implement me.");
-        }
+        J j = mapSourceElement(functionCall.getSource());
+        // TODO: add type mapping..
+        return j;
+    }
 
-        J j = mapSourceElement(sourceElement);
+    @Override
+    public J visitFunctionTypeRef(FirFunctionTypeRef functionTypeRef, ExecutionContext ctx) {
+        J j = mapSourceElement(functionTypeRef.getSource());
         // TODO: add type mapping..
         return j;
     }
@@ -807,6 +813,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitEnumEntry((FirEnumEntry) firElement, ctx);
         } else if (firElement instanceof FirFunctionCall) {
             return visitFunctionCall((FirFunctionCall) firElement, ctx);
+        } else if (firElement instanceof FirFunctionTypeRef) {
+            return visitFunctionTypeRef((FirFunctionTypeRef) firElement, ctx);
         } else if (firElement instanceof FirImplicitNullableAnyTypeRef) {
             return visitResolvedTypeRef((FirResolvedTypeRef) firElement, ctx);
         } else if (firElement instanceof FirEqualityOperatorCall) {
@@ -1111,12 +1119,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             PsiElement psiElement = ((KtRealPsiSourceElement) sourceElement).getPsi();
             if (psiElement instanceof KtBinaryExpression) {
                 return mapBinaryExpression((KtBinaryExpression) psiElement);
-            } else {
-                throw new IllegalStateException("Implement me.");
+            } else if (psiElement instanceof KtTypeReference) {
+                return mapTypeReference((KtTypeReference) psiElement);
             }
-        } else {
-            throw new IllegalStateException("Implement me.");
         }
+        throw new IllegalStateException("Implement me.");
     }
 
     private J mapBinaryExpression(KtBinaryExpression binaryExpression) {
@@ -1173,6 +1180,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = sourceBefore(nameReferenceExpression.getReferencedName());
         String name = nameReferenceExpression.getReferencedName();
         return new J.Identifier(randomId(), prefix, Markers.EMPTY, name, null, null); // TODO add types.
+    }
+
+    private J mapTypeReference(KtTypeReference typeReference) {
+        PsiChildRange childRange = PsiUtilsKt.getAllChildren(typeReference);
+        PsiElement firstChild = childRange.getFirst();
+        if (firstChild instanceof KtFunctionType) {
+            return mapFunctionType((KtFunctionType) firstChild);
+        }
+        throw new IllegalStateException("Implement me.");
+    }
+
+    private J mapFunctionType(KtFunctionType functionType) {
+        throw new IllegalStateException("Implement me.");
     }
 
     private int positionOfNext(String untilDelim) {

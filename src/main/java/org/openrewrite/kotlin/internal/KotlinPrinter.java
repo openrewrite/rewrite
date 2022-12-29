@@ -20,6 +20,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.EmptyBody;
@@ -131,6 +132,19 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(method.getBody(), p);
             afterSyntax(method, p);
             return method;
+        }
+
+        @Override
+        public J visitReturn(J.Return retrn, PrintOutputCapture<P> p) {
+            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
+                    retrn.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
+                visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
+                visitMarkers(retrn.getMarkers(), p);
+                visit(retrn.getExpression(), p);
+                afterSyntax(retrn, p);
+                return retrn;
+            }
+            return super.visitReturn(retrn, p);
         }
 
         @Override
