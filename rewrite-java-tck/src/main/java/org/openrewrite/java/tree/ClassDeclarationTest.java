@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +29,7 @@ class ClassDeclarationTest implements RewriteTest {
     /**
      * @see <a href="https://docs.oracle.com/en/java/javase/17/language/sealed-classes-and-interfaces.html>Sealed classes</a> documentation.
      */
+    @MinimumJava17
     @Issue("https://github.com/openrewrite/rewrite/pull/2569")
     @Test
     void sealedClasses() {

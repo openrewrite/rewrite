@@ -73,6 +73,7 @@ class MavenPomDownloaderTest {
         }
     }
 
+    @Disabled("Flaky on CI")
     @Test
     void normalizeOssSnapshots() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
