@@ -38,12 +38,13 @@ class MethodNameCasingTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2571")
     @Test
-    void noNumericOnlyRenames() {
+    void noChangesOnMethodsBeginningWithUnderscore() {
         rewriteRun(
           java(
             """
               class Test {
                   void _1() {}
+                  void _finally() {}
               }
               """
           )
