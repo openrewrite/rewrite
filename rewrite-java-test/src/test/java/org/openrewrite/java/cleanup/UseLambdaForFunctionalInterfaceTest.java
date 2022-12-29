@@ -31,6 +31,27 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         spec.recipe(new UseLambdaForFunctionalInterface());
     }
 
+    @SuppressWarnings({"Convert2Lambda", "TrivialFunctionalExpressionUsage"})
+    @Test
+    void usedAsStatementWithNonInferenceableType() {
+        rewriteRun(
+          spec -> spec.recipe(new UseLambdaForFunctionalInterface()),
+          java(
+            """
+              import java.util.function.Consumer;
+              class Test {
+                  public void test(int n) {
+                      new Consumer<Integer>() {
+                          public void accept(Integer n2) {
+                          }
+                      }.accept(n);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled("The recipe currently avoids simplifying anonymous classes that use the this keyword.")
     @Test
     void useLambdaThenSimplifyFurther() {

@@ -18,13 +18,14 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.cleanup.UseLambdaForFunctionalInterface;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings("UnnecessaryBoxing")
+@SuppressWarnings({"UnnecessaryBoxing", "PatternVariableCanBeUsed"})
 public class JavaTemplateTest7Test implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
@@ -147,6 +148,44 @@ public class JavaTemplateTest7Test implements RewriteTest {
                   void foo() {
                       int i;
                       i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"Convert2Lambda", "TrivialFunctionalExpressionUsage", "CodeBlock2Expr"})
+    @Test
+    void nestedAnonymousRunnables() {
+        rewriteRun(
+          spec -> spec.recipe(new UseLambdaForFunctionalInterface()),
+          java(
+            """
+              class Test {
+                  public void test(int n) {
+                      new Runnable() {
+                          public void run() {
+                              Runnable r = new Runnable() {
+                                  public void run() {
+                                      System.out.println("Hello world!");
+                                  }
+                              };
+                          }
+                      }.run();
+                  }
+              }
+              """,
+            """
+              class Test {
+                  public void test(int n) {
+                      new Runnable() {
+                          public void run() {
+                              Runnable r = () -> {
+                                  System.out.println("Hello world!");
+                              };
+                          }
+                      }.run();
                   }
               }
               """
