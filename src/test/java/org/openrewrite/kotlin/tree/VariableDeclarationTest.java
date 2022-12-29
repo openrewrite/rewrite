@@ -51,6 +51,7 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Disabled("Requires support for implicit return from if expression")
     @Test
     void conditionalAssignment() {
         rewriteRun(
