@@ -33,6 +33,7 @@ import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.List;
 import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
@@ -46,27 +47,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         } else {
             return super.visit(tree, p);
         }
-    }
-
-    @Override
-    public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
-        K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
-
-        beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
-
-        JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
-        if (pkg != null) {
-            visit(pkg.getElement(), p);
-            visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
-        }
-
-        for (JRightPadded<Statement> statement : cu.getPadding().getStatements()) {
-            visitRightPadded(statement, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
-        }
-
-        visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
-        afterSyntax(cu, p);
-        return cu;
     }
 
     private class KotlinJavaPrinter extends JavaPrinter<P> {

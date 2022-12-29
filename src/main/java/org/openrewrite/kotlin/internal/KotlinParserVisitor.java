@@ -358,9 +358,30 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             throw new IllegalStateException("Implement me.");
         }
 
-        J j = mapSourceElement(equalityOperatorCall.getSource());
-        // TODO: add type mapping..
-        return j;
+        FirElement left = equalityOperatorCall.getArgumentList().getArguments().get(0);
+        FirOperation op = equalityOperatorCall.getOperation();
+        FirElement right = equalityOperatorCall.getArgumentList().getArguments().get(1);
+
+        J.Binary binary = new J.Binary(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                (Expression) visitElement(left, ctx),
+                padLeft(sourceBefore(op.getOperator()), mapOperation(op)),
+                (Expression) visitElement(right, ctx),
+                null); // TODO
+        return binary;
+    }
+
+    private J.Binary.Type mapOperation(FirOperation op) {
+        switch (op) {
+            case EQ:
+                return J.Binary.Type.Equal;
+            case NOT_EQ:
+                return J.Binary.Type.NotEqual;
+            default:
+                throw new IllegalStateException("Implement me.");
+        }
     }
 
     @Override
@@ -370,16 +391,45 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionCall(FirFunctionCall functionCall, ExecutionContext ctx) {
-        J j = mapSourceElement(functionCall.getSource());
-        // TODO: add type mapping..
-        return j;
+        Space prefix = whitespace();
+        FirFunctionCallOrigin origin = functionCall.getOrigin();
+        if (origin == FirFunctionCallOrigin.Regular) {
+            throw new IllegalStateException("Implement me.");
+        } else if (origin == FirFunctionCallOrigin.Infix) {
+            throw new IllegalStateException("Implement me.");
+        } else if (origin == FirFunctionCallOrigin.Operator) {
+            return mapFunctionCallOperator(functionCall);
+        }
+
+        throw new IllegalStateException("Implement me.");
+    }
+
+    private J mapFunctionCallOperator(FirFunctionCall functionCall) {
+        String resolvedName = functionCall.getCalleeReference().getName().asString();
+        if ("times".equals(resolvedName)) {
+            J left = visitElement(functionCall.getDispatchReceiver(), ctx);
+            if (functionCall.getArgumentList().getArguments().size() != 1) {
+                throw new IllegalStateException("Implement me.");
+            }
+            Space opPrefix = sourceBefore("*");
+            J.Binary.Type op = J.Binary.Type.Multiplication;
+            J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+            return new J.Binary(
+                    randomId(),
+                    opPrefix,
+                    Markers.EMPTY,
+                    (Expression) left,
+                    padLeft(opPrefix, op),
+                    (Expression) right,
+                    null);
+        }
+
+        throw new IllegalStateException("Implement me.");
     }
 
     @Override
     public J visitFunctionTypeRef(FirFunctionTypeRef functionTypeRef, ExecutionContext ctx) {
-        J j = mapSourceElement(functionTypeRef.getSource());
-        // TODO: add type mapping..
-        return j;
+        throw new IllegalStateException("Implement me.");
     }
 
     @Override
@@ -861,15 +911,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final Function<FirElement, Space> commaDelim = ignored -> sourceBefore(",");
     private final Function<FirElement, Space> noDelim = ignored -> EMPTY;
 
-    private String skip(@Nullable String token) {
-        if (token == null) {
-            //noinspection ConstantConditions
-            return null;
-        }
+    private void skip(@Nullable String token) {
         if (source.startsWith(token, cursor)) {
             cursor += token.length();
         }
-        return token;
     }
 
     private void cursor(int n) {
@@ -921,10 +966,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return (T) expr;
     }
 
+    @SuppressWarnings("unchecked")
     private <J2 extends J> J2 convert(FirElement t, ExecutionContext ctx) {
         return (J2) visitElement(t, ctx);
     }
 
+    @SuppressWarnings("unchecked")
     private <J2 extends J> JRightPadded<J2> convert(FirElement t, Function<FirElement, Space> suffix, ExecutionContext ctx) {
         J2 j = (J2) visitElement(t, ctx);
         @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
@@ -1127,65 +1174,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private J mapSourceElement(KtSourceElement sourceElement) {
         if (sourceElement instanceof KtRealPsiSourceElement) {
             PsiElement psiElement = ((KtRealPsiSourceElement) sourceElement).getPsi();
-            if (psiElement instanceof KtBinaryExpression) {
-                return mapBinaryExpression((KtBinaryExpression) psiElement);
-            } else if (psiElement instanceof KtTypeReference) {
+            if (psiElement instanceof KtTypeReference) {
                 return mapTypeReference((KtTypeReference) psiElement);
             }
         }
         throw new IllegalStateException("Implement me.");
     }
 
-    private J mapBinaryExpression(KtBinaryExpression binaryExpression) {
-        Space prefix = whitespace();
-        Expression left = (Expression) mapExpression(binaryExpression.getLeft());
-        Space opPrefix = whitespace();
-        J.Binary.Type operator = mapBinaryOperator(binaryExpression.getOperationReference());
-        Expression right = (Expression) mapExpression(binaryExpression.getRight());
-        JavaType type = typeMapping.type(binaryExpression);
-        return new J.Binary(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                left,
-                padLeft(opPrefix, operator),
-                right,
-                type);
-    }
-
-    private J.Binary.Type mapBinaryOperator(KtOperationReferenceExpression operation) {
-        J.Binary.Type op;
-        switch (operation.getText()) {
-            case "==":
-                skip("==");
-                op = J.Binary.Type.Equal;
-                break;
-            case "*":
-                skip("*");
-                op = J.Binary.Type.Multiplication;
-                break;
-            default:
-                throw new IllegalArgumentException("Unexpected binary tag " + operation.getText());
-        }
-
-        return op;
-    }
-
-    private J mapExpression(KtExpression ktExpression) {
-        if (ktExpression instanceof KtNameReferenceExpression) {
-            return mapNameReferenceExpression((KtNameReferenceExpression) ktExpression);
-        } else if (ktExpression instanceof KtConstantExpression) {
-            return mapConstantExpression((KtConstantExpression) ktExpression);
-        }
-
-        throw new IllegalStateException("Implement me.");
-    }
-
-    private J mapConstantExpression(KtConstantExpression ktConstantExpression) {
-        String name = KtPsiUtil.getText(ktConstantExpression);
-        Space prefix = sourceBefore(name);
-        return new J.Identifier(randomId(), prefix, Markers.EMPTY, name, null, null); // TODO add types.
-    }
     private J mapNameReferenceExpression(KtNameReferenceExpression nameReferenceExpression) {
         Space prefix = sourceBefore(nameReferenceExpression.getReferencedName());
         String name = nameReferenceExpression.getReferencedName();
