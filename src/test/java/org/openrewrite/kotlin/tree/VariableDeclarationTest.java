@@ -40,9 +40,9 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires support for type parameters and method invociations")
+    @Disabled("Requires size and init to be parsed.")
     @Test
-    void parameterizedType() {
+    void diamondOperator() {
         rewriteRun(
           kotlin(
             """

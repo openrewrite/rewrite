@@ -15,12 +15,10 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
-import org.jetbrains.kotlin.com.intellij.psi.PsiRecursiveElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.*;
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.descriptors.ClassKind;
@@ -39,11 +37,9 @@ import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.*;
-import org.jetbrains.kotlin.psi.psiUtil.KtPsiUtilKt;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jetbrains.kotlin.psi.stubs.elements.KtAnnotationEntryElementType;
-import org.jetbrains.kotlin.psi.stubs.elements.KtNameReferenceExpressionElementType;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -391,20 +387,63 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionCall(FirFunctionCall functionCall, ExecutionContext ctx) {
-        Space prefix = whitespace();
         FirFunctionCallOrigin origin = functionCall.getOrigin();
         if (origin == FirFunctionCallOrigin.Regular) {
-            throw new IllegalStateException("Implement me.");
+            return mapRegularFunctionCall(functionCall);
         } else if (origin == FirFunctionCallOrigin.Infix) {
             throw new IllegalStateException("Implement me.");
         } else if (origin == FirFunctionCallOrigin.Operator) {
-            return mapFunctionCallOperator(functionCall);
+            return mapOperatorFunctionCall(functionCall);
         }
 
         throw new IllegalStateException("Implement me.");
     }
 
-    private J mapFunctionCallOperator(FirFunctionCall functionCall) {
+    private J mapRegularFunctionCall(FirFunctionCall functionCall) {
+        Space prefix = whitespace();
+        TypeTree className = (J.Identifier) visitElement(functionCall.getCalleeReference(), null);
+        if (!functionCall.getTypeArguments().isEmpty()) {
+            className = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (J.Identifier) className, mapTypeArguments(functionCall.getTypeArguments()));
+        }
+        JContainer<Expression> args = JContainer.empty();
+        J.Block body = null; // TODO
+        return new J.NewClass(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                null,
+                EMPTY,
+                className,
+                args,
+                body,
+                null);
+    }
+
+    private JContainer<Expression> mapTypeArguments(List<FirTypeProjection> types) {
+        Space prefix = whitespace();
+        if (source.startsWith("<", cursor)) {
+            skip("<");
+        }
+        List<JRightPadded<Expression>> parameters = new ArrayList<>(types.size());;
+
+        Space paramPrefix = whitespace();
+        for (int i = 0; i < types.size(); i++) {
+            FirTypeProjection type = types.get(i);
+            JRightPadded<Expression> padded = JRightPadded.build((Expression) visitElement(type, null)).withAfter(
+                    i < types.size() - 1 ?
+                            sourceBefore(",") :
+                            whitespace()
+            );
+            parameters.add(padded);
+        }
+
+        if (source.startsWith(">", cursor)) {
+            skip(">");
+        }
+        return JContainer.build(prefix, parameters, Markers.EMPTY);
+    }
+
+    private J mapOperatorFunctionCall(FirFunctionCall functionCall) {
         String resolvedName = functionCall.getCalleeReference().getName().asString();
         if ("times".equals(resolvedName)) {
             J left = visitElement(functionCall.getDispatchReceiver(), ctx);
@@ -670,9 +709,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     type,
                     null);
             if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
+                Space typeArgPrefix = sourceBefore("<");
                 List<JRightPadded<Expression>> parameters = new ArrayList<>(part.getTypeArgumentList().getTypeArguments().size());
-                for (FirTypeProjection typeArgument : part.getTypeArgumentList().getTypeArguments()) {
-                    parameters.add(JRightPadded.build((Expression) visitElement(typeArgument, ctx)));
+                List<FirTypeProjection> typeArguments = part.getTypeArgumentList().getTypeArguments();
+                for (int i = 0; i < typeArguments.size(); i++) {
+                    FirTypeProjection typeArgument = typeArguments.get(i);
+                    parameters.add(JRightPadded.build((Expression) visitElement(typeArgument, ctx))
+                            .withAfter(
+                            i < typeArguments.size() - 1 ?
+                                    sourceBefore(",") :
+                                    sourceBefore(">")
+                    ));
                 }
 
                 return new J.ParameterizedType(
@@ -680,7 +727,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         prefix,
                         Markers.EMPTY,
                         ident,
-                        JContainer.build(parameters)
+                        JContainer.build(typeArgPrefix, parameters, Markers.EMPTY)
                 );
             } else {
                 return ident.withPrefix(prefix);

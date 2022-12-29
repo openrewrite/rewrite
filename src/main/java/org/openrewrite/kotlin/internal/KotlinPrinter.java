@@ -21,6 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.EmptyBody;
@@ -28,12 +29,10 @@ import org.openrewrite.kotlin.marker.MethodClassifier;
 import org.openrewrite.kotlin.marker.PropertyClassifier;
 import org.openrewrite.kotlin.marker.Semicolon;
 import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.kotlin.tree.KRightPadded;
 import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.util.List;
 import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
@@ -134,6 +133,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(method.getBody(), p);
             afterSyntax(method, p);
             return method;
+        }
+
+        @Override
+        public J visitNewClass(J.NewClass newClass, PrintOutputCapture<P> p) {
+            beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
+            visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
+            visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
+            visit(newClass.getClazz(), p);
+            if (!newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            }
+            visit(newClass.getBody(), p);
+            afterSyntax(newClass, p);
+            return newClass;
         }
 
         @Override
