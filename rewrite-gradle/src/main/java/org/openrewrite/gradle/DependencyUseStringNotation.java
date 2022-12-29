@@ -94,7 +94,7 @@ public class DependencyUseStringNotation extends Recipe {
                     }
                 } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                     G.MapEntry firstEntry = (G.MapEntry) m.getArguments().get(0);
-                    Space prefix = firstEntry.getKey().getPrefix();
+                    Space prefix = firstEntry.getPrefix();
                     Markers markers = firstEntry.getMarkers();
 
                     for (Expression e : m.getArguments()) {

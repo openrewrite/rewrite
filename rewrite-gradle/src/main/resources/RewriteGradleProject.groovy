@@ -170,6 +170,10 @@ interface Plugin {
 }
 
 interface DependencyHandlerSpec extends DependencyHandler {
+    Dependency annotationProcessor(String dependencyNotation)
+    Dependency annotationProcessor(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
+    Dependency annotationProcessor(Map<String, String> dependencyNotation)
+    Dependency annotationProcessor(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
     Dependency api(String dependencyNotation)
     Dependency api(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
     Dependency api(Map<String, String> dependencyNotation)
