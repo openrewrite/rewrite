@@ -61,7 +61,7 @@ public class ReplaceConstant extends Recipe {
 
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
-                if (isConstant(fieldAccess.getName().getFieldType())) {
+                if (isConstantReference(fieldAccess.getName())) {
                     maybeRemoveImport(owningType);
                     return buildLiteral().withPrefix(fieldAccess.getPrefix());
                 }
@@ -70,33 +70,24 @@ public class ReplaceConstant extends Recipe {
 
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
-                if (isConstant(ident.getFieldType()) && !isVariableDeclaration()) {
+                if (isConstantReference(ident)) {
                     maybeRemoveImport(owningType);
                     return buildLiteral().withPrefix(ident.getPrefix());
                 }
                 return super.visitIdentifier(ident, executionContext);
             }
 
-            private boolean isConstant(@Nullable JavaType.Variable varType) {
-                return varType != null && TypeUtils.isOfClassType(varType.getOwner(), owningType) &&
-                        varType.getName().equals(constantName);
-            }
-
-            private boolean isVariableDeclaration() {
-                Cursor maybeVariable = getCursor().dropParentUntil(is -> is instanceof J.VariableDeclarations || is instanceof J.CompilationUnit);
-                JavaType.Variable variableType = ((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getVariableType();
-                if (variableType == null) {
-                    return true;
+            private boolean isConstantReference(J.Identifier ident) {
+                JavaType.Variable varType = ident.getFieldType();
+                if (varType == null || !varType.getName().equals(constantName)) {
+                    return false;
                 }
-
-                JavaType.FullyQualified ownerFqn = TypeUtils.asFullyQualified(variableType.getOwner());
-                if (ownerFqn == null) {
-                    return true;
+                J parent = getCursor().getParentTreeCursor().getValue();
+                if (parent instanceof J.VariableDeclarations.NamedVariable && ((J.VariableDeclarations.NamedVariable) parent).getName() == ident) {
+                    // this identifier is an actual variable declaration, not a reference
+                    return false;
                 }
-
-                return maybeVariable.getValue() instanceof J.VariableDeclarations &&
-                        constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
-                        owningType.equals(ownerFqn.getFullyQualifiedName());
+                return TypeUtils.isOfClassType(varType.getOwner(), owningType);
             }
 
             private J.Literal buildLiteral() {

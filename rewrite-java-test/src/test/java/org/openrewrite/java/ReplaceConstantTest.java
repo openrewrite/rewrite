@@ -20,6 +20,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.java.Assertions.java;
 
 class ReplaceConstantTest implements RewriteTest {
@@ -38,11 +39,17 @@ class ReplaceConstantTest implements RewriteTest {
               import com.google.common.base.Charsets;
               class Test {
                   Object o = Charsets.UTF_8;
+                  void foo() {
+                      System.out.println(Charsets.UTF_8);
+                  }
               }
               """,
             """
               class Test {
                   Object o = "UTF_8";
+                  void foo() {
+                      System.out.println("UTF_8");
+                  }
               }
               """
           )
@@ -58,11 +65,17 @@ class ReplaceConstantTest implements RewriteTest {
               import static com.google.common.base.Charsets.UTF_8;
               class Test {
                   Object o = UTF_8;
+                  void foo() {
+                      System.out.println(UTF_8);
+                  }
               }
               """,
             """
               class Test {
                   Object o = "UTF_8";
+                  void foo() {
+                      System.out.println("UTF_8");
+                  }
               }
               """
           )
@@ -108,4 +121,45 @@ class ReplaceConstantTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addsExplicitCastWhenReplacingWithNullAndOverloadRequiresIt() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new ReplaceConstant("com.abc.A", "VAR", "null")),
+            java(
+                """
+                package com.abc;
+                class A {
+                    public static final String VAR = "default";
+                    private String m1() {
+                        return m2(VAR);
+                    }
+                    private String m2(String s) {
+                        return s;
+                    }
+                    private String m2(Integer i) {
+                        return i.toString();
+                    }
+                }
+                """,
+              """
+                package com.abc;
+                class A {
+                    public static final String VAR = "default";
+                    private String m1() {
+                        return m2((String) null);
+                    }
+                    private String m2(String s) {
+                        return s;
+                    }
+                    private String m2(Integer i) {
+                        return i.toString();
+                    }
+                }
+                """
+            )
+          ));
+    }
+
 }
