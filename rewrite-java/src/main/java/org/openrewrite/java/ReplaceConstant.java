@@ -84,6 +84,9 @@ public class ReplaceConstant extends Recipe {
 
             private boolean isVariableDeclaration() {
                 Cursor maybeVariable = getCursor().dropParentUntil(is -> is instanceof J.VariableDeclarations || is instanceof J.CompilationUnit);
+                if (!(maybeVariable.getValue() instanceof J.VariableDeclarations)) {
+                    return false;
+                }
                 JavaType.Variable variableType = ((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getVariableType();
                 if (variableType == null) {
                     return true;
@@ -94,8 +97,7 @@ public class ReplaceConstant extends Recipe {
                     return true;
                 }
 
-                return maybeVariable.getValue() instanceof J.VariableDeclarations &&
-                        constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
+                return constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
                         owningType.equals(ownerFqn.getFullyQualifiedName());
             }
 

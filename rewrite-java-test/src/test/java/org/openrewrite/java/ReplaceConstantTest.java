@@ -58,11 +58,17 @@ class ReplaceConstantTest implements RewriteTest {
               import static com.google.common.base.Charsets.UTF_8;
               class Test {
                   Object o = UTF_8;
+                  void foo() {
+                      System.out.println(UTF_8);
+                  }
               }
               """,
             """
               class Test {
                   Object o = "UTF_8";
+                  void foo() {
+                      System.out.println("UTF_8");
+                  }
               }
               """
           )
