@@ -33,7 +33,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
         for (int i = 0; i < nodes.size(); i++) {
             JRightPadded<? extends J> node = nodes.get(i);
-            if(node == null) {
+            if (node == null) {
                 System.out.println("here");
             }
             visit(node.getElement(), p);
@@ -383,6 +383,19 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 s = ((Label) s).getStatement();
                 continue;
             }
+
+            if (getCursor().getValue() instanceof Case) {
+                Object aSwitch = getCursor().dropParentUntil(c -> c instanceof Switch || c instanceof SwitchExpression)
+                        .getValue();
+                if (aSwitch instanceof J.SwitchExpression) {
+                    Case aCase = getCursor().getValue();
+                    if (!(aCase.getBody() instanceof J.Block)) {
+                        p.append(';');
+                    }
+                    return;
+                }
+            }
+
             return;
         }
     }

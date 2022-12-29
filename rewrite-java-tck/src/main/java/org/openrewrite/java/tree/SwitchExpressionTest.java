@@ -27,6 +27,33 @@ import static org.openrewrite.java.Assertions.java;
 @MinimumJava17
 public class SwitchExpressionTest implements RewriteTest {
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2550")
+    @Test
+    void switchExpressionsReturningEnums() {
+        rewriteRun(
+          java(
+            """
+              enum Answer {
+                  YES, MAYBE, NO
+              }
+              """
+          ),
+          java(
+            """
+              class Test {
+                  private Answer run(String test) {
+                      return switch (test) {
+                          case "test1" -> Answer.NO;
+                          case "test2" -> Answer.YES;
+                          default -> Answer.MAYBE;
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2164")
     @Test
     void basicSyntax() {
