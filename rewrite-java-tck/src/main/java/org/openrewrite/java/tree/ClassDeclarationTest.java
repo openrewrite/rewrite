@@ -59,6 +59,42 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @MinimumJava17
+    @Issue("https://github.com/openrewrite/rewrite/pull/2569")
+    @Test
+    void sealedInterfaces() {
+        rewriteRun(
+          java(
+            """
+              public sealed interface Shape { }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).isNull())
+          ),
+          java(
+            """
+              public sealed interface HasFourCorners extends Shape
+                  permits Square, Rectangle {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).hasSize(2))
+          ),
+          java(
+            """
+              public non-sealed class Square extends HasFourCorners {
+                 public double side;
+              }
+              """
+          ),
+          java(
+            """
+              public sealed class Rectangle extends HasFourCorners {
+                  public double length, width;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/70")
     @Test
     void singleLineCommentBeforeModifier() {
