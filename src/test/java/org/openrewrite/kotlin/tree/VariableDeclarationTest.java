@@ -52,16 +52,16 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires support for implicit return from if expression")
+    @Disabled("Requires support for Kotlin If expressions.")
     @Test
-    void conditionalAssignment() {
+    void ifExpression() {
         rewriteRun(
           kotlin(
             """
               val latest = if (true) {
-              "latest.release"
+                  "latest.release"
               } else {
-              "latest.integration"
+                  "latest.integration"
               }
             """,
             isFullyParsed())
