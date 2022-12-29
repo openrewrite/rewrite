@@ -458,6 +458,15 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             );
         }
 
+        JContainer<TypeTree> permitting = null;
+        if (node.getPermitsClause() != null && !node.getPermitsClause().isEmpty()) {
+            permitting = JContainer.build(
+                    sourceBefore("permits"),
+                    convertAll(node.getPermitsClause(), commaDelim, noDelim),
+                    Markers.EMPTY
+            );
+        }
+
         Space bodyPrefix = sourceBefore("{");
 
         // enum values are required by the grammar to occur before any ordinary field, constructor, or method members
@@ -521,7 +530,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 members, sourceBefore("}"));
 
         return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
-                primaryConstructor, extendings, implementings, body, (JavaType.FullyQualified) typeMapping.type(node));
+                primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) typeMapping.type(node));
     }
 
     @Override

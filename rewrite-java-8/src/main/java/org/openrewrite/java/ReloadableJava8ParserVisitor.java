@@ -476,7 +476,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 members, sourceBefore("}"));
 
         return new J.ClassDeclaration(randomId(), fmt, Markers.EMPTY, modifierResults.getLeadingAnnotations(), modifierResults.getModifiers(), kind, name, typeParams,
-                null, extendings, implementings, body, (JavaType.FullyQualified) typeMapping.type(node));
+                null, extendings, implementings, null, body, (JavaType.FullyQualified) typeMapping.type(node));
     }
 
     @Override

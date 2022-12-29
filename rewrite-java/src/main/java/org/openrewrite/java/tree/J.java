@@ -1156,6 +1156,18 @@ public interface J extends Tree {
             return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings));
         }
 
+        @Nullable
+        JContainer<TypeTree> permitting;
+
+        @Nullable
+        public List<TypeTree> getPermits() {
+            return permitting == null ? null : permitting.getElements();
+        }
+
+        public ClassDeclaration withPermits(@Nullable List<TypeTree> permitting) {
+            return getPadding().withPermits(JContainer.withElementsNullable(this.permitting, permitting));
+        }
+
         @With
         @Getter
         Block body;
@@ -1175,7 +1187,7 @@ public interface J extends Tree {
                 throw new IllegalArgumentException("A class can only be type attributed with a fully qualified type name");
             }
 
-            return new ClassDeclaration(id, prefix, markers, leadingAnnotations, modifiers, kind, name, typeParameters, primaryConstructor, extendings, implementings, body, (JavaType.FullyQualified) type);
+            return new ClassDeclaration(id, prefix, markers, leadingAnnotations, modifiers, kind, name, typeParameters, primaryConstructor, extendings, implementings, permitting, body, (JavaType.FullyQualified) type);
         }
 
         @Override
@@ -1267,7 +1279,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withPrimaryConstructor(@Nullable JContainer<Statement> primaryConstructor) {
-                return t.primaryConstructor == primaryConstructor ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, primaryConstructor, t.extendings, t.implementings, t.body, t.type);
+                return t.primaryConstructor == primaryConstructor ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
 
             @Nullable
@@ -1276,7 +1288,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
-                return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, extendings, t.implementings, t.body, t.type);
+                return t.extendings == extendings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, extendings, t.implementings, t.permitting, t.body, t.type);
             }
 
             @Nullable
@@ -1285,7 +1297,16 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withImplements(@Nullable JContainer<TypeTree> implementings) {
-                return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, implementings, t.body, t.type);
+                return t.implementings == implementings ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, implementings, t.permitting, t.body, t.type);
+            }
+
+            @Nullable
+            public JContainer<TypeTree> getPermits() {
+                return t.permitting;
+            }
+
+            public ClassDeclaration withPermits(@Nullable JContainer<TypeTree> permitting) {
+                return t.permitting == permitting ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, permitting, t.body, t.type);
             }
 
             public Kind getKind() {
@@ -1293,7 +1314,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withKind(Kind kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.type);
+                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
 
             @Nullable
@@ -1302,7 +1323,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.type);
+                return t.typeParameters == typeParameters ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.kind, t.name, typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
         }
 
@@ -1330,7 +1351,7 @@ public interface J extends Tree {
             }
 
             public ClassDeclaration withKind(Kind kind) {
-                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.body, t.type);
+                return t.kind == kind ? t : new ClassDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, kind, t.name, t.typeParameters, t.primaryConstructor, t.extendings, t.implementings, t.permitting, t.body, t.type);
             }
         }
     }

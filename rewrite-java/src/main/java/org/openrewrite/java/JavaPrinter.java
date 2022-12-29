@@ -120,6 +120,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             case Native:
                 keyword = "native";
                 break;
+            case NonSealed:
+                keyword = "non-sealed";
+                break;
+            case Sealed:
+                keyword = "sealed";
+                break;
             case Strictfp:
                 keyword = "strictfp";
                 break;
@@ -459,6 +465,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
         visitContainer(classDecl.getKind().equals(ClassDeclaration.Kind.Type.Interface) ? "extends" : "implements",
                 classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
+        visitContainer("permits", classDecl.getPadding().getPermits(), JContainer.Location.PERMITS, ",", null, p);
         visit(classDecl.getBody(), p);
         afterSyntax(classDecl, p);
         return classDecl;

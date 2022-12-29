@@ -446,6 +446,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (c.getPadding().getImplements() != null) {
             c = c.getPadding().withImplements(visitContainer(c.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, p));
         }
+        if (c.getPadding().getPermits() != null) {
+            c = c.getPadding().withPermits(visitContainer(c.getPadding().getPermits(), JContainer.Location.PERMITS, p));
+        }
         c = c.getPadding().withImplements(visitTypeNames(c.getPadding().getImplements(), p));
         c = c.withBody(visitAndCast(c.getBody(), p));
         c = c.withType(visitType(c.getType(), p));

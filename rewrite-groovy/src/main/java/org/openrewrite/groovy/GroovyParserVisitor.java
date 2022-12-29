@@ -255,6 +255,7 @@ public class GroovyParserVisitor {
                     null,
                     extendings,
                     implementings,
+                    null,
                     visitClassBlock(clazz),
                     TypeUtils.asFullyQualified(typeMapping.type(clazz))));
         }

@@ -25,7 +25,39 @@ import static org.openrewrite.java.Assertions.java;
 
 class ClassDeclarationTest implements RewriteTest {
 
-    @Issue("#70")
+    /**
+     * @see <a href="https://docs.oracle.com/en/java/javase/17/language/sealed-classes-and-interfaces.html>Sealed classes</a> documentation.
+     */
+    @Issue("https://github.com/openrewrite/rewrite/pull/2569")
+    @Test
+    void sealedClasses() {
+        rewriteRun(
+          java(
+            """
+              public sealed class Shape
+                  permits Square, Rectangle {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> assertThat(cu.getClasses().get(0).getPermits()).hasSize(2))
+          ),
+          java(
+            """
+              public non-sealed class Square extends Shape {
+                 public double side;
+              }
+              """
+          ),
+          java(
+            """
+              public sealed class Rectangle extends Shape {
+                  public double length, width;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/70")
     @Test
     void singleLineCommentBeforeModifier() {
         rewriteRun(

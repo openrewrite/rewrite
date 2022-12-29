@@ -8,6 +8,12 @@ dependencies {
     implementation(project(":rewrite-java"))
     implementation(project(":rewrite-java-test"))
     implementation(project(":rewrite-test"))
+
+    if (System.getProperty("idea.active") != null ||
+            System.getProperty("idea.sync.active") != null) {
+        // so we can run tests in the IDE with the IntelliJ runner
+        runtimeOnly(project(":rewrite-java-17"))
+    }
 }
 
 tasks.withType<Javadoc> {
