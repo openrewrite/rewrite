@@ -1983,6 +1983,12 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             case VOLATILE:
                 type = J.Modifier.Type.Volatile;
                 break;
+            case SEALED:
+                type = J.Modifier.Type.Sealed;
+                break;
+            case NON_SEALED:
+                type = J.Modifier.Type.NonSealed;
+                break;
             default:
                 throw new IllegalArgumentException("Unexpected modifier " + mod);
         }

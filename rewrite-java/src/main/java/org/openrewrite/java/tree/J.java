@@ -3739,6 +3739,8 @@ public interface J extends Tree {
             Abstract,
             Static,
             Final,
+            Sealed,
+            NonSealed,
             Transient,
             Volatile,
             Synchronized,
