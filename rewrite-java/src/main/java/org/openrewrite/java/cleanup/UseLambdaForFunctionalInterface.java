@@ -212,13 +212,22 @@ public class UseLambdaForFunctionalInterface extends Recipe {
 
     private static boolean usedAsStatement(Cursor cursor) {
         Iterator<Object> path = cursor.getParentOrThrow().getPath();
-        while (path.hasNext()) {
+        for (Object last = cursor.getValue(); path.hasNext(); ) {
             Object next = path.next();
             if (next instanceof J.Block) {
                 return true;
-            }
-            if (next instanceof J && !(next instanceof J.MethodInvocation)) {
+            } else if (next instanceof J && !(next instanceof J.MethodInvocation)) {
                 return false;
+            } else if (next instanceof J.MethodInvocation) {
+                for (Expression argument : ((J.MethodInvocation) next).getArguments()) {
+                    if (argument == last) {
+                        return false;
+                    }
+                }
+            }
+
+            if (next instanceof J) {
+                last = next;
             }
         }
         return false;
