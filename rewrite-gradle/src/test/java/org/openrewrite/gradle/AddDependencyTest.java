@@ -88,6 +88,27 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyWithClassifier() {
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null, "implementation", "com.google.common.math.IntMath", "linux-x86_64", null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              "",
+              """
+                dependencies {
+                    implementation "io.netty:netty-tcnative-boringssl-static:2.0.54.Final:linux-x86_64"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void notUsingType() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.collect.ImmutableMap")),

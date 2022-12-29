@@ -159,6 +159,47 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyWithClassifier() {
+        AddDependency addDep = new AddDependency(
+          "io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null, "compile", true,
+          "com.google.common.math.IntMath", null, "linux-x86_64", false, null
+        );
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject(
+            "project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>io.netty</groupId>
+                                <artifactId>netty-tcnative-boringssl-static</artifactId>
+                                <version>2.0.54.Final</version>
+                                <classifier>linux-x86_64</classifier>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void notUsingType() {
         rewriteRun(
           spec -> spec.recipe(addDependency(
