@@ -218,8 +218,6 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    // TODO: Figure out how to fix the extra space being added after the comma for each of the G.MapEntry
-    // Source: org.openrewrite.java.format.AutoFormatVisitor#visit(Tree, P, Cursor)L62
     @Test
     void addDependenciesToExistingGrouping() {
         rewriteRun(
@@ -251,8 +249,6 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
-    // TODO: Figure out how to fix the extra space being added after the comma for each of the G.MapEntry
-    // Source: org.openrewrite.java.format.AutoFormatVisitor#visit(Tree, P, Cursor)L62
     @Test
     void matchesDependencyDeclarationStyle() {
         rewriteRun(
