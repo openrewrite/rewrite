@@ -17,6 +17,7 @@ package org.openrewrite.groovy;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.groovy.format.MinimumViableSpacingVisitor;
 import org.openrewrite.groovy.format.OmitParenthesesForLastArgumentLambdaVisitor;
 import org.openrewrite.groovy.tree.*;
 import org.openrewrite.internal.ListUtils;
@@ -160,7 +161,10 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
     @Override
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
         J after = super.autoFormat(j, stopAfter, p, cursor.fork());
+
         after = new OmitParenthesesForLastArgumentLambdaVisitor<>(stopAfter).visitNonNull(after, p, cursor.fork());
+
+        after = new MinimumViableSpacingVisitor<>(stopAfter).visitNonNull(after, p, cursor.fork());
 
         //noinspection unchecked
         return (J2) after;

@@ -1346,7 +1346,7 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitMapEntryExpression(MapEntryExpression expression) {
-            G.MapEntry mapEntry = new G.MapEntry(randomId(), EMPTY, Markers.EMPTY,
+            G.MapEntry mapEntry = new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
                     JRightPadded.build((Expression) visit(expression.getKeyExpression())).withAfter(sourceBefore(":")),
                     visit(expression.getValueExpression()),
                     null
