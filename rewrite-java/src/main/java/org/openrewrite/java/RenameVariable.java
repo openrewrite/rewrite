@@ -33,7 +33,7 @@ import java.util.Stack;
  * Renames a NamedVariable to the target name.
  * Prevents variables from being renamed to reserved java keywords.
  * Notes:
- *  - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
+ * - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
  */
 @Incubating(since = "7.5.0")
 public class RenameVariable<P> extends JavaIsoVisitor<P> {
@@ -84,7 +84,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier ident, P p) {
-            Cursor parent  = getCursor().getParentTreeCursor();
+            Cursor parent = getCursor().getParentTreeCursor();
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
                 if (parent.getValue() instanceof J.FieldAccess) {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
@@ -97,7 +97,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                         if (maybeParameter instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
                             if (methodDeclaration.getParameters().contains((Statement) variableDeclaration) &&
-                                    methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment)) {
+                                methodDeclaration.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment) &&
+                                ((J.MethodDeclaration) maybeParameter).getMethodType() != null) {
                                 doAfterVisit(new RenameJavaDocParamNameVisitor<>((J.MethodDeclaration) maybeParameter, renameVariable.getSimpleName(), newName));
                             }
                         }
@@ -112,16 +113,16 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         /**
          * FieldAccess targets the variable if its target is an Identifier and either
-         *  its target FieldType equals variable.Name.FieldType
-         *  or its target Type equals variable.Name.FieldType.Owner
+         * its target FieldType equals variable.Name.FieldType
+         * or its target Type equals variable.Name.FieldType.Owner
          */
         private boolean fieldAccessTargetsVariable(J.FieldAccess fieldAccess) {
             if (renameVariable.getName().getFieldType() != null && fieldAccess.getTarget() instanceof J.Identifier) {
                 J.Identifier fieldAccessTarget = (J.Identifier) fieldAccess.getTarget();
                 JavaType.Variable variableNameFieldType = renameVariable.getName().getFieldType();
-                JavaType fieldAccessTargetType = fieldAccessTarget.getType() instanceof JavaType.Parameterized ? ((JavaType.Parameterized)fieldAccessTarget.getType()).getType() : fieldAccessTarget.getType();
+                JavaType fieldAccessTargetType = fieldAccessTarget.getType() instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fieldAccessTarget.getType()).getType() : fieldAccessTarget.getType();
                 return variableNameFieldType.equals(fieldAccessTarget.getFieldType()) ||
-                        (fieldAccessTargetType != null && fieldAccessTargetType.equals(variableNameFieldType.getOwner()));
+                       (fieldAccessTargetType != null && fieldAccessTargetType.equals(variableNameFieldType.getOwner()));
             }
             return false;
         }
@@ -180,22 +181,23 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         private Cursor getCursorToParentScope(Cursor cursor) {
             return cursor.dropParentUntil(is ->
                     is instanceof JavaSourceFile ||
-                            is instanceof J.ClassDeclaration ||
-                            is instanceof J.MethodDeclaration ||
-                            is instanceof J.Block ||
-                            is instanceof J.ForLoop ||
-                            is instanceof J.ForEachLoop ||
-                            is instanceof J.Case ||
-                            is instanceof J.Try ||
-                            is instanceof J.Try.Catch ||
-                            is instanceof J.Lambda);
+                    is instanceof J.ClassDeclaration ||
+                    is instanceof J.MethodDeclaration ||
+                    is instanceof J.Block ||
+                    is instanceof J.ForLoop ||
+                    is instanceof J.ForEachLoop ||
+                    is instanceof J.Case ||
+                    is instanceof J.Try ||
+                    is instanceof J.Try.Catch ||
+                    is instanceof J.Lambda);
         }
     }
 
     private static final class JavaKeywords {
-        JavaKeywords() {}
+        JavaKeywords() {
+        }
 
-        private static final String[] RESERVED_WORDS = new String[] {
+        private static final String[] RESERVED_WORDS = new String[]{
                 "abstract",
                 "assert",
                 "boolean",
