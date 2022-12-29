@@ -457,6 +457,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
         List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
 
+        J expr = null;
+        Space exprPrefix = EMPTY;
+        if (property.getInitializer() != null) {
+            exprPrefix = sourceBefore("=");
+            expr = visitExpression(property.getInitializer(), ctx);
+            if (expr instanceof Statement && !(expr instanceof Expression)) {
+                expr = new K.StatementExpression(randomId(), (Statement) expr);
+            }
+        }
+
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
                 new J.VariableDeclarations.NamedVariable(
                         randomId(),
@@ -464,7 +474,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         Markers.EMPTY,
                         name,
                         dimensionsAfterName,
-                        property.getInitializer() != null ? padLeft(sourceBefore("="), (Expression) visitExpression(property.getInitializer(), ctx)) : null,
+                        expr == null ? null : padLeft(exprPrefix, (Expression) expr),
                         null // TODO: add type mapping
                 )
         );

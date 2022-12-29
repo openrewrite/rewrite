@@ -17,7 +17,8 @@ package org.openrewrite.kotlin.tree;
 
 public class KRightPadded {
     public enum Location {
-        TODO(KSpace.Location.TODO);
+        TOP_LEVEL_STATEMENT_SUFFIX(KSpace.Location.TOP_LEVEL_STATEMENT);
+
         private final KSpace.Location afterLocation;
 
         Location(KSpace.Location afterLocation) {

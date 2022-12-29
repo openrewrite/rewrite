@@ -241,6 +241,74 @@ public interface K extends J {
         }
     }
 
+    /**
+     * Kotlin defines certain java statements like J.If as expression.
+     *<p>
+     * Has no state or behavior of its own aside from the Expression it wraps.
+     */
+    @SuppressWarnings("unchecked")
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    final class StatementExpression implements K, Expression, Statement {
+
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Statement statement;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            J j = v.visit(getStatement(), p);
+            if (j instanceof StatementExpression) {
+                return j;
+            } else if (j instanceof Statement) {
+                return withStatement((Statement) j);
+            }
+            return j;
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withStatement(statement.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return statement.getPrefix();
+        }
+
+        @Override
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withStatement(statement.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return statement.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            throw new UnsupportedOperationException("StatementExpression cannot have a type");
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data

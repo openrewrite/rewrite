@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 public class KSpace {
     public enum Location {
-        TODO
+        TODO,
+        TOP_LEVEL_STATEMENT
     }
 }

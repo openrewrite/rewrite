@@ -28,11 +28,12 @@ import org.openrewrite.kotlin.marker.MethodClassifier;
 import org.openrewrite.kotlin.marker.PropertyClassifier;
 import org.openrewrite.kotlin.marker.Semicolon;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KRightPadded;
 import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
-import java.util.List;
+import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter delegate = new KotlinJavaPrinter();
@@ -47,12 +48,33 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
     }
 
+    @Override
+    public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
+        K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
+
+        beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
+
+        JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
+        if (pkg != null) {
+            visit(pkg.getElement(), p);
+            visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
+        }
+
+        for (JRightPadded<Statement> statement : cu.getPadding().getStatements()) {
+            visitRightPadded(statement, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
+        }
+
+        visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
+        afterSyntax(cu, p);
+        return cu;
+    }
+
     private class KotlinJavaPrinter extends JavaPrinter<P> {
         @Override
         public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
             if (tree instanceof K) {
                 // re-route printing back up to groovy
-                return KotlinJavaPrinter.this.visit(tree, p);
+                return KotlinPrinter.this.visit(tree, p);
             } else {
                 return super.visit(tree, p);
             }
@@ -209,5 +231,35 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
         return delegate.visitMarker(marker, p);
+    }
+
+    private static final UnaryOperator<String> JAVA_MARKER_WRAPPER =
+            out -> "/*~~" + out + (out.isEmpty() ? "" : "~~") + ">*/";
+
+    private void beforeSyntax(K k, Space.Location loc, PrintOutputCapture<P> p) {
+        beforeSyntax(k.getPrefix(), k.getMarkers(), loc, p);
+    }
+
+    private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        }
+        if (loc != null) {
+            visitSpace(prefix, loc, p);
+        }
+        visitMarkers(markers, p);
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        }
+    }
+
+    private void afterSyntax(K k, PrintOutputCapture<P> p) {
+        afterSyntax(k.getMarkers(), p);
+    }
+
+    private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        }
     }
 }

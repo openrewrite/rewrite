@@ -52,7 +52,6 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires support for Kotlin If expressions.")
     @Test
     void ifExpression() {
         rewriteRun(
