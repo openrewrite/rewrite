@@ -237,7 +237,6 @@ public interface Parser<S extends SourceFile> {
          */
         public abstract String getDslName();
 
-        @SuppressWarnings("CloneDoesntDeclareCloneNotSupportedException")
         @Override
         public Builder clone() {
             try {

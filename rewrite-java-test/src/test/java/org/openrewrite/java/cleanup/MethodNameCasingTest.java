@@ -36,6 +36,20 @@ class MethodNameCasingTest implements RewriteTest {
         spec.recipe(new MethodNameCasing(false, false));
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2571")
+    @Test
+    void noNumericOnlyRenames() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void _1() {}
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2557")
     @Test
     void interfaceMethods() {
