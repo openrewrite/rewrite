@@ -13,12 +13,13 @@ public class AssignmentTest implements RewriteTest {
     @Test
     void unaryMinus() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
               val i = -1
               val l = -2L
               val f = -3.0f
               val d = -4.0
-              """,
+            """,
             isFullyParsed()
           )
         );

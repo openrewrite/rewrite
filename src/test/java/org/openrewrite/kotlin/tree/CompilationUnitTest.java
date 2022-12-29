@@ -29,7 +29,7 @@ public class CompilationUnitTest implements RewriteTest {
           kotlin(
             """
               package kotlin
-              """,
+            """,
             isFullyParsed()
           )
         );

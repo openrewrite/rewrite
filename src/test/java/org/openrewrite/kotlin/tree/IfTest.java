@@ -18,8 +18,8 @@ public class IfTest implements RewriteTest {
                   if (n == 0) {
                   }
               }
-              """,
-              isFullyParsed()
+            """,
+            isFullyParsed()
           )
         );
     }
@@ -39,7 +39,7 @@ public class IfTest implements RewriteTest {
                       val x = 2
                   }
               }
-              """,
+            """,
             isFullyParsed()
           )
         );
@@ -59,7 +59,7 @@ public class IfTest implements RewriteTest {
                   else
                       n = 3
               }
-              """,
+            """,
             isFullyParsed()
           )
         );

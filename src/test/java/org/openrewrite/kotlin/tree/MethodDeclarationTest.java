@@ -13,8 +13,8 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun method() {
-                  }
+                fun method() {
+                }
               """,
             isFullyParsed()
           )
@@ -26,8 +26,8 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun method(i: Int) {
-                  }
+                fun method(i: Int) {
+                }
               """,
             isFullyParsed()
           )
@@ -39,10 +39,10 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  class A {
-                    fun method() {
-                    }
+                class A {
+                  fun method() {
                   }
+                }
               """,
             isFullyParsed()
           )

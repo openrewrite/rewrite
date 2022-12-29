@@ -44,9 +44,10 @@ public class VariableDeclarationTest implements RewriteTest {
     @Test
     void parameterizedType() {
         rewriteRun(
-          kotlin("""
-            val a: Array<Int> = Array<Int>(1){1}
-          """,
+          kotlin(
+            """
+              val a: Array<Int> = Array<Int>(1){1}
+            """,
             isFullyParsed())
         );
     }
@@ -55,13 +56,14 @@ public class VariableDeclarationTest implements RewriteTest {
     @Test
     void conditionalAssignment() {
         rewriteRun(
-          kotlin("""
-            val latest = if (true) {
-                "latest.release"
-            } else {
-                "latest.integration"
-            }
-          """,
+          kotlin(
+            """
+              val latest = if (true) {
+              "latest.release"
+              } else {
+              "latest.integration"
+              }
+            """,
             isFullyParsed())
         );
     }

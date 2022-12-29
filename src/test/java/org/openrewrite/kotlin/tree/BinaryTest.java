@@ -12,12 +12,13 @@ public class BinaryTest implements RewriteTest {
     @Test
     void equals() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
               fun method() {
                 val n = 0
                 val b = n == 0
               }
-              """,
+            """,
             isFullyParsed()
           )
         );
@@ -33,7 +34,7 @@ public class BinaryTest implements RewriteTest {
                 var n = 0
                 n -= 5
               }
-              """,
+            """,
             isFullyParsed()
           )
         );

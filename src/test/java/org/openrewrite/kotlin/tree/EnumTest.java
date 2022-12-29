@@ -13,9 +13,10 @@ public class EnumTest implements RewriteTest {
     @Test
     void enumEmptyBody() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
               enum class A
-              """,
+            """,
             isFullyParsed()
           )
         );
@@ -25,12 +26,13 @@ public class EnumTest implements RewriteTest {
     @Test
     void enumDefinition() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
               enum class A {
                   B, C,
                   D
               }
-              """,
+            """,
             isFullyParsed()
           )
         );
@@ -40,13 +42,14 @@ public class EnumTest implements RewriteTest {
     @Test
     void innerEnum() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
               class A {
                   enum class B {
                       C
                   }
               }
-              """,
+            """,
             isFullyParsed()
           )
         );

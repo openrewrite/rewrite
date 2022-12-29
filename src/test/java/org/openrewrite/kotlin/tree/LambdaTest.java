@@ -12,11 +12,12 @@ public class LambdaTest implements RewriteTest {
     @Test
     void binaryExpressionAsBody() {
         rewriteRun(
-          kotlin("""
-                fun method() {
-                    val square = { number: Int -> number * number }
-                }
-              """,
+          kotlin(
+            """
+              fun method() {
+                  val square = { number: Int -> number * number }
+              }
+            """,
             isFullyParsed()
           )
         );
@@ -26,11 +27,12 @@ public class LambdaTest implements RewriteTest {
     @Test
     void invokedLambda() {
         rewriteRun(
-          kotlin("""
-                fun invokeLambda(lambda: (Double) -> Boolean): Boolean {
-                    return lambda(1.0)
-                }
-              """,
+          kotlin(
+            """
+              fun invokeLambda(lambda: (Double) -> Boolean): Boolean {
+                  return lambda(1.0)
+              }
+            """,
             isFullyParsed()
           )
         );
