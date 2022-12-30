@@ -12,6 +12,10 @@ pluginManagement {
     }
 }
 
+// ---------------------------------------------------------------
+// ------ Included Projects --------------------------------------
+// ---------------------------------------------------------------
+
 val allProjects = listOf(
         "rewrite-benchmarks",
         "rewrite-bom",
@@ -29,7 +33,7 @@ val allProjects = listOf(
         "rewrite-protobuf",
         "rewrite-test",
         "rewrite-xml",
-        "rewrite-yaml"
+        "rewrite-yaml",
 )
 
 val includedProjects = file("IDE.properties").let {
@@ -41,6 +45,10 @@ val includedProjects = file("IDE.properties").let {
         allProjects
     }
 }.toSet()
+
+if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
+    includeBuild("tools")
+}
 
 include(*allProjects.toTypedArray())
 
@@ -71,6 +79,10 @@ if (System.getProperty("idea.active") == null &&
             "rewrite-java-11"
     )
 }
+
+// ---------------------------------------------------------------
+// ------ Gradle Enterprise Configuration ------------------------
+// ---------------------------------------------------------------
 
 plugins {
     id("com.gradle.enterprise") version "3.11"
