@@ -185,7 +185,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             DependencyListForCliModule.Builder dependencyListForCliModuleBuilder = new DependencyListForCliModule.Builder(name, targetPlatform, JvmPlatformAnalyzerServices.INSTANCE);
             // Class path dependencies may be added here:
-            dependencyListForCliModuleBuilder.dependsOnDependencies(runtimeClasspath());
+//            dependencyListForCliModuleBuilder.dependsOnDependencies(runtimeClasspath());
             DependencyListForCliModule dependencyListForCliModule = dependencyListForCliModuleBuilder.build();
 
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
