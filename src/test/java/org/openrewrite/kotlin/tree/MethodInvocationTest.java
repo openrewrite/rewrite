@@ -15,56 +15,26 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
 
-public class EnumTest implements RewriteTest {
+public class MethodInvocationTest implements RewriteTest {
 
-    @Disabled("add enum modifier as annotation.")
     @Test
-    void enumEmptyBody() {
+    void methodWithLambda() {
         rewriteRun(
           kotlin(
             """
-              enum class A
-            """,
-            isFullyParsed()
-          )
-        );
-    }
-
-    @Disabled
-    @Test
-    void enumDefinition() {
-        rewriteRun(
-          kotlin(
-            """
-              enum class A {
-                  B, C,
-                  D
+              fun method(arg: Any) {
               }
-            """,
-            isFullyParsed()
-          )
-        );
-    }
-
-    @Disabled
-    @Test
-    void innerEnum() {
-        rewriteRun(
-          kotlin(
-            """
-              class A {
-                  enum class B {
-                      C
+              fun callMethodWithLambda() {
+                  method {
                   }
               }
-            """,
+              """,
             isFullyParsed()
           )
         );

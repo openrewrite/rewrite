@@ -33,6 +33,7 @@ import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
+import java.util.List;
 import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
@@ -131,6 +132,51 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(method.getName(), p);
             visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
             visit(method.getBody(), p);
+            afterSyntax(method, p);
+            return method;
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
+            beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
+
+            Markers nameMarkers = method.getName().getMarkers();
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
+
+            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            visit(method.getName(), p);
+            JContainer<Expression> argContainer = method.getPadding().getArguments();
+
+            visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
+            List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
+            boolean omitParensOnMethod = method.getMarkers().findFirst(OmitParentheses.class).isPresent();
+            for (int i = 0; i < args.size(); i++) {
+                JRightPadded<Expression> arg = args.get(i);
+                boolean omitParens = arg.getElement().getMarkers()
+                        .findFirst(OmitParentheses.class)
+                        .isPresent() ||
+                        arg.getElement().getMarkers()
+                                .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
+                                .isPresent();
+
+                if (i == 0 && !omitParens && !omitParensOnMethod) {
+                    p.out.append('(');
+                } else if (i > 0 && omitParens && (
+                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
+                                !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
+                )) {
+                    p.out.append(')');
+                } else if (i > 0) {
+                    p.out.append(',');
+                }
+
+                visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
+
+                if (i == args.size() - 1 && !omitParens && !omitParensOnMethod) {
+                    p.out.append(')');
+                }
+            }
+
             afterSyntax(method, p);
             return method;
         }

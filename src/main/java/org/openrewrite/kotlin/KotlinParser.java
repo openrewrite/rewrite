@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import io.github.classgraph.ClassGraph;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
@@ -185,7 +186,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
             DependencyListForCliModule.Builder dependencyListForCliModuleBuilder = new DependencyListForCliModule.Builder(name, targetPlatform, JvmPlatformAnalyzerServices.INSTANCE);
             // Class path dependencies may be added here:
-//            dependencyListForCliModuleBuilder.dependencies();
+            dependencyListForCliModuleBuilder.dependsOnDependencies(runtimeClasspath());
             DependencyListForCliModule dependencyListForCliModule = dependencyListForCliModuleBuilder.build();
 
             FirProjectSessionProvider firProjectSessionProvider = new FirProjectSessionProvider();
@@ -245,6 +246,13 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         } finally {
             disposable.dispose();
         }
+    }
+
+    static List<Path> runtimeClasspath() {
+        return new ClassGraph()
+                .disableNestedJarScanning()
+                .getClasspathURIs().stream()
+                .map(Paths::get).collect(toList());
     }
 
     private CompilerConfiguration compilerConfiguration() {
