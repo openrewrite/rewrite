@@ -30,26 +30,26 @@ class ManagedDependencyRequiresVersionTest implements RewriteTest {
           spec -> spec.recipe(new DependencyManagementDependencyRequiresVersion()),
           pomXml(
             """
-                  <project>
-                    <groupId>test</groupId>
-                    <artifactId>test</artifactId>
-                    <version>1.0-SNAPSHOT</version>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.fasterxml.jackson.core</groupId>
-                          <artifactId>jackson-core</artifactId>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </project>
+              <project>
+                <groupId>test</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-core</artifactId>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>test</groupId>
-                    <artifactId>test</artifactId>
-                    <version>1.0-SNAPSHOT</version>
-                  </project>
+              <project>
+                <groupId>test</groupId>
+                <artifactId>test</artifactId>
+                <version>1.0-SNAPSHOT</version>
+              </project>
               """
           )
         );

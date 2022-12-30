@@ -45,11 +45,11 @@ class DeletePropertyKeyTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                management.metrics.binders.files.enabled: true
-                server.port: 8080
+              management.metrics.binders.files.enabled: true
+              server.port: 8080
               """,
             """
-                server.port: 8080
+              server.port: 8080
               """
           )
         );
@@ -60,11 +60,11 @@ class DeletePropertyKeyTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                server.port: 8080
-                management.metrics.binders.files.enabled: true
+              server.port: 8080
+              management.metrics.binders.files.enabled: true
               """,
             """
-                server.port: 8080
+              server.port: 8080
               """
           )
         );
@@ -75,13 +75,13 @@ class DeletePropertyKeyTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                app.name: foo
-                management.metrics.binders.files.enabled: true
-                server.port: 8080
+              app.name: foo
+              management.metrics.binders.files.enabled: true
+              server.port: 8080
               """,
             """
-                app.name: foo
-                server.port: 8080
+              app.name: foo
+              server.port: 8080
               """
           )
         );
@@ -92,15 +92,15 @@ class DeletePropertyKeyTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                management.metrics:
-                  enabled: true
-                  binders.files.enabled: true
-                server.port: 8080
+              management.metrics:
+                enabled: true
+                binders.files.enabled: true
+              server.port: 8080
               """,
             """
-                management.metrics:
-                  enabled: true
-                server.port: 8080
+              management.metrics:
+                enabled: true
+              server.port: 8080
               """
           )
         );
@@ -146,13 +146,13 @@ class DeletePropertyKeyTest implements RewriteTest {
           spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false, null)),
           yaml(
             """
-                  acme.myProject.person.firstName: example
-                  acme.my_project.person.first_name: example
-                  acme.my-project.person.first-name: example
+              acme.myProject.person.firstName: example
+              acme.my_project.person.first_name: example
+              acme.my-project.person.first-name: example
               """,
             """
-                  acme.myProject.person.firstName: example
-                  acme.my_project.person.first_name: example
+              acme.myProject.person.firstName: example
+              acme.my_project.person.first_name: example
               """
           )
         );

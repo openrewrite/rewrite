@@ -37,42 +37,42 @@ class UpgradePluginVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>io.quarkus</groupId>
-                          <artifactId>quarkus-maven-plugin</artifactId>
-                          <version>1.13.3.Final</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>1.13.3.Final</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>io.quarkus</groupId>
-                          <artifactId>quarkus-maven-plugin</artifactId>
-                          <version>1.13.5.Final</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>1.13.5.Final</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -91,46 +91,46 @@ class UpgradePluginVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <quarkus-plugin.group-id>io.quarkus</quarkus-plugin.group-id>
-                      <quarkus-plugin.artifact-id>quarkus-maven-plugin</quarkus-plugin.artifact-id>
-                      <quarkus-plugin.version>1.13.3.Final</quarkus-plugin.version>
-                    </properties>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>${quarkus-plugin.group-id}</groupId>
-                          <artifactId>${quarkus-plugin.artifact-id}</artifactId>
-                          <version>${quarkus-plugin.version}</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <quarkus-plugin.group-id>io.quarkus</quarkus-plugin.group-id>
+                  <quarkus-plugin.artifact-id>quarkus-maven-plugin</quarkus-plugin.artifact-id>
+                  <quarkus-plugin.version>1.13.3.Final</quarkus-plugin.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>${quarkus-plugin.group-id}</groupId>
+                      <artifactId>${quarkus-plugin.artifact-id}</artifactId>
+                      <version>${quarkus-plugin.version}</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <quarkus-plugin.group-id>io.quarkus</quarkus-plugin.group-id>
-                      <quarkus-plugin.artifact-id>quarkus-maven-plugin</quarkus-plugin.artifact-id>
-                      <quarkus-plugin.version>1.13.5.Final</quarkus-plugin.version>
-                    </properties>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>${quarkus-plugin.group-id}</groupId>
-                          <artifactId>${quarkus-plugin.artifact-id}</artifactId>
-                          <version>${quarkus-plugin.version}</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <quarkus-plugin.group-id>io.quarkus</quarkus-plugin.group-id>
+                  <quarkus-plugin.artifact-id>quarkus-maven-plugin</quarkus-plugin.artifact-id>
+                  <quarkus-plugin.version>1.13.5.Final</quarkus-plugin.version>
+                </properties>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>${quarkus-plugin.group-id}</groupId>
+                      <artifactId>${quarkus-plugin.artifact-id}</artifactId>
+                      <version>${quarkus-plugin.version}</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -149,22 +149,22 @@ class UpgradePluginVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>io.quarkus</groupId>
-                          <artifactId>quarkus-maven-plugin</artifactId>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -182,42 +182,42 @@ class UpgradePluginVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>4.2.0</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>4.2.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>4.2.3</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>4.2.3</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -235,26 +235,26 @@ class UpgradePluginVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                          
-                    <packaging>pom</packaging>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app-bom</artifactId>
-                    <version>1</version>
-                          
-                    <build>
-                      <pluginManagement>
-                        <plugins>
-                          <plugin>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>rewrite-maven-plugin</artifactId>
-                            <version>4.2.2</version>
-                          </plugin>
-                        </plugins>
-                      </pluginManagement>
-                    </build>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                      
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-bom</artifactId>
+                <version>1</version>
+                      
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>rewrite-maven-plugin</artifactId>
+                        <version>4.2.2</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
               """
           ),
           mavenProject("server",
@@ -319,22 +319,22 @@ class UpgradePluginVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app-bom</artifactId>
-                    <version>1</version>
-                    <build>
-                      <pluginManagement>
-                        <plugins>
-                          <plugin>
-                            <groupId>org.openrewrite.maven</groupId>
-                            <artifactId>rewrite-maven-plugin</artifactId>
-                            <version>4.2.2</version>
-                          </plugin>
-                        </plugins>
-                      </pluginManagement>
-                    </build>
-                  </project>
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-bom</artifactId>
+                <version>1</version>
+                <build>
+                  <pluginManagement>
+                    <plugins>
+                      <plugin>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>rewrite-maven-plugin</artifactId>
+                        <version>4.2.2</version>
+                      </plugin>
+                    </plugins>
+                  </pluginManagement>
+                </build>
+              </project>
               """
           ),
           mavenProject("server",
@@ -407,18 +407,18 @@ class UpgradePluginVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <packaging>pom</packaging>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app-bom</artifactId>
-                    <version>1</version>
+                <packaging>pom</packaging>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-bom</artifactId>
+                <version>1</version>
 
-                    <properties>
-                      <rewrite-maven-plugin.version>4.2.2</rewrite-maven-plugin.version>
-                    </properties>
-                  </project>
+                <properties>
+                  <rewrite-maven-plugin.version>4.2.2</rewrite-maven-plugin.version>
+                </properties>
+              </project>
               """
           ),
           mavenProject("server",

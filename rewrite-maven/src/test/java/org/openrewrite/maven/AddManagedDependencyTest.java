@@ -40,11 +40,11 @@ public class AddManagedDependencyTest implements RewriteTest {
             "pom", null,null, null, "org.apache.logging.log4j:*", false)),
           pomXml(
             """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                </project>
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            </project>
             """
           )
         );
@@ -57,43 +57,43 @@ public class AddManagedDependencyTest implements RewriteTest {
             "pom", null,null, null, "org.apache.logging.log4j:*", false)),
           pomXml(
             """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencies>
-                  <dependency>
-                    <groupId>org.apache.logging.log4j</groupId>
-                    <artifactId>log4j-core</artifactId>
-                    <version>2.17.2</version>
-                  </dependency>
-                </dependencies>
-              </project>
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencies>
+                <dependency>
+                  <groupId>org.apache.logging.log4j</groupId>
+                  <artifactId>log4j-core</artifactId>
+                  <version>2.17.2</version>
+                </dependency>
+              </dependencies>
+            </project>
             """,
             """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <dependencyManagement>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.apache.logging.log4j</groupId>
-                      <artifactId>log4j-bom</artifactId>
-                      <version>2.17.2</version>
-                      <type>pom</type>
-                      <scope>import</scope>
-                    </dependency>
-                  </dependencies>
-                </dependencyManagement>
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <dependencyManagement>
                 <dependencies>
                   <dependency>
                     <groupId>org.apache.logging.log4j</groupId>
-                    <artifactId>log4j-core</artifactId>
+                    <artifactId>log4j-bom</artifactId>
                     <version>2.17.2</version>
+                    <type>pom</type>
+                    <scope>import</scope>
                   </dependency>
                 </dependencies>
-              </project>
+              </dependencyManagement>
+              <dependencies>
+                <dependency>
+                  <groupId>org.apache.logging.log4j</groupId>
+                  <artifactId>log4j-core</artifactId>
+                  <version>2.17.2</version>
+                </dependency>
+              </dependencies>
+            </project>
             """
           )
         );
@@ -106,37 +106,37 @@ public class AddManagedDependencyTest implements RewriteTest {
             "pom", null,null, null, null, true)),
           pomXml(
             """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>project</artifactId>
-                <version>1</version>
-                <modules>
-                  <module>core</module>
-                  <module>service</module>
-                </modules>
-              </project>
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>project</artifactId>
+              <version>1</version>
+              <modules>
+                <module>core</module>
+                <module>service</module>
+              </modules>
+            </project>
             """,
             """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>project</artifactId>
-                <version>1</version>
-                <modules>
-                  <module>core</module>
-                  <module>service</module>
-                </modules>
-                <dependencyManagement>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.apache.logging.log4j</groupId>
-                      <artifactId>log4j-bom</artifactId>
-                      <version>2.17.2</version>
-                      <type>pom</type>
-                      <scope>import</scope>
-                    </dependency>
-                  </dependencies>
-                </dependencyManagement>
-              </project>
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>project</artifactId>
+              <version>1</version>
+              <modules>
+                <module>core</module>
+                <module>service</module>
+              </modules>
+              <dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-bom</artifactId>
+                    <version>2.17.2</version>
+                    <type>pom</type>
+                    <scope>import</scope>
+                  </dependency>
+                </dependencies>
+              </dependencyManagement>
+            </project>
             """
           ),
           mavenProject("service",

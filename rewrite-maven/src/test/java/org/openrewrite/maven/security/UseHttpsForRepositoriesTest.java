@@ -33,30 +33,30 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>my-repo</id>
-                        <url>http://repo.example.com/repo</url>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>my-repo</id>
+                    <url>http://repo.example.com/repo</url>
+                  </repository>
+                </repositories>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>my-repo</id>
-                        <url>https://repo.example.com/repo</url>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>my-repo</id>
+                    <url>https://repo.example.com/repo</url>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -67,44 +67,44 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <distributionManagement>
-                      <repository>
-                        <id>my-repo</id>
-                        <url>http://repo.example.com/repo</url>
-                      </repository>
-                      <snapshotRepository>
-                        <id>my-snapshot-repo</id>
-                        <url>http://repo.example.com/repo</url>
-                      </snapshotRepository>
-                    </distributionManagement>
-                  </project>
+                <distributionManagement>
+                  <repository>
+                    <id>my-repo</id>
+                    <url>http://repo.example.com/repo</url>
+                  </repository>
+                  <snapshotRepository>
+                    <id>my-snapshot-repo</id>
+                    <url>http://repo.example.com/repo</url>
+                  </snapshotRepository>
+                </distributionManagement>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <distributionManagement>
-                      <repository>
-                        <id>my-repo</id>
-                        <url>https://repo.example.com/repo</url>
-                      </repository>
-                      <snapshotRepository>
-                        <id>my-snapshot-repo</id>
-                        <url>https://repo.example.com/repo</url>
-                      </snapshotRepository>
-                    </distributionManagement>
-                  </project>
+                <distributionManagement>
+                  <repository>
+                    <id>my-repo</id>
+                    <url>https://repo.example.com/repo</url>
+                  </repository>
+                  <snapshotRepository>
+                    <id>my-snapshot-repo</id>
+                    <url>https://repo.example.com/repo</url>
+                  </snapshotRepository>
+                </distributionManagement>
+              </project>
               """
           )
         );
@@ -115,36 +115,36 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <pluginRepositories>
-                      <pluginRepository>
-                        <id>my-repo</id>
-                        <url>http://repo.example.com/repo</url>
-                      </pluginRepository>
-                    </pluginRepositories>
-                  </project>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>my-repo</id>
+                    <url>http://repo.example.com/repo</url>
+                  </pluginRepository>
+                </pluginRepositories>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
 
-                    <pluginRepositories>
-                      <pluginRepository>
-                        <id>my-repo</id>
-                        <url>https://repo.example.com/repo</url>
-                      </pluginRepository>
-                    </pluginRepositories>
-                  </project>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>my-repo</id>
+                    <url>https://repo.example.com/repo</url>
+                  </pluginRepository>
+                </pluginRepositories>
+              </project>
               """
           )
         );
@@ -155,38 +155,38 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <my-repo-url>http://repo.example.com/repo</my-repo-url>
-                    </properties>
-                    <repositories>
-                      <repository>
-                        <id>my-repo</id>
-                        <url>${my-repo-url}</url>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <my-repo-url>http://repo.example.com/repo</my-repo-url>
+                </properties>
+                <repositories>
+                  <repository>
+                    <id>my-repo</id>
+                    <url>${my-repo-url}</url>
+                  </repository>
+                </repositories>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <my-repo-url>https://repo.example.com/repo</my-repo-url>
-                    </properties>
-                    <repositories>
-                      <repository>
-                        <id>my-repo</id>
-                        <url>${my-repo-url}</url>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <my-repo-url>https://repo.example.com/repo</my-repo-url>
+                </properties>
+                <repositories>
+                  <repository>
+                    <id>my-repo</id>
+                    <url>${my-repo-url}</url>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );

@@ -30,14 +30,14 @@ class ChangeKeyTest implements RewriteTest {
           spec -> spec.recipe(new ChangeKey("$.description", "newDescription", null)),
           yaml(
             """
-                  id: something
-                  description: desc
-                  other: whatever
+              id: something
+              description: desc
+              other: whatever
               """,
             """
-                  id: something
-                  newDescription: desc
-                  other: whatever
+              id: something
+              newDescription: desc
+              other: whatever
               """
           )
         );

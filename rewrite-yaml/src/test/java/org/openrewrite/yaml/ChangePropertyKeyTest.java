@@ -267,14 +267,14 @@ class ChangePropertyKeyTest implements RewriteTest {
           )),
           yaml(
             """
-                  acme.myProject.person.firstName: example
-                  acme.my_project.person.first_name: example
-                  acme.my-project.person.first-name: example
+              acme.myProject.person.firstName: example
+              acme.my_project.person.first_name: example
+              acme.my-project.person.first-name: example
               """,
             """
-                  acme.myProject.person.firstName: example
-                  acme.my_project.person.first_name: example
-                  acme.my-project.person.changed-first-name-key: example
+              acme.myProject.person.firstName: example
+              acme.my_project.person.first_name: example
+              acme.my-project.person.changed-first-name-key: example
               """
           )
         );
@@ -385,14 +385,14 @@ class ChangePropertyKeyTest implements RewriteTest {
           )),
           yaml(
             """
-                  id: something
-                  description: desc
-                  other: whatever
+              id: something
+              description: desc
+              other: whatever
               """,
             """
-                  id: something
-                  newDescription: desc
-                  other: whatever
+              id: something
+              newDescription: desc
+              other: whatever
               """
           )
         );
@@ -461,9 +461,9 @@ class ChangePropertyKeyTest implements RewriteTest {
                     else: qwe
               """,
             """
-                  something:
-                    else: qwe
-                  x.y.z: abc
+              something:
+                else: qwe
+              x.y.z: abc
               """
           )
         );
@@ -506,10 +506,10 @@ class ChangePropertyKeyTest implements RewriteTest {
               spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null)),
               yaml(
                 """
-                      spring.profiles.group.prod: proddb,prodmq,prodmetrics
+                  spring.profiles.group.prod: proddb,prodmq,prodmetrics
                   """,
                 """
-                      spring.config.activate.on-profile.group.prod: proddb,prodmq,prodmetrics
+                  spring.config.activate.on-profile.group.prod: proddb,prodmq,prodmetrics
                   """
               )
             );
@@ -564,7 +564,7 @@ class ChangePropertyKeyTest implements RewriteTest {
                   spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
                   yaml(
                     """
-                          spring.profiles.group.prod: proddb,prodmq,prodmetrics
+                      spring.profiles.group.prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );

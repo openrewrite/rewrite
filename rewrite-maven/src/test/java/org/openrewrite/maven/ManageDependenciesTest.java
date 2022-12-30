@@ -32,42 +32,42 @@ class ManageDependenciesTest implements RewriteTest {
             false, false)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>5.6.2</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>org.junit.jupiter</groupId>
                               <artifactId>junit-jupiter-api</artifactId>
                               <version>5.6.2</version>
-                              <scope>test</scope>
                           </dependency>
                       </dependencies>
-                  </project>
-              """,
-            """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>org.junit.jupiter</groupId>
-                                  <artifactId>junit-jupiter-api</artifactId>
-                                  <version>5.6.2</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.junit.jupiter</groupId>
-                              <artifactId>junit-jupiter-api</artifactId>
-                              <scope>test</scope>
-                          </dependency>
-                      </dependencies>
-                  </project>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -82,20 +82,20 @@ class ManageDependenciesTest implements RewriteTest {
             false, false)),
           pomXml(
             """
-                  <project>
-                  <groupId>com.othercompany.app</groupId>
-                  <artifactId>my-parent-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>junit</groupId>
-                              <artifactId>junit</artifactId>
-                              <version>4.13.2</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-                  </project>
+              <project>
+              <groupId>com.othercompany.app</groupId>
+              <artifactId>my-parent-app</artifactId>
+              <version>1</version>
+              <dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.13.2</version>
+                      </dependency>
+                  </dependencies>
+              </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("my-app",
@@ -151,10 +151,25 @@ class ManageDependenciesTest implements RewriteTest {
             false, false)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.13.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>junit</groupId>
@@ -162,29 +177,14 @@ class ManageDependenciesTest implements RewriteTest {
                               <version>4.13.2</version>
                           </dependency>
                       </dependencies>
-                  </project>
-              """,
-            """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>junit</groupId>
-                                  <artifactId>junit</artifactId>
-                                  <version>4.13.2</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>junit</groupId>
-                              <artifactId>junit</artifactId>
-                          </dependency>
-                      </dependencies>
-                  </project>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -196,37 +196,37 @@ class ManageDependenciesTest implements RewriteTest {
           spec -> spec.recipe(new ManageDependencies("junit", "junit", true, false)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>project</artifactId>
-                      <version>1</version>
-                      <modules>
-                          <module>core</module>
-                          <module>api</module>
-                          <module>service</module>
-                      </modules>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1</version>
+                  <modules>
+                      <module>core</module>
+                      <module>api</module>
+                      <module>service</module>
+                  </modules>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>project</artifactId>
-                      <version>1</version>
-                      <modules>
-                          <module>core</module>
-                          <module>api</module>
-                          <module>service</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>junit</groupId>
-                                  <artifactId>junit</artifactId>
-                                  <version>4.13.2</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>project</artifactId>
+                  <version>1</version>
+                  <modules>
+                      <module>core</module>
+                      <module>api</module>
+                      <module>service</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>junit</groupId>
+                              <artifactId>junit</artifactId>
+                              <version>4.13.2</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("api",
@@ -309,39 +309,39 @@ class ManageDependenciesTest implements RewriteTest {
             true, false)),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.managed.test</groupId>
-                      <artifactId>a</artifactId>
-                      <version>1.0.0</version>
-                      <parent>
-                          <groupId>com.fasterxml.jackson</groupId>
-                          <artifactId>jackson-parent</artifactId>
-                          <version>2.9.1</version>
-                      </parent>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.managed.test</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-parent</artifactId>
+                      <version>2.9.1</version>
+                  </parent>
+              </project>
               """,
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.managed.test</groupId>
-                      <artifactId>a</artifactId>
-                      <version>1.0.0</version>
-                      <parent>
-                          <groupId>com.fasterxml.jackson</groupId>
-                          <artifactId>jackson-parent</artifactId>
-                          <version>2.9.1</version>
-                      </parent>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>org.apache.logging.log4j</groupId>
-                                  <artifactId>log4j-api</artifactId>
-                                  <version>2.17.2</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.managed.test</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-parent</artifactId>
+                      <version>2.9.1</version>
+                  </parent>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.apache.logging.log4j</groupId>
+                              <artifactId>log4j-api</artifactId>
+                              <version>2.17.2</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("b",
@@ -409,43 +409,43 @@ class ManageDependenciesTest implements RewriteTest {
             true, false)),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.managed.test</groupId>
-                      <artifactId>a</artifactId>
-                      <version>1.0.0</version>
-                      <parent>
-                          <groupId>com.fasterxml.jackson</groupId>
-                          <artifactId>jackson-parent</artifactId>
-                          <version>2.9.1</version>
-                      </parent>
-                      <dependencies>
-                          <dependency>
-                              <groupId>junit</groupId>
-                              <artifactId>junit</artifactId>
-                              <version>4.11</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.managed.test</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-parent</artifactId>
+                      <version>2.9.1</version>
+                  </parent>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.11</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.managed.test</groupId>
-                      <artifactId>a</artifactId>
-                      <version>1.0.0</version>
-                      <parent>
-                          <groupId>com.fasterxml.jackson</groupId>
-                          <artifactId>jackson-parent</artifactId>
-                          <version>2.9.1</version>
-                      </parent>
-                      <dependencies>
-                          <dependency>
-                              <groupId>junit</groupId>
-                              <artifactId>junit</artifactId>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.managed.test</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-parent</artifactId>
+                      <version>2.9.1</version>
+                  </parent>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );

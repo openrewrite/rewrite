@@ -58,14 +58,14 @@ class FindPropertyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindProperty(propertyKey, true)),
           yaml("""
-                  acme.my-project.person.first-name: example
-                  acme.myProject.person.firstName: example
-                  acme.my_project.person.first_name: example
+              acme.my-project.person.first-name: example
+              acme.myProject.person.firstName: example
+              acme.my_project.person.first_name: example
               """,
             """
-                  acme.my-project.person.first-name: ~~>example
-                  acme.myProject.person.firstName: ~~>example
-                  acme.my_project.person.first_name: ~~>example
+              acme.my-project.person.first-name: ~~>example
+              acme.myProject.person.firstName: ~~>example
+              acme.my_project.person.first_name: ~~>example
               """
           )
         );
@@ -77,14 +77,14 @@ class FindPropertyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindProperty("acme.my-project.person.first-name", false)),
           yaml("""
-                  acme.my-project.person.first-name: example
-                  acme.myProject.person.firstName: example
-                  acme.my_project.person.first_name: example
+              acme.my-project.person.first-name: example
+              acme.myProject.person.firstName: example
+              acme.my_project.person.first_name: example
               """,
             """
-                  acme.my-project.person.first-name: ~~>example
-                  acme.myProject.person.firstName: example
-                  acme.my_project.person.first_name: example
+              acme.my-project.person.first-name: ~~>example
+              acme.myProject.person.firstName: example
+              acme.my_project.person.first_name: example
               """
           )
         );

@@ -31,18 +31,18 @@ class ChangeKeyTest implements RewriteTest {
             null
           )),
           json("""
-                  {
-                    "id": "something",
-                    "description": "desc",
-                    "other": "whatever"
-                  }
+              {
+                "id": "something",
+                "description": "desc",
+                "other": "whatever"
+              }
               """,
             """
-                  {
-                    "id": "something",
-                    "newDescription": "desc",
-                    "other": "whatever"
-                  }
+              {
+                "id": "something",
+                "newDescription": "desc",
+                "other": "whatever"
+              }
               """
           )
         );
@@ -58,22 +58,22 @@ class ChangeKeyTest implements RewriteTest {
             null
           )),
           json("""
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      "name": "monitoring-tools",
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  "name": "monitoring-tools",
+                  "namespace": "monitoring-tools"
+                }
+              }
               """,
             """
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      "name2": "monitoring-tools",
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  "name2": "monitoring-tools",
+                  "namespace": "monitoring-tools"
+                }
+              }
               """
           )
         );
@@ -88,24 +88,24 @@ class ChangeKeyTest implements RewriteTest {
             null
           )),
           json("""
+              {
+                "subjects": [
                   {
-                    "subjects": [
-                      {
-                        "kind": "ServiceAccount",
-                        "name": "monitoring-tools"
-                      }
-                    ]
+                    "kind": "ServiceAccount",
+                    "name": "monitoring-tools"
                   }
+                ]
+              }
               """,
             """
+              {
+                "subjects": [
                   {
-                    "subjects": [
-                      {
-                        "kind2": "ServiceAccount",
-                        "name": "monitoring-tools"
-                      }
-                    ]
+                    "kind2": "ServiceAccount",
+                    "name": "monitoring-tools"
                   }
+                ]
+              }
               """
           )
         );

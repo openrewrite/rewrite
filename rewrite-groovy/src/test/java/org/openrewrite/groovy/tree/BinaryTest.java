@@ -29,8 +29,8 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  int n = 0;
-                  boolean b = n == 0;
+              int n = 0;
+              boolean b = n == 0;
               """
           )
         );
@@ -42,9 +42,9 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  def REGEX = /\\d+/
-                  def text = "123"
-                  def result = text =~ REGEX
+              def REGEX = /\\d+/
+              def text = "123"
+              def result = text =~ REGEX
               """
           )
         );

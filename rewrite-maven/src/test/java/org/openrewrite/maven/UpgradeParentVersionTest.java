@@ -40,17 +40,17 @@ class UpgradeParentVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.4.12</version>
-                      <relativePath/>
-                    </parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.4.12</version>
+                  <relativePath/>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """
           )
         );
@@ -70,26 +70,26 @@ class UpgradeParentVersionTest implements RewriteTest {
             ),
           pomXml(
             """
-                  <project>
-                      <parent>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>plugin</artifactId>
-                          <version>4.33</version>
-                      </parent>
-                      <artifactId>antisamy-markup-formatter</artifactId>
-                      <version>1.0.0</version>
-                  </project>
+              <project>
+                  <parent>
+                      <groupId>org.jenkins-ci.plugins</groupId>
+                      <artifactId>plugin</artifactId>
+                      <version>4.33</version>
+                  </parent>
+                  <artifactId>antisamy-markup-formatter</artifactId>
+                  <version>1.0.0</version>
+              </project>
               """,
             """
-                  <project>
-                      <parent>
-                          <groupId>org.jenkins-ci.plugins</groupId>
-                          <artifactId>plugin</artifactId>
-                          <version>4.40</version>
-                      </parent>
-                      <artifactId>antisamy-markup-formatter</artifactId>
-                      <version>1.0.0</version>
-                  </project>
+              <project>
+                  <parent>
+                      <groupId>org.jenkins-ci.plugins</groupId>
+                      <artifactId>plugin</artifactId>
+                      <version>4.40</version>
+                  </parent>
+                  <artifactId>antisamy-markup-formatter</artifactId>
+                  <version>1.0.0</version>
+              </project>
               """
           )
         );
@@ -107,30 +107,30 @@ class UpgradeParentVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>1.5.12.RELEASE</version>
-                      <relativePath/> <!-- lookup parent from repository -->
-                    </parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
+                  <relativePath/> <!-- lookup parent from repository -->
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>1.5.22.RELEASE</version>
-                      <relativePath/> <!-- lookup parent from repository -->
-                    </parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.22.RELEASE</version>
+                  <relativePath/> <!-- lookup parent from repository -->
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """
           )
         );
@@ -148,30 +148,30 @@ class UpgradeParentVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>1.5.12.RELEASE</version>
-                      <relativePath/> <!-- lookup parent from repository -->
-                    </parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
+                  <relativePath/> <!-- lookup parent from repository -->
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>1.5.22.RELEASE</version>
-                      <relativePath/> <!-- lookup parent from repository -->
-                    </parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.22.RELEASE</version>
+                  <relativePath/> <!-- lookup parent from repository -->
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """
           )
         );

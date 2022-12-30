@@ -40,11 +40,11 @@ class MappingTest implements RewriteTest {
     void flowStyleMapping() {
         rewriteRun(yaml(
             """
-                {
-                  "data": {
-                    "prometheus.yml": "global:\\n  scrape_interval: 10s\\n  scrape_timeout: 9s"
-                  }
+              {
+                "data": {
+                  "prometheus.yml": "global:\\n  scrape_interval: 10s\\n  scrape_timeout: 9s"
                 }
+              }
               """
           )
         );
@@ -54,8 +54,8 @@ class MappingTest implements RewriteTest {
     void multipleEntries() {
         rewriteRun(yaml(
             """
-                  type : specs.openrewrite.org/v1beta/visitor # comment with colon :
-                  name : org.openrewrite.text.ChangeTextToJon
+              type : specs.openrewrite.org/v1beta/visitor # comment with colon :
+              name : org.openrewrite.text.ChangeTextToJon
               """,
             spec -> spec.afterRecipe(y -> {
                 assertThat(((Yaml.Mapping) (y.getDocuments().get(0).getBlock())).getEntries().stream()
@@ -133,9 +133,9 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  for: bar
-                  # Comment with a colon:
-                  baz: foo
+              for: bar
+              # Comment with a colon:
+              baz: foo
               """,
             spec -> spec.afterRecipe(documents -> {
                 var doc = documents.getDocuments().get(0);
@@ -163,12 +163,12 @@ class MappingTest implements RewriteTest {
     void multiDocOnlyComments() {
         rewriteRun(yaml(
             """
-                  # doc-1-pre
-                  ---
-                  # doc-1-end
-                  ...
-                  ---
-                  # doc-2-pre
+              # doc-1-pre
+              ---
+              # doc-1-end
+              ...
+              ---
+              # doc-2-pre
               """,
             spec -> spec.afterRecipe(docs -> {
                 assertThat(docs.getDocuments().size()).isEqualTo(2);
@@ -186,7 +186,7 @@ class MappingTest implements RewriteTest {
     void singleDocOnlyComments() {
         rewriteRun(yaml(
             """
-                  # doc-1-pre
+              # doc-1-pre
               """,
             spec -> spec.afterRecipe(docs -> {
                 assertThat(docs.getDocuments().size()).isEqualTo(1);
@@ -203,8 +203,8 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                    date: @build.timestamp@
-                    version: @project.version@
+              date: @build.timestamp@
+              version: @project.version@
               """
           )
         );
@@ -244,8 +244,8 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  default: &default test
-                  stage: *default
+              default: &default test
+              stage: *default
               """
           )
         );
@@ -256,8 +256,8 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  defaults: [&first A, &stage test, &last Z]
-                  config: [first: *first, stage: *stage, last: *last]
+              defaults: [&first A, &stage test, &last Z]
+              config: [first: *first, stage: *stage, last: *last]
               """
           )
         );
@@ -322,10 +322,10 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  defaults: &defaults
-                    - A: 1
-                    - B: 2
-                  key: *defaults
+              defaults: &defaults
+                - A: 1
+                - B: 2
+              key: *defaults
               """
           )
         );
@@ -336,8 +336,8 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  defaults: &defaults [A:1, B:2] # comment
-                  key: *defaults
+              defaults: &defaults [A:1, B:2] # comment
+              key: *defaults
               """
           )
         );
@@ -348,10 +348,10 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  defaults: &defaults # sequence start comment
-                    - A: 1 # A comment
-                    - B: 2 # B comment
-                  key: *defaults
+              defaults: &defaults # sequence start comment
+                - A: 1 # A comment
+                - B: 2 # B comment
+              key: *defaults
               """
           )
         );
@@ -362,8 +362,8 @@ class MappingTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                defaults: &defaults [A: 1, B: 2]
-                mapping: *defaults
+              defaults: &defaults [A: 1, B: 2]
+              mapping: *defaults
               """
           )
         );

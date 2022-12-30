@@ -40,8 +40,8 @@ class MergeYamlTest implements RewriteTest {
           )),
           yaml(
             """
-                  name: Github Actions workflow
-                  on: [workflow_dispatch]
+              name: Github Actions workflow
+              on: [workflow_dispatch]
               """
           )
         );
@@ -280,13 +280,13 @@ class MergeYamlTest implements RewriteTest {
           )),
           yaml(
             """
-                apiVersion: policy/v1beta1
-                kind: PodSecurityPolicy
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
               """,
             """
-                apiVersion: policy/v1beta1
-                kind: PodSecurityPolicy
-                spec: 0
+              apiVersion: policy/v1beta1
+              kind: PodSecurityPolicy
+              spec: 0
               """
           )
         );
@@ -844,8 +844,8 @@ class MergeYamlTest implements RewriteTest {
           yaml(
             "apiVersion: policy/v1beta1",
             """
-                  apiVersion: policy/v1beta1
-                  spec: 0
+              apiVersion: policy/v1beta1
+              spec: 0
               """,
             spec -> spec.path("a.yml")
           ),

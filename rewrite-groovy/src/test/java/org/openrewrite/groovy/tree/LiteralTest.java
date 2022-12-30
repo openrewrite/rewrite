@@ -136,7 +136,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  def person = [ name: 'sam' , age: 9000 ]
+              def person = [ name: 'sam' , age: 9000 ]
               """
           )
         );
@@ -147,10 +147,10 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  float a = 0.1
-                  def b = 0.1f
-                  double c = 1.0d
-                  long d = 1L
+              float a = 0.1
+              def b = 0.1f
+              double c = 1.0d
+              long d = 1L
               """
           )
         );

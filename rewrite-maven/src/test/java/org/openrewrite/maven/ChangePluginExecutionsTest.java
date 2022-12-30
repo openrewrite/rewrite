@@ -28,44 +28,44 @@ class ChangePluginExecutionsTest implements RewriteTest {
           spec -> spec.recipe(new ChangePluginExecutions("org.openrewrite.maven", "rewrite-maven-plugin", null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <executions>
-                                      <execution>
-                                          <phase>validate</phase>
-                                          <goals><goal>dryRun</goal></goals>
-                                      </execution>
-                                  </executions>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <executions>
+                                  <execution>
+                                      <phase>validate</phase>
+                                      <goals><goal>dryRun</goal></goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );
@@ -80,46 +80,46 @@ class ChangePluginExecutionsTest implements RewriteTest {
             "<execution>\n<phase>validate</phase>\n<goals><goal>dryRun</goal></goals>\n</execution>")),
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <executions>
-                                      <execution>
-                                          <phase>validate</phase>
-                                          <goals>
-                                              <goal>dryRun</goal>
-                                          </goals>
-                                      </execution>
-                                  </executions>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <executions>
+                                  <execution>
+                                      <phase>validate</phase>
+                                      <goals>
+                                          <goal>dryRun</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );
@@ -134,47 +134,47 @@ class ChangePluginExecutionsTest implements RewriteTest {
             "<execution>\n<phase>validate</phase>\n<goals><goal>dryRun</goal></goals>\n</execution>")),
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <executions />
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <executions />
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <executions>
-                                      <execution>
-                                          <phase>validate</phase>
-                                          <goals>
-                                              <goal>dryRun</goal>
-                                          </goals>
-                                      </execution>
-                                  </executions>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <executions>
+                                  <execution>
+                                      <phase>validate</phase>
+                                      <goals>
+                                          <goal>dryRun</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );

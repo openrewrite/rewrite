@@ -34,9 +34,9 @@ class AutoFormatTest implements RewriteTest {
         rewriteRun(
           hcl(
           """
-              a = [for v in ["a", "b"] : v]
-              b = [for i, v in ["a", "b"] : i]
-              c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
+          a = [for v in ["a", "b"] : v]
+          b = [for i, v in ["a", "b"] : i]
+          c = [for i, v in ["a", "b", "c"]: v if 1 && !0]
           """
           )
         );

@@ -27,30 +27,30 @@ class ChangePropertyValueTest implements RewriteTest {
           spec -> spec.recipe(new ChangePropertyValue("guava.version", "29.0-jre", false, false)),
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                     
-                    <properties>
-                      <guava.version>28.2-jre</guava.version>
-                    </properties>
-                    
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                 
+                <properties>
+                  <guava.version>28.2-jre</guava.version>
+                </properties>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                     
-                    <properties>
-                      <guava.version>29.0-jre</guava.version>
-                    </properties>
-                    
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                 
+                <properties>
+                  <guava.version>29.0-jre</guava.version>
+                </properties>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """
           )
         );
@@ -62,27 +62,27 @@ class ChangePropertyValueTest implements RewriteTest {
           spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <key>value</key>
-                    </properties>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -94,30 +94,30 @@ class ChangePropertyValueTest implements RewriteTest {
           spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <key>v</key>
-                    </properties>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>v</key>
+                </properties>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <key>value</key>
-                    </properties>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -129,33 +129,33 @@ class ChangePropertyValueTest implements RewriteTest {
           spec -> spec.recipe(new ChangePropertyValue("key", "value", true, false)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <abc>value</abc>
-                      <other>value</other>
-                    </properties>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <abc>value</abc>
+                  <other>value</other>
+                </properties>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <abc>value</abc>
-                      <key>value</key>
-                      <other>value</other>
-                    </properties>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <abc>value</abc>
+                  <key>value</key>
+                  <other>value</other>
+                </properties>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """
           )
         );

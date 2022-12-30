@@ -31,24 +31,24 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -63,32 +63,32 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <name>qq</name>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <name>qq</name>
+                  </repository>
+                </repositories>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <name>bb</name>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <name>bb</name>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -103,18 +103,18 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <name>qq</name>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <name>qq</name>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -129,33 +129,33 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <snapshots>
-                            <enabled>true</enabled>
-                        </snapshots>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                </repositories>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -170,37 +170,37 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <snapshots>
-                          <enabled>true</enabled>
-                        </snapshots>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                </repositories>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <snapshots>
-                          <enabled>false</enabled>
-                          <checksumPolicy>whatever</checksumPolicy>
-                        </snapshots>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <snapshots>
+                      <enabled>false</enabled>
+                      <checksumPolicy>whatever</checksumPolicy>
+                    </snapshots>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -215,36 +215,36 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <snapshots>
-                          <enabled>true</enabled>
-                        </snapshots>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                </repositories>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <snapshots>
-                          <checksumPolicy>whatever</checksumPolicy>
-                        </snapshots>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <snapshots>
+                      <checksumPolicy>whatever</checksumPolicy>
+                    </snapshots>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -259,20 +259,20 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>myRepo-X</id>
-                        <url>http://myrepo.maven.com/repo</url>
-                        <snapshots>
-                          <enabled>true</enabled>
-                        </snapshots>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>myRepo-X</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );
@@ -287,37 +287,37 @@ public class AddRepositoryTest implements RewriteTest {
             null, null, null).doNext(new UpgradeParentVersion("org.springframework.boot", "spring-boot-starter-parent", "3.0.0-SNAPSHOT", null, null))),
           pomXml(
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.7.3</version>
-                    </parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.7.3</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>3.0.0-SNAPSHOT</version>
-                    </parent>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <repositories>
-                      <repository>
-                        <id>boot-snapshots</id>
-                        <url>https://repo.spring.io/snapshot</url>
-                        <snapshots>
-                          <enabled>true</enabled>
-                        </snapshots>
-                      </repository>
-                    </repositories>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>3.0.0-SNAPSHOT</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <repositories>
+                  <repository>
+                    <id>boot-snapshots</id>
+                    <url>https://repo.spring.io/snapshot</url>
+                    <snapshots>
+                      <enabled>true</enabled>
+                    </snapshots>
+                  </repository>
+                </repositories>
+              </project>
               """
           )
         );

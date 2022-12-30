@@ -37,60 +37,60 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>javax.activation</groupId>
                               <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
                           </dependency>
-                      </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>javax.activation</groupId>
-                                  <artifactId>javax.activation-api</artifactId>
-                                  <version>1.2.0</version>
-                              </dependency>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
-              """,
-            """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
                           </dependency>
                       </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>javax.activation</groupId>
-                                  <artifactId>javax.activation-api</artifactId>
-                                  <version>1.2.0</version>
-                              </dependency>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -110,61 +110,61 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>javax.activation</groupId>
                               <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
                           </dependency>
-                      </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>javax.activation</groupId>
-                                  <artifactId>javax.activation-api</artifactId>
-                                  <version>1.2.0</version>
-                              </dependency>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
-              """,
-            """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.2</version>
+                              <version>1.2.1</version>
                           </dependency>
                       </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>javax.activation</groupId>
-                                  <artifactId>javax.activation-api</artifactId>
-                                  <version>1.2.0</version>
-                              </dependency>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.2</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
+                          </dependency>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -184,51 +184,51 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>javax.activation</groupId>
                               <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
                           </dependency>
                       </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>javax.activation</groupId>
-                                  <artifactId>javax.activation-api</artifactId>
-                                  <version>1.2.0</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+                  </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.2</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
-                              <groupId>jakarta.activation</groupId>
-                              <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.2</version>
+                              <groupId>javax.activation</groupId>
+                              <artifactId>javax.activation-api</artifactId>
+                              <version>1.2.0</version>
                           </dependency>
                       </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>javax.activation</groupId>
-                                  <artifactId>javax.activation-api</artifactId>
-                                  <version>1.2.0</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -248,51 +248,51 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>javax.activation</groupId>
-                              <artifactId>javax.activation-api</artifactId>
-                              <version>1.2.0</version>
-                          </dependency>
-                      </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
-              """,
-            """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>1.2.0</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
                           </dependency>
                       </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -312,52 +312,52 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>javax.activation</groupId>
-                              <artifactId>javax.activation-api</artifactId>
-                              <version>1.2.0</version>
-                          </dependency>
-                      </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
-              """,
-            """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>1.2.0</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>1.2.2</version>
+                              <version>1.2.1</version>
                           </dependency>
                       </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>1.2.2</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -377,51 +377,51 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>javax.activation</groupId>
-                              <artifactId>javax.activation-api</artifactId>
-                              <version>1.2.0</version>
-                          </dependency>
-                      </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
-              """,
-            """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>1.2.0</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
                           </dependency>
                       </dependencies>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>jakarta.activation</groupId>
-                                  <artifactId>jakarta.activation-api</artifactId>
-                                  <version>1.2.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>jakarta.activation</groupId>
+                              <artifactId>jakarta.activation-api</artifactId>
+                              <version>1.2.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -440,19 +440,19 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.openrewrite</groupId>
-                              <artifactId>rewrite-java-8</artifactId>
-                              <version>7.20.0</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite</groupId>
+                          <artifactId>rewrite-java-8</artifactId>
+                          <version>7.20.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
               <project>
@@ -486,19 +486,19 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.openrewrite.recipe</groupId>
-                              <artifactId>rewrite-spring</artifactId>
-                              <version>4.12.0</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-spring</artifactId>
+                          <version>4.12.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -517,34 +517,34 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>javax.activation</groupId>
-                              <artifactId>javax.activation-api</artifactId>
-                              <version>1.2.0</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>javax.activation</groupId>
+                          <artifactId>javax.activation-api</artifactId>
+                          <version>1.2.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>jakarta.activation</groupId>
-                              <artifactId>jakarta.activation-api</artifactId>
-                              <version>2.1.0</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>jakarta.activation</groupId>
+                          <artifactId>jakarta.activation-api</artifactId>
+                          <version>2.1.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -564,14 +564,14 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           ),
           pomXml(
             """
-                      <project>
-                          <groupId>com.mycompany.app</groupId>
-                          <artifactId>parent</artifactId>
-                          <version>1</version>
-                          <modules>
-                              <module>child</module>
-                          </modules>
-                      </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+              </project>
               """
           ),
           mavenProject("child",
@@ -652,30 +652,30 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                      <project>
-                          <groupId>com.mycompany.app</groupId>
-                          <artifactId>parent</artifactId>
-                          <version>1</version>
-                          <modules>
-                              <module>child</module>
-                          </modules>
-                          <dependencyManagement>
-                              <dependencies>
-                                  <dependency>
-                                      <groupId>io.quarkus</groupId>
-                                      <artifactId>quarkus-core</artifactId>
-                                      <version>2.8.0.Final</version>
-                                      <scope>test</scope>
-                                  </dependency>
-                                  <dependency>
-                                      <groupId>io.quarkus</groupId>
-                                      <artifactId>quarkus-arc</artifactId>
-                                      <version>2.8.0.Final</version>
-                                      <scope>test</scope>
-                                  </dependency>
-                              </dependencies>
-                          </dependencyManagement>
-                      </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-core</artifactId>
+                              <version>2.8.0.Final</version>
+                              <scope>test</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>io.quarkus</groupId>
+                              <artifactId>quarkus-arc</artifactId>
+                              <version>2.8.0.Final</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -750,19 +750,19 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
               </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>30.1.1-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>30.1.1-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -781,34 +781,34 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.apache.commons</groupId>
-                              <artifactId>commons-io</artifactId>
-                              <version>1.3.2</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.apache.commons</groupId>
+                          <artifactId>commons-io</artifactId>
+                          <version>1.3.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>commons-io</groupId>
-                              <artifactId>commons-io</artifactId>
-                              <version>2.11.0</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>commons-io</groupId>
+                          <artifactId>commons-io</artifactId>
+                          <version>2.11.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );

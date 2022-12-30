@@ -43,11 +43,11 @@ public class UpperCaseLiteralSuffixesTest implements RewriteTest {
               }
               """,
             """
-                class Test {
-                    long lp = 1L;
-                    double dp = 1D;
-                    float df = 1F;
-                }
+              class Test {
+                  long lp = 1L;
+                  double dp = 1D;
+                  float df = 1F;
+              }
               """
           )
         );

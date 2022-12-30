@@ -101,17 +101,17 @@ public class MavenDependencyFailuresTest implements RewriteTest {
               </project>
               """,
             """
-                <project>
-                  <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
-                https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
-                      <groupId>org.jenkins-ci.plugins</groupId>
-                      <artifactId>credentials</artifactId>
-                      <version>2.3.0</version>
-                  </parent>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                </project>
+              <project>
+                <!--~~(org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:
+              https://repo.maven.apache.org/maven2: HTTP 404)~~>--><parent>
+                    <groupId>org.jenkins-ci.plugins</groupId>
+                    <artifactId>credentials</artifactId>
+                    <version>2.3.0</version>
+                </parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """
           )
         );

@@ -33,36 +33,36 @@ class OrderPomElementsTest implements RewriteTest {
     void validOrderNoChange() {
         rewriteRun(
           pomXml("""
-                <project>
-                    <modelVersion>4.0.0</modelVersion>
+            <project>
+                <modelVersion>4.0.0</modelVersion>
 
-                    <groupId>my.org.project</groupId>
-                    <artifactId>my-project</artifactId>
-                    <version>4.3.0</version>
-                    
-                    <name>Some Project</name>
-                    <description>Some project desc</description>
-                    
-                    <properties>
-                    </properties>
-                    
-                    <dependencyManagement>
-                        <dependencies>
-                        </dependencies>
-                    </dependencyManagement>
-                    
+                <groupId>my.org.project</groupId>
+                <artifactId>my-project</artifactId>
+                <version>4.3.0</version>
+                
+                <name>Some Project</name>
+                <description>Some project desc</description>
+                
+                <properties>
+                </properties>
+                
+                <dependencyManagement>
                     <dependencies>
                     </dependencies>
+                </dependencyManagement>
+                
+                <dependencies>
+                </dependencies>
 
-                    <repositories>
-                    </repositories>
-                    
-                    <pluginRepositories>
-                    </pluginRepositories>
-                    
-                    <build>
-                    </build>
-                </project>
+                <repositories>
+                </repositories>
+                
+                <pluginRepositories>
+                </pluginRepositories>
+                
+                <build>
+                </build>
+            </project>
             """
           )
         );
@@ -74,98 +74,98 @@ class OrderPomElementsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <parent>
-                          <groupId>jpl</groupId>
-                          <artifactId>jpl</artifactId>
-                          <version>7.4.0</version>
-                      </parent>
-                      <!-- modelVersion1 -->
-                      
-                      <!-- modelVersion2 -->
-                      <modelVersion>4.0.0</modelVersion>
-                      <artifactId>my-project</artifactId>
-                      <groupId>my.org.project</groupId>
-                      <version>4.3.0</version>
-                      <properties>
-                      </properties>
-                      <description>Some project desc</description>
-                      <name>Some Project</name>
-                      <dependencies>
-                          <dependency>
-                              <!-- artifact content
-                                  comment -->
-                              <artifactId>my-project</artifactId>
-                              <scope>test</scope>
-                              <!-- group content -->
-                              <groupId>my.org.project</groupId>
-                              <!-- version content -->
-                              <version>4.3.0</version>
-                          </dependency>
-                      </dependencies>
-                      <dependencyManagement>
-                          <dependency>
-                              <type>pom</type>
-                              <version>2</version>
-                              <groupId>my.org.project</groupId>
-                              <scope>import</scope>
-                              <artifactId>my-project-thing</artifactId>
-                          </dependency>
-                      </dependencyManagement>
-                      <repositories>
-                      </repositories>
-                      <pluginRepositories>
-                      </pluginRepositories>
-                      <build>
-                      </build>
-                  </project>
+              <project>
+                  <parent>
+                      <groupId>jpl</groupId>
+                      <artifactId>jpl</artifactId>
+                      <version>7.4.0</version>
+                  </parent>
+                  <!-- modelVersion1 -->
+                  
+                  <!-- modelVersion2 -->
+                  <modelVersion>4.0.0</modelVersion>
+                  <artifactId>my-project</artifactId>
+                  <groupId>my.org.project</groupId>
+                  <version>4.3.0</version>
+                  <properties>
+                  </properties>
+                  <description>Some project desc</description>
+                  <name>Some Project</name>
+                  <dependencies>
+                      <dependency>
+                          <!-- artifact content
+                              comment -->
+                          <artifactId>my-project</artifactId>
+                          <scope>test</scope>
+                          <!-- group content -->
+                          <groupId>my.org.project</groupId>
+                          <!-- version content -->
+                          <version>4.3.0</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependency>
+                          <type>pom</type>
+                          <version>2</version>
+                          <groupId>my.org.project</groupId>
+                          <scope>import</scope>
+                          <artifactId>my-project-thing</artifactId>
+                      </dependency>
+                  </dependencyManagement>
+                  <repositories>
+                  </repositories>
+                  <pluginRepositories>
+                  </pluginRepositories>
+                  <build>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <!-- modelVersion1 -->
-                      
-                      <!-- modelVersion2 -->
-                      <modelVersion>4.0.0</modelVersion>
-                      <parent>
-                          <groupId>jpl</groupId>
-                          <artifactId>jpl</artifactId>
-                          <version>7.4.0</version>
-                      </parent>
-                      <groupId>my.org.project</groupId>
-                      <artifactId>my-project</artifactId>
-                      <version>4.3.0</version>
-                      <name>Some Project</name>
-                      <description>Some project desc</description>
-                      <properties>
-                      </properties>
-                      <dependencyManagement>
-                          <dependency>
-                              <groupId>my.org.project</groupId>
-                              <artifactId>my-project-thing</artifactId>
-                              <version>2</version>
-                              <type>pom</type>
-                              <scope>import</scope>
-                          </dependency>
-                      </dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <!-- group content -->
-                              <groupId>my.org.project</groupId>
-                              <!-- artifact content
-                                  comment -->
-                              <artifactId>my-project</artifactId>
-                              <!-- version content -->
-                              <version>4.3.0</version>
-                              <scope>test</scope>
-                          </dependency>
-                      </dependencies>
-                      <repositories>
-                      </repositories>
-                      <pluginRepositories>
-                      </pluginRepositories>
-                      <build>
-                      </build>
-                  </project>
+              <project>
+                  <!-- modelVersion1 -->
+                  
+                  <!-- modelVersion2 -->
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                      <groupId>jpl</groupId>
+                      <artifactId>jpl</artifactId>
+                      <version>7.4.0</version>
+                  </parent>
+                  <groupId>my.org.project</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>4.3.0</version>
+                  <name>Some Project</name>
+                  <description>Some project desc</description>
+                  <properties>
+                  </properties>
+                  <dependencyManagement>
+                      <dependency>
+                          <groupId>my.org.project</groupId>
+                          <artifactId>my-project-thing</artifactId>
+                          <version>2</version>
+                          <type>pom</type>
+                          <scope>import</scope>
+                      </dependency>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <!-- group content -->
+                          <groupId>my.org.project</groupId>
+                          <!-- artifact content
+                              comment -->
+                          <artifactId>my-project</artifactId>
+                          <!-- version content -->
+                          <version>4.3.0</version>
+                          <scope>test</scope>
+                      </dependency>
+                  </dependencies>
+                  <repositories>
+                  </repositories>
+                  <pluginRepositories>
+                  </pluginRepositories>
+                  <build>
+                  </build>
+              </project>
               """
           )
         );
@@ -177,106 +177,106 @@ class OrderPomElementsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <parent>
-                          <groupId>jpl</groupId>
-                          <artifactId>jpl</artifactId>
-                          <version>7.4.0</version>
-                      </parent>
-                      
-                      <!-- model version comment -->
-                      
-                      <!-- model version comment 2 -->
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <artifactId>my-project</artifactId>
-                      <groupId>my.org.project</groupId>
-                      <version>4.3.0</version>
-                      
-                      <properties>
-                      </properties>
-                      
-                      <description>Some project desc</description>
-                      <name>Some Project</name>
-                      
-                      <dependencies>
-                          <dependency>
-                              <!-- artifact content
-                                  comment -->
-                              <artifactId>my-project</artifactId>
-                              <!-- group content -->
-                              <groupId>my.org.project</groupId>
-                              <!-- version content -->
-                              <version>4.3.0</version>
-                          </dependency>
-                      </dependencies>
-                      <dependencyManagement>
-                          <dependency>
-                              <version>2</version>
-                              <groupId>my.org.project</groupId>
-                              <artifactId>my-project-thing</artifactId>
-                          </dependency>
-                      </dependencyManagement>
-                      
-                      <repositories>
-                      </repositories>
-                      <pluginRepositories>
-                      </pluginRepositories>
-                      
-                      <build>
-                      </build>
-                  </project>
+              <project>
+                  <parent>
+                      <groupId>jpl</groupId>
+                      <artifactId>jpl</artifactId>
+                      <version>7.4.0</version>
+                  </parent>
+                  
+                  <!-- model version comment -->
+                  
+                  <!-- model version comment 2 -->
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <artifactId>my-project</artifactId>
+                  <groupId>my.org.project</groupId>
+                  <version>4.3.0</version>
+                  
+                  <properties>
+                  </properties>
+                  
+                  <description>Some project desc</description>
+                  <name>Some Project</name>
+                  
+                  <dependencies>
+                      <dependency>
+                          <!-- artifact content
+                              comment -->
+                          <artifactId>my-project</artifactId>
+                          <!-- group content -->
+                          <groupId>my.org.project</groupId>
+                          <!-- version content -->
+                          <version>4.3.0</version>
+                      </dependency>
+                  </dependencies>
+                  <dependencyManagement>
+                      <dependency>
+                          <version>2</version>
+                          <groupId>my.org.project</groupId>
+                          <artifactId>my-project-thing</artifactId>
+                      </dependency>
+                  </dependencyManagement>
+                  
+                  <repositories>
+                  </repositories>
+                  <pluginRepositories>
+                  </pluginRepositories>
+                  
+                  <build>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <!-- model version comment -->
-                      
-                      <!-- model version comment 2 -->
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <parent>
-                          <groupId>jpl</groupId>
-                          <artifactId>jpl</artifactId>
-                          <version>7.4.0</version>
-                      </parent>
-                      
-                      <groupId>my.org.project</groupId>
-                      <artifactId>my-project</artifactId>
-                      <version>4.3.0</version>
-                      
-                      <name>Some Project</name>
-                      
-                      <description>Some project desc</description>
-                      <properties>
-                      </properties>
-                      
-                      <dependencyManagement>
-                          <dependency>
-                              <groupId>my.org.project</groupId>
-                              <artifactId>my-project-thing</artifactId>
-                              <version>2</version>
-                          </dependency>
-                      </dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <!-- group content -->
-                              <groupId>my.org.project</groupId>
-                              <!-- artifact content
-                                  comment -->
-                              <artifactId>my-project</artifactId>
-                              <!-- version content -->
-                              <version>4.3.0</version>
-                          </dependency>
-                      </dependencies>
-                      
-                      <repositories>
-                      </repositories>
-                      <pluginRepositories>
-                      </pluginRepositories>
-                      
-                      <build>
-                      </build>
-                  </project>
+              <project>
+                  <!-- model version comment -->
+                  
+                  <!-- model version comment 2 -->
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <parent>
+                      <groupId>jpl</groupId>
+                      <artifactId>jpl</artifactId>
+                      <version>7.4.0</version>
+                  </parent>
+                  
+                  <groupId>my.org.project</groupId>
+                  <artifactId>my-project</artifactId>
+                  <version>4.3.0</version>
+                  
+                  <name>Some Project</name>
+                  
+                  <description>Some project desc</description>
+                  <properties>
+                  </properties>
+                  
+                  <dependencyManagement>
+                      <dependency>
+                          <groupId>my.org.project</groupId>
+                          <artifactId>my-project-thing</artifactId>
+                          <version>2</version>
+                      </dependency>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <!-- group content -->
+                          <groupId>my.org.project</groupId>
+                          <!-- artifact content
+                              comment -->
+                          <artifactId>my-project</artifactId>
+                          <!-- version content -->
+                          <version>4.3.0</version>
+                      </dependency>
+                  </dependencies>
+                  
+                  <repositories>
+                  </repositories>
+                  <pluginRepositories>
+                  </pluginRepositories>
+                  
+                  <build>
+                  </build>
+              </project>
               """
           )
         );

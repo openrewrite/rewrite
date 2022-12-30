@@ -28,15 +28,15 @@ class HclCommentTest implements RewriteTest {
         rewriteRun(
           hcl(
             """
+              # test
+              /*
+               multiline
+              */
+              resource {
                   # test
-                  /*
-                   multiline
-                  */
-                  resource {
-                      # test
-                      // test
-                      a = 1
-                  }
+                  // test
+                  a = 1
+              }
               """
           )
         );

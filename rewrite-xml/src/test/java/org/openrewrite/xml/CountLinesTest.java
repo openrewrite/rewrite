@@ -29,37 +29,37 @@ public class CountLinesTest implements RewriteTest {
         rewriteRun(
           xml(
             """
-                <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                         xmlns="http://maven.apache.org/POM/4.0.0"
-                         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    
-                    <groupId>org.openrewrite.maven</groupId>
-                    <artifactId>round_trip_serialization</artifactId>
-                    <version>1.0</version>
-                    <packaging>jar</packaging>
-                    <name>BasicIT#round_trip_serialization</name>
-                    
-                    <properties>
-                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-                    </properties>
-                    
-                    <build>
-                        <plugins>
-                            <plugin>
-                                <groupId>@project.groupId@</groupId>
-                                <artifactId>@project.artifactId@</artifactId>
-                                <version>@project.version@</version>
-                                <executions>
-                                    <execution>
-                                        <phase>package</phase>
-                                        <goals><goal>ast</goal></goals>
-                                    </execution>
-                                </executions>
-                            </plugin>
-                        </plugins>
-                    </build>
-                </project>
+              <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                       xmlns="http://maven.apache.org/POM/4.0.0"
+                       xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>org.openrewrite.maven</groupId>
+                  <artifactId>round_trip_serialization</artifactId>
+                  <version>1.0</version>
+                  <packaging>jar</packaging>
+                  <name>BasicIT#round_trip_serialization</name>
+                  
+                  <properties>
+                      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                  </properties>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>@project.groupId@</groupId>
+                              <artifactId>@project.artifactId@</artifactId>
+                              <version>@project.version@</version>
+                              <executions>
+                                  <execution>
+                                      <phase>package</phase>
+                                      <goals><goal>ast</goal></goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             spec -> spec.afterRecipe(xml -> assertThat(CountLinesVisitor.countLines(xml)).isEqualTo(28))
           )

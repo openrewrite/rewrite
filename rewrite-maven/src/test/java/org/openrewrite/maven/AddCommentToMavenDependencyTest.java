@@ -33,51 +33,51 @@ class AddCommentToMavenDependencyTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                      </dependency>
-                      <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                        <version>4.13.1</version>
-                        <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.1</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    
-                    <dependencies>
-                      <dependency>
-                        <!-- Comment text -->
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                      </dependency>
-                      <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                        <version>4.13.1</version>
-                        <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <dependencies>
+                  <dependency>
+                    <!-- Comment text -->
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.1</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
