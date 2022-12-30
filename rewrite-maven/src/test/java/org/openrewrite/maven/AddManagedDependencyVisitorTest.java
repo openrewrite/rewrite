@@ -34,21 +34,21 @@ public class AddManagedDependencyVisitorTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.apache.logging.log4j</groupId>
-                                <artifactId>log4j-bom</artifactId>
-                                <version>2.17.0</version>
-                                <type>pom</type>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-bom</artifactId>
+                            <version>2.17.0</version>
+                            <type>pom</type>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
             """
           )
         );
@@ -60,29 +60,29 @@ public class AddManagedDependencyVisitorTest implements RewriteTest {
           spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
           pomXml(
             """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                </project>
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+            </project>
             """,
             """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.apache.logging.log4j</groupId>
-                                <artifactId>log4j-bom</artifactId>
-                                <version>2.17.2</version>
-                                <type>pom</type>
-                                <scope>import</scope>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-bom</artifactId>
+                            <version>2.17.2</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
             """
           )
         );
@@ -94,30 +94,30 @@ public class AddManagedDependencyVisitorTest implements RewriteTest {
           spec -> spec.cycles(1).expectedCyclesThatMakeChanges(1),
           pomXml(
             """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencyManagement/>
-                </project>
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement/>
+            </project>
             """,
             """
-                <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.apache.logging.log4j</groupId>
-                                <artifactId>log4j-bom</artifactId>
-                                <version>2.17.2</version>
-                                <type>pom</type>
-                                <scope>import</scope>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
-                </project>
+            <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.logging.log4j</groupId>
+                            <artifactId>log4j-bom</artifactId>
+                            <version>2.17.2</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
             """
           )
         );

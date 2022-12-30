@@ -28,40 +28,40 @@ class FindPropertiesTest implements RewriteTest {
           spec -> spec.recipe(new FindProperties("guava*")),
           pomXml(
             """
-                  <project>
-                    <properties>
-                      <someNullProp/>
-                      <guava.version>28.2-jre</guava.version>
-                    </properties>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>${guava.version}</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <properties>
+                  <someNullProp/>
+                  <guava.version>28.2-jre</guava.version>
+                </properties>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${guava.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <properties>
-                      <someNullProp/>
-                      <!--~~>--><guava.version>28.2-jre</guava.version>
-                    </properties>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version><!--~~(28.2-jre)~~>-->${guava.version}</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <properties>
+                  <someNullProp/>
+                  <!--~~>--><guava.version>28.2-jre</guava.version>
+                </properties>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version><!--~~(28.2-jre)~~>-->${guava.version}</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );

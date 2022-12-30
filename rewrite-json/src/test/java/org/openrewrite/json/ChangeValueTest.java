@@ -32,22 +32,22 @@ class ChangeValueTest implements RewriteTest {
             null
           )),
           json("""
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      "name": "monitoring-tools",
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  "name": "monitoring-tools",
+                  "namespace": "monitoring-tools"
+                }
+              }
               """,
             """
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      "name": "monitoring",
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  "name": "monitoring",
+                  "namespace": "monitoring-tools"
+                }
+              }
               """
           )
         );
@@ -62,24 +62,24 @@ class ChangeValueTest implements RewriteTest {
             null
           )),
           json("""
+              {
+                "subjects": [
                   {
-                    "subjects": [
-                      {
-                        "kind": "ServiceAccount",
-                        "name": "monitoring-tools"
-                      }
-                    ]
+                    "kind": "ServiceAccount",
+                    "name": "monitoring-tools"
                   }
+                ]
+              }
               """,
             """
+              {
+                "subjects": [
                   {
-                    "subjects": [
-                      {
-                        "kind": "Deployment",
-                        "name": "monitoring-tools"
-                      }
-                    ]
+                    "kind": "Deployment",
+                    "name": "monitoring-tools"
                   }
+                ]
+              }
               """
           )
         );

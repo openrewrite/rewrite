@@ -27,7 +27,7 @@ public class LabelsTest implements RewriteTest {
         rewriteRun(
           //language=groovy
           groovy("""
-              given: "hello"
+            given: "hello"
             """)
         );
     }
@@ -37,11 +37,11 @@ public class LabelsTest implements RewriteTest {
         rewriteRun(
           //language=groovy
           groovy("""
-              def foo() {}
-              label1:
-              label2:
-              label3:
-              foo()
+            def foo() {}
+            label1:
+            label2:
+            label3:
+            foo()
             """)
         );
     }

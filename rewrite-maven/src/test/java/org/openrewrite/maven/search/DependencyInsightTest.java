@@ -30,19 +30,19 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile")),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>29.0-jre</version>
-                          <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                      <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -54,32 +54,32 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile")),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>29.0-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <!--~~>--><dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>29.0-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~>--><dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -91,32 +91,32 @@ class DependencyInsightTest implements RewriteTest {
           spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile")),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                          <groupId>io.micrometer</groupId>
-                          <artifactId>micrometer-registry-prometheus</artifactId>
-                          <version>1.6.3</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                      <groupId>io.micrometer</groupId>
+                      <artifactId>micrometer-registry-prometheus</artifactId>
+                      <version>1.6.3</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <!--~~(io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
-                          <groupId>io.micrometer</groupId>
-                          <artifactId>micrometer-registry-prometheus</artifactId>
-                          <version>1.6.3</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <!--~~(io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
+                      <groupId>io.micrometer</groupId>
+                      <artifactId>micrometer-registry-prometheus</artifactId>
+                      <version>1.6.3</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );

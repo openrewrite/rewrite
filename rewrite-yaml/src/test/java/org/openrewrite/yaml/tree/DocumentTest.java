@@ -28,10 +28,10 @@ class DocumentTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  ---
-                  type: specs.openrewrite.org/v1beta/visitor
-                  ---
-                  type: specs.openrewrite.org/v1beta/recipe
+              ---
+              type: specs.openrewrite.org/v1beta/visitor
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
               """,
             spec -> spec.afterRecipe(y -> {
                 assertThat(y.getDocuments()).hasSize(2);
@@ -46,12 +46,12 @@ class DocumentTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  type: specs.openrewrite.org/v1beta/visitor
-                  ...
-                  ---
-                  type: specs.openrewrite.org/v1beta/recipe
-                  
-                  ...
+              type: specs.openrewrite.org/v1beta/visitor
+              ...
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              
+              ...
               """,
             spec -> spec.afterRecipe(y -> {
                 assertThat(y.getDocuments()).hasSize(2);

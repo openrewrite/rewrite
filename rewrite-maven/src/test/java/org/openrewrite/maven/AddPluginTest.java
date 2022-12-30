@@ -36,32 +36,32 @@ public class AddPluginTest implements RewriteTest {
             null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>100.0</version>
-                          <configuration>
-                            <activeRecipes>
-                              <recipe>io.moderne.FindTest</recipe>
-                            </activeRecipes>
-                          </configuration>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>100.0</version>
+                      <configuration>
+                        <activeRecipes>
+                          <recipe>io.moderne.FindTest</recipe>
+                        </activeRecipes>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -82,34 +82,34 @@ public class AddPluginTest implements RewriteTest {
               """, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>100.0</version>
+                      <dependencies>
+                        <dependency>
                           <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>100.0</version>
-                          <dependencies>
-                            <dependency>
-                              <groupId>org.openrewrite.maven</groupId>
-                              <artifactId>java-8-migration</artifactId>
-                              <version>1.0.0</version>
-                            </dependency>
-                          </dependencies>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+                          <artifactId>java-8-migration</artifactId>
+                          <version>1.0.0</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -138,42 +138,42 @@ public class AddPluginTest implements RewriteTest {
               """)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>100.0</version>
-                          <executions>
-                            <execution>
-                              <id>xjc</id>
-                              <goals>
-                                <goal>xjc</goal>
-                              </goals>
-                              <configuration>
-                                <sources>
-                                  <source>/src/main/resources/countries.xsd</source>
-                                  <source>/src/main/resources/countries1.xsd</source>
-                                </sources>
-                                <outputDirectory>/src/main/generated-java</outputDirectory>
-                              </configuration>
-                            </execution>
-                          </executions>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>100.0</version>
+                      <executions>
+                        <execution>
+                          <id>xjc</id>
+                          <goals>
+                            <goal>xjc</goal>
+                          </goals>
+                          <configuration>
+                            <sources>
+                              <source>/src/main/resources/countries.xsd</source>
+                              <source>/src/main/resources/countries1.xsd</source>
+                            </sources>
+                            <outputDirectory>/src/main/generated-java</outputDirectory>
+                          </configuration>
+                        </execution>
+                      </executions>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -184,27 +184,27 @@ public class AddPluginTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>100.0</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>100.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );
@@ -215,36 +215,36 @@ public class AddPluginTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>99.0</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>99.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <build>
-                      <plugins>
-                        <plugin>
-                          <groupId>org.openrewrite.maven</groupId>
-                          <artifactId>rewrite-maven-plugin</artifactId>
-                          <version>100.0</version>
-                        </plugin>
-                      </plugins>
-                    </build>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>100.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
               """
           )
         );

@@ -30,8 +30,8 @@ public class LambdaTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                def f1 = { -> 1 }
-                def f2 = { 1 }
+              def f1 = { -> 1 }
+              def f2 = { 1 }
               """
           )
         );

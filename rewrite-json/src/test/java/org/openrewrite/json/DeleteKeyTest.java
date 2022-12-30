@@ -28,21 +28,21 @@ class DeleteKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.metadata.name", null)),
           json("""
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      "name": "monitoring-tools",
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  "name": "monitoring-tools",
+                  "namespace": "monitoring-tools"
+                }
+              }
               """,
             """
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  "namespace": "monitoring-tools"
+                }
+              }
               """
           )
         );
@@ -53,23 +53,23 @@ class DeleteKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.subjects.kind", null)),
           json("""
+              {
+                "subjects": [
                   {
-                    "subjects": [
-                      {
-                        "kind": "ServiceAccount",
-                        "name": "monitoring-tools"
-                      }
-                    ]
+                    "kind": "ServiceAccount",
+                    "name": "monitoring-tools"
                   }
+                ]
+              }
               """,
             """
+              {
+                "subjects": [
                   {
-                    "subjects": [
-                      {
-                        "name": "monitoring-tools"
-                      }
-                    ]
+                    "name": "monitoring-tools"
                   }
+                ]
+              }
               """
           )
         );
@@ -82,19 +82,19 @@ class DeleteKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DeleteKey("$.b.c.d", null)),
           json("""
-                  {
-                    "a": "a-value",
-                    "b": {
-                      "c": {
-                        "d": "d-value"
-                      }
-                    }
+              {
+                "a": "a-value",
+                "b": {
+                  "c": {
+                    "d": "d-value"
                   }
+                }
+              }
               """,
             """
-                  {
-                    "a": "a-value"
-                  }
+              {
+                "a": "a-value"
+              }
               """
           )
         );

@@ -28,22 +28,22 @@ class FindKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new FindKey("$.metadata.name")),
           json("""
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      "name": "monitoring-tools",
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  "name": "monitoring-tools",
+                  "namespace": "monitoring-tools"
+                }
+              }
               """,
             """
-                  {
-                    "apiVersion": "v1",
-                    "metadata": {
-                      /*~~>*/"name": "monitoring-tools",
-                      "namespace": "monitoring-tools"
-                    }
-                  }
+              {
+                "apiVersion": "v1",
+                "metadata": {
+                  /*~~>*/"name": "monitoring-tools",
+                  "namespace": "monitoring-tools"
+                }
+              }
               """
           )
         );

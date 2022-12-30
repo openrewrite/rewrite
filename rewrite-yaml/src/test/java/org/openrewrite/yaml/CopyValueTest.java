@@ -28,14 +28,14 @@ class CopyValueTest implements RewriteTest {
           spec -> spec.recipe(new CopyValue(".source", ".destination", null)),
           yaml(
             """
-                  id: something
-                  source:   password
-                  destination: whatever
+              id: something
+              source:   password
+              destination: whatever
               """,
             """
-                  id: something
-                  source:   password
-                  destination:   password
+              id: something
+              source:   password
+              destination:   password
               """
           )
         );
@@ -47,11 +47,11 @@ class CopyValueTest implements RewriteTest {
           spec -> spec.recipe(new CopyValue(".source", ".destination", null)),
           yaml(
             """
-                  id: something
-                  source:
-                      complex:
-                          structure: 1
-                  destination: whatever
+              id: something
+              source:
+                  complex:
+                      structure: 1
+              destination: whatever
               """
           )
         );
@@ -65,12 +65,12 @@ class CopyValueTest implements RewriteTest {
             .doNext(new DeleteKey(".source", null))),
           yaml(
             """
-                  id: something
-                  source:   password
+              id: something
+              source:   password
               """,
             """
-                  id: something
-                  destination:   password
+              id: something
+              destination:   password
               """
           )
         );

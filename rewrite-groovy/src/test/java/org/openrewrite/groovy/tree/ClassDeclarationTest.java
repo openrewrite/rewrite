@@ -247,10 +247,10 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  class A {
-                      List<String> a
-                      Map<Object, Object> b
-                  }
+              class A {
+                  List<String> a
+                  Map<Object, Object> b
+              }
               """,
             spec -> spec.beforeRecipe(cu -> {
                 var statements = cu.getClasses().get(0).getBody().getStatements();
@@ -271,9 +271,9 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  @Deprecated
-                  // Some comment
-                  public final class A {}
+              @Deprecated
+              // Some comment
+              public final class A {}
               """,
             spec -> spec.beforeRecipe(cu -> {
                 var annotations = cu.getClasses().get(0).getAllAnnotations();

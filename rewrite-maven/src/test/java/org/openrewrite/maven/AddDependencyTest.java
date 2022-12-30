@@ -494,20 +494,20 @@ class AddDependencyTest implements RewriteTest {
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-parent</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>28.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>28.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject(

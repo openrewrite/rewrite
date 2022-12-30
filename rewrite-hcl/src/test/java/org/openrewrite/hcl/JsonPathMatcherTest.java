@@ -63,16 +63,16 @@ class JsonPathMatcherTest implements RewriteTest {
         rewriteRun(
           hcl(
             """
-                  provider "azurerm" {
-                    features {
-                      key_vault {
-                        purge_soft_delete_on_destroy = true
-                      }
-                    }
-                    somethingElse {
-                    }
-                    attr = 1
+              provider "azurerm" {
+                features {
+                  key_vault {
+                    purge_soft_delete_on_destroy = true
                   }
+                }
+                somethingElse {
+                }
+                attr = 1
+              }
               """,
             spec ->
               spec.beforeRecipe(configFile -> {
@@ -88,13 +88,13 @@ class JsonPathMatcherTest implements RewriteTest {
         rewriteRun(
           hcl(
             """
-                  provider "azurerm" {
-                    features {
-                      key_vault {
-                        purge_soft_delete_on_destroy = true
-                      }
-                    }
+              provider "azurerm" {
+                features {
+                  key_vault {
+                    purge_soft_delete_on_destroy = true
                   }
+                }
+              }
               """,
             spec -> spec.beforeRecipe(configFile -> {
                 assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy == 'true')]"))).isTrue();
@@ -109,13 +109,13 @@ class JsonPathMatcherTest implements RewriteTest {
         rewriteRun(
           hcl(
             """
-                  provider "azurerm" {
-                    features {
-                      key_vault {
-                        purge_soft_delete_on_destroy = true
-                      }
-                    }
+              provider "azurerm" {
+                features {
+                  key_vault {
+                    purge_soft_delete_on_destroy = true
                   }
+                }
+              }
               """,
             spec -> spec.beforeRecipe(configFile -> {
                 assertThat(anyAttributeMatch(configFile, new JsonPathMatcher("$.provider.features.key_vault[?(@.purge_soft_delete_on_destroy)]"))).isTrue();

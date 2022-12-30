@@ -34,14 +34,14 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-parent</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <key>value</key>
-                  </properties>
-                </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
               """
           ),
           mavenProject("my-app",
@@ -68,14 +68,14 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty("key", "value", null, true)),
           pomXml(
             """
-                    <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-parent</artifactId>
-                      <version>1</version>
-                      <properties>
-                        <key>v</key>
-                      </properties>
-                    </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-parent</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>v</key>
+                </properties>
+              </project>
               """,
             SourceSpec::skip
           ),
@@ -102,27 +102,27 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <key>value</key>
-                    </properties>
-                  
-                    <dependencies>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              
+                <dependencies>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -133,27 +133,27 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <abc>value</abc>
-                      <other>value</other>
-                    </properties>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <abc>value</abc>
+                  <other>value</other>
+                </properties>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <abc>value</abc>
-                      <key>value</key>
-                      <other>value</other>
-                    </properties>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <abc>value</abc>
+                  <key>value</key>
+                  <other>value</other>
+                </properties>
+              </project>
               """
           )
         );
@@ -164,24 +164,24 @@ class AddPropertyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <key>v</key>
-                    </properties>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>v</key>
+                </properties>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <properties>
-                      <key>value</key>
-                    </properties>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <properties>
+                  <key>value</key>
+                </properties>
+              </project>
               """
           )
         );
@@ -193,14 +193,14 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty("key", "value", true, false)),
           pomXml(
 """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <properties>
-                    <key>v</key>
-                  </properties>
-                </project>
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <properties>
+                <key>v</key>
+              </properties>
+            </project>
             """
           )
         );

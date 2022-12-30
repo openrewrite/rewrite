@@ -149,8 +149,8 @@ class CoalescePropertiesTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  management.metrics.enable.process.files: true
-                  management.metrics.enable.jvm: true
+              management.metrics.enable.process.files: true
+              management.metrics.enable.jvm: true
               """,
             """
                   management.metrics.enable:

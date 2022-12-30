@@ -33,60 +33,60 @@ class ExcludeDependencyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.3.6.RELEASE</version>
-                    </parent>
-                    
-                    <groupId>com.example</groupId>
-                    <artifactId>demo</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter</artifactId>
-                      </dependency>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-test</artifactId>
-                        <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.3.6.RELEASE</version>
+                </parent>
+                
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-test</artifactId>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <modelVersion>4.0.0</modelVersion>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.3.6.RELEASE</version>
-                    </parent>
-                    
-                    <groupId>com.example</groupId>
-                    <artifactId>demo</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter</artifactId>
-                      </dependency>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-test</artifactId>
-                        <scope>test</scope>
-                        <exclusions>
-                          <exclusion>
-                            <groupId>org.junit.vintage</groupId>
-                            <artifactId>junit-vintage-engine</artifactId>
-                          </exclusion>
-                        </exclusions>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.3.6.RELEASE</version>
+                </parent>
+                
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-test</artifactId>
+                    <scope>test</scope>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>org.junit.vintage</groupId>
+                        <artifactId>junit-vintage-engine</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -97,23 +97,23 @@ class ExcludeDependencyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.4.0</version>
-                    </parent>
-                    
-                    <groupId>com.example</groupId>
-                    <artifactId>demo</artifactId>
-                    <dependencies>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-test</artifactId>
-                        <scope>test</scope>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>2.4.0</version>
+                </parent>
+                
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-test</artifactId>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -126,18 +126,18 @@ class ExcludeDependencyTest implements RewriteTest {
           spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
           pomXml(
             """
-                  <project>
-                      <groupId>com.example</groupId>
-                      <artifactId>demo</artifactId>
-                      <version>0.0.1-SNAPSHOT</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>junit</groupId>
-                              <artifactId>junit</artifactId>
-                              <version>4.13.2</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.13.2</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -149,38 +149,38 @@ class ExcludeDependencyTest implements RewriteTest {
           spec -> spec.recipe(new ExcludeDependency("junit", "junit", "compile")),
           pomXml(
             """
-                  <project>
-                      <groupId>com.example</groupId>
-                      <artifactId>demo</artifactId>
-                      <version>0.0.1-SNAPSHOT</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.neo4j</groupId>
-                              <artifactId>neo4j-ogm-core</artifactId>
-                              <version>3.2.21</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.neo4j</groupId>
+                          <artifactId>neo4j-ogm-core</artifactId>
+                          <version>3.2.21</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.example</groupId>
-                      <artifactId>demo</artifactId>
-                      <version>0.0.1-SNAPSHOT</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.neo4j</groupId>
-                              <artifactId>neo4j-ogm-core</artifactId>
-                              <version>3.2.21</version>
-                              <exclusions>
-                                  <exclusion>
-                                      <groupId>junit</groupId>
-                                      <artifactId>junit</artifactId>
-                                  </exclusion>
-                              </exclusions>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.neo4j</groupId>
+                          <artifactId>neo4j-ogm-core</artifactId>
+                          <version>3.2.21</version>
+                          <exclusions>
+                              <exclusion>
+                                  <groupId>junit</groupId>
+                                  <artifactId>junit</artifactId>
+                              </exclusion>
+                          </exclusions>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -192,16 +192,16 @@ class ExcludeDependencyTest implements RewriteTest {
           spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.example</groupId>
-                      <artifactId>demo</artifactId>
-                      <version>0.0.1-SNAPSHOT</version>
-                      <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot</artifactId>
-                        <version>2.4.10</version>
-                      </dependency>
-                  </project>
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>0.0.1-SNAPSHOT</version>
+                  <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot</artifactId>
+                    <version>2.4.10</version>
+                  </dependency>
+              </project>
               """
           )
         );
@@ -214,21 +214,21 @@ class ExcludeDependencyTest implements RewriteTest {
           spec -> spec.recipe(new ExcludeDependency("junit", "junit", null)),
           pomXml(
              """
-              <project>
-                <parent>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-parent</artifactId>
-                  <version>2.5.14</version>
-                </parent>
-                <groupId>com.example</groupId>
-                <artifactId>demo</artifactId>
-                <dependencies>
-                  <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-actuator</artifactId>
-                  </dependency>
-                </dependencies>
-              </project>
+          <project>
+            <parent>
+              <groupId>org.springframework.boot</groupId>
+              <artifactId>spring-boot-starter-parent</artifactId>
+              <version>2.5.14</version>
+            </parent>
+            <groupId>com.example</groupId>
+            <artifactId>demo</artifactId>
+            <dependencies>
+              <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-actuator</artifactId>
+              </dependency>
+            </dependencies>
+          </project>
           """)
         );
     }

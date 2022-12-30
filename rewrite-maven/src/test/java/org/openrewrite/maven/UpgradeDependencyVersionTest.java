@@ -37,89 +37,89 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             true, null)),
           pomXml(
             """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>com.example</groupId>
-                    <artifactId>explicit-deps-app</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <name>explicit-deps-app</name>
-                    <description>explicit-deps-app</description>
-                    <properties>
-                        <java.version>17</java.version>
-                        <maven.compiler.source>17</maven.compiler.source>
-                        <maven.compiler.target>17</maven.compiler.target>
-                    </properties>
-                    <repositories>
-                        <repository>
-                            <id>spring-milestone</id>
-                            <url>https://repo.spring.io/milestone</url>
-                            <snapshots>
-                                <enabled>false</enabled>
-                            </snapshots>
-                        </repository>
-                    </repositories>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.springframework.boot</groupId>
-                                <artifactId>spring-boot-dependencies</artifactId>
-                                <version>2.4.0</version>
-                                <type>pom</type>
-                                <scope>import</scope>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>explicit-deps-app</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <name>explicit-deps-app</name>
+                <description>explicit-deps-app</description>
+                <properties>
+                    <java.version>17</java.version>
+                    <maven.compiler.source>17</maven.compiler.source>
+                    <maven.compiler.target>17</maven.compiler.target>
+                </properties>
+                <repositories>
+                    <repository>
+                        <id>spring-milestone</id>
+                        <url>https://repo.spring.io/milestone</url>
+                        <snapshots>
+                            <enabled>false</enabled>
+                        </snapshots>
+                    </repository>
+                </repositories>
+                <dependencyManagement>
                     <dependencies>
                         <dependency>
-                            <groupId>io.dropwizard.metrics</groupId>
-                            <artifactId>metrics-annotation</artifactId>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-dependencies</artifactId>
+                            <version>2.4.0</version>
+                            <type>pom</type>
+                            <scope>import</scope>
                         </dependency>
                     </dependencies>
-                </project>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>io.dropwizard.metrics</groupId>
+                        <artifactId>metrics-annotation</artifactId>
+                    </dependency>
+                </dependencies>
+            </project>
             """,
             """
-                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>com.example</groupId>
-                    <artifactId>explicit-deps-app</artifactId>
-                    <version>0.0.1-SNAPSHOT</version>
-                    <name>explicit-deps-app</name>
-                    <description>explicit-deps-app</description>
-                    <properties>
-                        <java.version>17</java.version>
-                        <maven.compiler.source>17</maven.compiler.source>
-                        <maven.compiler.target>17</maven.compiler.target>
-                    </properties>
-                    <repositories>
-                        <repository>
-                            <id>spring-milestone</id>
-                            <url>https://repo.spring.io/milestone</url>
-                            <snapshots>
-                                <enabled>false</enabled>
-                            </snapshots>
-                        </repository>
-                    </repositories>
-                    <dependencyManagement>
-                        <dependencies>
-                            <dependency>
-                                <groupId>org.springframework.boot</groupId>
-                                <artifactId>spring-boot-dependencies</artifactId>
-                                <version>2.4.0</version>
-                                <type>pom</type>
-                                <scope>import</scope>
-                            </dependency>
-                        </dependencies>
-                    </dependencyManagement>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>com.example</groupId>
+                <artifactId>explicit-deps-app</artifactId>
+                <version>0.0.1-SNAPSHOT</version>
+                <name>explicit-deps-app</name>
+                <description>explicit-deps-app</description>
+                <properties>
+                    <java.version>17</java.version>
+                    <maven.compiler.source>17</maven.compiler.source>
+                    <maven.compiler.target>17</maven.compiler.target>
+                </properties>
+                <repositories>
+                    <repository>
+                        <id>spring-milestone</id>
+                        <url>https://repo.spring.io/milestone</url>
+                        <snapshots>
+                            <enabled>false</enabled>
+                        </snapshots>
+                    </repository>
+                </repositories>
+                <dependencyManagement>
                     <dependencies>
                         <dependency>
-                            <groupId>io.dropwizard.metrics</groupId>
-                            <artifactId>metrics-annotation</artifactId>
-                            <version>4.2.9</version>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-dependencies</artifactId>
+                            <version>2.4.0</version>
+                            <type>pom</type>
+                            <scope>import</scope>
                         </dependency>
                     </dependencies>
-                </project>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>io.dropwizard.metrics</groupId>
+                        <artifactId>metrics-annotation</artifactId>
+                        <version>4.2.9</version>
+                    </dependency>
+                </dependencies>
+            </project>
             """
           )
         );
@@ -131,38 +131,38 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>org.junit.jupiter</groupId>
-                                  <artifactId>junit-jupiter-api</artifactId>
-                                  <version>5.6.2</version>
-                                  <scope>test</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.6.2</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>org.junit.jupiter</groupId>
-                                  <artifactId>junit-jupiter-api</artifactId>
-                                  <version>5.7.2</version>
-                                  <scope>test</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.junit.jupiter</groupId>
+                              <artifactId>junit-jupiter-api</artifactId>
+                              <version>5.7.2</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -175,32 +175,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion(groupId, artifactId, "latest.patch", null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>13.0</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>13.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>13.0.1</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>13.0.1</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -212,36 +212,36 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "14.0", "", true, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany</groupId>
-                      <artifactId>my-parent</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>13.0.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>13.0.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.mycompany</groupId>
-                      <artifactId>my-parent</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>14.0</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>14.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("my-child",
@@ -296,50 +296,50 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
-                          <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
-                          <quarkus.platform.version>1.11.7.Final</quarkus.platform.version>
-                      </properties>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>${quarkus.platform.group-id}</groupId>
-                                  <artifactId>${quarkus.platform.artifact-id}</artifactId>
-                                  <version>${quarkus.platform.version}</version>
-                                  <type>pom</type>
-                                  <scope>import</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
+                      <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
+                      <quarkus.platform.version>1.11.7.Final</quarkus.platform.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>${quarkus.platform.group-id}</groupId>
+                              <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                              <version>${quarkus.platform.version}</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
-                          <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
-                          <quarkus.platform.version>1.13.7.Final</quarkus.platform.version>
-                      </properties>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>${quarkus.platform.group-id}</groupId>
-                                  <artifactId>${quarkus.platform.artifact-id}</artifactId>
-                                  <version>${quarkus.platform.version}</version>
-                                  <type>pom</type>
-                                  <scope>import</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <quarkus.platform.artifact-id>quarkus-universe-bom</quarkus.platform.artifact-id>
+                      <quarkus.platform.group-id>io.quarkus</quarkus.platform.group-id>
+                      <quarkus.platform.version>1.13.7.Final</quarkus.platform.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>${quarkus.platform.group-id}</groupId>
+                              <artifactId>${quarkus.platform.artifact-id}</artifactId>
+                              <version>${quarkus.platform.version}</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -353,32 +353,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>27.0-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>27.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -391,42 +391,42 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.patch", null, null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <dependency.group-id>com.google.guava</dependency.group-id>
-                          <dependency.artifact-id>guava</dependency.artifact-id>
-                          <dependency.version>13.0</dependency.version>
-                      </properties>
-                      <dependencies>
-                          <dependency>
-                              <groupId>${dependency.group-id}</groupId>
-                              <artifactId>${dependency.artifact-id}</artifactId>
-                              <version>${dependency.version}</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <dependency.group-id>com.google.guava</dependency.group-id>
+                      <dependency.artifact-id>guava</dependency.artifact-id>
+                      <dependency.version>13.0</dependency.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>${dependency.group-id}</groupId>
+                          <artifactId>${dependency.artifact-id}</artifactId>
+                          <version>${dependency.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <dependency.group-id>com.google.guava</dependency.group-id>
-                          <dependency.artifact-id>guava</dependency.artifact-id>
-                          <dependency.version>13.0.1</dependency.version>
-                      </properties>
-                      <dependencies>
-                          <dependency>
-                              <groupId>${dependency.group-id}</groupId>
-                              <artifactId>${dependency.artifact-id}</artifactId>
-                              <version>${dependency.version}</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <dependency.group-id>com.google.guava</dependency.group-id>
+                      <dependency.artifact-id>guava</dependency.artifact-id>
+                      <dependency.version>13.0.1</dependency.version>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>${dependency.group-id}</groupId>
+                          <artifactId>${dependency.artifact-id}</artifactId>
+                          <version>${dependency.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -438,32 +438,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-android", null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>25.0-android</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>25.0-android</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>28.0-android</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>28.0-android</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -476,32 +476,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "latest.release", "", null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>22.0</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>22.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>23.0</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>23.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -513,42 +513,42 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", false, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <guava.version>25.0-jre</guava.version>
-                      </properties>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>${guava.version}</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <guava.version>25.0-jre</guava.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>${guava.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <guava.version>28.0-jre</guava.version>
-                      </properties>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>${guava.version}</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <guava.version>28.0-jre</guava.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>${guava.version}</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("my-app-server",
@@ -583,52 +583,52 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("com.google.guava", "*", "25-28", "-jre", null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <guava.version>25.0-jre</guava.version>
-                          <spring.version>5.3.9</spring.version>
-                          <spring.artifact-id>spring-jdbc</spring.artifact-id>
-                      </properties>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>${guava.version}</version>
-                          </dependency>
-                          <dependency>
-                              <groupId>org.springframework</groupId>
-                              <artifactId>${spring.artifact-id}</artifactId>
-                              <version>${spring.version}</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <guava.version>25.0-jre</guava.version>
+                      <spring.version>5.3.9</spring.version>
+                      <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>${guava.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework</groupId>
+                          <artifactId>${spring.artifact-id}</artifactId>
+                          <version>${spring.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <guava.version>28.0-jre</guava.version>
-                          <spring.version>5.3.9</spring.version>
-                          <spring.artifact-id>spring-jdbc</spring.artifact-id>
-                      </properties>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>${guava.version}</version>
-                          </dependency>
-                          <dependency>
-                              <groupId>org.springframework</groupId>
-                              <artifactId>${spring.artifact-id}</artifactId>
-                              <version>${spring.version}</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <guava.version>28.0-jre</guava.version>
+                      <spring.version>5.3.9</spring.version>
+                      <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>${guava.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework</groupId>
+                          <artifactId>${spring.artifact-id}</artifactId>
+                          <version>${spring.version}</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -640,40 +640,40 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app-server</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>io.micronaut</groupId>
-                          <artifactId>micronaut-bom</artifactId>
-                          <version>2.5.10</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </project>
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.micronaut</groupId>
+                      <artifactId>micronaut-bom</artifactId>
+                      <version>2.5.10</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>org.openrewrite.example</groupId>
-                    <artifactId>my-app-server</artifactId>
-                    <version>1</version>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>io.micronaut</groupId>
-                          <artifactId>micronaut-bom</artifactId>
-                          <version>3.0.0-M5</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </project>
+              <project>
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.micronaut</groupId>
+                      <artifactId>micronaut-bom</artifactId>
+                      <version>3.0.0-M5</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
               """
           )
         );
@@ -685,56 +685,56 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app-server</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <micronaut.version>2.5.10</micronaut.version>
-                      </properties>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>io.micronaut</groupId>
-                                  <artifactId>micronaut-bom</artifactId>
-                                  <version>${micronaut.version}</version>
-                                  <type>pom</type>
-                                  <scope>import</scope>
-                              </dependency>
-                              <dependency>
-                                  <groupId>javax.servlet</groupId>
-                                  <artifactId>javax.servlet-api</artifactId>
-                                  <version>4.0.0</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app-server</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <micronaut.version>2.5.10</micronaut.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.micronaut</groupId>
+                              <artifactId>micronaut-bom</artifactId>
+                              <version>${micronaut.version}</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>javax.servlet</groupId>
+                              <artifactId>javax.servlet-api</artifactId>
+                              <version>4.0.0</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app-server</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <micronaut.version>2.5.13</micronaut.version>
-                      </properties>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>io.micronaut</groupId>
-                                  <artifactId>micronaut-bom</artifactId>
-                                  <version>${micronaut.version}</version>
-                                  <type>pom</type>
-                                  <scope>import</scope>
-                              </dependency>
-                              <dependency>
-                                  <groupId>javax.servlet</groupId>
-                                  <artifactId>javax.servlet-api</artifactId>
-                                  <version>4.0.1</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app-server</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <micronaut.version>2.5.13</micronaut.version>
+                  </properties>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>io.micronaut</groupId>
+                              <artifactId>micronaut-bom</artifactId>
+                              <version>${micronaut.version}</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                          <dependency>
+                              <groupId>javax.servlet</groupId>
+                              <artifactId>javax.servlet-api</artifactId>
+                              <version>4.0.1</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -746,62 +746,62 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app-server</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <guava.version>28.0-jre</guava.version>
-                          <spring.version>5.3.4</spring.version>
-                          <spring.artifact-id>spring-jdbc</spring.artifact-id>
-                      </properties>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>${guava.version}</version>
-                          </dependency>
-                          <dependency>
-                              <groupId>org.springframework</groupId>
-                              <artifactId>${spring.artifact-id}</artifactId>
-                              <version>${spring.version}</version>
-                          </dependency>
-                          <dependency>
-                              <groupId>com.fasterxml.jackson.core</groupId>
-                              <artifactId>jackson-core</artifactId>
-                              <version>2.13.1</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app-server</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <guava.version>28.0-jre</guava.version>
+                      <spring.version>5.3.4</spring.version>
+                      <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>${guava.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework</groupId>
+                          <artifactId>${spring.artifact-id}</artifactId>
+                          <version>${spring.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                          <version>2.13.1</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.openrewrite.example</groupId>
-                      <artifactId>my-app-server</artifactId>
-                      <version>1</version>
-                      <properties>
-                          <guava.version>28.0-jre</guava.version>
-                          <spring.version>5.3.24</spring.version>
-                          <spring.artifact-id>spring-jdbc</spring.artifact-id>
-                      </properties>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>${guava.version}</version>
-                          </dependency>
-                          <dependency>
-                              <groupId>org.springframework</groupId>
-                              <artifactId>${spring.artifact-id}</artifactId>
-                              <version>${spring.version}</version>
-                          </dependency>
-                          <dependency>
-                              <groupId>com.fasterxml.jackson.core</groupId>
-                              <artifactId>jackson-core</artifactId>
-                              <version>2.13.4</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app-server</artifactId>
+                  <version>1</version>
+                  <properties>
+                      <guava.version>28.0-jre</guava.version>
+                      <spring.version>5.3.24</spring.version>
+                      <spring.artifact-id>spring-jdbc</spring.artifact-id>
+                  </properties>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>${guava.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>org.springframework</groupId>
+                          <artifactId>${spring.artifact-id}</artifactId>
+                          <version>${spring.version}</version>
+                      </dependency>
+                      <dependency>
+                          <groupId>com.fasterxml.jackson.core</groupId>
+                          <artifactId>jackson-core</artifactId>
+                          <version>2.13.4</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -813,46 +813,46 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("io.micronaut", "micronaut-bom", "3.0.0-M5", null, null, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>org.openrewrite</groupId>
-                    <artifactId>my-app-server</artifactId>
-                    <version>1.0.0</version>
-                    <properties>
-                      <micronaut.version>2.5.11</micronaut.version>
-                    </properties>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>io.micronaut</groupId>
-                          <artifactId>micronaut-bom</artifactId>
-                          <version>${micronaut.version}</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </project>
+              <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <micronaut.version>2.5.11</micronaut.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.micronaut</groupId>
+                      <artifactId>micronaut-bom</artifactId>
+                      <version>${micronaut.version}</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                    <groupId>org.openrewrite</groupId>
-                    <artifactId>my-app-server</artifactId>
-                    <version>1.0.0</version>
-                    <properties>
-                      <micronaut.version>3.0.0-M5</micronaut.version>
-                    </properties>
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>io.micronaut</groupId>
-                          <artifactId>micronaut-bom</artifactId>
-                          <version>${micronaut.version}</version>
-                          <type>pom</type>
-                          <scope>import</scope>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                  </project>
+              <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>my-app-server</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <micronaut.version>3.0.0-M5</micronaut.version>
+                </properties>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>io.micronaut</groupId>
+                      <artifactId>micronaut-bom</artifactId>
+                      <version>${micronaut.version}</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
               """
           )
         );
@@ -865,32 +865,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
             null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.thymeleaf</groupId>
-                              <artifactId>thymeleaf-spring5</artifactId>
-                              <version>3.0.8.RELEASE</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.thymeleaf</groupId>
+                          <artifactId>thymeleaf-spring5</artifactId>
+                          <version>3.0.8.RELEASE</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                          <dependency>
-                              <groupId>org.thymeleaf</groupId>
-                              <artifactId>thymeleaf-spring5</artifactId>
-                              <version>3.0.12.RELEASE</version>
-                          </dependency>
-                      </dependencies>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.thymeleaf</groupId>
+                          <artifactId>thymeleaf-spring5</artifactId>
+                          <version>3.0.12.RELEASE</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -903,32 +903,32 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.13", null, false, null)),
           pomXml(
             """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                        <version>[4.11]</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>[4.11]</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """,
             """            
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <dependency>
-                        <groupId>junit</groupId>
-                        <artifactId>junit</artifactId>
-                        <version>4.13</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13</version>
+                  </dependency>
+                </dependencies>
+              </project>
               """
           )
         );
@@ -940,20 +940,20 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>net.sourceforge.saxon</groupId>
-                                  <artifactId>saxon</artifactId>
-                                  <version>9.1.0.8</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>net.sourceforge.saxon</groupId>
+                              <artifactId>saxon</artifactId>
+                              <version>9.1.0.8</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -965,36 +965,36 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>net.sourceforge.orbroker</groupId>
-                                  <artifactId>orbroker</artifactId>
-                                  <version>2.0.3</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>net.sourceforge.orbroker</groupId>
+                              <artifactId>orbroker</artifactId>
+                              <version>2.0.3</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>net.sourceforge.orbroker</groupId>
-                                  <artifactId>orbroker</artifactId>
-                                  <version>2.0.4</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>net.sourceforge.orbroker</groupId>
+                              <artifactId>orbroker</artifactId>
+                              <version>2.0.4</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );
@@ -1006,19 +1006,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>net.sourceforge.orbroker</groupId>
-                                  <artifactId>orbroker</artifactId>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>net.sourceforge.orbroker</groupId>
+                              <artifactId>orbroker</artifactId>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           )
         );

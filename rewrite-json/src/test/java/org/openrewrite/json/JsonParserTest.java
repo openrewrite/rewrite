@@ -37,16 +37,16 @@ public class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
       """
-                {
-                  // comments
-                  unquoted: 'and you can quote me on that',
-                  singleQuotes: 'I can use "double quotes" here',
-                  hexadecimal: 0xdecaf,
-                  leadingDecimalPoint: .8675309, andTrailing: 8675309.,
-                  positiveSign: +1,
-                  trailingComma: 'in objects', andIn: ['arrays',],
-                  "backwardsCompatible": "with JSON",
-                }
+            {
+              // comments
+              unquoted: 'and you can quote me on that',
+              singleQuotes: 'I can use "double quotes" here',
+              hexadecimal: 0xdecaf,
+              leadingDecimalPoint: .8675309, andTrailing: 8675309.,
+              positiveSign: +1,
+              trailingComma: 'in objects', andIn: ['arrays',],
+              "backwardsCompatible": "with JSON",
+            }
             """
           )
         );
@@ -85,10 +85,10 @@ public class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-                {
-                    key: "value",
-                    "key": 1,
-                }
+            {
+                key: "value",
+                "key": 1,
+            }
             """
           )
         );
@@ -99,13 +99,13 @@ public class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
+            // test
+            {
+                /* test */
+                key: "value",
                 // test
-                {
-                    /* test */
-                    key: "value",
-                    // test
-                    "key": 1,
-                }
+                "key": 1,
+            }
             """
           )
         );
@@ -117,9 +117,9 @@ public class JsonParserTest implements RewriteTest {
         rewriteRun(
           json(
             """
-                {
-                    "timestamp": 1577000812973
-                }
+            {
+                "timestamp": 1577000812973
+            }
             """
           )
         );

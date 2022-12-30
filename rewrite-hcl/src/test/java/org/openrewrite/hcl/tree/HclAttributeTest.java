@@ -67,14 +67,14 @@ class HclAttributeTest implements RewriteTest {
             )),
           hcl(
             """
-                  provider {
-                      key = "hello"
-                  }
+              provider {
+                  key = "hello"
+              }
               """,
             """
-                  provider {
-                      key = "goodbye"
-                  }
+              provider {
+                  key = "goodbye"
+              }
               """
           )
         );

@@ -28,8 +28,8 @@ class SequenceTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  - apples
-                  - oranges
+              - apples
+              - oranges
               """,
             spec -> spec.afterRecipe(y -> {
                 assertThat(((Yaml.Sequence) (y.getDocuments().get(0).getBlock())).getEntries().stream()
@@ -60,11 +60,11 @@ class SequenceTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                      [
-                          a,
-                      b,
-                              c,
-                      ]
+              [
+                  a,
+              b,
+                      c,
+              ]
               """
           )
         );
@@ -95,9 +95,9 @@ class SequenceTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  [[],
-                  [1, 2, 3, []],
-                  [ [ ] ],]
+              [[],
+              [1, 2, 3, []],
+              [ [ ] ],]
               """
           )
         );

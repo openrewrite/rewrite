@@ -28,19 +28,19 @@ public class ChangePackagingTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
           pomXml(
 """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      <packaging>pom</packaging>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>pom</packaging>
+              </project>
               """
           )
         );
@@ -52,19 +52,19 @@ public class ChangePackagingTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackaging("*", "*", null)),
           pomXml(
 """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      <packaging>pom</packaging>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>pom</packaging>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+              </project>
               """
           )
         );
@@ -76,20 +76,20 @@ public class ChangePackagingTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
           pomXml(
 """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      <packaging>jar</packaging>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>jar</packaging>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      <packaging>pom</packaging>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>pom</packaging>
+              </project>
               """
           )
         );

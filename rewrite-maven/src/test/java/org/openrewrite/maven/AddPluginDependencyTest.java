@@ -34,45 +34,45 @@ class AddPluginDependencyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <dependencies>
-                                      <dependency>
-                                          <groupId>org.openrewrite.recipe</groupId>
-                                          <artifactId>rewrite-spring</artifactId>
-                                          <version>1.0.0</version>
-                                      </dependency>
-                                  </dependencies>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                      <version>1.0.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );
@@ -83,62 +83,62 @@ class AddPluginDependencyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <dependencies>
-                                      <dependency>
-                                          <groupId>org.foo</groupId>
-                                          <artifactId>bar</artifactId>
-                                          <version>1.0.0</version>
-                                      </dependency>
-                                      <dependency>
-                                          <groupId>org.openrewrite.recipe</groupId>
-                                          <artifactId>rewrite-spring</artifactId>
-                                          <version>0.1.0</version>
-                                      </dependency>
-                                  </dependencies>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.foo</groupId>
+                                      <artifactId>bar</artifactId>
+                                      <version>1.0.0</version>
+                                  </dependency>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                      <version>0.1.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <dependencies>
-                                      <dependency>
-                                          <groupId>org.foo</groupId>
-                                          <artifactId>bar</artifactId>
-                                          <version>1.0.0</version>
-                                      </dependency>
-                                      <dependency>
-                                          <groupId>org.openrewrite.recipe</groupId>
-                                          <artifactId>rewrite-spring</artifactId>
-                                          <version>1.0.0</version>
-                                      </dependency>
-                                  </dependencies>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.foo</groupId>
+                                      <artifactId>bar</artifactId>
+                                      <version>1.0.0</version>
+                                  </dependency>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                      <version>1.0.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );
@@ -149,52 +149,52 @@ class AddPluginDependencyTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <dependencies>
-                                      <dependency>
-                                          <groupId>org.openrewrite.recipe</groupId>
-                                          <artifactId>rewrite-spring</artifactId>
-                                          <version>0.1.0</version>
-                                      </dependency>
-                                  </dependencies>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                      <version>0.1.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <dependencies>
-                                      <dependency>
-                                          <groupId>org.openrewrite.recipe</groupId>
-                                          <artifactId>rewrite-spring</artifactId>
-                                          <version>1.0.0</version>
-                                      </dependency>
-                                  </dependencies>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                      <version>1.0.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );
@@ -207,51 +207,51 @@ class AddPluginDependencyTest implements RewriteTest {
             "org.openrewrite.recipe", "rewrite-spring", null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <dependencies>
-                                      <dependency>
-                                          <groupId>org.openrewrite.recipe</groupId>
-                                          <artifactId>rewrite-spring</artifactId>
-                                          <version>0.1.0</version>
-                                      </dependency>
-                                  </dependencies>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                      <version>0.1.0</version>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>foo</artifactId>
-                      <version>1.0</version>
-                      
-                      <build>
-                          <plugins>
-                              <plugin>
-                                  <groupId>org.openrewrite.maven</groupId>
-                                  <artifactId>rewrite-maven-plugin</artifactId>
-                                  <version>4.1.5</version>
-                                  <dependencies>
-                                      <dependency>
-                                          <groupId>org.openrewrite.recipe</groupId>
-                                          <artifactId>rewrite-spring</artifactId>
-                                      </dependency>
-                                  </dependencies>
-                              </plugin>
-                          </plugins>
-                      </build>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.openrewrite.maven</groupId>
+                              <artifactId>rewrite-maven-plugin</artifactId>
+                              <version>4.1.5</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>org.openrewrite.recipe</groupId>
+                                      <artifactId>rewrite-spring</artifactId>
+                                  </dependency>
+                              </dependencies>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
               """
           )
         );

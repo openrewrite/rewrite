@@ -73,11 +73,11 @@ public class FindGradleProjectTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.openrewrite</groupId>
-                      <artifactId>maven-project</artifactId>
-                      <version>1</version>
-                  </project>
+              <project>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>maven-project</artifactId>
+                  <version>1</version>
+              </project>
               """
           )
         );

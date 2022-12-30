@@ -53,11 +53,11 @@ class DependencyUseMapNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
-                  def version = "latest.release"
-                  dependencies {
-                      api("org.openrewrite:rewrite-core:$version")
-                      implementation "group:artifact:$version"
-                  }
+              def version = "latest.release"
+              dependencies {
+                  api("org.openrewrite:rewrite-core:$version")
+                  implementation "group:artifact:$version"
+              }
               """,
             """
               def version = "latest.release"

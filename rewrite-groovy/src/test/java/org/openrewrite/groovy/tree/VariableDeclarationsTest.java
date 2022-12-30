@@ -77,7 +77,7 @@ class VariableDeclarationsTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  List<? super String> l
+              List<? super String> l
               """
           )
         );

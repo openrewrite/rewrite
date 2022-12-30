@@ -36,24 +36,24 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                                  <scope>test</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -103,24 +103,24 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                                  <scope>compile</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                              <scope>compile</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -168,23 +168,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -234,24 +234,24 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                                  <scope>test</scope>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                              <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -301,23 +301,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -365,19 +365,11 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>com.google.guava</groupId>
@@ -385,29 +377,37 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                               <version>30.0-jre</version>
                           </dependency>
                       </dependencies>
-                  </project>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.0-jre</version>
+                      </dependency>
+                  </dependencies>
+              </project>
               """,
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <dependencyManagement>
                       <dependencies>
                           <dependency>
                               <groupId>com.google.guava</groupId>
                               <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
                           </dependency>
                       </dependencies>
-                  </project>
+                  </dependencyManagement>
+                  <dependencies>
+                      <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                      </dependency>
+                  </dependencies>
+              </project>
               """
           )
         );
@@ -418,23 +418,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -475,12 +475,12 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany</groupId>
-                      <artifactId>myApiApp</artifactId>
-                      <version>1.0.0</version>
-                  </project>
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>myApiApp</artifactId>
+                  <version>1.0.0</version>
+              </project>
               """
           ),
           mavenProject("child",
@@ -516,20 +516,20 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany</groupId>
-                      <artifactId>myApiApp</artifactId>
-                      <version>1.0.0</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>myApiApp</artifactId>
+                  <version>1.0.0</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -564,20 +564,20 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>com.mycompany</groupId>
-                      <artifactId>myApiApp</artifactId>
-                      <version>1.0.0</version>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>30.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>myApiApp</artifactId>
+                  <version>1.0.0</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -620,23 +620,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>29.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -716,23 +716,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>29.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -803,23 +803,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>29.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -877,23 +877,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         rewriteRun(
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>29.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>29.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",
@@ -952,23 +952,23 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
           pomXml(
             """
-                  <project>
-                      <groupId>org.example</groupId>
-                      <artifactId>parent</artifactId>
-                      <version>1.0-SNAPSHOT</version>
-                      <modules>
-                          <module>child</module>
-                      </modules>
-                      <dependencyManagement>
-                          <dependencies>
-                              <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>31.0-jre</version>
-                              </dependency>
-                          </dependencies>
-                      </dependencyManagement>
-                  </project>
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>31.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
               """
           ),
           mavenProject("child",

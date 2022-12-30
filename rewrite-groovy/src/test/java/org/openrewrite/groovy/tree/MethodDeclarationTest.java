@@ -30,9 +30,9 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  class A {
-                      void method() {}
-                  }
+              class A {
+                  void method() {}
+              }
               """,
             spec -> spec.beforeRecipe(cu -> {
                 var method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
@@ -54,8 +54,8 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  def accept(Map m) {
-                  }
+              def accept(Map m) {
+              }
               """
           )
         );
@@ -66,9 +66,9 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  static int accept(Map m) {
-                      return 0
-                  }
+              static int accept(Map m) {
+                  return 0
+              }
               """
           )
         );
@@ -86,8 +86,8 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  def foo(int a) throws Exception , RuntimeException {
-                  }
+              def foo(int a) throws Exception , RuntimeException {
+              }
               """
           )
         );
@@ -98,8 +98,8 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                 def foo(bar, baz) {
-                 }
+              def foo(bar, baz) {
+              }
               """
           )
         );
@@ -110,8 +110,8 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
-                  }
+              def confirmNextStepWithCredentials(String message /* = prefix */ = /* hello prefix */ "Hello" ) {
+              }
               """
           )
         );
@@ -122,9 +122,9 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-                  static def foo() {
-                      return null
-                  }
+              static def foo() {
+                  return null
+              }
               """
           )
         );
