@@ -372,6 +372,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 null, // TODO
                 extendings, // TODO
                 implementings,
+                null,
                 body, // TODO
                 null // TODO
         );
