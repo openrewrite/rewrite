@@ -272,7 +272,7 @@ class MethodNameCasingTest implements RewriteTest {
           java(
             """
               class ParentClass {
-                  void _method() {
+                  void Method() {
                   }
               }
               """,
@@ -287,7 +287,7 @@ class MethodNameCasingTest implements RewriteTest {
             """
               class Test extends ParentClass {
                   @Override
-                  void _method() {
+                  void Method() {
                   }
               }
               """,
@@ -308,7 +308,7 @@ class MethodNameCasingTest implements RewriteTest {
           java(
             """
               class Test {
-                  void _method() {
+                  void Method() {
                   }
                   void method() {
                   }
@@ -324,10 +324,10 @@ class MethodNameCasingTest implements RewriteTest {
           java(
             """
               class T {
-                  void _method(){}
+                  void Method(){}
                   
                   private static class M {
-                      void _method(){}
+                      void Method(){}
                   }
               }
               """,
@@ -426,19 +426,19 @@ class MethodNameCasingTest implements RewriteTest {
     }
 
     @Test
-    void keepCamelCaseWhenRemovingLeadingUnderscore() {
+    void keepCamelCase() {
         rewriteRun(
           java(
             """
               class Test {
-                  private void _theMethod() {
+                  private void Method() {
                   
                   }
               }
               """,
             """
               class Test {
-                  private void theMethod() {
+                  private void method() {
                   
                   }
               }
@@ -448,14 +448,14 @@ class MethodNameCasingTest implements RewriteTest {
     }
 
     @Test
-    void keepCamelCaseWhenRemovingLeadingUnderscore2() {
+    void keepCamelCase2() {
         rewriteRun(
           java(
             """
               import java.util.*;
                             
               class Test {
-                  private List<String> _getNames() {
+                  private List<String> GetNames() {
                       List<String> result = new ArrayList<>();
                       result.add("Alice");
                       result.add("Bob");
@@ -464,7 +464,7 @@ class MethodNameCasingTest implements RewriteTest {
                   }
                   
                   public void run() {
-                      for (String n: _getNames()) {
+                      for (String n: GetNames()) {
                           System.out.println(n);
                       }
                   }
@@ -502,7 +502,7 @@ class MethodNameCasingTest implements RewriteTest {
               import java.util.*;
                             
               class Test {
-                  private List<String> _getNames(String[] names) {
+                  private List<String> GetNames(String[] names) {
                       List<String> result = new ArrayList<>(Arrays.asList(names));
                       return result;
                   }
@@ -530,7 +530,7 @@ class MethodNameCasingTest implements RewriteTest {
           java(
             """
               class Test {
-                  private void _foo(Unknown u) {
+                  private void Foo(Unknown u) {
                   }
               }
               """,
