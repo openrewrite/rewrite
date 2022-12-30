@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import io.github.classgraph.ClassGraph;
 import kotlin.Unit;
 import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
@@ -246,13 +245,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         } finally {
             disposable.dispose();
         }
-    }
-
-    static List<Path> runtimeClasspath() {
-        return new ClassGraph()
-                .disableNestedJarScanning()
-                .getClasspathURIs().stream()
-                .map(Paths::get).collect(toList());
     }
 
     private CompilerConfiguration compilerConfiguration() {
