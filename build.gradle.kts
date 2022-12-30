@@ -63,6 +63,8 @@ dependencies {
 
     implementation(platform(kotlin("bom", "1.7.22")))
     implementation(kotlin("compiler-embeddable"))
+    // This may be necessary for scripts.
+//    implementation(kotlin("scripting-compiler-embeddable"))
     implementation(kotlin("stdlib"))
 
     implementation("org.openrewrite:rewrite-java")
@@ -73,6 +75,9 @@ dependencies {
 
     testImplementation("org.openrewrite:rewrite-test")
     testImplementation("org.assertj:assertj-core:latest.release")
+
+    // temp ... sorting out class path issues.
+    implementation("io.github.classgraph:classgraph:latest.release")
 }
 
 tasks.named<Test>("test") {

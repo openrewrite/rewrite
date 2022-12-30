@@ -39,4 +39,18 @@ public class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void methodInvocation() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(arg: Any) {
+                val l = listOf(1, 2, 3)
+              }
+              """,
+            isFullyParsed()
+          )
+        );
+    }
 }

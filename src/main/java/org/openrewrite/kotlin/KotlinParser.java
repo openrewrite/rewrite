@@ -15,14 +15,18 @@
  */
 package org.openrewrite.kotlin;
 
+import io.github.classgraph.ClassGraph;
 import kotlin.Unit;
+
 import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.kotlin.backend.jvm.serialization.JvmIdSignatureDescriptor;
+import org.jetbrains.kotlin.cli.common.config.ContentRootsKt;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
+import org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt;
 import org.jetbrains.kotlin.cli.jvm.compiler.*;
 import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt;
 import org.jetbrains.kotlin.com.intellij.core.CoreProjectScopeBuilder;
@@ -33,7 +37,9 @@ import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.StandardFileSystems;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFileManager;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFileFactory;
+import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.search.GlobalSearchScope;
+import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
@@ -51,9 +57,7 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.descriptors.FirModuleDescriptor;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
-import org.jetbrains.kotlin.fir.resolve.providers.impl.FirProviderImpl;
 import org.jetbrains.kotlin.fir.scopes.FirKotlinScopeProvider;
-import org.jetbrains.kotlin.fir.scopes.FirScopeProvider;
 import org.jetbrains.kotlin.fir.signaturer.FirBasedSignatureComposer;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
 import org.jetbrains.kotlin.ir.IrBuiltIns;
@@ -68,6 +72,7 @@ import org.jetbrains.kotlin.platform.TargetPlatform;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatformAnalyzerServices;
+import org.jetbrains.kotlin.utils.PathUtil;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -89,9 +94,12 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
+import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.REPEAT_COMPILE_MODULES;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.*;
 import static org.jetbrains.kotlin.fir.pipeline.AnalyseKt.runResolution;
@@ -193,7 +201,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             LanguageVersionSettings languageVersionSettings = new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7,
                     ApiVersion.KOTLIN_1_7);
 
-            JvmPackagePartProvider packagePartProvider = new JvmPackagePartProvider(languageVersionSettings, globalScope);
+            JvmPackagePartProvider packagePartProvider = kenv.createPackagePartProvider(globalScope);
             Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
             VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
                     project,
@@ -247,6 +255,13 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         }
     }
 
+    static List<Path> runtimeClasspath() {
+        return new ClassGraph()
+                .disableNestedJarScanning()
+                .getClasspathURIs().stream()
+                .map(Paths::get).collect(toList());
+    }
+
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
@@ -255,13 +270,16 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         compilerConfiguration.put(JVMConfigurationKeys.JDK_HOME, javaHome);
 
         compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT,  true);
-//        compilerConfiguration.put(RETAIN_OUTPUT_IN_MEMORY,  true);
         compilerConfiguration.put(USE_PSI_CLASS_FILES_READING, true);
 
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
+//        JvmContentRootsKt.addJvmClasspathRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
+//        ContentRootsKt.addKotlinSourceRoot(compilerConfiguration, PathUtil.getKotlinPathsForCompiler().getStdlibPath().getAbsoluteFile().getPath(), true);
+//        ContentRootsKt.addKotlinSourceRoot(compilerConfiguration, new ClassGraph().acceptJars("kotlin-stdlib-1.7.22.jar").getClasspathFiles().stream().filter(it -> it.getPath().contains("kotlin-stdlib")).map(it -> it.getAbsoluteFile().getPath()).collect(toList()).get(0), true);
+//        PathUtil.getKotlinPathsForCompiler()
         return compilerConfiguration;
     }
 
@@ -326,7 +344,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         components.setCallGenerator(callAndReferenceGenerator);
 
         FirIrProvider firIrProvider = new FirIrProvider(components);
-        components.setIrProviders(Collections.singletonList(firIrProvider));
+        components.setIrProviders(singletonList(firIrProvider));
 
         Fir2IrExtensions fir2IrExtensions = Fir2IrExtensions.Default.INSTANCE;
         fir2IrExtensions.registerDeclarations(symbolTable);

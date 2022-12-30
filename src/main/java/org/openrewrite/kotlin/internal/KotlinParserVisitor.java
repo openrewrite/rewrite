@@ -476,11 +476,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             int saveCursor = cursor;
-            Space bodyPrefix = whitespace();
-            JContainer<Expression> args = JContainer.empty();
+            whitespace();
+            JContainer<Expression> args;
             Markers markers = Markers.EMPTY;
             if (source.startsWith("(", cursor)) {
-                throw new IllegalStateException("Implement me.");
+                cursor = saveCursor;
+                args = JContainer.build(sourceBefore("("), functionCall.getArgumentList().getArguments().isEmpty() ?
+                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                        convertAll(functionCall.getArgumentList().getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             } else {
                 cursor = saveCursor;
                 markers = markers.addIfAbsent(new OmitParentheses(randomId()));
