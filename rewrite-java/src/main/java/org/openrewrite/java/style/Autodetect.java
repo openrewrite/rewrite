@@ -30,6 +30,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
@@ -119,7 +120,7 @@ public class Autodetect extends NamedStyles {
             int continuationDepth;
         }
         // depth -> count of whitespace char (4 spaces, 2 tabs, etc) -> count of occurrences
-        Map<DepthCoordinate, Map<Integer, Long>> depthToSpaceIndentFrequencies = new HashMap<>();
+        Map<DepthCoordinate, Map<Integer, Long>> depthToSpaceIndentFrequencies = new ConcurrentHashMap<>();
 
         public void record(int indentDepth, int continuationDepth, int charCount) {
             record(new DepthCoordinate(indentDepth, continuationDepth), charCount);
@@ -131,7 +132,7 @@ public class Autodetect extends NamedStyles {
             }
             depthToSpaceIndentFrequencies.compute(depth, (n, map) -> {
                 if(map == null) {
-                    map = new HashMap<>();
+                    map = new ConcurrentHashMap<>();
                 }
                 map.compute(charCount, (m, count) -> {
                     if(count == null) {
