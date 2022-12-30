@@ -859,6 +859,82 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1698")
+    @Test
+    void correctlyRemoveImportsFromLowerCaseClassNames() {
+        rewriteRun(
+          java(
+            """
+              package com.source;
+
+              public class a {
+                  public static final short SHORT1 = (short)1;
+                  public static final short SHORT2 = (short)2;
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import static com.source.a.SHORT1;
+              import static com.source.a.SHORT2;
+              
+              class Test {
+                  short uniqueCount = SHORT1;
+              }
+              """,
+            """
+              package com.test;
+
+              import static com.source.a.SHORT1;
+              
+              class Test {
+                  short uniqueCount = SHORT1;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1698")
+    @Test
+    void correctlyRemoveImportsFromUpperCasedPackages() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.$;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+                  public static final short SHORT2 = (short)2;
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import static com.Source.$.A.SHORT1;
+              import static com.Source.$.A.SHORT2;
+              
+              class Test {
+                  short uniqueCount = SHORT1;
+              }
+              """,
+            """
+              package com.test;
+
+              import static com.Source.$.A.SHORT1;
+              
+              class Test {
+                  short uniqueCount = SHORT1;
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void removeImportUsedAsLambdaParameter() {
         rewriteRun(
