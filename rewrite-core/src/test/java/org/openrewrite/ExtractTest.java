@@ -51,16 +51,28 @@ public class ExtractTest implements RewriteTest {
         );
     }
 
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
     @Entity
     static class Word {
         @Id
-        int position;
+        private int position;
 
         @Column
-        String text;
+        private String text;
+
+        public Word() {
+        }
+
+        public Word(int position, String text) {
+            this.position = position;
+            this.text = text;
+        }
+
+        public int getPosition() {
+            return position;
+        }
+
+        public String getText() {
+            return text;
+        }
     }
 }
