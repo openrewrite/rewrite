@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
@@ -294,13 +293,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
-        if (firRegularClass.getSource() != null) {
-            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) firRegularClass.getSource()).getPsi());
-            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
-                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
-                modifiers = getModifiers(modifierList);
-            }
-        }
+//        if (firRegularClass.getSource() != null) {
+//            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) firRegularClass.getSource()).getPsi());
+//            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+//                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+//                modifiers = getModifiers(modifierList);
+//            }
+//        }
 
         List<J.Annotation> kindAnnotations = emptyList(); // TODO: the last annotations in modifiersAndAnnotations should be added to the class.
 
@@ -470,10 +469,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     args,
                     body,
                     null);
-        } else if (namedReference instanceof FirErrorNamedReference) {
+        } else if (namedReference instanceof FirResolvedNamedReference) {
             JContainer<Expression> typeParams = null;
             if (!functionCall.getTypeArguments().isEmpty()) {
-                typeParams = mapTypeArguments(functionCall.getTypeArguments());
+                int saveCursor = cursor;
+                whitespace();
+                boolean parseTypeArguments = source.startsWith("<", cursor);
+                cursor = saveCursor;
+                if (parseTypeArguments) {
+                    typeParams = mapTypeArguments(functionCall.getTypeArguments());
+                }
             }
 
             int saveCursor = cursor;
@@ -482,9 +487,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Markers markers = Markers.EMPTY;
             if (source.startsWith("(", cursor)) {
                 cursor = saveCursor;
-                args = JContainer.build(sourceBefore("("), functionCall.getArgumentList().getArguments().isEmpty() ?
-                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                        convertAll(functionCall.getArgumentList().getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+                throw new IllegalStateException("Convert FirExpression");
             } else {
                 cursor = saveCursor;
                 markers = markers.addIfAbsent(new OmitParentheses(randomId()));
@@ -611,11 +614,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J> modifiers = emptyList();
         if (property.getSource() != null) {
-            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) property.getSource()).getPsi());
-            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
-                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
-                modifiers = getModifiers(modifierList);
-            }
+//            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) property.getSource()).getPsi());
+//            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+//                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+//                modifiers = getModifiers(modifierList);
+//            }
         }
 
         List<J.Annotation> annotations = emptyList(); // TODO: the last annotations in modifiers should be added.
@@ -734,11 +737,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
         if (simpleFunction.getSource() != null) {
-            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) simpleFunction.getSource()).getPsi());
-            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
-                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
-                modifiers = getModifiers(modifierList);
-            }
+//            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) simpleFunction.getSource()).getPsi());
+//            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+//                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+//                modifiers = getModifiers(modifierList);
+//            }
         }
 
         List<J.Annotation> kindAnnotations = emptyList(); // TODO: the last annotations in modifiersAndAnnotations should be added to the fun.
@@ -865,11 +868,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J> modifiers = emptyList();
         if (valueParameter.getSource() != null) {
-            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) valueParameter.getSource()).getPsi());
-            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
-                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
-                modifiers = getModifiers(modifierList);
-            }
+//            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) valueParameter.getSource()).getPsi());
+//            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+//                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+//                modifiers = getModifiers(modifierList);
+//            }
         }
 
         List<J.Annotation> annotations = emptyList(); // TODO: the last annotations in modifiers should be added.
@@ -1066,14 +1069,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitUserTypeRef((FirUserTypeRef) firElement, ctx);
         } else if (firElement instanceof FirValueParameter) {
             return visitValueParameter((FirValueParameter) firElement, ctx);
+        } else if (firElement instanceof FirVarargArgumentsExpression) {
+            return visitVarargArgumentsExpression((FirVarargArgumentsExpression) firElement, ctx);
         } else if (firElement instanceof FirVariableAssignment) {
             return visitVariableAssignment((FirVariableAssignment) firElement, ctx);
         }  else if (firElement instanceof FirWhenBranch) {
             return visitWhenBranch((FirWhenBranch) firElement, ctx);
         } else if (firElement instanceof FirWhenExpression) {
             return visitWhenExpression((FirWhenExpression) firElement, ctx);
-        } else if (firElement instanceof FirErrorNamedReference) {
-            throw new IllegalStateException("Unresolved type.");
         }
 
         throw new IllegalStateException("Implement me.");
