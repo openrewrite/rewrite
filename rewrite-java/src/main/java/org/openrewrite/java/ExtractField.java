@@ -76,12 +76,13 @@ public class ExtractField<P> extends JavaVisitor<P> {
                     .putMessage("extractTo", true);
 
             String fieldType = requireNonNull(multiVariable.getTypeAsFullyQualified()).getFullyQualifiedName();
-            return multiVariable.withTemplate(
+            J.Assignment assignment = multiVariable.withTemplate(
                     JavaTemplate.builder(this::getCursor, "this.#{} = #{any(" + fieldType + ")}").build(),
                     multiVariable.getCoordinates().replace(),
                     multiVariable.getVariables().get(0).getSimpleName(),
                     multiVariable.getVariables().get(0).getInitializer()
             );
+            return assignment.withType(multiVariable.getType());
         }
         return super.visitVariableDeclarations(multiVariable, p);
     }

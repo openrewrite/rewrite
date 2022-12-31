@@ -65,6 +65,13 @@ public class ExtractFieldTest implements RewriteTest {
                       "Test{name=today,type=java.util.Date}");
                     return variable;
                 }
+
+                @Override
+                public J.Assignment visitAssignment(J.Assignment assignment, Object o) {
+                    assertThat(requireNonNull(assignment.getType()).toString()).isEqualTo(
+                      "java.util.Date");
+                    return super.visitAssignment(assignment, o);
+                }
             }.visit(cu, 0))
           )
         );
