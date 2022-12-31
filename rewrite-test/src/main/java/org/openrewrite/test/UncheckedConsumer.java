@@ -13,26 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.test;
 
-import lombok.Value;
-import lombok.With;
+import org.openrewrite.internal.LoathingOfOthers;
 
-import java.util.List;
-import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
-@Value
-public class RecipeRun {
-    RecipeRunStats stats;
-
-    @With
-    List<Result> results;
-
-    @With
-    Map<Class<?>, List<Object>> extracts;
-
-    public <E> List<E> getExtract(Class<E> extractType) {
-        //noinspection unchecked
-        return (List<E>) extracts.get(extractType);
+@LoathingOfOthers("Checked Exceptions")
+public interface UncheckedConsumer<T> extends Consumer<T> {
+    @Override
+    default void accept(T t) {
+        try {
+            acceptThrows(t);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
+
+    void acceptThrows(T t) throws Exception;
 }

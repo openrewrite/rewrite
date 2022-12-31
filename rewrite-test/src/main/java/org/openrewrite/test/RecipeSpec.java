@@ -29,8 +29,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
-import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+@SuppressWarnings("UnusedReturnValue")
 @Getter
 public class RecipeSpec {
     public static RecipeSpec defaults() {
@@ -77,11 +81,9 @@ public class RecipeSpec {
     @Nullable
     PrintOutputCapture.MarkerPrinter markerPrinter;
 
-    Consumer<List<SourceFile>> beforeRecipe = s -> {
-    };
+    List<UncheckedConsumer<List<SourceFile>>> beforeRecipes = new ArrayList<>();
 
-    Consumer<RecipeRun> afterRecipe = r -> {
-    };
+    List<UncheckedConsumer<RecipeRun>> afterRecipes = new ArrayList<>();
 
     // The before and after here don't mean anything
     SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser.builder(), "", null);
@@ -143,16 +145,30 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec beforeRecipe(Consumer<List<SourceFile>> beforeRecipe) {
-        this.beforeRecipe = beforeRecipe;
+    public RecipeSpec beforeRecipe(UncheckedConsumer<List<SourceFile>> beforeRecipe) {
+        this.beforeRecipes.add(beforeRecipe);
         return this;
     }
 
-    public RecipeSpec afterRecipe(Consumer<RecipeRun> afterRecipe) {
-        this.afterRecipe = afterRecipe;
+    public RecipeSpec afterRecipe(UncheckedConsumer<RecipeRun> afterRecipe) {
+        this.afterRecipes.add(afterRecipe);
         return this;
     }
 
+    public <E> RecipeSpec extracted(Class<E> extractType, UncheckedConsumer<List<E>> extract) {
+        return afterRecipe(run -> {
+            List<E> rows = run.getExtract(extractType);
+            assertFalse(rows.isEmpty());
+            extract.accept(rows);
+        });
+    }
+
+    @Incubating(since = "7.35.0")
+    public <E, V> RecipeSpec extracted(Class<E> extractType, Function<E, V> map, UncheckedConsumer<List<V>> extract) {
+        return extracted(extractType, ex -> extract.accept(ex.stream().map(map).collect(Collectors.toList())));
+    }
+
+    @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
         return this;

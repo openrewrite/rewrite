@@ -15,9 +15,16 @@
  */
 package org.openrewrite;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import org.openrewrite.marker.Markup;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -35,14 +42,41 @@ public class FindParseFailures extends Recipe {
     }
 
     @Override
+    public List<Class<?>> extracts() {
+        return Collections.singletonList(ParseExceptionExtract.class);
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile.getMarkers().findFirst(ParseExceptionResult.class)
-                        .<Tree>map(exceptionResult -> Markup.info(sourceFile, exceptionResult.getMessage()))
+                        .<Tree>map(exceptionResult -> {
+                            ctx.extract(new ParseExceptionExtract(
+                                    sourceFile.getId(),
+                                    sourceFile.getSourcePath().toString(),
+                                    exceptionResult.getMessage()
+                            ));
+                            return Markup.info(sourceFile, exceptionResult.getMessage());
+                        })
                         .orElse(sourceFile);
             }
         };
+    }
+
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Entity(name = "parse_exception")
+    public static class ParseExceptionExtract {
+        @Id
+        UUID id;
+
+        @Column
+        String sourcePath;
+
+        String stackTrace;
     }
 }

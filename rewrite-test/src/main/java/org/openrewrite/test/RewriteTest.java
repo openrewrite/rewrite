@@ -289,8 +289,12 @@ public interface RewriteTest extends SourceSpecs {
 
         List<SourceFile> beforeSourceFiles = new ArrayList<>(specBySourceFile.keySet());
 
-        testClassSpec.beforeRecipe.accept(beforeSourceFiles);
-        testMethodSpec.beforeRecipe.accept(beforeSourceFiles);
+        for (Consumer<List<SourceFile>> beforeRecipe : testClassSpec.beforeRecipes) {
+            beforeRecipe.accept(beforeSourceFiles);
+        }
+        for (Consumer<List<SourceFile>> beforeRecipe : testMethodSpec.beforeRecipes) {
+            beforeRecipe.accept(beforeSourceFiles);
+        }
 
         List<SourceFile> runnableSourceFiles = new ArrayList<>(beforeSourceFiles.size());
         for (Map.Entry<SourceFile, SourceSpec<?>> sourceFileSpec : specBySourceFile.entrySet()) {
@@ -314,8 +318,12 @@ public interface RewriteTest extends SourceSpecs {
                 expectedCyclesThatMakeChanges + 1
         );
 
-        testMethodSpec.afterRecipe.accept(recipeRun);
-        testClassSpec.afterRecipe.accept(recipeRun);
+        for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
+            afterRecipe.accept(recipeRun);
+        }
+        for (Consumer<RecipeRun> afterRecipe : testMethodSpec.afterRecipes) {
+            afterRecipe.accept(recipeRun);
+        }
 
         Collection<SourceSpec<?>> expectedNewSources = Collections.newSetFromMap(new IdentityHashMap<>());
         for (SourceSpec<?> sourceSpec : sourceSpecs) {

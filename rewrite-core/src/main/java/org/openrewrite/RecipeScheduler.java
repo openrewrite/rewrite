@@ -63,7 +63,7 @@ public interface RecipeScheduler {
                                   ExecutionContext ctx,
                                   int maxCycles,
                                   int minCycles) {
-        RecipeRun recipeRun = new RecipeRun(new RecipeRunStats(recipe), emptyList());
+        RecipeRun recipeRun = new RecipeRun(new RecipeRunStats(recipe), emptyList(), emptyMap());
 
         Set<UUID> sourceFileIds = new HashSet<>();
         before = ListUtils.map(before, sourceFile -> {
@@ -102,7 +102,7 @@ public interface RecipeScheduler {
         }
 
         if (after == before) {
-            return recipeRun;
+            return recipeRun.withExtracts(ctx.getMessage(ExecutionContext.EXTRACTS));
         }
 
         Map<UUID, SourceFile> sourceFileIdentities = new HashMap<>();
@@ -143,7 +143,9 @@ public interface RecipeScheduler {
             }
         }
 
-        return recipeRun.withResults(results);
+        return recipeRun
+                .withResults(results)
+                .withExtracts(ctx.getMessage(ExecutionContext.EXTRACTS));
     }
 
     default <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats,
