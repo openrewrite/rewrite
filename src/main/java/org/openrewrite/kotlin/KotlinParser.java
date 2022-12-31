@@ -139,24 +139,24 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     public List<K.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
-        Map<Input, FirFile> compilerCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
+        List<CompiledKotlinSource> compilerCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
         List<K.CompilationUnit> cus = new ArrayList<>(compilerCus.size());
 
-        for (Map.Entry<Input, FirFile> compiled : compilerCus.entrySet()) {
+        for (CompiledKotlinSource compiled : compilerCus) {
             try {
                 KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
-                        compiled.getKey().getRelativePath(relativeTo),
-                        compiled.getKey().getFileAttributes(),
-                        compiled.getKey().getSource(ctx),
+                        compiled.getInput().getRelativePath(relativeTo),
+                        compiled.getInput().getFileAttributes(),
+                        compiled.getInput().getSource(ctx),
                         typeCache,
                         ctx
                 );
 
-                K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getValue(), new InMemoryExecutionContext());
+                K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
                 cus.add(kcu);
-                parsingListener.parsed(compiled.getKey(), kcu);
+                parsingListener.parsed(compiled.getInput(), kcu);
             } catch (Throwable t) {
-                pctx.parseFailure(compiled.getKey(), compiled.getKey().getRelativePath(relativeTo), KotlinParser.builder().build(), t);
+                pctx.parseFailure(compiled.getInput(), compiled.getInput().getRelativePath(relativeTo), KotlinParser.builder().build(), t);
                 ctx.getOnError().accept(t);
             }
         }
@@ -164,7 +164,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         return cus;
     }
 
-    private Map<Input, FirFile> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
+    private List<CompiledKotlinSource> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
 
         File buildFile = null;
@@ -255,11 +255,11 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             sources.iterator().forEachRemaining(inputs::add);
             assert firFiles.size() == inputs.size();
 
-            Map<Input, FirFile> cus = new LinkedHashMap<>();
+            List<CompiledKotlinSource> cus = new ArrayList<>();
             for (int i = 0; i < inputs.size(); i++) {
                 Input input = inputs.get(i);
                 FirFile firFile = firFiles.get(i);
-                cus.put(input, firFile);
+                cus.add(new CompiledKotlinSource(input, firFile));
             }
 
             return cus;

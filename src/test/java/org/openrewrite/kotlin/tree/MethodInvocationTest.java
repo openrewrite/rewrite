@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,10 +26,14 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void methodWithLambda() {
         rewriteRun(
-          kotlin(
-            """
+          kotlin("""
               fun method(arg: Any) {
               }
+            """,
+            isFullyParsed()
+          ),
+          kotlin(
+            """
               fun callMethodWithLambda() {
                   method {
                   }
@@ -41,7 +44,6 @@ public class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Fix arguments.")
     @Test
     void methodInvocation() {
         rewriteRun(
@@ -49,6 +51,22 @@ public class MethodInvocationTest implements RewriteTest {
             """
               fun method(arg: Any) {
                 val l = listOf(1, 2, 3)
+              }
+              """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void multipleTypesOfMethodArguments() {
+        rewriteRun(
+          kotlin(
+            """
+              fun methodA(a: String, b: int, c: Double) {
+              }
+              fun methodB() {
+                methodA("a", 1, 2.0)
               }
               """,
             isFullyParsed()

@@ -487,7 +487,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Markers markers = Markers.EMPTY;
             if (source.startsWith("(", cursor)) {
                 cursor = saveCursor;
-                throw new IllegalStateException("Convert FirExpression");
+                List<FirExpression> firExpressions = functionCall.getArgumentList().getArguments();
+                if (firExpressions.size() == 1 || (firExpressions.get(0) instanceof FirVarargArgumentsExpression)) {
+                    FirVarargArgumentsExpression argumentsExpression = (FirVarargArgumentsExpression) firExpressions.get(0);
+                    args = JContainer.build(sourceBefore("("), argumentsExpression.getArguments().isEmpty() ?
+                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                            convertAll(argumentsExpression.getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+                } else {
+                    args = JContainer.build(sourceBefore("("), firExpressions.isEmpty() ?
+                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                            convertAll(firExpressions, commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+                }
+
             } else {
                 cursor = saveCursor;
                 markers = markers.addIfAbsent(new OmitParentheses(randomId()));
