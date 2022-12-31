@@ -188,8 +188,8 @@ public class AddDependency extends Recipe {
                     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                         Xml maven = super.visitDocument(document, executionContext);
 
-                        String resolvedScope = scope == null ? scopeByProject.get(javaProject) : scope;
-                        if (resolvedScope == null) {
+                        String maybeScope = scopeByProject.get(javaProject);
+                        if (maybeScope == null) {
                             return maven;
                         }
 
@@ -204,6 +204,7 @@ public class AddDependency extends Recipe {
                             }
                         }
 
+                        String resolvedScope = scope == null ? maybeScope : scope;
                         Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
                         if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
                             for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
