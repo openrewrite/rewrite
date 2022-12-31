@@ -27,6 +27,7 @@ import org.jetbrains.kotlin.KtVirtualFileSourceFile;
 import org.jetbrains.kotlin.cli.common.CommonCompilerPerformanceManager;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.config.ContentRoot;
+import org.jetbrains.kotlin.cli.common.config.ContentRootsKt;
 import org.jetbrains.kotlin.cli.common.config.KotlinSourceRoot;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
@@ -175,8 +176,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
 
         configureJdkClasspathRoots(compilerConfiguration);
-        addJvmClasspathRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
-        addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
+        addJvmClasspathRoots(compilerConfiguration, runtimeClasspath());
 
         Disposable disposable = Disposer.newDisposable();
         try {
@@ -265,6 +265,12 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         } finally {
             disposable.dispose();
         }
+    }
+
+    static List<File> runtimeClasspath() {
+        return new ClassGraph()
+                .disableNestedJarScanning()
+                .getClasspathFiles();
     }
 
     private CompilerConfiguration compilerConfiguration() {

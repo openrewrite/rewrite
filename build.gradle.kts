@@ -55,26 +55,29 @@ val latest = if (project.hasProperty("releasing")) {
 }
 
 dependencies {
+    annotationProcessor("org.projectlombok:lombok:latest.release")
+
     compileOnly("org.openrewrite:rewrite-test")
     compileOnly("org.projectlombok:lombok:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")
-    annotationProcessor("org.projectlombok:lombok:latest.release")
+
+    implementation("io.github.classgraph:classgraph:latest.release")
+
     implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:${latest}"))
+    implementation("org.openrewrite:rewrite-java")
 
     implementation(platform(kotlin("bom", "1.7.22")))
     implementation(kotlin("compiler-embeddable"))
+    implementation(kotlin("stdlib"))
     // This may be necessary for scripts.
 //    implementation(kotlin("scripting-compiler-embeddable"))
-    implementation(kotlin("stdlib"))
 
-    implementation("org.openrewrite:rewrite-java")
-
+    testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
-
     testImplementation("org.openrewrite:rewrite-test")
-    testImplementation("org.assertj:assertj-core:latest.release")
+
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 }
 
 tasks.named<Test>("test") {
