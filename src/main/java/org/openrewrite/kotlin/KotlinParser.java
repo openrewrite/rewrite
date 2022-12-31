@@ -176,7 +176,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         configureJdkClasspathRoots(compilerConfiguration);
         addJvmClasspathRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
-        // Add kotlin-stdlib ... replace with ClassGraph.
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
         Disposable disposable = Disposer.newDisposable();
@@ -266,13 +265,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         } finally {
             disposable.dispose();
         }
-    }
-
-    static List<Path> runtimeClasspath() {
-        return new ClassGraph()
-                .disableNestedJarScanning()
-                .getClasspathURIs().stream()
-                .map(Paths::get).collect(toList());
     }
 
     private CompilerConfiguration compilerConfiguration() {

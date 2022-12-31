@@ -75,9 +75,6 @@ dependencies {
 
     testImplementation("org.openrewrite:rewrite-test")
     testImplementation("org.assertj:assertj-core:latest.release")
-
-    // temp ... sorting out class path issues.
-    implementation("io.github.classgraph:classgraph:latest.release")
 }
 
 tasks.named<Test>("test") {
