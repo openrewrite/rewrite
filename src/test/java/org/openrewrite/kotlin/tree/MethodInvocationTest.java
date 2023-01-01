@@ -30,7 +30,9 @@ public class MethodInvocationTest implements RewriteTest {
               fun plugins(input: () -> String) {
                 println( input() )
               }
-          """),
+              """,
+            isFullyParsed()
+          ),
           kotlin("""
               fun main() {
                 plugins {
@@ -107,10 +109,14 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void multipleTypesOfMethodArguments() {
         rewriteRun(
-          kotlin(
-            """
+          kotlin("""
               fun methodA(a: String, b: int, c: Double) {
               }
+              """,
+            isFullyParsed()
+          ),
+          kotlin(
+            """
               fun methodB() {
                 methodA("a", 1, 2.0)
               }
