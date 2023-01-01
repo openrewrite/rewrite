@@ -12,7 +12,9 @@ dependencies {
     testRuntimeOnly("junit:junit:4.13.2") {
         because("Used for RemoveUnneededAssertionTest")
     }
+    testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
+    testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
 }
 
 tasks.withType<Javadoc> {
