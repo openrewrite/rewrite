@@ -15,8 +15,8 @@
  */
 package org.openrewrite.kotlin;
 
-import io.github.classgraph.ClassGraph;
 import kotlin.Unit;
+import kotlin.annotation.AnnotationTarget;
 import kotlin.jvm.functions.Function2;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +54,7 @@ import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.modules.TargetId;
 import org.jetbrains.kotlin.platform.CommonPlatforms;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
+import org.jetbrains.kotlin.utils.PathUtil;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -174,7 +175,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
 
         configureJdkClasspathRoots(compilerConfiguration);
-        addJvmClasspathRoots(compilerConfiguration, runtimeClasspath());
+        addJvmClasspathRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
+        addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
         Disposable disposable = Disposer.newDisposable();
         try {
@@ -264,12 +266,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         } finally {
             disposable.dispose();
         }
-    }
-
-    static List<File> runtimeClasspath() {
-        return new ClassGraph()
-                .disableNestedJarScanning()
-                .getClasspathFiles();
     }
 
     private CompilerConfiguration compilerConfiguration() {

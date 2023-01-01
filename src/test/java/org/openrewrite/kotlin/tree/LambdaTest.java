@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -38,14 +37,13 @@ public class LambdaTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void invokedLambda() {
         rewriteRun(
           kotlin(
             """
-              fun invokeLambda(lambda: (Double) -> Boolean): Boolean {
-                  return lambda(1.0)
+              fun plugins(input: () -> String) {
+                println( input( ) )
               }
             """,
             isFullyParsed()

@@ -37,6 +37,7 @@ import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.types.*;
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.name.Name;
@@ -248,10 +249,29 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
         for (int i = 0; i < firStatements.size(); i++) {
             FirElement firElement = firStatements.get(i);
+            boolean explicitReturn = false;
+            Space returnPrefix = EMPTY;
+            if (i == firStatements.size() - 1) {
+                saveCursor = cursor;
+                returnPrefix = whitespace();
+                if (source.startsWith("return", cursor)) {
+                    cursor += "return".length();
+                    explicitReturn = true;
+                } else {
+                    cursor = saveCursor;
+                }
+            }
+
             J expr = visitElement(firElement, ctx);
             if (i == firStatements.size() - 1 && (expr instanceof Expression)) {
-                expr = new J.Return(randomId(), expr.getPrefix(), expr.getMarkers(), expr.withPrefix(EMPTY));
-                expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+                if (!explicitReturn) {
+                    returnPrefix = expr.getPrefix();
+                    expr = expr.withPrefix(EMPTY);
+                }
+                expr = new J.Return(randomId(), returnPrefix, expr.getMarkers(), (Expression) expr);
+                if (!explicitReturn) {
+                    expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+                }
             } else if (i == firStatements.size() - 1 && expr instanceof J.Return && ((J.Return) expr).getExpression() == null) {
                 expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
             }
@@ -431,7 +451,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitFunctionCall(FirFunctionCall functionCall, ExecutionContext ctx) {
         FirFunctionCallOrigin origin = functionCall.getOrigin();
-        if (origin == FirFunctionCallOrigin.Regular) {
+        if (origin == FirFunctionCallOrigin.Regular || functionCall instanceof FirImplicitInvokeCall) {
             return mapRegularFunctionCall(functionCall);
         } else if (origin == FirFunctionCallOrigin.Infix) {
             throw new IllegalStateException("Implement me.");
@@ -491,7 +511,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         args = JContainer.build(sourceBefore("("), argumentsExpression.getArguments().isEmpty() ?
                                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                                 convertAll(argumentsExpression.getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
-                    } else if (firExpression instanceof FirImplicitInvokeCall) {
+                    } else if (firExpression instanceof FirImplicitInvokeCall || firExpression instanceof FirConstExpression) {
                         args = JContainer.build(sourceBefore("("), convertAll(singletonList(firExpression), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
                     } else {
                         throw new IllegalStateException("Implement me.");
@@ -552,49 +572,46 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private J mapOperatorFunctionCall(FirFunctionCall functionCall) {
-        String resolvedName = functionCall.getCalleeReference().getName().asString();
-        if ("times".equals(resolvedName)) {
+        J.Binary.Type type = mapFunctionalCallOperator(functionCall);
+        if (type != null) {
             Space prefix = whitespace();
             J left = visitElement(functionCall.getDispatchReceiver(), ctx);
             if (functionCall.getArgumentList().getArguments().size() != 1) {
                 throw new IllegalStateException("Implement me.");
             }
-            Space opPrefix = sourceBefore("*");
-            J.Binary.Type op = J.Binary.Type.Multiplication;
+
+            Space opPrefix = EMPTY;
+            if (type == J.Binary.Type.Multiplication) {
+                opPrefix = sourceBefore("*");
+            } else if (type == J.Binary.Type.Subtraction) {
+                opPrefix = sourceBefore("-");
+            }
+
             J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
             return new J.Binary(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     (Expression) left,
-                    padLeft(opPrefix, op),
+                    padLeft(opPrefix, type),
                     (Expression) right,
-                    null);
-        } else if (functionCall instanceof FirImplicitInvokeCall) {
-            Space prefix = whitespace();
-            JContainer<Expression> typeParams = null;
-            if (!functionCall.getTypeArguments().isEmpty()) {
-                int saveCursor = cursor;
-                whitespace();
-                boolean parseTypeArguments = source.startsWith("<", cursor);
-                cursor = saveCursor;
-                if (parseTypeArguments) {
-                    typeParams = mapTypeArguments(functionCall.getTypeArguments());
-                }
-            }
-
-            return new J.MethodInvocation(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    null,
-                    typeParams,
-                    (J.Identifier) visitElement(functionCall.getCalleeReference(), null),
-                    JContainer.build(whitespace(), convertAll(functionCall.getArgumentList().getArguments(), commaDelim, t -> whitespace(), ctx), Markers.EMPTY),
                     null);
         }
 
         throw new IllegalStateException("Implement me.");
+    }
+
+    @Nullable
+    private J.Binary.Type mapFunctionalCallOperator(FirFunctionCall functionCall) {
+        String resolvedName = functionCall.getCalleeReference().getName().asString();
+        J.Binary.Type op = null;
+        if ("times".equals(resolvedName)) {
+            op = J.Binary.Type.Multiplication;
+        } else if ("minus".equals(resolvedName)) {
+            op = J.Binary.Type.Subtraction;
+        }
+
+        return op;
     }
 
     @Override
@@ -817,6 +834,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitSimpleFunction(FirSimpleFunction simpleFunction, ExecutionContext ctx) {
         Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
         // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
         if (simpleFunction.getSource() != null) {
@@ -829,8 +847,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> kindAnnotations = emptyList(); // TODO: the last annotations in modifiersAndAnnotations should be added to the fun.
 
-        MethodClassifier methodClassifier = new MethodClassifier(randomId(), sourceBefore("fun"));
-
+        markers = markers.addIfAbsent(new MethodClassifier(randomId(), sourceBefore("fun")));
         String methodName = "";
         if ("<no name provided>".equals(simpleFunction.getName().asString())) {
             // Extract name from source.
@@ -853,16 +870,26 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 JContainer.build(paramFmt, convertAll(simpleFunction.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
+        TypeTree returnTypeExpression = null;
+        if (!(simpleFunction.getReturnTypeRef() instanceof FirImplicitUnitTypeRef)) {
+            Space delimiterPrefix = whitespace();
+            boolean addTypeReferencePrefix = source.startsWith(":", cursor);
+            skip(":");
+            if (addTypeReferencePrefix) {
+                markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
+            }
+            returnTypeExpression = (TypeTree) visitElement(simpleFunction.getReturnTypeRef(), ctx);
+        }
         J.Block body = convertOrNull(simpleFunction.getBody(), ctx);
 
         return new J.MethodDeclaration(
                 randomId(),
                 prefix,
-                Markers.EMPTY.addIfAbsent(methodClassifier),
+                markers,
                 emptyList(), // TODO
                 emptyList(), // TODO
                 null, // TODO
-                null, // TODO
+                returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params, // TODO
                 null, // TODO

@@ -50,6 +50,20 @@ public class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void returnType() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method() : Boolean {
+                    return true
+                }
+              """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
     void methodDeclarationDeclaringType() {
         rewriteRun(
           kotlin(

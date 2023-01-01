@@ -28,7 +28,7 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin("""
               fun plugins(input: () -> String) {
-                println( input() )
+                println( input( ) )
               }
               """,
             isFullyParsed()
@@ -50,7 +50,7 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method(input: (  ) -> String) {
+              fun method( input : (  ) -> String ) {
               }
               """,
             isFullyParsed()
@@ -63,7 +63,7 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method(input : ( Int, Int ) -> Boolean) {
+              fun method( input : ( Int, Int ) -> Boolean ) {
               }
               """,
             isFullyParsed()
