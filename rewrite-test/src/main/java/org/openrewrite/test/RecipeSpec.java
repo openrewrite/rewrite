@@ -15,6 +15,10 @@
  */
 package org.openrewrite.test;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.dataformat.csv.CsvMapper;
+import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
@@ -23,15 +27,15 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.QuarkParser;
 
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Properties;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SuppressWarnings("UnusedReturnValue")
@@ -166,6 +170,17 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E, V> RecipeSpec extracted(Class<E> extractType, Function<E, V> map, UncheckedConsumer<List<V>> extract) {
         return extracted(extractType, ex -> extract.accept(ex.stream().map(map).collect(Collectors.toList())));
+    }
+
+    @Incubating(since = "7.35.0")
+    public <E, V> RecipeSpec extractedCsv(Class<E> extractType, String expect) {
+        return extracted(extractType, ex -> {
+            CsvMapper mapper = new CsvMapper();
+            CsvSchema schema = mapper.schemaFor(extractType).withHeader();
+            StringWriter writer = new StringWriter();
+            mapper.writerFor(extractType).with(schema).writeValues(writer).writeAll(ex);
+            assertThat(writer.toString()).isEqualTo(expect);
+        });
     }
 
     @Incubating(since = "7.35.0")

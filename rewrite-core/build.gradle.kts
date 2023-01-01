@@ -8,8 +8,6 @@ plugins {
 dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
-    implementation("jakarta.persistence:jakarta.persistence-api:latest.release")
-
     implementation("de.danielbechler:java-object-diff:latest.release")
     implementation("org.apache.ant:ant:latest.release")
 

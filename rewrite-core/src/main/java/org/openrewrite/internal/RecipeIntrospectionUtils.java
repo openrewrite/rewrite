@@ -15,11 +15,10 @@
  */
 package org.openrewrite.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
-import org.openrewrite.config.DeclarativeRecipe;
-import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.config.RecipeIntrospectionException;
+import org.openrewrite.config.*;
+import org.openrewrite.extract.Extract;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -97,7 +96,7 @@ public class RecipeIntrospectionUtils {
         //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
                 recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                emptyList(), recipe.getLanguages(), recipeList, source);
+                emptyList(), recipe.getLanguages(), recipeList, emptyList(), source);
     }
 
     public static Constructor<?> getPrimaryConstructor(Class<?> recipeClass) {
@@ -142,16 +141,32 @@ public class RecipeIntrospectionUtils {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
+
+        List<ExtractDescriptor> extractTypes = new ArrayList<>();
+        for (Class<? extends Extract> extractType : recipe.getExtractTypes()) {
+            Extract extract = constructExtract(extractType);
+            extractTypes.add(new ExtractDescriptor(extractType.getName(), extract.getDisplayName(),
+                    extract.getDescription()));
+        }
+
         //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(),
                 recipe.getDescription(), recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                options, recipe.getLanguages(), recipeList, recipeSource);
+                options, recipe.getLanguages(), recipeList, extractTypes, recipeSource);
+    }
+
+    public static Extract constructExtract(Class<?> extractClass) {
+        return construct(extractClass);
     }
 
     public static Recipe constructRecipe(Class<?> recipeClass) {
-        Constructor<?> primaryConstructor = getZeroArgsConstructor(recipeClass);
+        return construct(recipeClass);
+    }
+
+    private static <V> V construct(Class<?> clazz) {
+        Constructor<?> primaryConstructor = getZeroArgsConstructor(clazz);
         if (primaryConstructor == null) {
-            primaryConstructor = getPrimaryConstructor(recipeClass);
+            primaryConstructor = getPrimaryConstructor(clazz);
         }
         Object[] constructorArgs = new Object[primaryConstructor.getParameterCount()];
         for (int i = 0; i < primaryConstructor.getParameters().length; i++) {
@@ -175,11 +190,17 @@ public class RecipeIntrospectionUtils {
         }
         primaryConstructor.setAccessible(true);
         try {
-            return (Recipe) primaryConstructor.newInstance(constructorArgs);
+            //noinspection unchecked
+            return (V) primaryConstructor.newInstance(constructorArgs);
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException e) {
             // Should never happen
-            throw new RecipeIntrospectionException("Unable to call primary constructor for Recipe " + recipeClass, e);
+            throw getRecipeIntrospectionException(clazz, e);
         }
+    }
+
+    @NotNull
+    private static RecipeIntrospectionException getRecipeIntrospectionException(Class<?> recipeClass, ReflectiveOperationException e) {
+        return new RecipeIntrospectionException("Unable to call primary constructor for Recipe " + recipeClass, e);
     }
 
     private static List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {

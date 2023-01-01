@@ -41,8 +41,6 @@ public interface ExecutionContext {
             extractsOfType.add(o);
             return allExtracts;
         });
-
-        System.out.println(o);
     }
 
     @Incubating(since = "7.20.0")

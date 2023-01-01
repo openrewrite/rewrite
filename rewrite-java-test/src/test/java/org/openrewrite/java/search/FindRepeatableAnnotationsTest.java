@@ -16,7 +16,6 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,8 +25,7 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindRepeatableAnnotations())
-          .parser(JavaParser.fromJavaVersion().classpath("mapstruct"));
+        spec.recipe(new FindRepeatableAnnotations());
     }
 
     @Test
@@ -54,6 +52,42 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
                   })
                   void test() {
                   }
+              }
+              """
+          ),
+          java(
+            """
+              package org.mapstruct;
+
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Repeatable;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+
+              @Repeatable(ValueMappings.class)
+              @Retention(RetentionPolicy.CLASS)
+              @Target(ElementType.METHOD)
+              public @interface ValueMapping {
+                  String source();
+
+                  String target();
+              }
+              """
+          ),
+          java(
+            """
+              package org.mapstruct;
+                          
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                          
+              @Target({ElementType.METHOD})
+              @Retention(RetentionPolicy.CLASS)
+              public @interface ValueMappings {
+                  ValueMapping[] value();
               }
               """
           )

@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,40 +17,15 @@ package org.openrewrite.config;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
-import org.openrewrite.internal.lang.Nullable;
-
-import java.net.URI;
-import java.time.Duration;
-import java.util.List;
-import java.util.Set;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class RecipeDescriptor {
+public class ExtractDescriptor {
+
     @EqualsAndHashCode.Include
     String name;
 
     String displayName;
 
     String description;
-
-    Set<String> tags;
-
-    @Nullable
-    Duration estimatedEffortPerOccurrence;
-
-    @EqualsAndHashCode.Include
-    List<OptionDescriptor> options;
-
-    @Deprecated
-    List<String> languages;
-
-    @With
-    List<RecipeDescriptor> recipeList;
-
-    @With
-    List<ExtractDescriptor> extractTypes;
-
-    URI source;
 }

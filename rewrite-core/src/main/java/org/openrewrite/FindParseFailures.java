@@ -15,16 +15,14 @@
  */
 package org.openrewrite;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.extract.Extract;
 import org.openrewrite.marker.Markup;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
+
+import static java.util.Collections.singletonList;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -42,8 +40,8 @@ public class FindParseFailures extends Recipe {
     }
 
     @Override
-    public List<Class<?>> extracts() {
-        return Collections.singletonList(ParseExceptionExtract.class);
+    public List<Class<? extends Extract>> getExtractTypes() {
+        return singletonList(ParseExceptionExtract.class);
     }
 
     @Override
@@ -54,7 +52,6 @@ public class FindParseFailures extends Recipe {
                 return sourceFile.getMarkers().findFirst(ParseExceptionResult.class)
                         .<Tree>map(exceptionResult -> {
                             ctx.extract(new ParseExceptionExtract(
-                                    sourceFile.getId(),
                                     sourceFile.getSourcePath().toString(),
                                     exceptionResult.getMessage()
                             ));
@@ -65,18 +62,19 @@ public class FindParseFailures extends Recipe {
         };
     }
 
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Entity(name = "parse_exception")
-    public static class ParseExceptionExtract {
-        @Id
-        UUID id;
+    @Value
+    public static class ParseExceptionExtract implements Extract {
+        @Override
+        public String getDisplayName() {
+            return "Parse exceptions";
+        }
 
-        @Column
+        @Override
+        public String getDescription() {
+            return "A list of parse exceptions for grouping by category of failure.";
+        }
+
         String sourcePath;
-
         String stackTrace;
     }
 }

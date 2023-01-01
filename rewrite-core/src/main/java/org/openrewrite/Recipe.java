@@ -18,9 +18,9 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import jakarta.persistence.Entity;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.extract.Extract;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -168,11 +168,9 @@ public abstract class Recipe implements Cloneable {
     private final List<Recipe> recipeList = new CopyOnWriteArrayList<>();
 
     /**
-     * A list of the types that this recipe may generate extracts for.
-     *
-     * @return A list of classes. Each class must be an {@link Entity}.
+     * @return A list of the types that this recipe may generate extracts for.
      */
-    public List<Class<?>> extracts() {
+    public List<Class<? extends Extract>> getExtractTypes() {
         return emptyList();
     }
 

@@ -15,11 +15,6 @@
  */
 package org.openrewrite;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import lombok.*;
-import lombok.experimental.FieldDefaults;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -45,18 +40,19 @@ public class ExtractTest implements RewriteTest {
                     return text;
                 }
             }))
+            .extractedCsv(Word.class, """
+              position,text
+              0,hello
+              1,world
+              """)
             .extracted(Word.class, Word::getText, words -> assertThat(words)
               .containsExactly("hello", "world")),
           text("hello world")
         );
     }
 
-    @Entity
     static class Word {
-        @Id
         private int position;
-
-        @Column
         private String text;
 
         public Word() {
