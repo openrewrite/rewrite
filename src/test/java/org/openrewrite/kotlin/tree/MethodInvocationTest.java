@@ -24,6 +24,52 @@ import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
 public class MethodInvocationTest implements RewriteTest {
 
     @Test
+    void implicitFunctionCall() {
+        rewriteRun(
+          kotlin("""
+              fun plugins(input: () -> String) {
+                println( input() )
+              }
+          """),
+          kotlin("""
+              fun main() {
+                plugins {
+                    "test"
+                }
+              }
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void functionTypeReference() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(input: (  ) -> String) {
+              }
+              """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void typedFunctionTypeReference() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(input : ( Int, Int ) -> Boolean) {
+              }
+              """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
     void methodWithLambda() {
         rewriteRun(
           kotlin("""

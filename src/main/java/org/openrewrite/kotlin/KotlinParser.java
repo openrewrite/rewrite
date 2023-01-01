@@ -17,7 +17,6 @@ package org.openrewrite.kotlin;
 
 import io.github.classgraph.ClassGraph;
 import kotlin.Unit;
-import kotlin.annotation.AnnotationTarget;
 import kotlin.jvm.functions.Function2;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +26,6 @@ import org.jetbrains.kotlin.KtVirtualFileSourceFile;
 import org.jetbrains.kotlin.cli.common.CommonCompilerPerformanceManager;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.config.ContentRoot;
-import org.jetbrains.kotlin.cli.common.config.ContentRootsKt;
 import org.jetbrains.kotlin.cli.common.config.KotlinSourceRoot;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
@@ -56,7 +54,6 @@ import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.modules.TargetId;
 import org.jetbrains.kotlin.platform.CommonPlatforms;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
-import org.jetbrains.kotlin.utils.PathUtil;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -88,6 +85,7 @@ import static org.jetbrains.kotlin.cli.jvm.compiler.CoreEnvironmentUtilsKt.apply
 import static org.jetbrains.kotlin.cli.jvm.compiler.CoreEnvironmentUtilsKt.forAllFiles;
 import static org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompilerKt.configureSourceRoots;
 import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.compileModuleToAnalyzedFir;
+import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.convertAnalyzedFirToIr;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.USE_FIR;
@@ -248,6 +246,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     diagnosticsReporter,
                     performanceManager
             );
+            convertAnalyzedFirToIr(compilerInput, output, compilerEnvironment);
 
             List<FirFile> firFiles = output.getFir();
             List<Input> inputs = new ArrayList<>(firFiles.size());

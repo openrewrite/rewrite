@@ -17,12 +17,14 @@ package org.openrewrite.kotlin.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
 @With
-public class EmptyBody implements Marker {
+public class TypeReferencePrefix implements Marker {
     UUID id;
+    Space prefix;
 }

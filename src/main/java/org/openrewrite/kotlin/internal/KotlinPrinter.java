@@ -24,10 +24,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
-import org.openrewrite.kotlin.marker.EmptyBody;
-import org.openrewrite.kotlin.marker.MethodClassifier;
-import org.openrewrite.kotlin.marker.PropertyClassifier;
-import org.openrewrite.kotlin.marker.Semicolon;
+import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
@@ -85,7 +82,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             // TODO: requires extends and implements
             visitLeftPadded(":", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
             visitContainer(":", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
-            if (!classDecl.getBody().getMarkers().findFirst(EmptyBody.class).isPresent()) {
+            if (!classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
                 visit(classDecl.getBody(), p);
             }
             afterSyntax(classDecl, p);
@@ -95,9 +92,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
-            p.out.append('{');
+            boolean omitBraces = lambda.getMarkers().findFirst(OmitBraces.class).isPresent();
+            if (!omitBraces) {
+                p.out.append('{');
+            }
             visitMarkers(lambda.getParameters().getMarkers(), p);
-            visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+            if (lambda.getParameters().isParenthesized()) {
+                p.append('(');
+                visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+                p.append(')');
+            } else {
+                visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+            }
             if (!lambda.getParameters().getParameters().isEmpty()) {
                 visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.out.append("->");
@@ -109,7 +115,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             } else {
                 visit(lambda.getBody(), p);
             }
-            p.out.append('}');
+            if (!omitBraces) {
+                p.out.append('}');
+            }
             afterSyntax(lambda, p);
             return lambda;
         }
@@ -229,7 +237,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(variable.getName(), p);
 
             if (multiVariable.getTypeExpression() != null) {
-                p.append(":");
+                TypeReferencePrefix typeReferencePrefix = multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
+                if (typeReferencePrefix != null) {
+                    KotlinPrinter.this.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
+                    p.append(":");
+                }
                 visit(multiVariable.getTypeExpression(), p);
             }
 

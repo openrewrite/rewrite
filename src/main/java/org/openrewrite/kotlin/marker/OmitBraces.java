@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin.tree;
+package org.openrewrite.kotlin.marker;
 
-public class KSpace {
-    public enum Location {
-        TODO,
-        TOP_LEVEL_STATEMENT,
-        TYPE_REFERENCE_PREFIX
-    }
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.marker.Marker;
+
+import java.util.UUID;
+
+@Value
+@With
+public class OmitBraces implements Marker {
+    UUID id;
 }

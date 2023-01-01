@@ -69,8 +69,6 @@ dependencies {
     implementation(platform(kotlin("bom", "1.7.22")))
     implementation(kotlin("compiler-embeddable"))
     implementation(kotlin("stdlib"))
-    // This may be necessary for scripts.
-//    implementation(kotlin("scripting-compiler-embeddable"))
 
     testImplementation("org.assertj:assertj-core:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")

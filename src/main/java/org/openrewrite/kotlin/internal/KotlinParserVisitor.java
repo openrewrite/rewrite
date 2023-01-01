@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
@@ -36,7 +37,6 @@ import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.types.*;
-import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.name.Name;
@@ -54,10 +54,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinTypeMapping;
-import org.openrewrite.kotlin.marker.EmptyBody;
-import org.openrewrite.kotlin.marker.MethodClassifier;
-import org.openrewrite.kotlin.marker.PropertyClassifier;
-import org.openrewrite.kotlin.marker.Semicolon;
+import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
@@ -209,13 +206,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             cursor = saveCursor;
         }
 
-        J body = visitElement(anonymousFunction.getBody(), ctx);
+        J body = anonymousFunction.getBody() == null ? null : visitElement(anonymousFunction.getBody(), ctx);
         if (body instanceof J.Block) {
             body = ((J.Block) body).withEnd(sourceBefore("}"));
         }
 
-        if (anonymousFunction.getValueParameters().isEmpty()) {
-            body = body.withMarkers(body.getMarkers().removeByType(EmptyBody.class));
+        if (body != null && anonymousFunction.getValueParameters().isEmpty()) {
+            body = body.withMarkers(body.getMarkers().removeByType(OmitBraces.class));
         }
 
         return new J.Lambda(
@@ -232,12 +229,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitBlock(FirBlock block, ExecutionContext ctx) {
         int saveCursor = cursor;
         Space prefix = whitespace();
-        EmptyBody emptyBody = null;
+        OmitBraces omitBraces = null;
         boolean isEmptyBody = !source.startsWith("{", cursor);
         if (isEmptyBody) {
             cursor = saveCursor;
             prefix = EMPTY;
-            emptyBody = new EmptyBody(randomId());
+            omitBraces = new OmitBraces(randomId());
         } else {
             skip("{");
         }
@@ -276,7 +273,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new J.Block(
                 randomId(),
                 prefix,
-                emptyBody == null ? Markers.EMPTY : Markers.EMPTY.addIfAbsent(emptyBody),
+                omitBraces == null ? Markers.EMPTY : Markers.EMPTY.addIfAbsent(omitBraces),
                 JRightPadded.build(false),
                 statements,
                 isEmptyBody ? Space.EMPTY : sourceBefore("}"));
@@ -331,13 +328,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         int saveCursor = cursor;
         Space bodyPrefix = whitespace();
-        EmptyBody emptyBody = null;
+        OmitBraces omitBraces = null;
         J.Block body;
         if (source.substring(cursor).isEmpty() || !source.substring(cursor).startsWith("{")) {
             cursor = saveCursor;
-            emptyBody = new EmptyBody(randomId());
+            omitBraces = new OmitBraces(randomId());
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY), emptyList(), Space.EMPTY);
-            body = body.withMarkers(body.getMarkers().addIfAbsent(emptyBody));
+            body = body.withMarkers(body.getMarkers().addIfAbsent(omitBraces));
         } else {
             skip("{"); // Increment past the `{`
             List<FirElement> membersMultiVariablesSeparated = new ArrayList<>(firRegularClass.getDeclarations().size());
@@ -405,7 +402,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         FirOperation op = equalityOperatorCall.getOperation();
         FirElement right = equalityOperatorCall.getArgumentList().getArguments().get(1);
 
-        J.Binary binary = new J.Binary(
+        return new J.Binary(
                 randomId(),
                 whitespace(),
                 Markers.EMPTY,
@@ -413,7 +410,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 padLeft(sourceBefore(op.getOperator()), mapOperation(op)),
                 (Expression) visitElement(right, ctx),
                 null); // TODO
-        return binary;
     }
 
     private J.Binary.Type mapOperation(FirOperation op) {
@@ -483,22 +479,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             int saveCursor = cursor;
             whitespace();
-            JContainer<Expression> args;
+            JContainer<Expression> args = JContainer.empty();
             Markers markers = Markers.EMPTY;
             if (source.startsWith("(", cursor)) {
                 cursor = saveCursor;
                 List<FirExpression> firExpressions = functionCall.getArgumentList().getArguments();
-                if (firExpressions.size() == 1 || (firExpressions.get(0) instanceof FirVarargArgumentsExpression)) {
-                    FirVarargArgumentsExpression argumentsExpression = (FirVarargArgumentsExpression) firExpressions.get(0);
-                    args = JContainer.build(sourceBefore("("), argumentsExpression.getArguments().isEmpty() ?
-                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                            convertAll(argumentsExpression.getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+                if (firExpressions.size() == 1) {
+                    FirExpression firExpression = firExpressions.get(0);
+                    if (firExpression instanceof FirVarargArgumentsExpression) {
+                        FirVarargArgumentsExpression argumentsExpression = (FirVarargArgumentsExpression) firExpressions.get(0);
+                        args = JContainer.build(sourceBefore("("), argumentsExpression.getArguments().isEmpty() ?
+                                singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                                convertAll(argumentsExpression.getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+                    } else if (firExpression instanceof FirImplicitInvokeCall) {
+                        args = JContainer.build(sourceBefore("("), convertAll(singletonList(firExpression), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+                    } else {
+                        throw new IllegalStateException("Implement me.");
+                    }
                 } else {
                     args = JContainer.build(sourceBefore("("), firExpressions.isEmpty() ?
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                             convertAll(firExpressions, commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
                 }
-
             } else {
                 cursor = saveCursor;
                 markers = markers.addIfAbsent(new OmitParentheses(randomId()));
@@ -533,7 +535,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         List<JRightPadded<Expression>> parameters = new ArrayList<>(types.size());;
 
-        Space paramPrefix = whitespace();
         for (int i = 0; i < types.size(); i++) {
             FirTypeProjection type = types.get(i);
             JRightPadded<Expression> padded = JRightPadded.build((Expression) visitElement(type, null)).withAfter(
@@ -569,6 +570,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     padLeft(opPrefix, op),
                     (Expression) right,
                     null);
+        } else if (functionCall instanceof FirImplicitInvokeCall) {
+            Space prefix = whitespace();
+            JContainer<Expression> typeParams = null;
+            if (!functionCall.getTypeArguments().isEmpty()) {
+                int saveCursor = cursor;
+                whitespace();
+                boolean parseTypeArguments = source.startsWith("<", cursor);
+                cursor = saveCursor;
+                if (parseTypeArguments) {
+                    typeParams = mapTypeArguments(functionCall.getTypeArguments());
+                }
+            }
+
+            return new J.MethodInvocation(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    null,
+                    typeParams,
+                    (J.Identifier) visitElement(functionCall.getCalleeReference(), null),
+                    JContainer.build(whitespace(), convertAll(functionCall.getArgumentList().getArguments(), commaDelim, t -> whitespace(), ctx), Markers.EMPTY),
+                    null);
         }
 
         throw new IllegalStateException("Implement me.");
@@ -576,7 +599,55 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionTypeRef(FirFunctionTypeRef functionTypeRef, ExecutionContext ctx) {
-        throw new IllegalStateException("Implement me.");
+        Space prefix = whitespace();
+        boolean parenthesized = source.charAt(cursor) == '(';
+        skip("(");
+
+        JavaType closureType = null; // TODO
+        List<JRightPadded<J>> paramExprs = new ArrayList<>(functionTypeRef.getValueParameters().size());
+        if (!functionTypeRef.getValueParameters().isEmpty()) {
+            List<FirValueParameter> parameters = functionTypeRef.getValueParameters();
+            for (int i = 0; i < parameters.size(); i++) {
+                FirValueParameter p = parameters.get(i);
+                JavaType type = null; // TODO
+                J expr = visitElement(p, ctx);
+                JRightPadded<J> param = JRightPadded.build(expr);
+                Space after = i < parameters.size() - 1 ? sourceBefore(",") : (parenthesized ? sourceBefore(")") : EMPTY);
+                param = param.withAfter(after);
+                paramExprs.add(param);
+            }
+        }
+
+        J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, parenthesized, paramExprs);
+        if (parenthesized && functionTypeRef.getValueParameters().isEmpty()) {
+            params = params.getPadding().withParams(singletonList(JRightPadded
+                    .build((J)new J.Empty(randomId(), EMPTY, Markers.EMPTY))
+                    .withAfter(sourceBefore(")"))));
+        }
+
+        Space arrow = sourceBefore("->");
+        int saveCursor = cursor;
+        whitespace();
+        boolean omitBraces = !source.startsWith("{");
+        cursor = saveCursor;
+
+        J body = visitElement(functionTypeRef.getReturnTypeRef(), ctx);
+        if (body instanceof J.Block) {
+            body = ((J.Block) body).withEnd(sourceBefore("}"));
+        }
+
+        if (functionTypeRef.getValueParameters().isEmpty()) {
+            body = body.withMarkers(body.getMarkers().removeByType(OmitBraces.class));
+        }
+
+        return new J.Lambda(
+                randomId(),
+                prefix,
+                omitBraces ? Markers.EMPTY.addIfAbsent(new OmitBraces(randomId())) : Markers.EMPTY,
+                params,
+                arrow,
+                body,
+                closureType);
     }
 
     @Override
@@ -633,9 +704,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         List<J.Annotation> annotations = emptyList(); // TODO: the last annotations in modifiers should be added.
+        Markers markers = Markers.EMPTY;
 
         boolean isVal = property.isVal();
-        PropertyClassifier propertyClassifier = new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR);
+        markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
         Space namePrefix = sourceBefore(property.getName().asString());
@@ -652,6 +724,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
             FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
             if (typeRef.getDelegatedTypeRef() != null) {
+                Space delimiterPrefix = whitespace();
+                boolean addTypeReferencePrefix = source.startsWith(":", cursor);
+                skip(":");
+                if (addTypeReferencePrefix) {
+                    markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
+                }
                 typeExpression = (TypeTree) visitElement(typeRef.getDelegatedTypeRef(), ctx);
             }
         } else {
@@ -687,7 +765,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new J.VariableDeclarations(
                 randomId(),
                 prefix,
-                Markers.EMPTY.addIfAbsent(propertyClassifier),
+                markers,
                 emptyList(),
                 emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
                 typeExpression,
@@ -730,16 +808,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitResolvedTypeRef(FirResolvedTypeRef resolvedTypeRef, ExecutionContext ctx) {
-        String name = ((KtRealPsiSourceElement) resolvedTypeRef.getSource()).getPsi().getText();
-        Space prefix = sourceBefore(name);
-
-        JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
-        return new J.Identifier(randomId(),
-                prefix,
-                Markers.EMPTY,
-                name,
-                type,
-                null);
+        if (resolvedTypeRef.getDelegatedTypeRef() != null) {
+            return visitElement(resolvedTypeRef.getDelegatedTypeRef(), ctx);
+        }
+        throw new IllegalStateException("Implement me.");
     }
 
     @Override
@@ -828,8 +900,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitUserTypeRef(FirUserTypeRef userTypeRef, ExecutionContext ctx) {
-        sourceBefore(":"); // increment passed the ":"
-
         JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
         if (userTypeRef.getQualifier().size() == 1) {
             FirQualifierPart part = userTypeRef.getQualifier().get(0);
@@ -887,15 +957,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         List<J.Annotation> annotations = emptyList(); // TODO: the last annotations in modifiers should be added.
+        Markers markers = Markers.EMPTY;
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
-        Space namePrefix = sourceBefore(valueParameter.getName().asString());
+        Space namePrefix = EMPTY;
+        String valueName = "";
+        if ("<no name provided>".equals(valueParameter.getName().toString())) {
+            KtSourceElement sourceElement = valueParameter.getSource();
+            if (sourceElement == null) {
+                throw new IllegalStateException("Unexpected null source.");
+            } else {
+                KtLightSourceElement element = (KtLightSourceElement) sourceElement;
+            }
+        } else {
+            valueName = valueParameter.getName().asString();
+            namePrefix = sourceBefore(valueName);
+        }
 
         J.Identifier name = new J.Identifier(
                 randomId(),
                 EMPTY,
                 Markers.EMPTY,
-                valueParameter.getName().asString(),
+                valueName,
                 null, // TODO: add type mapping and set type
                 null); // TODO: add type mapping and set variable type
 
@@ -903,7 +986,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef) {
             FirResolvedTypeRef typeRef = (FirResolvedTypeRef) valueParameter.getReturnTypeRef();
             if (typeRef.getDelegatedTypeRef() != null) {
-                typeExpression = (TypeTree) visitElement(typeRef.getDelegatedTypeRef(), ctx);
+                Space delimiterPrefix = whitespace();
+                boolean addTypeReferencePrefix = source.startsWith(":", cursor);
+                skip(":");
+                if (addTypeReferencePrefix) {
+                    markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
+                }
+                J j = visitElement(typeRef.getDelegatedTypeRef(), ctx);
+                if (j instanceof TypeTree) {
+                    typeExpression = (TypeTree) j;
+                } else {
+                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j);
+                }
             }
         } else {
             throw new IllegalStateException("Implement me.");
@@ -928,7 +1022,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new J.VariableDeclarations(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                markers,
                 emptyList(),
                 emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
                 typeExpression,
@@ -1058,8 +1152,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitFunctionCall((FirFunctionCall) firElement, ctx);
         } else if (firElement instanceof FirFunctionTypeRef) {
             return visitFunctionTypeRef((FirFunctionTypeRef) firElement, ctx);
-        } else if (firElement instanceof FirImplicitNullableAnyTypeRef) {
-            return visitResolvedTypeRef((FirResolvedTypeRef) firElement, ctx);
         } else if (firElement instanceof FirLambdaArgumentExpression) {
             return visitLambdaArgumentExpression((FirLambdaArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirProperty) {
@@ -1068,6 +1160,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitPropertyAccessExpression((FirPropertyAccessExpression) firElement, ctx);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return visitResolvedNamedReference((FirResolvedNamedReference) firElement, ctx);
+        } else if (firElement instanceof FirResolvedTypeRef) {
+            return visitResolvedTypeRef((FirResolvedTypeRef) firElement, ctx);
         } else if (firElement instanceof FirReturnExpression) {
             return visitReturnExpression((FirReturnExpression) firElement, ctx);
         } else if (firElement instanceof FirSimpleFunction) {
