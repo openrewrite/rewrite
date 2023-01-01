@@ -51,6 +51,7 @@ dependencies {
     testRuntimeOnly("org.gradle:gradle-testing-base:latest.release")
     testRuntimeOnly("org.gradle:gradle-testing-jvm:latest.release")
     testRuntimeOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
+    testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }

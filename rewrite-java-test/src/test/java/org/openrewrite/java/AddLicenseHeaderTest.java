@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Calendar.*;
+import static java.util.Calendar.getInstance;
 import static org.openrewrite.java.Assertions.java;
 
 class AddLicenseHeaderTest implements RewriteTest {
@@ -47,7 +49,7 @@ class AddLicenseHeaderTest implements RewriteTest {
               """,
             """
               /*
-               * Copyright 2022 the original author or authors.
+               * Copyright %s the original author or authors.
                * <p>
                * Licensed under the Apache License, Version 2.0 (the "License");
                * you may not use this file except in compliance with the License.
@@ -56,7 +58,7 @@ class AddLicenseHeaderTest implements RewriteTest {
               package com.sample;
               class Test {
               }
-              """
+              """.formatted(getInstance().get(YEAR))
           )
         );
     }
