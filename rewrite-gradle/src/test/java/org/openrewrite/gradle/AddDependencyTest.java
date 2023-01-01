@@ -25,6 +25,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.java.Assertions.*;
 
 class AddDependencyTest implements RewriteTest {
@@ -337,6 +338,42 @@ class AddDependencyTest implements RewriteTest {
                     %s "com.fasterxml.jackson.core:jackson-core:2.12.0"
                 }
                 """.formatted(configuration)
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyToProjectsThatNeedIt() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("root",
+            buildGradle(
+              ""
+            ),
+            settingsGradle(
+              """
+              include "project1"
+              include "project2"
+              """
+            )
+          ),
+          mavenProject("project1",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              "",
+              """
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          ),
+          mavenProject("project2",
+            buildGradle(
+              ""
             )
           )
         );

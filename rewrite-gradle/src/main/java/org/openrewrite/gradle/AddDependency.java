@@ -201,13 +201,22 @@ public class AddDependency extends Recipe {
 
                     @Override
                     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+                        if (!cu.getSourcePath().toString().endsWith(".gradle") || cu.getSourcePath().getFileName().equals("settings.gradle")) {
+                            return cu;
+                        }
+
+                        String maybeConfiguration = configurationByProject.get(javaProject);
+                        if (maybeConfiguration == null) {
+                            return cu;
+                        }
+
                         G.CompilationUnit g = super.visitCompilationUnit(cu, executionContext);
 
                         if (getCursor().getMessage(DEPENDENCY_PRESENT, false)) {
                             return g;
                         }
 
-                        String resolvedConfiguration = configuration == null ? configurationByProject.get(javaProject) : configuration;
+                        String resolvedConfiguration = configuration == null ? maybeConfiguration : configuration;
 
                         return (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
                                 classifier, extension, familyPatternCompiled).visitNonNull(g, ctx);
