@@ -137,6 +137,11 @@ public class RemoveUnusedImports extends Recipe {
                     String outerType = elem.getTypeName();
                     SortedSet<String> methodsAndFields = methodsAndFieldsByTypeName.get(outerType);
 
+                    // some class names are not handled properly by `getTypeName()`
+                    // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
+                    String target = qualid.getTarget().toString();
+                    SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(target);
+
                     Set<JavaType.FullyQualified> staticClasses = null;
                     for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(elem.getPackageName(), emptySet())) {
                         if(maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
@@ -147,7 +152,7 @@ public class RemoveUnusedImports extends Recipe {
                         }
                     }
 
-                    if (methodsAndFields == null && staticClasses == null) {
+                    if (methodsAndFields == null && targetMethodsAndFields == null && staticClasses == null) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(qualid.getSimpleName())) {
@@ -185,7 +190,8 @@ public class RemoveUnusedImports extends Recipe {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         }
                     } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
-                            methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) {
+                            (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
+                            (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
                         anImport.used = true;
                     } else {
                         anImport.used = false;
