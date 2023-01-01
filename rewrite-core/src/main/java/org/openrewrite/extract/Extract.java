@@ -15,7 +15,6 @@
  */
 package org.openrewrite.extract;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.intellij.lang.annotations.Language;
 
 public interface Extract {

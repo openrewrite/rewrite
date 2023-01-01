@@ -12,6 +12,7 @@ dependencies {
     testRuntimeOnly("junit:junit:4.13.2") {
         because("Used for RemoveUnneededAssertionTest")
     }
+    testRuntimeOnly("com.google.guava:guava:latest.release")
 }
 
 tasks.withType<Javadoc> {

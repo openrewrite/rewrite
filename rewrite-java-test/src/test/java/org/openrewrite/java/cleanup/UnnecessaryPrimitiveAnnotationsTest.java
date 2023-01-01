@@ -36,7 +36,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings("NullableProblems")
 class UnnecessaryPrimitiveAnnotationsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
