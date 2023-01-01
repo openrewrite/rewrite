@@ -397,10 +397,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public <T> J visitConstExpression(FirConstExpression<T> constExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
-        cursor(endPos(constExpression));
+        String valueSource = null;
+        if (constExpression.getSource() != null) {
+            valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
+            cursor += valueSource.length();
+        }
+
         Object value = constExpression.getValue();
-        String valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
-        JavaType.Primitive type = null; // TODO: add type mapping.
+        JavaType.Primitive type;
+        if (constExpression.getTypeRef() instanceof FirResolvedTypeRef &&
+                ((FirResolvedTypeRef) constExpression.getTypeRef()).getType() instanceof ConeClassLikeType) {
+            ConeClassLikeType coneClassLikeType = (ConeClassLikeType) ((FirResolvedTypeRef) constExpression.getTypeRef()).getType();
+            type = typeMapping.primitive(coneClassLikeType);
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
 
         return new J.Literal(
                 randomId(),

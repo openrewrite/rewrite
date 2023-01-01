@@ -15,6 +15,9 @@
  */
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.fir.types.ConeClassLikeType;
+import org.jetbrains.kotlin.name.ClassId;
+import org.jetbrains.kotlin.name.StandardClassIds;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
@@ -36,5 +39,32 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 //        }
 
 //        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+    }
+
+    public JavaType.Primitive primitive(ConeClassLikeType type) {
+        ClassId classId = type.getLookupTag().getClassId();
+        if (StandardClassIds.INSTANCE.getByte().equals(classId)) {
+            return JavaType.Primitive.Byte;
+        } else if (StandardClassIds.INSTANCE.getBoolean().equals(classId)) {
+            return JavaType.Primitive.Boolean;
+        } else if (StandardClassIds.INSTANCE.getChar().equals(classId)) {
+            return JavaType.Primitive.Char;
+        } else if (StandardClassIds.INSTANCE.getDouble().equals(classId)) {
+            return JavaType.Primitive.Double;
+        } else if (StandardClassIds.INSTANCE.getFloat().equals(classId)) {
+            return JavaType.Primitive.Float;
+        } else if (StandardClassIds.INSTANCE.getInt().equals(classId)) {
+            return JavaType.Primitive.Int;
+        } else if (StandardClassIds.INSTANCE.getLong().equals(classId)) {
+            return JavaType.Primitive.Long;
+        } else if (StandardClassIds.INSTANCE.getShort().equals(classId)) {
+            return JavaType.Primitive.Short;
+        } else if (StandardClassIds.INSTANCE.getString().equals(classId)) {
+            return JavaType.Primitive.String;
+        } else if (StandardClassIds.INSTANCE.getUnit().equals(classId)) {
+            return JavaType.Primitive.Void;
+        }
+
+        throw new UnsupportedOperationException("Unknown primitive type " + type);
     }
 }
