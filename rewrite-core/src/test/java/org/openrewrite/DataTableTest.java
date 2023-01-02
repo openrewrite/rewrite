@@ -29,7 +29,7 @@ public class DataTableTest implements RewriteTest {
 
     @Test
     void dataTable() {
-        DataTable<Word> wordTable = new DataTable<>("Words", "Each word in the text.");
+        DataTable<Word> wordTable = new DataTable<>(Word.class, "Words", "Each word in the text.");
         rewriteRun(
           spec -> spec
             .recipe(toRecipe(() -> new PlainTextVisitor<>() {

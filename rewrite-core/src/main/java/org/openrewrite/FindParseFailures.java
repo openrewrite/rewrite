@@ -26,7 +26,7 @@ import static java.util.Collections.singletonList;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindParseFailures extends Recipe {
-    DataTable<ParseExceptionRow> failures = new DataTable<>("Parse failures", "A list of files that failed to parse.");
+    DataTable<ParseExceptionRow> failures = new DataTable<>(ParseExceptionRow.class, "Parse failures", "A list of files that failed to parse.");
 
     @Override
     public String getDisplayName() {

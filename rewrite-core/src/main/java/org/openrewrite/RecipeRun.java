@@ -31,8 +31,8 @@ public class RecipeRun {
     @With
     Map<DataTable<?>, List<?>> dataTables;
 
-    public <E> List<E> getDataTable(DataTable<E> dataTableType) {
+    public <E> List<E> getDataTable(DataTable<E> dataTable) {
         //noinspection unchecked
-        return (List<E>) dataTables.get(dataTableType);
+        return (List<E>) dataTables.get(dataTable);
     }
 }

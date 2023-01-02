@@ -15,7 +15,6 @@
  */
 package org.openrewrite.test;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
@@ -176,16 +175,11 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public <E, V> RecipeSpec dataTableAsCsv(DataTable<E> dataTable, String expect) {
         return dataTable(dataTable, ex -> {
-            if (ex.isEmpty()) {
-                assertThat(expect).isEmpty();
-            } else {
-                StringWriter writer = new StringWriter();
-                CsvMapper mapper = new CsvMapper();
-                Class<?> rowType = ex.iterator().next().getClass();
-                CsvSchema schema = mapper.schemaFor(rowType).withHeader();
-                mapper.writerFor(rowType).with(schema).writeValues(writer).writeAll(ex);
-                assertThat(writer.toString()).isEqualTo(expect);
-            }
+            StringWriter writer = new StringWriter();
+            CsvMapper mapper = new CsvMapper();
+            CsvSchema schema = mapper.schemaFor(dataTable.getType()).withHeader();
+            mapper.writerFor(dataTable.getType()).with(schema).writeValues(writer).writeAll(ex);
+            assertThat(writer.toString()).isEqualTo(expect);
         });
     }
 

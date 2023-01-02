@@ -28,6 +28,8 @@ import java.util.List;
 @Value
 @Incubating(since = "7.35.0")
 public class DataTable<Row> {
+    Class<Row> type;
+
     @Language("markdown")
     String displayName;
 
@@ -36,11 +38,11 @@ public class DataTable<Row> {
 
     @SuppressWarnings("UnusedReturnValue")
     DataTable<Row> insertRow(ExecutionContext ctx, Row row) {
-        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allExtracts) -> {
+        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
             //noinspection unchecked
-            List<Row> extractsOfType = (List<Row>) allExtracts.computeIfAbsent(DataTable.this, c -> new ArrayList<>());
-            extractsOfType.add(row);
-            return allExtracts;
+            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(DataTable.this, c -> new ArrayList<>());
+            dataTablesOfType.add(row);
+            return allDataTables;
         });
         return this;
     }
