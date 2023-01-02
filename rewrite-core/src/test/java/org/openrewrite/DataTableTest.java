@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -24,10 +25,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class ExtractTest implements RewriteTest {
+public class DataTableTest implements RewriteTest {
 
     @Test
-    void extract() {
+    void dataTable() {
+        DataTable<Word> wordTable = new DataTable<>("Words", "Each word in the text.");
         rewriteRun(
           spec -> spec
             .recipe(toRecipe(() -> new PlainTextVisitor<>() {
@@ -35,17 +37,18 @@ public class ExtractTest implements RewriteTest {
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     int i = 0;
                     for (String s : text.getText().split(" ")) {
-                        ctx.extract(new Word(i++, s));
+                        wordTable.insertRow(ctx, new Word(i++, s));
                     }
                     return text;
                 }
             }))
-            .extractedCsv(Word.class, """
+            .dataTableAsCsv(wordTable, """
               position,text
               0,hello
               1,world
-              """)
-            .extracted(Word.class, Word::getText, words -> assertThat(words)
+              """
+            )
+            .dataTable(wordTable, Word::getText, words -> assertThat(words)
               .containsExactly("hello", "world")),
           text("hello world")
         );

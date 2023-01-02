@@ -13,14 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.extract;
+package org.openrewrite.config;
 
-import org.intellij.lang.annotations.Language;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 
-public interface Extract {
-    @Language("markdown")
-    String getDisplayName();
+@Value
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class DataTableDescriptor {
 
-    @Language("markdown")
-    String getDescription();
+    @EqualsAndHashCode.Include
+    String name;
+
+    String displayName;
+
+    String description;
 }

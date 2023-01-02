@@ -102,7 +102,7 @@ public interface RecipeScheduler {
         }
 
         if (after == before) {
-            return recipeRun.withExtracts(ctx.getMessage(ExecutionContext.EXTRACTS));
+            return recipeRun.withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES));
         }
 
         Map<UUID, SourceFile> sourceFileIdentities = new HashMap<>();
@@ -145,7 +145,7 @@ public interface RecipeScheduler {
 
         return recipeRun
                 .withResults(results)
-                .withExtracts(ctx.getMessage(ExecutionContext.EXTRACTS));
+                .withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES));
     }
 
     default <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats,

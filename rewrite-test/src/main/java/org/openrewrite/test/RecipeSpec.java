@@ -15,8 +15,7 @@
  */
 package org.openrewrite.test;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
@@ -30,12 +29,14 @@ import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SuppressWarnings("UnusedReturnValue")
@@ -159,27 +160,32 @@ public class RecipeSpec {
         return this;
     }
 
-    public <E> RecipeSpec extracted(Class<E> extractType, UncheckedConsumer<List<E>> extract) {
+    public <E> RecipeSpec dataTable(DataTable<E> dataTable, UncheckedConsumer<List<E>> extract) {
         return afterRecipe(run -> {
-            List<E> rows = run.getExtract(extractType);
+            List<E> rows = run.getDataTable(dataTable);
             assertFalse(rows.isEmpty());
             extract.accept(rows);
         });
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec extracted(Class<E> extractType, Function<E, V> map, UncheckedConsumer<List<V>> extract) {
-        return extracted(extractType, ex -> extract.accept(ex.stream().map(map).collect(Collectors.toList())));
+    public <E, V> RecipeSpec dataTable(DataTable<E> dataTable, Function<E, V> map, UncheckedConsumer<List<V>> extract) {
+        return dataTable(dataTable, ex -> extract.accept(ex.stream().map(map).collect(Collectors.toList())));
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec extractedCsv(Class<E> extractType, String expect) {
-        return extracted(extractType, ex -> {
-            CsvMapper mapper = new CsvMapper();
-            CsvSchema schema = mapper.schemaFor(extractType).withHeader();
-            StringWriter writer = new StringWriter();
-            mapper.writerFor(extractType).with(schema).writeValues(writer).writeAll(ex);
-            assertThat(writer.toString()).isEqualTo(expect);
+    public <E, V> RecipeSpec dataTableAsCsv(DataTable<E> dataTable, String expect) {
+        return dataTable(dataTable, ex -> {
+            if (ex.isEmpty()) {
+                assertThat(expect).isEmpty();
+            } else {
+                StringWriter writer = new StringWriter();
+                CsvMapper mapper = new CsvMapper();
+                Class<?> rowType = ex.iterator().next().getClass();
+                CsvSchema schema = mapper.schemaFor(rowType).withHeader();
+                mapper.writerFor(rowType).with(schema).writeValues(writer).writeAll(ex);
+                assertThat(writer.toString()).isEqualTo(expect);
+            }
         });
     }
 

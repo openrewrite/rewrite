@@ -31,17 +31,7 @@ import java.util.function.Supplier;
 public interface ExecutionContext {
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String UNCAUGHT_EXCEPTION_COUNT = "org.openrewrite.uncaughtExceptionCount";
-    String EXTRACTS = "org.openrewrite.extracts";
-
-    @Incubating(since = "7.35.0")
-    default void extract(Object o) {
-        computeMessage(ExecutionContext.EXTRACTS, o, HashMap::new, (extract, allExtracts) -> {
-            //noinspection unchecked
-            List<Object> extractsOfType = (List<Object>) allExtracts.computeIfAbsent(o.getClass(), c -> new ArrayList<>());
-            extractsOfType.add(o);
-            return allExtracts;
-        });
-    }
+    String DATA_TABLES = "org.openrewrite.dataTables";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
@@ -52,7 +42,7 @@ public interface ExecutionContext {
 
     @Incubating(since = "7.20.0")
     default Set<TreeObserver.Subscription> getObservers() {
-        return getMessage("org.openrewrite.internal.treeObservers", Collections.<TreeObserver.Subscription>emptySet());
+        return getMessage("org.openrewrite.internal.treeObservers", Collections.emptySet());
     }
 
     void putMessage(String key, @Nullable Object value);

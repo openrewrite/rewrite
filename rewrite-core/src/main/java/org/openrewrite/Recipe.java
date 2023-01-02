@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.extract.Extract;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -168,9 +167,9 @@ public abstract class Recipe implements Cloneable {
     private final List<Recipe> recipeList = new CopyOnWriteArrayList<>();
 
     /**
-     * @return A list of the types that this recipe may generate extracts for.
+     * @return A list of the types that this recipe may generate data tables for.
      */
-    public List<Class<? extends Extract>> getExtractTypes() {
+    public List<DataTable<?>> getDataTables() {
         return emptyList();
     }
 

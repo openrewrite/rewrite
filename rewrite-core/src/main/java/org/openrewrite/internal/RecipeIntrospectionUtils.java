@@ -18,7 +18,7 @@ package org.openrewrite.internal;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.*;
-import org.openrewrite.extract.Extract;
+import org.openrewrite.DataTable;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -142,21 +142,16 @@ public class RecipeIntrospectionUtils {
             throw new RuntimeException(e);
         }
 
-        List<ExtractDescriptor> extractTypes = new ArrayList<>();
-        for (Class<? extends Extract> extractType : recipe.getExtractTypes()) {
-            Extract extract = constructExtract(extractType);
-            extractTypes.add(new ExtractDescriptor(extractType.getName(), extract.getDisplayName(),
-                    extract.getDescription()));
+        List<DataTableDescriptor> extractTypes = new ArrayList<>();
+        for (DataTable<?> dataTable : recipe.getDataTables()) {
+            extractTypes.add(new DataTableDescriptor(dataTable.getClass().getName(), dataTable.getDisplayName(),
+                    dataTable.getDescription()));
         }
 
         //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(),
                 recipe.getDescription(), recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
                 options, recipe.getLanguages(), recipeList, extractTypes, recipeSource);
-    }
-
-    public static Extract constructExtract(Class<?> extractClass) {
-        return construct(extractClass);
     }
 
     public static Recipe constructRecipe(Class<?> recipeClass) {

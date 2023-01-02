@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.StringUtils;
 
 import java.net.URI;
+import java.util.Collection;
 import java.util.Properties;
 
 import static java.util.Collections.emptyList;
@@ -157,8 +158,8 @@ public class CategoryTreeTest {
 
     @Test
     void getRecipesInArtificialCorePackage() {
-        assertThat(requireNonNull(categoryTree().getCategory("org", "openrewrite", "core")).getRecipes())
-          .isNotEmpty();
+        Collection<RecipeDescriptor> recipes = requireNonNull(categoryTree().getCategory("org", "openrewrite", "core")).getRecipes();
+        assertThat(recipes).isNotEmpty();
     }
 
     @Test

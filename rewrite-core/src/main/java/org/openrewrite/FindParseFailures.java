@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.extract.Extract;
 import org.openrewrite.marker.Markup;
 
 import java.util.List;
@@ -27,6 +26,7 @@ import static java.util.Collections.singletonList;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindParseFailures extends Recipe {
+    DataTable<ParseExceptionRow> failures = new DataTable<>("Parse failures", "A list of files that failed to parse.");
 
     @Override
     public String getDisplayName() {
@@ -40,8 +40,8 @@ public class FindParseFailures extends Recipe {
     }
 
     @Override
-    public List<Class<? extends Extract>> getExtractTypes() {
-        return singletonList(ParseExceptionExtract.class);
+    public List<DataTable<?>> getDataTables() {
+        return singletonList(failures);
     }
 
     @Override
@@ -51,7 +51,7 @@ public class FindParseFailures extends Recipe {
             public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile.getMarkers().findFirst(ParseExceptionResult.class)
                         .<Tree>map(exceptionResult -> {
-                            ctx.extract(new ParseExceptionExtract(
+                            failures.insertRow(ctx, new ParseExceptionRow(
                                     sourceFile.getSourcePath().toString(),
                                     exceptionResult.getMessage()
                             ));
@@ -63,17 +63,7 @@ public class FindParseFailures extends Recipe {
     }
 
     @Value
-    public static class ParseExceptionExtract implements Extract {
-        @Override
-        public String getDisplayName() {
-            return "Parse exceptions";
-        }
-
-        @Override
-        public String getDescription() {
-            return "A list of parse exceptions for grouping by category of failure.";
-        }
-
+    public static class ParseExceptionRow {
         String sourcePath;
         String stackTrace;
     }

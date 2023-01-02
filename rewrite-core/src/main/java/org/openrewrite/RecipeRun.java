@@ -29,10 +29,10 @@ public class RecipeRun {
     List<Result> results;
 
     @With
-    Map<Class<?>, List<Object>> extracts;
+    Map<DataTable<?>, List<?>> dataTables;
 
-    public <E> List<E> getExtract(Class<E> extractType) {
+    public <E> List<E> getDataTable(DataTable<E> dataTableType) {
         //noinspection unchecked
-        return (List<E>) extracts.get(extractType);
+        return (List<E>) dataTables.get(dataTableType);
     }
 }

@@ -24,7 +24,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class ExtractFieldTest implements RewriteTest {
+public class DataTableFieldTest implements RewriteTest {
 
     @Test
     void extractField() {
