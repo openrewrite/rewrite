@@ -50,7 +50,7 @@ public class RecipeDescriptor {
     List<RecipeDescriptor> recipeList;
 
     @With
-    List<DataTableDescriptor> extractTypes;
+    List<DataTableDescriptor> dataTables;
 
     URI source;
 }
