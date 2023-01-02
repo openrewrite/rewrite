@@ -47,12 +47,12 @@ public class SetFilePermissions extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Set File Permission Attributes";
+        return "Set file permission attributes";
     }
 
     @Override
     public String getDescription() {
-        return "Set a files read, write and executable permission attributes.";
+        return "Set a file's read, write and executable permission attributes.";
     }
 
     @Override
