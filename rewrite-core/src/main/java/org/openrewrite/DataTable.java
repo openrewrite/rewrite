@@ -37,7 +37,7 @@ public class DataTable<Row> {
     String description;
 
     @SuppressWarnings("UnusedReturnValue")
-    DataTable<Row> insertRow(ExecutionContext ctx, Row row) {
+    public DataTable<Row> insertRow(ExecutionContext ctx, Row row) {
         ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
             //noinspection unchecked
             List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(DataTable.this, c -> new ArrayList<>());
