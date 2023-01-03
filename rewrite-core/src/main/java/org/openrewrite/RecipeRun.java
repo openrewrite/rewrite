@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -31,6 +32,7 @@ public class RecipeRun {
     @With
     Map<DataTable<?>, List<?>> dataTables;
 
+    @Nullable
     public <E> List<E> getDataTable(DataTable<E> dataTable) {
         //noinspection unchecked
         return (List<E>) dataTables.get(dataTable);

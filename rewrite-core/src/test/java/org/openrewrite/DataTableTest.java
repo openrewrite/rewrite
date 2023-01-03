@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
