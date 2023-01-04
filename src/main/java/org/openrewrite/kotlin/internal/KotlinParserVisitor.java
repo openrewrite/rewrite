@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -971,6 +972,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitStringConcatenationCall(FirStringConcatenationCall stringConcatenationCall, ExecutionContext ctx) {
+        throw new IllegalStateException("Implement me.");
+    }
+
+    @Override
     public J visitThisReceiverExpression(FirThisReceiverExpression thisReceiverExpression, ExecutionContext ctx) {
         Space prefix = sourceBefore("this");
 
@@ -1280,7 +1286,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitReturnExpression((FirReturnExpression) firElement, ctx);
         } else if (firElement instanceof FirSimpleFunction) {
             return visitSimpleFunction((FirSimpleFunction) firElement, ctx);
-        }  else if (firElement instanceof FirThisReceiverExpression) {
+        } else if (firElement instanceof FirStringConcatenationCall) {
+            return visitStringConcatenationCall((FirStringConcatenationCall) firElement, ctx);
+        } else if (firElement instanceof FirThisReceiverExpression) {
             return visitThisReceiverExpression((FirThisReceiverExpression) firElement, ctx);
         } else if (firElement instanceof FirTypeParameter) {
             return visitTypeParameter((FirTypeParameter) firElement, ctx);
