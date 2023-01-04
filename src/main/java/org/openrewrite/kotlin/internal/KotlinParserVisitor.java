@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.jetbrains.kotlin.com.intellij.psi.impl.source.JavaLightTreeUtil;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.*;
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.descriptors.ClassKind;
@@ -892,6 +893,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
         if (simpleFunction.getSource() != null) {
+//            modifiers = mapModifiers(simpleFunction.getSource());
 //            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) simpleFunction.getSource()).getPsi());
 //            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
 //                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
@@ -1437,7 +1439,38 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new JRightPadded<>(tree, right, Markers.EMPTY);
     }
 
-    // TODO: parse comments.
+    private List<J> mapModifiers(KtSourceElement sourceElement) {
+        List<J> modifiers = new ArrayList<>();
+        if (sourceElement instanceof KtRealPsiSourceElement) {
+            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) sourceElement).getPsi());
+            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
+                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
+                modifiers = getModifiers(modifierList);
+            }
+        } else if (sourceElement instanceof KtLightSourceElement) {
+            KtLightSourceElement lightSourceElement = (KtLightSourceElement) sourceElement;
+            throw new IllegalStateException("Navigate Light source to preserve modifier / annotation positions.");
+        } else {
+            throw new IllegalStateException("Unexpected source type");
+        }
+
+        return modifiers;
+    }
+
+    private class test extends KtVisitorVoid() {
+        visit
+    }
+    inline fun <reified T : KtElement> forEachDescendantOfTypeVisitor(noinline block: (T) -> Unit): KtVisitorVoid {
+        return object : KtTreeVisitorVoid() {
+            override fun visitKtElement(element: KtElement) {
+                super.visitKtElement(element)
+                if (element is T) {
+                    block(element)
+                }
+            }
+        }
+    }
+
     private List<J> getModifiers(KtDeclarationModifierList modifierList) {
         List<J> modifiers = new ArrayList<>();
         PsiElement current = modifierList.getFirstChild();

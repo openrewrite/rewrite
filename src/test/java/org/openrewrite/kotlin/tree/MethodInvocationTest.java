@@ -111,7 +111,7 @@ public class MethodInvocationTest implements RewriteTest {
                     val delegate: Spec = Spec()
                     fun id(id: String): Spec = delegate.id(id)
                 }
-                infix fun Spec.version(version: String): Spec = version(version)
+                public infix fun Spec.version(version: String): Spec = version(version)
             """,
             isFullyParsed()
           ),
