@@ -91,8 +91,8 @@ public class FindPlugins extends Recipe {
                 Function.identity()
         );
 
-        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
         MethodMatcher idMatcher = new MethodMatcher("PluginSpec id(..)", false);
+        MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
         return plugins.stream().flatMap(plugin -> {
             if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect())) {
                 return Stream.of(new GradlePlugin(
@@ -100,6 +100,13 @@ public class FindPlugins extends Recipe {
                         requireNonNull(((J.Literal) requireNonNull(((J.MethodInvocation) plugin.getSelect()))
                                 .getArguments().get(0)).getValue()).toString(),
                         requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
+                ));
+            } else if (idMatcher.matches(plugin)) {
+                return Stream.of(new GradlePlugin(
+                        plugin,
+                        requireNonNull(((J.Literal) requireNonNull(plugin)
+                                .getArguments().get(0)).getValue()).toString(),
+                        null
                 ));
             }
             return Stream.<GradlePlugin>empty();
