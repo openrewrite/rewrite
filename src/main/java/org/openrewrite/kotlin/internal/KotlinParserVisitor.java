@@ -1457,20 +1457,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return modifiers;
     }
 
-    private class test extends KtVisitorVoid() {
-        visit
-    }
-    inline fun <reified T : KtElement> forEachDescendantOfTypeVisitor(noinline block: (T) -> Unit): KtVisitorVoid {
-        return object : KtTreeVisitorVoid() {
-            override fun visitKtElement(element: KtElement) {
-                super.visitKtElement(element)
-                if (element is T) {
-                    block(element)
-                }
-            }
-        }
-    }
-
     private List<J> getModifiers(KtDeclarationModifierList modifierList) {
         List<J> modifiers = new ArrayList<>();
         PsiElement current = modifierList.getFirstChild();
