@@ -590,7 +590,7 @@ public class MavenPomDownloader {
                 return gav.getVersion();
             }
             MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
-            if (snapshot != null) {
+            if (snapshot != null && snapshot.getTimestamp() != null) {
                 return gav.getVersion().replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
             }
         }
