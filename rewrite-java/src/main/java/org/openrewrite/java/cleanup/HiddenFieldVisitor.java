@@ -28,10 +28,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -100,7 +97,7 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
          * @return A set of existing variable definition of the {@param childTargetName} within the same name scope as the {@param childTargetName}.
          */
         public static Set<J.VariableDeclarations.NamedVariable> find(J j, Cursor childTargetReference, String childTargetName) {
-            Set<J.VariableDeclarations.NamedVariable> references = new HashSet<>();
+            Set<J.VariableDeclarations.NamedVariable> references = new LinkedHashSet<>();
             new FindExistingVariableDeclarations(childTargetReference, childTargetName).visit(j, references);
             return references;
         }
@@ -187,7 +184,7 @@ public class HiddenFieldVisitor<P> extends JavaIsoVisitor<P> {
          * @return A set representing any found {@link J.VariableDeclarations.NamedVariable} which shadow the provided {@param targetVariable}.
          */
         public static Set<J.VariableDeclarations.NamedVariable> find(J j, J.VariableDeclarations.NamedVariable targetVariable, J.ClassDeclaration targetVariableEnclosingClass, HiddenFieldStyle hiddenFieldStyle) {
-            Set<J.VariableDeclarations.NamedVariable> references = new HashSet<>();
+            Set<J.VariableDeclarations.NamedVariable> references = new LinkedHashSet<>();
             new FindNameShadows(targetVariable, targetVariableEnclosingClass, hiddenFieldStyle).visit(j, references);
             return references;
         }
