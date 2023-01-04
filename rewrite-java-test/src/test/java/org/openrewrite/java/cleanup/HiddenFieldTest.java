@@ -254,6 +254,116 @@ class HiddenFieldTest implements RewriteTest {
         );
     }
 
+    @Test
+    void blocks() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  int n;
+
+                  public void blocks() {
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                      {
+                          int n = 0;
+                          int x = n;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  int n;
+
+                  public void blocks() {
+                      {
+                          int n1 = 0;
+                          int x = n1;
+                      }
+                      {
+                          int n1 = 0;
+                          int x = n1;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("ConstantValue")
+    void tryResources() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  int n;
+
+                  public void tryWithResources(int n4) {
+                      Object n1 = null;
+                      try (java.io.InputStream n = null; java.io.OutputStream n2 = null) {
+                          Object n3 = null;
+                          Object x = n;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  int n;
+
+                  public void tryWithResources(int n4) {
+                      Object n1 = null;
+                      try (java.io.InputStream n5 = null; java.io.OutputStream n2 = null) {
+                          Object n3 = null;
+                          Object x = n5;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings({"EmptyTryBlock", "CatchMayIgnoreException", "TryWithIdenticalCatches"})
+    void catchClause() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  int e;
+
+                  public void tryCatch() {
+                      try (java.io.InputStream e1 = null) {
+                      } catch (RuntimeException e) {
+                      } catch (java.io.IOException e) {
+                      } catch (Exception e) {
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  int e;
+
+                  public void tryCatch() {
+                      try (java.io.InputStream e1 = null) {
+                      } catch (RuntimeException e2) {
+                      } catch (java.io.IOException e3) {
+                      } catch (Exception e4) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"Convert2MethodRef", "ResultOfMethodCallIgnored"})
     @Test
     void lambdaWithTypedParameterHides() {
