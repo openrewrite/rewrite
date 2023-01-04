@@ -28,7 +28,7 @@ public class CompilationUnitTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              package kotlin
+                package kotlin
             """,
             isFullyParsed()
           )

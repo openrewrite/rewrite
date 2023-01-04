@@ -60,6 +60,13 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         throw new UnsupportedOperationException("Kotlin has a different structure for its compilation unit. See K.CompilationUnit.");
     }
 
+    public J visitFunctionType(K.FunctionType functionType, P p) {
+        K.FunctionType f = functionType;
+        f = f.withReceiver(visitRightPadded(f.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p));
+        f = f.withTypedTree(visitAndCast(f.getTypedTree(), p));
+        return f;
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }

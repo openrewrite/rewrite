@@ -30,7 +30,7 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                 fun method() {
                 }
-              """,
+            """,
             isFullyParsed()
           )
         );
@@ -43,7 +43,46 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                 fun method(i: Int) {
                 }
-              """,
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void functionTypeReference() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method( input : (  ) -> String ) {
+                }
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void typedFunctionTypeReference() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method( input : ( Int, Int ) -> Boolean ) {
+              }
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Test
+    void functionTypeWithReceiver() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method(arg: String.() -> String) {
+                }
+            """,
             isFullyParsed()
           )
         );
@@ -57,7 +96,7 @@ public class MethodDeclarationTest implements RewriteTest {
                 fun method() : Boolean {
                     return true
                 }
-              """,
+            """,
             isFullyParsed()
           )
         );
@@ -72,7 +111,7 @@ public class MethodDeclarationTest implements RewriteTest {
                   fun method() {
                   }
                 }
-              """,
+            """,
             isFullyParsed()
           )
         );

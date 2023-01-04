@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -46,26 +47,90 @@ public class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
-    void functionTypeReference() {
+    void buildGradle() {
         rewriteRun(
-          kotlin(
-            """
-              fun method( input : (  ) -> String ) {
+          kotlin("""
+              class Spec {
+                var id = ""
+                fun id(arg: String): Spec {
+                    return this
+                }
               }
-              """,
+            """,
+            isFullyParsed()
+          ),
+          kotlin("""
+                class SpecScope  {
+                    val delegate: Spec = Spec()
+                    fun id(id: String): Spec = delegate.id(id)
+                }
+            """,
+            isFullyParsed()
+          ),
+          kotlin("""
+                class DSL  {
+                    fun setScope(block: SpecScope.() -> Unit) {
+                        block(SpecScope())
+                    }
+                }
+            """,
+            isFullyParsed()
+          ),
+          kotlin("""
+                fun method() {
+                    DSL().setScope {
+                        id("someId")
+                    }
+                }
+            """,
             isFullyParsed()
           )
         );
     }
 
+    // Temp code that contains infix function decl and function call.
+    @Disabled("Requires support of Kotlin modifier `infix`. Add support for infix function calls ` version \"10\"`")
     @Test
-    void typedFunctionTypeReference() {
+    void buildGradle2() {
         rewriteRun(
-          kotlin(
-            """
-              fun method( input : ( Int, Int ) -> Boolean ) {
+          kotlin("""
+              class Spec {
+                var id = ""
+                fun id(arg: String): Spec {
+                    return this
+                }
+                fun version(version: String): Spec {
+                    return this
+                }
               }
-              """,
+            """,
+            isFullyParsed()
+          ),
+          kotlin("""
+                class SpecScope  {
+                    val delegate: Spec = Spec()
+                    fun id(id: String): Spec = delegate.id(id)
+                }
+                infix fun Spec.version(version: String): Spec = version(version)
+            """,
+            isFullyParsed()
+          ),
+          kotlin("""
+                class DSL  {
+                    fun setScope(block: SpecScope.() -> Unit) {
+                        block(SpecScope())
+                    }
+                }
+            """,
+            isFullyParsed()
+          ),
+          kotlin("""
+                fun method() {
+                    DSL().setScope {
+                        id("someId") version "10"
+                    }
+                }
+            """,
             isFullyParsed()
           )
         );

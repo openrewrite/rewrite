@@ -28,7 +28,7 @@ public class ImportTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              import java.util.ArrayList
+                import java.util.ArrayList
             """,
             isFullyParsed()
           )
@@ -40,7 +40,7 @@ public class ImportTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              import kotlin.collections.List
+                import kotlin.collections.List
             """,
             isFullyParsed()
           )
@@ -52,7 +52,7 @@ public class ImportTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              import kotlin.collections.*
+                import kotlin.collections.*
             """,
             isFullyParsed()
           )

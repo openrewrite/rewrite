@@ -28,11 +28,11 @@ public class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method() {
-                  val n: Int = 0
-                  if (n == 0) {
-                  }
-              }
+                fun method() {
+                    val n: Int = 0
+                    if (n == 0) {
+                    }
+                }
             """,
             isFullyParsed()
           )
@@ -44,16 +44,16 @@ public class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method() {
-                  val n: Int = 0
-                  if (n == 0) {
-                      val x = 0
-                  } else if (n == 1) {
-                      val x = 1
-                  } else {
-                      val x = 2
-                  }
-              }
+                fun method() {
+                    val n: Int = 0
+                    if (n == 0) {
+                        val x = 0
+                    } else if (n == 1) {
+                        val x = 1
+                    } else {
+                        val x = 2
+                    }
+                }
             """,
             isFullyParsed()
           )
@@ -65,15 +65,15 @@ public class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method() {
-                  var n: Int = 0
-                  if (n == 0)
-                      n = 1
-                  else if (n == 1)
-                      n = 2
-                  else
-                      n = 3
-              }
+                fun method() {
+                    var n: Int = 0
+                    if (n == 0)
+                        n = 1
+                    else if (n == 1)
+                        n = 2
+                    else
+                        n = 3
+                }
             """,
             isFullyParsed()
           )

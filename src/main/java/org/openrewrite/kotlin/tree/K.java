@@ -256,6 +256,11 @@ public interface K extends J {
         @Getter
         TypedTree typedTree;
 
+        @Nullable
+        @With
+        @Getter
+        JRightPadded<NameTree> receiver;
+
         @Override
         public Space getPrefix() {
             return typedTree.getPrefix();
@@ -293,13 +298,7 @@ public interface K extends J {
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            J j = v.visit(getTypedTree(), p);
-            if (j instanceof FunctionType) {
-                return j;
-            } else if (j instanceof TypedTree) {
-                return withTypedTree((TypedTree) j);
-            }
-            return j;
+            return v.visitFunctionType(this, p);
         }
     }
 

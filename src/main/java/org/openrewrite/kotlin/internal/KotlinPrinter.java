@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KRightPadded;
 import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
@@ -46,6 +47,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
     }
 
+    @Override
+    public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
+        if (functionType.getReceiver() != null) {
+            visitRightPadded(functionType.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p);
+            p.out.append(".");
+        }
+        visit(functionType.getTypedTree(), p);
+        return functionType;
+    }
+
     private class KotlinJavaPrinter extends JavaPrinter<P> {
         @Override
         public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
@@ -55,6 +66,34 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             } else {
                 return super.visit(tree, p);
             }
+        }
+
+        @Override
+        public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
+            beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+
+            if (block.isStatic()) {
+                p.append("static");
+                visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
+            }
+
+            SingleExpressionBlock singleExpressionBlock = block.getMarkers().findFirst(SingleExpressionBlock.class).orElse(null);
+            if (singleExpressionBlock != null) {
+                visitSpace(singleExpressionBlock.getPrefix(), Space.Location.ASSIGNMENT_OPERATION_PREFIX, p);
+                p.out.append("=");
+            }
+
+            boolean omitParens = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+            if (!omitParens) {
+                p.append("{");
+            }
+            visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+            visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            if (!omitParens) {
+                p.append("}");
+            }
+            afterSyntax(block, p);
+            return block;
         }
 
         @Override
@@ -158,6 +197,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             Markers nameMarkers = method.getName().getMarkers();
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
+            if (method.getSelect() != null) {
+                p.out.append(".");
+            }
 
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
             visit(method.getName(), p);

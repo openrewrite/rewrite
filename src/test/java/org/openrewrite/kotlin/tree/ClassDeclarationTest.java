@@ -57,8 +57,8 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              interface A
-              class C : A
+                interface A
+                class C : A
             """,
             isFullyParsed()
           )
@@ -71,8 +71,8 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class A {}
-              class B : A() {}
+                class A {}
+                class B : A() {}
             """,
             isFullyParsed()
           )
@@ -85,7 +85,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              public abstract class A
+                public abstract class A
             """,
             isFullyParsed()
           )
@@ -98,7 +98,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              annotation class A
+                annotation class A
             """,
             isFullyParsed()
           )
@@ -111,7 +111,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              enum class A
+                enum class A
             """,
             isFullyParsed()
           )
@@ -124,15 +124,15 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              public @Deprecated("message 0") abstract @Suppress("") class Test
-            
-              @Deprecated("message 1") 
-              @Suppress("")
-              class A
-            
-              @Suppress("")
-              @Deprecated("message 2")
-              class B
+                public @Deprecated("message 0") abstract @Suppress("") class Test
+                
+                @Deprecated("message 1") 
+                @Suppress("")
+                class A
+                
+                @Suppress("")
+                @Deprecated("message 2")
+                class B
             """,
             isFullyParsed()
           )

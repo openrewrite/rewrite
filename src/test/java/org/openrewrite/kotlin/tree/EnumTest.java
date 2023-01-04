@@ -30,7 +30,7 @@ public class EnumTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              enum class A
+                enum class A
             """,
             isFullyParsed()
           )
@@ -43,10 +43,10 @@ public class EnumTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              enum class A {
-                  B, C,
-                  D
-              }
+                enum class A {
+                    B, C,
+                    D
+                }
             """,
             isFullyParsed()
           )
@@ -59,11 +59,11 @@ public class EnumTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class A {
-                  enum class B {
-                      C
-                  }
-              }
+                class A {
+                    enum class B {
+                        C
+                    }
+                }
             """,
             isFullyParsed()
           )

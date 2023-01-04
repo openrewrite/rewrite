@@ -30,10 +30,28 @@ public class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val i = -1
-              val l = -2L
-              val f = -3.0f
-              val d = -4.0
+                val i = -1
+                val l = -2L
+                val f = -3.0f
+                val d = -4.0
+            """,
+            isFullyParsed()
+          )
+        );
+    }
+
+    @Disabled("Requires detection of field access.")
+    @Test
+    void fieldAccess() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    var id: String = ""
+                    fun setId(id: String) {
+                        this.id = id
+                    }
+                }
             """,
             isFullyParsed()
           )

@@ -29,10 +29,10 @@ public class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method() {
-                val n = 0
-                val b = n == 0
-              }
+                fun method() {
+                  val n = 0
+                  val b = n == 0
+                }
             """,
             isFullyParsed()
           )
@@ -45,10 +45,10 @@ public class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method() {
-                var n = 0
-                n -= 5
-              }
+                fun method() {
+                  var n = 0
+                  n -= 5
+                }
             """,
             isFullyParsed()
           )
