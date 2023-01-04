@@ -69,6 +69,21 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitAnnotation(J.Annotation annotation, PrintOutputCapture<P> p) {
+            beforeSyntax(annotation, Space.Location.ANNOTATION_PREFIX, p);
+            boolean isKModifier = annotation.getMarkers().findFirst(Modifier.class).isPresent();
+            if (!isKModifier) {
+                p.append("@");
+            }
+            visit(annotation.getAnnotationType(), p);
+            if (!isKModifier) {
+                visitContainer("(", annotation.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, ",", ")", p);
+            }
+            afterSyntax(annotation, p);
+            return annotation;
+        }
+
+        @Override
         public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
 

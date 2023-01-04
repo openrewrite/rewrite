@@ -850,7 +850,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitResolvedNamedReference(FirResolvedNamedReference resolvedNamedReference, ExecutionContext ctx) {
-        return convertToIdentifier(resolvedNamedReference.getName());
+        return convertToIdentifier(resolvedNamedReference.getName().toString());
     }
 
     @Override
@@ -891,18 +891,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitSimpleFunction(FirSimpleFunction simpleFunction, ExecutionContext ctx) {
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
-        // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
-        if (simpleFunction.getSource() != null) {
-//            modifiers = mapModifiers(simpleFunction.getSource());
-//            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) simpleFunction.getSource()).getPsi());
-//            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
-//                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
-//                modifiers = getModifiers(modifierList);
-//            }
-        }
-
-        List<J.Annotation> kindAnnotations = emptyList(); // TODO: the last annotations in modifiersAndAnnotations should be added to the fun.
+        List<J.Annotation> annotations = mapFunctionModifiers(simpleFunction.getAnnotations());
 
         markers = markers.addIfAbsent(new MethodClassifier(randomId(), sourceBefore("fun")));
         String methodName = "";
@@ -959,8 +949,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                emptyList(), // TODO
-                emptyList(), // TODO
+                annotations, // TODO
+                emptyList(),
                 null, // TODO
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
@@ -1407,14 +1397,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return converted;
     }
 
-    private J.Identifier convertToIdentifier(Name name) {
-        Space prefix = sourceBefore(name.asString());
+    private J.Identifier convertToIdentifier(String name) {
+        Space prefix = sourceBefore(name);
 
         JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
         return new J.Identifier(randomId(),
                 prefix,
                 Markers.EMPTY,
-                name.asString(),
+                name,
                 type,
                 null);
     }
@@ -1447,148 +1437,130 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new JRightPadded<>(tree, right, Markers.EMPTY);
     }
 
-    private List<J> mapModifiers(KtSourceElement sourceElement) {
-        List<J> modifiers = new ArrayList<>();
-        if (sourceElement instanceof KtRealPsiSourceElement) {
-            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) sourceElement).getPsi());
-            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
-                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
-                modifiers = getModifiers(modifierList);
+    private List<J.Annotation> mapFunctionModifiers(List<FirAnnotation> firAnnotations) {
+        List<J.Annotation> modifiers = new ArrayList<>();
+        int count = 0;
+        while (true && count < 10) {
+            int saveCursor = cursor;
+            Space prefix = whitespace();
+
+            if (source.startsWith("fun ", cursor)) {
+                cursor = saveCursor;
+                return modifiers;
+            } else if (source.startsWith("@", cursor)) {
+                J.Annotation annotation = mapAnnotation(prefix, firAnnotations);
+                modifiers.add(annotation);
+                throw new IllegalStateException("Implement me.");
+            } else {
+                K.Modifier modifier = mapModifier(prefix, emptyList());
+                J.Identifier name = convertToIdentifier(modifier.getType().name().toLowerCase());
+                J.Annotation annotation = new J.Annotation(randomId(), modifier.getPrefix(), Markers.EMPTY, name, JContainer.empty());
+                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
+                modifiers.add(annotation);
             }
-        } else if (sourceElement instanceof KtLightSourceElement) {
-            KtLightSourceElement lightSourceElement = (KtLightSourceElement) sourceElement;
-            throw new IllegalStateException("Navigate Light source to preserve modifier / annotation positions.");
-        } else {
-            throw new IllegalStateException("Unexpected source type");
+
+            count++;
         }
 
-        return modifiers;
-    }
-
-    private List<J> getModifiers(KtDeclarationModifierList modifierList) {
-        List<J> modifiers = new ArrayList<>();
-        PsiElement current = modifierList.getFirstChild();
-        List<J.Annotation> annotations = new ArrayList<>();
-        while (current != null) {
-            IElementType elementType = current.getNode().getElementType();
-            if (elementType instanceof KtModifierKeywordToken) {
-                KtModifierKeywordToken token = (KtModifierKeywordToken) elementType;
-                K.Modifier modifier = mapModifier(token, annotations);
-                annotations = new ArrayList<>();
-                modifiers.add(modifier);
-            } else if (elementType instanceof KtAnnotationEntryElementType) {
-                ASTNode astNode = current.getNode();
-                if (astNode instanceof CompositeElement) {
-                    J.Annotation annotation = mapAnnotation((CompositeElement) astNode);
-                    annotations.add(annotation);
-                } else {
-                    throw new IllegalStateException("Implement me.");
-                }
-            }
-            current = current.getNextSibling();
-        }
-        modifiers.addAll(annotations);
         return modifiers;
     }
 
     // TODO: parse annotation composite and create J.Annotation.
-    private J.Annotation mapAnnotation(CompositeElement compositeElement) {
-        Space prefix = whitespace();
+    private J.Annotation mapAnnotation(Space prefix, List<FirAnnotation> firAnnotations) {
+        // look up annotation.
         return new J.Annotation(randomId(), prefix, Markers.EMPTY, null, JContainer.empty());
     }
 
     // TODO: confirm this works for all types of kotlin modifiers.
-    private K.Modifier mapModifier(KtModifierKeywordToken mod, List<J.Annotation> annotations) {
-        Space modFormat = whitespace();
-        cursor += mod.getValue().length();
+    private K.Modifier mapModifier(Space prefix, List<J.Annotation> annotations) {
         K.Modifier.Type type;
         // Ordered based on kotlin requirements.
-        switch (mod.getValue()) {
-            case "public":
-                type = K.Modifier.Type.Public;
-                break;
-            case "protected":
-                type = K.Modifier.Type.Protected;
-                break;
-            case "private":
-                type = K.Modifier.Type.Private;
-                break;
-            case "internal":
-                type = K.Modifier.Type.Internal;
-                break;
-            case "expect":
-                type = K.Modifier.Type.Expect;
-                break;
-            case "actual":
-                type = K.Modifier.Type.Actual;
-                break;
-            case "final":
-                type = K.Modifier.Type.Final;
-                break;
-            case "open":
-                type = K.Modifier.Type.Open;
-                break;
-            case "abstract":
-                type = K.Modifier.Type.Abstract;
-                break;
-            case "sealed":
-                type = K.Modifier.Type.Sealed;
-                break;
-            case "const":
-                type = K.Modifier.Type.Const;
-                break;
-            case "external":
-                type = K.Modifier.Type.External;
-                break;
-            case "override":
-                type = K.Modifier.Type.Override;
-                break;
-            case "lateinit":
-                type = K.Modifier.Type.LateInit;
-                break;
-            case "tailrec":
-                type = K.Modifier.Type.TailRec;
-                break;
-            case "vararg":
-                type = K.Modifier.Type.Vararg;
-                break;
-            case "suspend":
-                type = K.Modifier.Type.Suspend;
-                break;
-            case "inner":
-                type = K.Modifier.Type.Inner;
-                break;
-            case "enum":
-                type = K.Modifier.Type.Enum;
-                break;
-            case "annotation":
-                type = K.Modifier.Type.Annotation;
-                break;
-            case "fun":
-                type = K.Modifier.Type.Fun;
-                break;
-            case "companion":
-                type = K.Modifier.Type.Companion;
-                break;
-            case "inline":
-                type = K.Modifier.Type.Inline;
-                break;
-            case "value":
-                type = K.Modifier.Type.Value;
-                break;
-            case "infix":
-                type = K.Modifier.Type.Infix;
-                break;
-            case "operator":
-                type = K.Modifier.Type.Operator;
-                break;
-            case "data":
-                type = K.Modifier.Type.Data;
-                break;
-            default:
-                throw new IllegalArgumentException("Unexpected modifier " + mod);
+        if (source.startsWith("public", cursor)) {
+            cursor += "public".length();
+            type = K.Modifier.Type.Public;
+        } else if (source.startsWith("protected", cursor)) {
+            cursor += "protected".length();
+            type = K.Modifier.Type.Protected;
+        } else if (source.startsWith("private", cursor)) {
+            cursor += "private".length();
+            type = K.Modifier.Type.Private;
+        } else if (source.startsWith("internal", cursor)) {
+            cursor += "internal".length();
+            type = K.Modifier.Type.Internal;
+        } else if (source.startsWith("expect", cursor)) {
+            cursor += "expect".length();
+            type = K.Modifier.Type.Expect;
+        } else if (source.startsWith("actual", cursor)) {
+            cursor += "actual".length();
+            type = K.Modifier.Type.Actual;
+        } else if (source.startsWith("final", cursor)) {
+            cursor += "final".length();
+            type = K.Modifier.Type.Final;
+        } else if (source.startsWith("open", cursor)) {
+            cursor += "open".length();
+            type = K.Modifier.Type.Open;
+        } else if (source.startsWith("abstract", cursor)) {
+            cursor += "abstract".length();
+            type = K.Modifier.Type.Abstract;
+        } else if (source.startsWith("sealed", cursor)) {
+            cursor += "sealed".length();
+            type = K.Modifier.Type.Sealed;
+        } else if (source.startsWith("const", cursor)) {
+            cursor += "const".length();
+            type = K.Modifier.Type.Const;
+        } else if (source.startsWith("external", cursor)) {
+            cursor += "external".length();
+            type = K.Modifier.Type.External;
+        } else if (source.startsWith("override", cursor)) {
+            cursor += "override".length();
+            type = K.Modifier.Type.Override;
+        } else if (source.startsWith("lateinit", cursor)) {
+            cursor += "lateinit".length();
+            type = K.Modifier.Type.LateInit;
+        } else if (source.startsWith("tailrec", cursor)) {
+            cursor += "tailrec".length();
+            type = K.Modifier.Type.TailRec;
+        } else if (source.startsWith("vararg", cursor)) {
+            cursor += "vararg".length();
+            type = K.Modifier.Type.Vararg;
+        } else if (source.startsWith("suspend", cursor)) {
+            cursor += "suspend".length();
+            type = K.Modifier.Type.Suspend;
+        } else if (source.startsWith("inner", cursor)) {
+            cursor += "inner".length();
+            type = K.Modifier.Type.Inner;
+        } else if (source.startsWith("enum", cursor)) {
+            cursor += "enum".length();
+            type = K.Modifier.Type.Enum;
+        } else if (source.startsWith("annotation", cursor)) {
+            cursor += "annotation".length();
+            type = K.Modifier.Type.Annotation;
+        } else if (source.startsWith("fun", cursor)) {
+            cursor += "fun".length();
+            type = K.Modifier.Type.Fun;
+        } else if (source.startsWith("companion", cursor)) {
+            cursor += "companion".length();
+            type = K.Modifier.Type.Companion;
+        } else if (source.startsWith("inline", cursor)) {
+            cursor += "inline".length();
+            type = K.Modifier.Type.Inline;
+        } else if (source.startsWith("value", cursor)) {
+            cursor += "value".length();
+            type = K.Modifier.Type.Value;
+        } else if (source.startsWith("infix", cursor)) {
+            cursor += "infix".length();
+            type = K.Modifier.Type.Infix;
+        } else if (source.startsWith("operator", cursor)) {
+            cursor += "operator".length();
+            type = K.Modifier.Type.Operator;
+        } else if (source.startsWith("data", cursor)) {
+            cursor += "data".length();
+            type = K.Modifier.Type.Data;
+        } else {
+            throw new IllegalArgumentException("Source starts with " + source.substring(cursor, cursor + 10) + "at cursor pos " + cursor);
         }
-        return new K.Modifier(randomId(), modFormat, Markers.EMPTY, type, annotations);
+
+        return new K.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
     }
 
     private J mapSourceElement(KtSourceElement sourceElement) {
