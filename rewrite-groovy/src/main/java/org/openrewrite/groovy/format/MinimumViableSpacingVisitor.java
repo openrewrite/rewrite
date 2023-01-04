@@ -32,7 +32,7 @@ public class MinimumViableSpacingVisitor<P> extends GroovyIsoVisitor<P> {
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
-        return method.withArguments(ListUtils.mapFirst(m.getArguments(), first -> {
+        return m.withArguments(ListUtils.mapFirst(m.getArguments(), first -> {
             if (first.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
                 return first.getPrefix().getWhitespace().isEmpty() ?
                         first.withPrefix(first.getPrefix().withWhitespace(" ")) :
