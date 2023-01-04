@@ -222,6 +222,18 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             };
 
             forAllFiles(roots, compilerConfiguration, project, null, sortFiles);
+
+            /*
+                Create a `LightVirtualFile` for each `Input` and add the virtual files as platform sources.
+                A platform source will result in an IR FirFile.
+
+                A `KtVirtualFileSourceFile` will have a different PSI than a file that is resolvable on disk.
+                For actual source files, the input may be resolved by `forAllFiles` using `ContentRootsKt#addKotlinSourceRoots(Path, false)`.
+
+                The benefit of `addKotlinSourceRoots` is a higher quality PSI element that backs the IR FirFile.
+                `LightVirtualFile` are created to support tests and in the future, Kotlin template.
+                We might want to extract the generation of `platformSources` later on.
+             */
             sources.forEach(it -> {
                 VirtualFile vFile = new LightVirtualFile(it.getPath().getFileName().toString(), it.getSource().readFully());
                 platformSources.add(new KtVirtualFileSourceFile(vFile));
