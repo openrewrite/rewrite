@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -43,6 +44,36 @@ class ChangeValueTest implements RewriteTest {
                     name: monitoring
                     namespace: monitoring-tools
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2595")
+    @Test
+    void updateScalarValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeValue(
+            "$.sources[?(@ == 'https://old-url.git')]",
+            "https://super-cool-url.git",
+            null
+          )),
+          yaml(
+            """
+                sources:
+                    - https://old-url.git
+                    - value2
+                maintainers:
+                    - name: Mara
+                      email: mara@mara.com
+            """,
+            """
+                sources:
+                    - https://super-cool-url.git
+                    - value2
+                maintainers:
+                    - name: Mara
+                      email: mara@mara.com
+            """
           )
         );
     }

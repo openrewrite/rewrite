@@ -80,6 +80,15 @@ public class ChangeValue extends Recipe {
                 }
                 return e;
             }
+
+            @Override
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext executionContext) {
+                Yaml.Scalar s = super.visitScalar(scalar, executionContext);
+                if (matcher.matches(getCursor())) {
+                    s = s.withValue(value);
+                }
+                return s;
+            }
         };
     }
 
