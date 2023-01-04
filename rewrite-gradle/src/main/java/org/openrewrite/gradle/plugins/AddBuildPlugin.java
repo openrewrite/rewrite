@@ -30,7 +30,7 @@ public class AddBuildPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to apply.",
             example = "com.jfrog.bintray")
-    String pluginIdPattern;
+    String pluginId;
 
     @Option(displayName = "Plugin version",
             description = "An exact version number or node-style semver selector used to select the version number.",
@@ -64,6 +64,6 @@ public class AddBuildPlugin extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AddPluginVisitor(pluginIdPattern, version, versionPattern);
+        return new AddPluginVisitor(pluginId, version, versionPattern);
     }
 }

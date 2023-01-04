@@ -24,11 +24,11 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-class AddSettingPluginTest implements RewriteTest {
+class AddSettingsPluginTest implements RewriteTest {
     @Test
     void addPluginToNewBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingPlugin("com.gradle.enterprise", "3.11.x", null)),
+          spec -> spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null)),
           settingsGradle(
             """
               rootProject.name = 'my-project'
@@ -52,6 +52,7 @@ class AddSettingPluginTest implements RewriteTest {
     @Test
     void addPluginToExistingBlock() {
         rewriteRun(
+          spec -> spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null)),
           settingsGradle(
             """
               plugins {

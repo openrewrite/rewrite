@@ -46,7 +46,7 @@ import static org.openrewrite.gradle.plugins.GradlePluginUtils.availablePluginVe
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
-    String pluginIdPattern;
+    String pluginId;
 
     @Nullable
     String newVersion;
@@ -56,7 +56,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-        if (FindPlugins.find(cu, pluginIdPattern).isEmpty()) {
+        if (FindPlugins.find(cu, pluginId).isEmpty()) {
             Optional<String> version;
             if (newVersion == null) {
                 version = Optional.empty();
@@ -67,7 +67,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 if (versionComparator instanceof ExactVersion) {
                     version = versionComparator.upgrade("0", singletonList(newVersion));
                 } else {
-                    version = versionComparator.upgrade("0", availablePluginVersions(pluginIdPattern, ctx));
+                    version = versionComparator.upgrade("0", availablePluginVersions(pluginId, ctx));
                 }
             }
 
@@ -92,12 +92,12 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 }
             }.visitCompilationUnit(cu, 0);
 
-            String delimiter = singleQuote.get() <= doubleQuote.get() ? "\"" : "'";
+            String delimiter = singleQuote.get() < doubleQuote.get() ? "\"" : "'";
             List<Statement> statements = GradleParser.builder().build()
                     .parseInputs(
                             singletonList(
                                     Parser.Input.fromString("plugins {\n" +
-                                            "    id " + delimiter + pluginIdPattern + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
+                                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
                                             "}")),
                             null,
                             ctx
