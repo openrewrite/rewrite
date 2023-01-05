@@ -48,6 +48,42 @@ class AddDependencyTest implements RewriteTest {
       """;
 
     @Test
+    void addDependencyWithUnresolvedRepositoryUri() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.eclipse.persistence:org.eclipse.persistence.moxy:4.0.0", "com.google.common.math.IntMath"))
+            .expectedCyclesThatMakeChanges(1),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.eclipse.persistence</groupId>
+                                <artifactId>org.eclipse.persistence.moxy</artifactId>
+                                <version>4.0.0</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void dontAddDuplicateIfUpdateModelOnPriorRecipeCycleFailed() {
         rewriteRun(
           spec -> spec
