@@ -210,9 +210,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
-            Markers nameMarkers = method.getName().getMarkers();
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
-            if (method.getSelect() != null) {
+            if (method.getSelect() != null && !method.getMarkers().findFirst(InfixFunCall.class).isPresent()) {
                 p.out.append(".");
             }
 

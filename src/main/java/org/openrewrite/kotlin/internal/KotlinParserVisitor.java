@@ -496,18 +496,27 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     null);
         } else if (namedReference instanceof FirResolvedNamedReference) {
             JRightPadded<Expression> select = null;
-            FirExpression dispatchReciever = functionCall.getDispatchReceiver();
+            FirElement dispatchReciever = functionCall.getDispatchReceiver();
+            FirElement extensionReciever = functionCall.getExtensionReceiver();
             if (!(functionCall instanceof FirImplicitInvokeCall) &&
-                    !(dispatchReciever instanceof FirNoReceiverExpression || dispatchReciever instanceof FirThisReceiverExpression)) {
+                    (!(dispatchReciever instanceof FirNoReceiverExpression || dispatchReciever instanceof FirThisReceiverExpression)) ||
+                    !(extensionReciever instanceof FirNoReceiverExpression || extensionReciever instanceof FirThisReceiverExpression)) {
+                FirElement visit = null;
                 if (dispatchReciever instanceof FirFunctionCall || dispatchReciever instanceof FirPropertyAccessExpression) {
-                    Expression selectExpr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
-                    select = JRightPadded.build(selectExpr)
-                            .withAfter(sourceBefore("."));
+                    visit = dispatchReciever;
+                } else if (extensionReciever instanceof FirFunctionCall || extensionReciever instanceof FirPropertyAccessExpression) {
+                    visit = extensionReciever;
                 } else {
                     throw new IllegalStateException("Implement me.");
                 }
+                Expression selectExpr = (Expression) visitElement(visit, ctx);
+                select = JRightPadded.build(selectExpr)
+                        .withAfter(sourceBefore("."));
             }
             Markers markers = Markers.EMPTY;
+            if (isInfix) {
+                markers = markers.addIfAbsent(new InfixFunCall(randomId()));
+            }
 
             TypeTree name = (J.Identifier) visitElement(namedReference, null);
 

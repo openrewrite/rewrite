@@ -96,10 +96,10 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("""
               class Spec {
                 var id = ""
-                fun id(arg: String): Spec {
+                fun id ( arg : String) : Spec {
                     return this
                 }
-                fun version(version: String): Spec {
+                fun version ( version : String) : Spec {
                     return this
                 }
               }
@@ -108,26 +108,26 @@ public class MethodInvocationTest implements RewriteTest {
           ),
           kotlin("""
                 class SpecScope  {
-                    val delegate: Spec = Spec()
-                    fun id(id: String): Spec = delegate.id(id)
+                    val delegate : Spec = Spec()
+                    fun id ( id : String ) : Spec = delegate . id ( id )
                 }
-                public infix fun Spec.version(version: String): Spec = version(version)
+                public infix fun Spec . version ( version : String ) : Spec = version ( version )
             """,
             isFullyParsed()
           ),
           kotlin("""
                 class DSL  {
-                    fun setScope(block: SpecScope.() -> Unit) {
-                        block(SpecScope())
+                    fun setScope ( block : SpecScope . ( ) -> Unit ) {
+                        block ( SpecScope ( ) )
                     }
                 }
             """,
             isFullyParsed()
           ),
           kotlin("""
-                fun method() {
-                    DSL().setScope {
-                        id("someId") version "10"
+                fun method ( ) {
+                    DSL ( ) . setScope {
+                        id ( " someId " ) version "10"
                     }
                 }
             """,
