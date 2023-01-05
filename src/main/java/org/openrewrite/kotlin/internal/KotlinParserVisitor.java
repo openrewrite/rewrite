@@ -36,6 +36,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
+import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
@@ -844,7 +845,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitResolvedNamedReference(FirResolvedNamedReference resolvedNamedReference, ExecutionContext ctx) {
-        return convertToIdentifier(resolvedNamedReference.getName().toString());
+        String name = resolvedNamedReference.getName().asString();
+        return new J.Identifier(randomId(),
+                sourceBefore(name),
+                Markers.EMPTY,
+                name,
+                null,
+                null);
     }
 
     @Override
@@ -888,7 +895,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(ModifierScope.FUNCTION, simpleFunction.getAnnotations());
 
-        markers = markers.addIfAbsent(new MethodClassifier(randomId(), sourceBefore("fun")));
         boolean isInfix = annotations.stream()
                 .filter(it -> it.getAnnotationType() instanceof J.Identifier)
                 .map(it -> (J.Identifier) it.getAnnotationType())
@@ -1435,18 +1441,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return converted;
     }
 
-    private J.Identifier convertToIdentifier(String name) {
-        Space prefix = sourceBefore(name);
-
-        JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
-        return new J.Identifier(randomId(),
-                prefix,
-                Markers.EMPTY,
-                name,
-                type,
-                null);
-    }
-
     private <K2 extends J> JRightPadded<K2> maybeSemicolon(K2 k) {
         int saveCursor = cursor;
         Space beforeSemi = whitespace();
@@ -1496,17 +1490,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space prefix = whitespace();
 
             if (source.startsWith(modifierScope.getKeyword() + " ", cursor)) {
-                cursor = saveCursor;
+                if (ModifierScope.FUNCTION == modifierScope) {
+                    K.Modifier modifier = mapModifier(prefix, emptyList());
+                    J.Annotation annotation = convertToAnnotation(modifier);
+                    modifiers.add(annotation);
+                } else {
+                    cursor = saveCursor;
+                }
                 return modifiers;
             } else if (source.startsWith("@", cursor)) {
                 J.Annotation annotation = mapAnnotation(prefix, firAnnotations);
                 modifiers.add(annotation);
                 throw new IllegalStateException("Implement me.");
             } else {
+                // TODO: Move the converstion when views are implemented. K.Modifier should exist on a K type, and the annotation should only exist on the J type.
                 K.Modifier modifier = mapModifier(prefix, emptyList());
-                J.Identifier name = convertToIdentifier(modifier.getType().name().toLowerCase());
-                J.Annotation annotation = new J.Annotation(randomId(), modifier.getPrefix(), Markers.EMPTY, name, JContainer.empty());
-                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
+                J.Annotation annotation = convertToAnnotation(modifier);
                 modifiers.add(annotation);
             }
 
@@ -1514,6 +1513,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return modifiers;
+    }
+
+    private J.Annotation convertToAnnotation(K.Modifier modifier) {
+        J.Identifier name = new J.Identifier(randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                modifier.getType().name().toLowerCase(),
+                null,
+                null);
+        return new J.Annotation(randomId(), modifier.getPrefix(), Markers.EMPTY.addIfAbsent(new Modifier(randomId())), name, JContainer.empty());
     }
 
     private J.Annotation mapAnnotation(Space prefix, List<FirAnnotation> firAnnotations) {
@@ -1525,90 +1534,64 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         K.Modifier.Type type;
         // Ordered based on kotlin requirements.
         if (source.startsWith("public", cursor)) {
-            cursor += "public".length();
             type = K.Modifier.Type.Public;
         } else if (source.startsWith("protected", cursor)) {
-            cursor += "protected".length();
             type = K.Modifier.Type.Protected;
         } else if (source.startsWith("private", cursor)) {
-            cursor += "private".length();
             type = K.Modifier.Type.Private;
         } else if (source.startsWith("internal", cursor)) {
-            cursor += "internal".length();
             type = K.Modifier.Type.Internal;
         } else if (source.startsWith("expect", cursor)) {
-            cursor += "expect".length();
             type = K.Modifier.Type.Expect;
         } else if (source.startsWith("actual", cursor)) {
-            cursor += "actual".length();
             type = K.Modifier.Type.Actual;
         } else if (source.startsWith("final", cursor)) {
-            cursor += "final".length();
             type = K.Modifier.Type.Final;
         } else if (source.startsWith("open", cursor)) {
-            cursor += "open".length();
             type = K.Modifier.Type.Open;
         } else if (source.startsWith("abstract", cursor)) {
-            cursor += "abstract".length();
             type = K.Modifier.Type.Abstract;
         } else if (source.startsWith("sealed", cursor)) {
-            cursor += "sealed".length();
             type = K.Modifier.Type.Sealed;
         } else if (source.startsWith("const", cursor)) {
-            cursor += "const".length();
             type = K.Modifier.Type.Const;
         } else if (source.startsWith("external", cursor)) {
-            cursor += "external".length();
             type = K.Modifier.Type.External;
         } else if (source.startsWith("override", cursor)) {
-            cursor += "override".length();
             type = K.Modifier.Type.Override;
         } else if (source.startsWith("lateinit", cursor)) {
-            cursor += "lateinit".length();
             type = K.Modifier.Type.LateInit;
         } else if (source.startsWith("tailrec", cursor)) {
-            cursor += "tailrec".length();
             type = K.Modifier.Type.TailRec;
         } else if (source.startsWith("vararg", cursor)) {
-            cursor += "vararg".length();
             type = K.Modifier.Type.Vararg;
         } else if (source.startsWith("suspend", cursor)) {
-            cursor += "suspend".length();
             type = K.Modifier.Type.Suspend;
         } else if (source.startsWith("inner", cursor)) {
-            cursor += "inner".length();
             type = K.Modifier.Type.Inner;
         } else if (source.startsWith("enum", cursor)) {
-            cursor += "enum".length();
             type = K.Modifier.Type.Enum;
         } else if (source.startsWith("annotation", cursor)) {
-            cursor += "annotation".length();
             type = K.Modifier.Type.Annotation;
         } else if (source.startsWith("fun", cursor)) {
-            cursor += "fun".length();
             type = K.Modifier.Type.Fun;
         } else if (source.startsWith("companion", cursor)) {
-            cursor += "companion".length();
             type = K.Modifier.Type.Companion;
         } else if (source.startsWith("inline", cursor)) {
-            cursor += "inline".length();
             type = K.Modifier.Type.Inline;
         } else if (source.startsWith("value", cursor)) {
-            cursor += "value".length();
             type = K.Modifier.Type.Value;
         } else if (source.startsWith("infix", cursor)) {
-            cursor += "infix".length();
             type = K.Modifier.Type.Infix;
         } else if (source.startsWith("operator", cursor)) {
-            cursor += "operator".length();
             type = K.Modifier.Type.Operator;
         } else if (source.startsWith("data", cursor)) {
-            cursor += "data".length();
             type = K.Modifier.Type.Data;
         } else {
             throw new IllegalArgumentException("Source starts with " + source.substring(cursor, cursor + 10) + "at cursor pos " + cursor);
         }
 
+        skip(type.name().toLowerCase());
         return new K.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
     }
 

@@ -184,12 +184,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitModifier(m, p);
             }
 
-            MethodClassifier methodClassifier = method.getMarkers().findFirst(MethodClassifier.class).orElse(null);
-            if (methodClassifier != null) {
-                p.append(methodClassifier.getPrefix().getWhitespace());
-                p.append("fun");
-            }
-
             boolean isInfix = method.getMarkers().findFirst(InfixFunction.class).isPresent();
             if (isInfix) {
                 J.VariableDeclarations infixReceiver = (J.VariableDeclarations) method.getParameters().get(0);
