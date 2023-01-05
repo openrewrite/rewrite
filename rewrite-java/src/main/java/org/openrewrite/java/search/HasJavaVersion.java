@@ -57,7 +57,7 @@ public class HasJavaVersion extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
