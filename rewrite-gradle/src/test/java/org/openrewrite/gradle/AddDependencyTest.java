@@ -83,6 +83,11 @@ class AddDependencyTest implements RewriteTest {
                     implementation "com.google.guava:guava:29.0-jre"
                 }
                 """
+            ),
+            settingsGradle(
+              """
+                rootProject.name = "project"
+                """
             )
           )
         );

@@ -201,7 +201,7 @@ public class AddDependency extends Recipe {
 
                     @Override
                     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
-                        if (!cu.getSourcePath().toString().endsWith(".gradle") || cu.getSourcePath().getFileName().equals("settings.gradle")) {
+                        if (!cu.getSourcePath().toString().endsWith(".gradle") || cu.getSourcePath().getFileName().toString().equals("settings.gradle")) {
                             return cu;
                         }
 
