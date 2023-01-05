@@ -18,8 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class IfTest implements RewriteTest {
 
@@ -33,8 +32,7 @@ public class IfTest implements RewriteTest {
                     if (n == 0) {
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -54,8 +52,7 @@ public class IfTest implements RewriteTest {
                         val x = 2
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -74,8 +71,7 @@ public class IfTest implements RewriteTest {
                     else
                         n = 3
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }

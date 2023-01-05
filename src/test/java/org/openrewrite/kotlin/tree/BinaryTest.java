@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class BinaryTest implements RewriteTest {
 
@@ -33,8 +32,7 @@ public class BinaryTest implements RewriteTest {
                   val n = 0
                   val b = n == 0
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -49,8 +47,7 @@ public class BinaryTest implements RewriteTest {
                   var n = 0
                   n -= 5
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }

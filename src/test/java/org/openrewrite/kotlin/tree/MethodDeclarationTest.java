@@ -18,8 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class MethodDeclarationTest implements RewriteTest {
 
@@ -30,8 +29,7 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                 fun method() {
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -43,8 +41,7 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                 fun method(i: Int) {
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -56,8 +53,7 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                 fun method( input : (  ) -> String ) {
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -69,8 +65,7 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                 fun method( input : ( Int, Int ) -> Boolean ) {
               }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -82,8 +77,7 @@ public class MethodDeclarationTest implements RewriteTest {
             """
                 fun method(arg: String.() -> String) {
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -96,8 +90,7 @@ public class MethodDeclarationTest implements RewriteTest {
                 fun method() : Boolean {
                     return true
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -111,8 +104,7 @@ public class MethodDeclarationTest implements RewriteTest {
                   fun method() {
                   }
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }

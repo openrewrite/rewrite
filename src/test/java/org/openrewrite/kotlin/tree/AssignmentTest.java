@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class AssignmentTest implements RewriteTest {
 
@@ -34,8 +33,7 @@ public class AssignmentTest implements RewriteTest {
                 val l = -2L
                 val f = -3.0f
                 val d = -4.0
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -52,8 +50,7 @@ public class AssignmentTest implements RewriteTest {
                         this.id = id
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -68,8 +65,7 @@ public class AssignmentTest implements RewriteTest {
                 fun someFun() {
                     val ref = "${latest}"
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }

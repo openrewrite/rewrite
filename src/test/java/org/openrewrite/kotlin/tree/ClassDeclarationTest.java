@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 @SuppressWarnings("GrUnnecessaryPublicModifier")
 class ClassDeclarationTest implements RewriteTest {
@@ -32,8 +31,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
                 class A {}
                 class B {}
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -45,8 +43,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
                 class A
                 class B
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -59,8 +56,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
                 interface A
                 class C : A
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -73,8 +69,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
                 class A {}
                 class B : A() {}
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -85,8 +80,7 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
                 public abstract class A
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -97,8 +91,7 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
                 annotation class A
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -109,8 +102,7 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
                 enum class A
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -130,8 +122,7 @@ class ClassDeclarationTest implements RewriteTest {
                 @Suppress("")
                 @Deprecated("message 2")
                 class B
-            """,
-            isFullyParsed()
+            """
           )
         );
     }

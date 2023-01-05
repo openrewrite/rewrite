@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class EnumTest implements RewriteTest {
 
@@ -31,8 +30,7 @@ public class EnumTest implements RewriteTest {
           kotlin(
             """
                 enum class A
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -47,8 +45,7 @@ public class EnumTest implements RewriteTest {
                     B, C,
                     D
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -64,8 +61,7 @@ public class EnumTest implements RewriteTest {
                         C
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }

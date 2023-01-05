@@ -18,8 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class MethodInvocationTest implements RewriteTest {
 
@@ -30,8 +29,7 @@ public class MethodInvocationTest implements RewriteTest {
                 fun plugins(input: () -> String) {
                     println( input( ) )
                 }
-            """,
-            isFullyParsed()
+            """
           ),
           kotlin("""
                 fun main() {
@@ -39,8 +37,7 @@ public class MethodInvocationTest implements RewriteTest {
                         "test"
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -58,8 +55,7 @@ public class MethodInvocationTest implements RewriteTest {
                         return this
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           ),
           kotlin("""
                 class SpecScope  {
@@ -67,8 +63,7 @@ public class MethodInvocationTest implements RewriteTest {
                     fun id ( id : String ) : Spec = delegate . id ( id )
                 }
                 public infix fun Spec . version ( version : String ) : Spec = version ( version )
-            """,
-            isFullyParsed()
+            """
           ),
           kotlin("""
                 class DSL  {
@@ -76,8 +71,7 @@ public class MethodInvocationTest implements RewriteTest {
                         block ( SpecScope ( ) )
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           ),
           kotlin("""
                 fun method ( ) {
@@ -85,8 +79,7 @@ public class MethodInvocationTest implements RewriteTest {
                         id ( " someId " ) version "10"
                     }
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -97,8 +90,7 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("""
                 fun method(arg: Any) {
                 }
-            """,
-            isFullyParsed()
+            """
           ),
           kotlin(
             """
@@ -106,8 +98,7 @@ public class MethodInvocationTest implements RewriteTest {
                   method {
                   }
               }
-              """,
-            isFullyParsed()
+              """
           )
         );
     }
@@ -120,8 +111,7 @@ public class MethodInvocationTest implements RewriteTest {
                 fun method(arg: Any) {
                   val l = listOf(1, 2, 3)
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -132,16 +122,14 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("""
                 fun methodA(a: String, b: int, c: Double) {
                 }
-            """,
-            isFullyParsed()
+            """
           ),
           kotlin(
             """
                 fun methodB() {
                   methodA("a", 1, 2.0)
                 }
-            """,
-            isFullyParsed()
+            """
           )
         );
     }

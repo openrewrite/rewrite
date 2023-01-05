@@ -18,8 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.kotlin;
-import static org.openrewrite.kotlin.tree.ParserAsserts.isFullyParsed;
+import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class ImportTest implements RewriteTest {
 
@@ -29,8 +28,7 @@ public class ImportTest implements RewriteTest {
           kotlin(
             """
                 import java.util.ArrayList
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -41,8 +39,7 @@ public class ImportTest implements RewriteTest {
           kotlin(
             """
                 import kotlin.collections.List
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
@@ -53,8 +50,7 @@ public class ImportTest implements RewriteTest {
           kotlin(
             """
                 import kotlin.collections.*
-            """,
-            isFullyParsed()
+            """
           )
         );
     }
