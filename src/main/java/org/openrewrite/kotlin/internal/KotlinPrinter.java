@@ -324,7 +324,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visit(multiVariable.getTypeExpression(), p);
             }
 
-            visitLeftPadded("=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+            boolean implicitEquals = variable.getInitializer() instanceof K.StatementExpression &&
+                    ((K.StatementExpression) variable.getInitializer()).getStatement() instanceof J.MethodDeclaration;
+            visitLeftPadded(implicitEquals ? "" : "=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
 
             visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);
             afterSyntax(multiVariable, p);

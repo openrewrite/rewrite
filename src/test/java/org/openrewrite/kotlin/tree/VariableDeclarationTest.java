@@ -58,4 +58,24 @@ public class VariableDeclarationTest implements RewriteTest {
             """)
         );
     }
+
+    @Disabled
+    @Test
+    void inline() {
+        rewriteRun(
+          kotlin("class Spec"),
+          kotlin("inline val Spec . `java-base`: String get ( ) = \"\"")
+        );
+    }
+
+    @Test
+    void getter() {
+        rewriteRun(
+          kotlin("class Spec"),
+          kotlin("""
+              val isEmpty: Boolean
+                  get ( ) : Boolean = 1 == 1
+          """)
+        );
+    }
 }

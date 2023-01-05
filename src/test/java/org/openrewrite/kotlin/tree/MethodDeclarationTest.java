@@ -108,4 +108,20 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void infix() {
+        rewriteRun(
+          kotlin(
+            """
+                class A {
+                  fun method() {
+                  }
+                }
+            """
+          ),
+          kotlin("infix fun Spec . version ( version : String ) : Spec = version ( version )"
+          )
+        );
+    }
 }
