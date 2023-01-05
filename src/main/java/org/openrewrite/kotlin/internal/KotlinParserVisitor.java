@@ -500,7 +500,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             Markers markers = Markers.EMPTY;
             if (isInfix) {
-                markers = markers.addIfAbsent(new InfixFunCall(randomId()));
+                markers = markers.addIfAbsent(new InfixFunction(randomId()));
             }
 
             TypeTree name = (J.Identifier) visitElement(namedReference, null);
@@ -894,10 +894,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 .map(it -> (J.Identifier) it.getAnnotationType())
                 .anyMatch(it -> "infix".equals(it.getSimpleName()));
 
-        JRightPadded<NameTree> infixReceiver = null;
+        JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (isInfix) {
-            NameTree identifier = (NameTree) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
-            infixReceiver = JRightPadded.build(identifier)
+            // Infix functions are desugared during the backend phase of the compiler.
+            // The desugaring process moves the infix receiver to the first position of the method declaration.
+            // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
+            markers = markers.addIfAbsent(new InfixFunction(randomId()));
+            J.Identifier receiver = (J.Identifier) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
+            infixReceiver = JRightPadded.build(new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    receiver,
+                    emptyList(),
+                    null,
+                    null))
                     .withAfter(sourceBefore("."));
         }
 
@@ -923,6 +934,25 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 JContainer.build(paramFmt, convertAll(simpleFunction.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
+        if (isInfix) {
+            // Insert the infix receiver to the list of parameters.
+            J.VariableDeclarations implicitParam = new J.VariableDeclarations(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY.addIfAbsent(new InfixFunction(randomId())),
+                    emptyList(),
+                    emptyList(),
+                    null,
+                    null,
+                    null,
+                    singletonList(infixReceiver));
+            implicitParam = implicitParam.withMarkers(implicitParam.getMarkers().addIfAbsent(new TypeReferencePrefix(randomId(), EMPTY)));
+            List<JRightPadded<Statement>> newStatements = new ArrayList<>(params.getElements().size() + 1);
+            newStatements.add(JRightPadded.build(implicitParam));
+            newStatements.addAll(params.getPadding().getElements());
+            params = params.getPadding().withElements(newStatements);
+        }
+
         TypeTree returnTypeExpression = null;
         if (!(simpleFunction.getReturnTypeRef() instanceof FirImplicitUnitTypeRef)) {
             Space delimiterPrefix = whitespace();
@@ -940,8 +970,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (simpleFunction.getBody() instanceof FirSingleExpressionBlock) {
             if (source.startsWith("=", cursor)) {
                 skip("=");
-                SingleExpressionBlock singleExpressionBlock = new SingleExpressionBlock(randomId(), blockPrefix);
+                SingleExpressionBlock singleExpressionBlock = new SingleExpressionBlock(randomId());
+
                 body = convertOrNull(simpleFunction.getBody(), ctx);
+                body = body.withPrefix(blockPrefix);
                 body = body.withMarkers(body.getMarkers().addIfAbsent(singleExpressionBlock));
             } else {
                 throw new IllegalStateException("Implement me.");
@@ -951,7 +983,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             body = convertOrNull(simpleFunction.getBody(), ctx);
         }
 
-        J.MethodDeclaration m = new J.MethodDeclaration(
+        return new J.MethodDeclaration(
                 randomId(),
                 prefix,
                 markers,
@@ -965,8 +997,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 body,
                 null,
                 null); // TODO
-
-        return isInfix ? new K.InfixFunctionDeclaration(randomId(), m, infixReceiver) : m;
     }
 
     @Override

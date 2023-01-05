@@ -48,41 +48,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitInfixFunctionDeclaration(K.InfixFunctionDeclaration infixFunctionDeclaration, PrintOutputCapture<P> p) {
-        J.MethodDeclaration method = infixFunctionDeclaration.getMethodDeclaration();
-        visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, p);
-
-        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-        visit(method.getLeadingAnnotations(), p);
-        for (J.Modifier m : method.getModifiers()) {
-            visit(m, p);
-        }
-
-        MethodClassifier methodClassifier = method.getMarkers().findFirst(MethodClassifier.class).orElse(null);
-        if (methodClassifier != null) {
-            p.append(methodClassifier.getPrefix().getWhitespace());
-            p.append("fun");
-        }
-
-        visitRightPadded(infixFunctionDeclaration.getFunctionReceiver(), KRightPadded.Location.INFIX_FUNCTION_DECLARATION_RECEIVER, p);
-        p.out.append(".");
-        visit(method.getName(), p);
-
-        delegate.visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
-
-        if (method.getReturnTypeExpression() != null) {
-            TypeReferencePrefix typeReferencePrefix = method.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
-            if (typeReferencePrefix != null) {
-                KotlinPrinter.this.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
-                p.append(":");
-            }
-            visit(method.getReturnTypeExpression(), p);
-        }
-        visit(method.getBody(), p);
-        return method;
-    }
-
-    @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p);
@@ -129,7 +94,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             SingleExpressionBlock singleExpressionBlock = block.getMarkers().findFirst(SingleExpressionBlock.class).orElse(null);
             if (singleExpressionBlock != null) {
-                visitSpace(singleExpressionBlock.getPrefix(), Space.Location.ASSIGNMENT_OPERATION_PREFIX, p);
                 p.out.append("=");
             }
 
@@ -226,8 +190,30 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("fun");
             }
 
+            boolean isInfix = method.getMarkers().findFirst(InfixFunction.class).isPresent();
+            if (isInfix) {
+                J.VariableDeclarations infixReceiver = (J.VariableDeclarations) method.getParameters().get(0);
+                JRightPadded<J.VariableDeclarations.NamedVariable> receiver = infixReceiver.getPadding().getVariables().get(0);
+                visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, p);
+                p.out.append(".");
+            }
+
             visit(method.getName(), p);
-            visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
+
+            // visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
+            JContainer<Statement> params = method.getPadding().getParameters();
+            beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
+            p.append("(");
+            int i = isInfix ? 1 : 0;
+            List<JRightPadded<Statement>> elements = params.getPadding().getElements();
+            for (;i < elements.size(); i++) {
+                JRightPadded<Statement> element = elements.get(i);
+                String suffix = i == elements.size() - 1 ? "" : ",";
+                visitRightPadded(element, JContainer.Location.METHOD_DECLARATION_PARAMETERS.getElementLocation(), suffix, p);
+            }
+            afterSyntax(params.getMarkers(), p);
+            p.append(")");
+
             if (method.getReturnTypeExpression() != null) {
                 TypeReferencePrefix typeReferencePrefix = method.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
                 if (typeReferencePrefix != null) {
@@ -246,7 +232,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
-            if (method.getSelect() != null && !method.getMarkers().findFirst(InfixFunCall.class).isPresent()) {
+            if (method.getSelect() != null && !method.getMarkers().findFirst(InfixFunction.class).isPresent()) {
                 p.out.append(".");
             }
 

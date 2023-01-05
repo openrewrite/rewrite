@@ -67,13 +67,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
-    public J visitInfixFunctionDeclaration(K.InfixFunctionDeclaration infixFunctionDeclaration, P p) {
-        K.InfixFunctionDeclaration i = infixFunctionDeclaration;
-        i = i.withFunctionReceiver(visitRightPadded(i.getFunctionReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p));
-        i = i.withMethodDeclaration(visitAndCast(i.getMethodDeclaration(), p));
-        return i;
-    }
-
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }

@@ -21,11 +21,8 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-/**
- * Note: this might be replaceable after type mapping is implemented.
- */
 @Value
 @With
-public class InfixFunCall implements Marker {
+public class InfixFunction implements Marker {
     UUID id;
 }

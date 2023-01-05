@@ -17,7 +17,6 @@ package org.openrewrite.kotlin.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
@@ -26,5 +25,4 @@ import java.util.UUID;
 @With
 public class SingleExpressionBlock implements Marker {
     UUID id;
-    Space prefix;
 }
