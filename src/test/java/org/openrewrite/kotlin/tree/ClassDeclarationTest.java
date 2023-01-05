@@ -79,7 +79,6 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires support for modifiers.")
     @Test
     void modifierOrdering() {
         rewriteRun(
@@ -92,7 +91,6 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires supporting Kotlin modifiers.")
     @Test
     void annotationClass() {
         rewriteRun(
@@ -105,7 +103,6 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires supporting Kotlin modifiers.")
     @Test
     void enumClass() {
         rewriteRun(

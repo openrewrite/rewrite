@@ -15,15 +15,10 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
-import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
-import org.jetbrains.kotlin.com.intellij.psi.impl.source.JavaLightTreeUtil;
-import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.*;
-import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
@@ -41,12 +36,9 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
-import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
-import org.jetbrains.kotlin.psi.stubs.elements.KtAnnotationEntryElementType;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -312,15 +304,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
-//        if (firRegularClass.getSource() != null) {
-//            PsiChildRange psiChildRange = PsiUtilsKt.getAllChildren(((KtRealPsiSourceElement) firRegularClass.getSource()).getPsi());
-//            if (psiChildRange.getFirst() instanceof KtDeclarationModifierList) {
-//                KtDeclarationModifierList modifierList = (KtDeclarationModifierList) psiChildRange.getFirst();
-//                modifiers = getModifiers(modifierList);
-//            }
-//        }
 
-        List<J.Annotation> kindAnnotations = emptyList(); // TODO: the last annotations in modifiersAndAnnotations should be added to the class.
+        List<J.Annotation> kindAnnotations = mapModifiers(ModifierScope.CLASS, firRegularClass.getAnnotations()); // TODO: the last annotations in modifiersAndAnnotations should be added to the class.
 
         J.ClassDeclaration.Kind kind;
         ClassKind classKind = klass.getClassKind();
@@ -901,7 +886,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
         List<J> modifiers = emptyList();
-        List<J.Annotation> annotations = mapFunctionModifiers(simpleFunction.getAnnotations());
+        List<J.Annotation> annotations = mapModifiers(ModifierScope.FUNCTION, simpleFunction.getAnnotations());
 
         markers = markers.addIfAbsent(new MethodClassifier(randomId(), sourceBefore("fun")));
         boolean isInfix = annotations.stream()
@@ -1460,14 +1445,27 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new JRightPadded<>(tree, right, Markers.EMPTY);
     }
 
-    private List<J.Annotation> mapFunctionModifiers(List<FirAnnotation> firAnnotations) {
+    private enum ModifierScope {
+        CLASS("class"), FUNCTION("fun");
+
+        private String keyword;
+        ModifierScope(String keyword) {
+            this.keyword = keyword;
+        }
+
+        public String getKeyword() {
+            return keyword;
+        }
+    }
+
+    private List<J.Annotation> mapModifiers(ModifierScope modifierScope, List<FirAnnotation> firAnnotations) {
         List<J.Annotation> modifiers = new ArrayList<>();
         int count = 0;
         while (true && count < 10) {
             int saveCursor = cursor;
             Space prefix = whitespace();
 
-            if (source.startsWith("fun ", cursor)) {
+            if (source.startsWith(modifierScope.getKeyword() + " ", cursor)) {
                 cursor = saveCursor;
                 return modifiers;
             } else if (source.startsWith("@", cursor)) {
@@ -1488,13 +1486,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return modifiers;
     }
 
-    // TODO: parse annotation composite and create J.Annotation.
     private J.Annotation mapAnnotation(Space prefix, List<FirAnnotation> firAnnotations) {
         // look up annotation.
         return new J.Annotation(randomId(), prefix, Markers.EMPTY, null, JContainer.empty());
     }
 
-    // TODO: confirm this works for all types of kotlin modifiers.
     private K.Modifier mapModifier(Space prefix, List<J.Annotation> annotations) {
         K.Modifier.Type type;
         // Ordered based on kotlin requirements.
