@@ -30,8 +30,8 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class A {}
-              class B {}
+                class A {}
+                class B {}
             """,
             isFullyParsed()
           )
@@ -43,8 +43,8 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class A
-              class B
+                class A
+                class B
             """,
             isFullyParsed()
           )
