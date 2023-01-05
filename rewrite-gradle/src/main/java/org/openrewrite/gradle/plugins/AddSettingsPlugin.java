@@ -26,11 +26,11 @@ import org.openrewrite.internal.lang.Nullable;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class AddSettingPlugin extends Recipe {
+public class AddSettingsPlugin extends Recipe {
     @Option(displayName = "Plugin id",
             description = "The plugin id to apply.",
             example = "com.jfrog.bintray")
-    String pluginIdPattern;
+    String pluginId;
 
     @Option(displayName = "Plugin version",
             description = "An exact version number or node-style semver selector used to select the version number.",
@@ -52,7 +52,7 @@ public class AddSettingPlugin extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add a Gradle settings plugin to `build.gradle(.kts)`.";
+        return "Add a Gradle settings plugin to `settings.gradle(.kts)`.";
     }
 
     @Override
@@ -62,6 +62,6 @@ public class AddSettingPlugin extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AddPluginVisitor(pluginIdPattern, version, versionPattern);
+        return new AddPluginVisitor(pluginId, version, versionPattern);
     }
 }

@@ -84,7 +84,7 @@ class AddBuildPluginTest implements RewriteTest {
             """
               plugins {
                   id "java"
-                  id 'com.jfrog.bintray' version '1.0'
+                  id "com.jfrog.bintray" version "1.0"
               }
               """
           )
