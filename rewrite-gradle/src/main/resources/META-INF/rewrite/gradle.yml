@@ -24,9 +24,18 @@ recipeList:
       matchOverrides: false
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.gradle.search.EnableGradleParallelExecution
+name: org.openrewrite.gradle.EnableGradleBuildCache
+displayName: Enable Gradle build cache
+description: Enable the Gradle build cache. By enabling build cache the build outputs are stored externally and fetched from the cache when it is determined that those inputs have no changed, avoiding the expensive work of regenerating them. See the [Gradle Build Cache](https://docs.gradle.org/current/userguide/build_cache.html) for more information.
+recipeList:
+  - org.openrewrite.gradle.AddProperty:
+      key: org.gradle.caching
+      value: true
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.gradle.EnableGradleParallelExecution
 displayName: Enable Gradle parallel execution
-description: Most builds consist of more than one project and some of those projects are usually independent of one another. Yet Gradle will only run one task at a time by default, regardless of the project structure. By using the `--parallel` switch, you can force Gradle to execute tasks in parallel as long as those tasks are in different projects. See the [Gradle performance documentation](https://docs.gradle.org/current/userguide/performance.html#parallel_execution) for more.
+description: Most builds consist of more than one project and some of those projects are usually independent of one another. Yet Gradle will only run one task at a time by default, regardless of the project structure. By using the `--parallel` switch, you can force Gradle to execute tasks in parallel as long as those tasks are in different projects. See the [Gradle performance documentation](https://docs.gradle.org/current/userguide/performance.html#parallel_execution) for more information.
 recipeList:
   - org.openrewrite.gradle.AddProperty:
       key: org.gradle.parallel
