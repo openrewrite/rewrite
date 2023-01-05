@@ -19,6 +19,7 @@ public class KSpace {
     public enum Location {
         TODO,
         FUNCTION_TYPE_RECEIVER,
+        INFIX_FUNCTION_DECLARATION_RECEIVER,
         TOP_LEVEL_STATEMENT,
         TYPE_REFERENCE_PREFIX
     }

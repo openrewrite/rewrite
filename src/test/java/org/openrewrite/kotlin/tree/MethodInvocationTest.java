@@ -52,50 +52,6 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("""
               class Spec {
                 var id = ""
-                fun id(arg: String): Spec {
-                    return this
-                }
-              }
-            """,
-            isFullyParsed()
-          ),
-          kotlin("""
-                class SpecScope  {
-                    val delegate: Spec = Spec()
-                    fun id(id: String): Spec = delegate.id(id)
-                }
-            """,
-            isFullyParsed()
-          ),
-          kotlin("""
-                class DSL  {
-                    fun setScope(block: SpecScope.() -> Unit) {
-                        block(SpecScope())
-                    }
-                }
-            """,
-            isFullyParsed()
-          ),
-          kotlin("""
-                fun method() {
-                    DSL().setScope {
-                        id("someId")
-                    }
-                }
-            """,
-            isFullyParsed()
-          )
-        );
-    }
-
-    // Temp code that contains infix function decl and function call.
-    @Disabled("Requires support of Kotlin modifier `infix`. Add support for infix function calls ` version \"10\"`")
-    @Test
-    void buildGradle2() {
-        rewriteRun(
-          kotlin("""
-              class Spec {
-                var id = ""
                 fun id ( arg : String) : Spec {
                     return this
                 }
@@ -117,7 +73,7 @@ public class MethodInvocationTest implements RewriteTest {
           ),
           kotlin("""
                 class DSL  {
-                    fun setScope ( block : SpecScope . ( ) -> Unit ) {
+                    fun plugins ( block : SpecScope . ( ) -> Unit ) {
                         block ( SpecScope ( ) )
                     }
                 }
@@ -126,7 +82,7 @@ public class MethodInvocationTest implements RewriteTest {
           ),
           kotlin("""
                 fun method ( ) {
-                    DSL ( ) . setScope {
+                    DSL ( ) . plugins {
                         id ( " someId " ) version "10"
                     }
                 }

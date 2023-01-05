@@ -48,6 +48,41 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitInfixFunctionDeclaration(K.InfixFunctionDeclaration infixFunctionDeclaration, PrintOutputCapture<P> p) {
+        J.MethodDeclaration method = infixFunctionDeclaration.getMethodDeclaration();
+        visitSpace(method.getPrefix(), Space.Location.METHOD_DECLARATION_PREFIX, p);
+
+        visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+        visit(method.getLeadingAnnotations(), p);
+        for (J.Modifier m : method.getModifiers()) {
+            visit(m, p);
+        }
+
+        MethodClassifier methodClassifier = method.getMarkers().findFirst(MethodClassifier.class).orElse(null);
+        if (methodClassifier != null) {
+            p.append(methodClassifier.getPrefix().getWhitespace());
+            p.append("fun");
+        }
+
+        visitRightPadded(infixFunctionDeclaration.getFunctionReceiver(), KRightPadded.Location.INFIX_FUNCTION_DECLARATION_RECEIVER, p);
+        p.out.append(".");
+        visit(method.getName(), p);
+
+        delegate.visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
+
+        if (method.getReturnTypeExpression() != null) {
+            TypeReferencePrefix typeReferencePrefix = method.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
+            if (typeReferencePrefix != null) {
+                KotlinPrinter.this.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
+                p.append(":");
+            }
+            visit(method.getReturnTypeExpression(), p);
+        }
+        visit(method.getBody(), p);
+        return method;
+    }
+
+    @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p);
@@ -322,6 +357,19 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
                 visitMarkers(paddedStat.getMarkers(), p);
             }
+        }
+
+        @Override
+        protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location,
+                                      String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+            if (container == null) {
+                return;
+            }
+            beforeSyntax(container.getBefore(), container.getMarkers(), location.getBeforeLocation(), p);
+            p.append(before);
+            visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+            afterSyntax(container.getMarkers(), p);
+            p.append(after == null ? "" : after);
         }
 
         @Override

@@ -904,6 +904,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J.Annotation> annotations = mapFunctionModifiers(simpleFunction.getAnnotations());
 
         markers = markers.addIfAbsent(new MethodClassifier(randomId(), sourceBefore("fun")));
+        boolean isInfix = annotations.stream()
+                .filter(it -> it.getAnnotationType() instanceof J.Identifier)
+                .map(it -> (J.Identifier) it.getAnnotationType())
+                .anyMatch(it -> "infix".equals(it.getSimpleName()));
+
+        JRightPadded<NameTree> infixReceiver = null;
+        if (isInfix) {
+            NameTree identifier = (NameTree) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
+            infixReceiver = JRightPadded.build(identifier)
+                    .withAfter(sourceBefore("."));
+        }
+
         String methodName = "";
         if ("<no name provided>".equals(simpleFunction.getName().asString())) {
             // Extract name from source.
@@ -954,7 +966,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             body = convertOrNull(simpleFunction.getBody(), ctx);
         }
 
-        return new J.MethodDeclaration(
+        J.MethodDeclaration m = new J.MethodDeclaration(
                 randomId(),
                 prefix,
                 markers,
@@ -968,6 +980,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 body,
                 null,
                 null); // TODO
+
+        return isInfix ? new K.InfixFunctionDeclaration(randomId(), m, infixReceiver) : m;
     }
 
     @Override

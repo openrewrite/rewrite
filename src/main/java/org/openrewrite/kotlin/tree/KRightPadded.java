@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 public class KRightPadded {
     public enum Location {
         FUNCTION_TYPE_RECEIVER(KSpace.Location.TOP_LEVEL_STATEMENT),
+        INFIX_FUNCTION_DECLARATION_RECEIVER(KSpace.Location.TOP_LEVEL_STATEMENT),
         TOP_LEVEL_STATEMENT_SUFFIX(KSpace.Location.TOP_LEVEL_STATEMENT);
 
         private final KSpace.Location afterLocation;
