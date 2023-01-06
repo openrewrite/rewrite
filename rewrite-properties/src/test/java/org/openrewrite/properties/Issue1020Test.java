@@ -28,7 +28,7 @@ class Issue1020Test implements RewriteTest {
     @Test
     void removalOfDoublePound() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("server.port", "chassis.name", null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("server.port", "chassis.name", null, null, null)),
           properties(
             """
               key=**##**chassis.management.metrics.export.cloudwatch.awsAccessKey

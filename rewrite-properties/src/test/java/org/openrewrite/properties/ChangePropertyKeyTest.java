@@ -33,8 +33,8 @@ class ChangePropertyKeyTest implements RewriteTest {
           "management.metrics.binders.files.enabled",
           "management.metrics.enable.process.files",
           null,
-          null
-        ));
+          null,
+          null));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/575")
@@ -73,7 +73,12 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey(propertyKey, "acme.my-project.person.change-to", true, null)),
+          spec -> spec.recipe(new ChangePropertyKey(
+            propertyKey,
+            "acme.my-project.person.change-to",
+            true,
+            null,
+            null)),
           properties(
             """
               acme.my-project.person.first-name=example
@@ -95,8 +100,8 @@ class ChangePropertyKeyTest implements RewriteTest {
             "acme.my-project.person.first-name",
             "acme.my-project.person.change-to",
             false,
-            null
-          )),
+            null,
+            null)),
           properties(
             """
               acme.my-project.person.first-name=example
@@ -115,7 +120,12 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void changeOnlyMatchingFile() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("management.metrics", "management.stats", null, "**/a.properties")),
+          spec -> spec.recipe(new ChangePropertyKey(
+            "management.metrics",
+            "management.stats",
+            null,
+            "**/a.properties",
+            null)),
           properties(
             "management.metrics=true",
             "management.stats=true",
@@ -124,6 +134,30 @@ class ChangePropertyKeyTest implements RewriteTest {
           properties(
             "management.metrics=true",
             spec -> spec.path("b.properties")
+          )
+        );
+    }
+
+    @Test
+    void prefixMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.resources.", "spring.web.resources.", null, null, true)),
+          properties(
+            "spring.resources.chain.strategy.content.enabled=true",
+            "spring.web.resources.chain.strategy.content.enabled=true"
+          ),
+          properties(
+            "springzresourceszchain.strategy.content.enabled=true"
+          )
+        );
+    }
+
+    @Test
+    void prefixMatchDefaultDisabled() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.resources.", "spring.web.resources.", null, null, null)),
+          properties(
+            "spring.resources.chain.strategy.content.enabled=true"
           )
         );
     }

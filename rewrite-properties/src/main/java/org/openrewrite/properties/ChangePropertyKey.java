@@ -15,12 +15,16 @@
  */
 package org.openrewrite.properties;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -52,6 +56,30 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     String fileMatcher;
 
+    @Option(displayName = "Prefix match",
+            description = "Default false. If enabled, will match keys which **start with** oldPropertyKey, and replace that prefix with newPropertyKey",
+            required = false,
+            example = "true")
+    @Nullable
+    Boolean prefixMatch;
+
+    @Deprecated
+    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
+            @Nullable Boolean relaxedBinding, @Nullable String fileMatcher) {
+        this(oldPropertyKey, newPropertyKey, relaxedBinding, fileMatcher, null);
+    }
+
+    @JsonCreator
+    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
+            @Nullable Boolean relaxedBinding, @Nullable String fileMatcher,
+            @Nullable Boolean prefixMatch) {
+        this.oldPropertyKey = oldPropertyKey;
+        this.newPropertyKey = newPropertyKey;
+        this.relaxedBinding = relaxedBinding;
+        this.fileMatcher = fileMatcher;
+        this.prefixMatch = prefixMatch;
+    }
+
     @Override
     public String getDisplayName() {
         return "Change property key";
@@ -81,8 +109,20 @@ public class ChangePropertyKey extends Recipe {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), oldPropertyKey) : entry.getKey().equals(oldPropertyKey)) {
-                entry = entry.withKey(newPropertyKey).withPrefix(entry.getPrefix());
+            if (Boolean.TRUE.equals(prefixMatch)) {
+                if (!Boolean.FALSE.equals(relaxedBinding)
+                        ? NameCaseConvention.startsWithRelaxedBinding(entry.getKey(), oldPropertyKey)
+                        : entry.getKey().startsWith(oldPropertyKey)) {
+                    entry = entry.withKey(entry.getKey().replaceFirst(Pattern.quote(oldPropertyKey), Matcher.quoteReplacement(newPropertyKey)))
+                            .withPrefix(entry.getPrefix());
+                }
+            } else {
+                if (!Boolean.FALSE.equals(relaxedBinding)
+                        ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), oldPropertyKey)
+                        : entry.getKey().equals(oldPropertyKey)) {
+                    entry = entry.withKey(newPropertyKey)
+                            .withPrefix(entry.getPrefix());
+                }
             }
             return super.visitEntry(entry, p);
         }

@@ -126,6 +126,10 @@ public enum NameCaseConvention {
         return StringUtils.matchesGlob(LOWER_CAMEL.format(test), LOWER_CAMEL.format(pattern));
     }
 
+    public static boolean startsWithRelaxedBinding(String str0, String str1) {
+        return LOWER_CAMEL.format(str0).startsWith(LOWER_CAMEL.format(str1));
+    }
+
     private static String lowerHyphen(String str) {
         return nameCaseJoiner(str.replace('_', '-').replace(' ', '-'), true, '-');
     }
