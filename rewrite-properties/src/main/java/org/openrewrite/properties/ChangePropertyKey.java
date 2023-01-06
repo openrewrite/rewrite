@@ -23,9 +23,6 @@ import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
@@ -56,12 +53,12 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     String fileMatcher;
 
-    @Option(displayName = "Prefix match",
-            description = "Default false. If enabled, will match keys which **start with** oldPropertyKey, and replace that prefix with newPropertyKey",
+    @Option(displayName = "Regex",
+            description = "Default false. If enabled, `oldPropertyKey` will be interepreted as a Regular Expression, and capture group contents will be available in `newPropertyKey`",
             required = false,
             example = "true")
     @Nullable
-    Boolean prefixMatch;
+    Boolean regex;
 
     @Deprecated
     public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
@@ -72,12 +69,12 @@ public class ChangePropertyKey extends Recipe {
     @JsonCreator
     public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
             @Nullable Boolean relaxedBinding, @Nullable String fileMatcher,
-            @Nullable Boolean prefixMatch) {
+            @Nullable Boolean regex) {
         this.oldPropertyKey = oldPropertyKey;
         this.newPropertyKey = newPropertyKey;
         this.relaxedBinding = relaxedBinding;
         this.fileMatcher = fileMatcher;
-        this.prefixMatch = prefixMatch;
+        this.regex = regex;
     }
 
     @Override
@@ -109,11 +106,11 @@ public class ChangePropertyKey extends Recipe {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (Boolean.TRUE.equals(prefixMatch)) {
+            if (Boolean.TRUE.equals(regex)) {
                 if (!Boolean.FALSE.equals(relaxedBinding)
-                        ? NameCaseConvention.startsWithRelaxedBinding(entry.getKey(), oldPropertyKey)
-                        : entry.getKey().startsWith(oldPropertyKey)) {
-                    entry = entry.withKey(entry.getKey().replaceFirst(Pattern.quote(oldPropertyKey), Matcher.quoteReplacement(newPropertyKey)))
+                        ? NameCaseConvention.matchesRegexRelaxedBinding(entry.getKey(), oldPropertyKey)
+                        : entry.getKey().matches(oldPropertyKey)) {
+                    entry = entry.withKey(entry.getKey().replaceFirst(oldPropertyKey, newPropertyKey))
                             .withPrefix(entry.getPrefix());
                 }
             } else {

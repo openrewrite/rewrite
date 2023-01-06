@@ -229,7 +229,7 @@ public class ChangePropertyKey extends Recipe {
 
     private boolean matches(String string, String pattern) {
         return !Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.matchesRelaxedBinding(string, pattern) :
+                NameCaseConvention.matchesGlobRelaxedBinding(string, pattern) :
                 StringUtils.matchesGlob(string, pattern);
     }
 

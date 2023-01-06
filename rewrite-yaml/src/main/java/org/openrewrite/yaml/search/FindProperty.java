@@ -64,7 +64,7 @@ public class FindProperty extends Recipe {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
                 if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) :
+                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
                         StringUtils.matchesGlob(prop, propertyKey)) {
                     e = e.withValue(SearchResult.found(e.getValue()));
                 }
@@ -80,7 +80,7 @@ public class FindProperty extends Recipe {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, values);
                 String prop = getProperty(getCursor());
                 if (!Boolean.FALSE.equals(relaxedBinding) ?
-                        NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) :
+                        NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
                         StringUtils.matchesGlob(prop, propertyKey)) {
                     values.add(entry.getValue());
                 }
@@ -96,7 +96,7 @@ public class FindProperty extends Recipe {
     public static boolean matches(Cursor cursor, String propertyKey, @Nullable Boolean relaxedBinding) {
         String prop = getProperty(cursor);
         return !Boolean.FALSE.equals(relaxedBinding) ?
-                NameCaseConvention.matchesRelaxedBinding(prop, propertyKey) :
+                NameCaseConvention.matchesGlobRelaxedBinding(prop, propertyKey) :
                 StringUtils.matchesGlob(prop, propertyKey);
     }
 

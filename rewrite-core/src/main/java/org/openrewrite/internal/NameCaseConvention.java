@@ -122,12 +122,12 @@ public enum NameCaseConvention {
      * @see <a href="https://docs.micronaut.io/3.1.0/guide/index.html#_property_value_binding">Micronaut Property Value Binding Normalization</a>
      * @see <a href="https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding">Spring Boot Relaxed Binding</a>
      */
-    public static boolean matchesRelaxedBinding(String test, String pattern) {
+    public static boolean matchesGlobRelaxedBinding(String test, String pattern) {
         return StringUtils.matchesGlob(LOWER_CAMEL.format(test), LOWER_CAMEL.format(pattern));
     }
 
-    public static boolean startsWithRelaxedBinding(String str0, String str1) {
-        return LOWER_CAMEL.format(str0).startsWith(LOWER_CAMEL.format(str1));
+    public static boolean matchesRegexRelaxedBinding(String test, String pattern) {
+        return LOWER_CAMEL.format(test).matches(LOWER_CAMEL.format(pattern));
     }
 
     private static String lowerHyphen(String str) {

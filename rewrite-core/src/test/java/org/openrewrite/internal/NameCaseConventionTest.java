@@ -124,13 +124,13 @@ class NameCaseConventionTest {
     }
 
     @Test
-    void matchesRelaxedBinding() {
-        assertThat(NameCaseConvention.matchesRelaxedBinding(
+    void matchesGlobRelaxedBinding() {
+        assertThat(NameCaseConvention.matchesGlobRelaxedBinding(
           "spring.registration.test.identityprovider",
           "spring.registration.*.identityprovider"
         )).isTrue();
 
-        assertThat(NameCaseConvention.matchesRelaxedBinding(
+        assertThat(NameCaseConvention.matchesGlobRelaxedBinding(
           "spring.registration.test.assertingparty",
           "spring.registration.*.identityprovider"
         )).isFalse();
