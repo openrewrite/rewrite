@@ -574,7 +574,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if (firExpression instanceof FirConstExpression ||
                     firExpression instanceof FirPropertyAccessExpression ||
                     firExpression instanceof FirFunctionCall ||
-                    firExpression instanceof FirNamedArgumentExpression) {
+                    firExpression instanceof FirNamedArgumentExpression ||
+                    firExpression instanceof FirStringConcatenationCall) {
                 args = JContainer.build(sourceBefore("("), convertAll(singletonList(firExpression), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             } else {
                 throw new IllegalStateException("Implement me.");
@@ -624,6 +625,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 opPrefix = sourceBefore("*");
             } else if (type == J.Binary.Type.Subtraction) {
                 opPrefix = sourceBefore("-");
+            } else if (type == J.Binary.Type.Addition) {
+                opPrefix = sourceBefore("+");
+            } else {
+                throw new IllegalStateException("Implement me.");
             }
 
             J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
@@ -648,6 +653,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             op = J.Binary.Type.Multiplication;
         } else if ("minus".equals(resolvedName)) {
             op = J.Binary.Type.Subtraction;
+        } else if ("plus".equals(resolvedName)) {
+            op = J.Binary.Type.Addition;
         }
 
         return op;
