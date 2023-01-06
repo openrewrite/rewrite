@@ -114,7 +114,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<JRightPadded<Statement>> statements = new ArrayList<>(file.getDeclarations().size());
         for (FirDeclaration declaration : file.getDeclarations()) {
             Statement statement = (Statement) visitElement(declaration, ctx);
-            statements.add(JRightPadded.build(statement));
+            statements.add(maybeSemicolon(statement));
         }
 
         return new K.CompilationUnit(
@@ -492,7 +492,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             if (!(functionCall instanceof FirImplicitInvokeCall) &&
                     (!(dispatchReciever instanceof FirNoReceiverExpression || dispatchReciever instanceof FirThisReceiverExpression)) ||
                     !(extensionReciever instanceof FirNoReceiverExpression || extensionReciever instanceof FirThisReceiverExpression)) {
-                FirElement visit = null;
+                FirElement visit;
                 if (dispatchReciever instanceof FirFunctionCall || dispatchReciever instanceof FirPropertyAccessExpression) {
                     visit = dispatchReciever;
                 } else if (extensionReciever instanceof FirFunctionCall || extensionReciever instanceof FirPropertyAccessExpression) {
@@ -501,8 +501,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     throw new IllegalStateException("Implement me.");
                 }
                 Expression selectExpr = (Expression) visitElement(visit, ctx);
+                Space after = whitespace();
+                if (source.startsWith(".", cursor)) {
+                    skip(".");
+                }
+
                 select = JRightPadded.build(selectExpr)
-                        .withAfter(sourceBefore("."));
+                        .withAfter(after);
             }
             Markers markers = Markers.EMPTY;
             if (isInfix) {
@@ -1596,7 +1601,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private J.Identifier convertToIdentifier(String name, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
         Space prefix = whitespace();
         boolean isQuotedSymbol = source.startsWith("`", cursor);
-        String value = "";
+        String value;
         if (isQuotedSymbol) {
             skip("`");
             value = source.substring(cursor, cursor + source.substring(cursor).indexOf('`'));

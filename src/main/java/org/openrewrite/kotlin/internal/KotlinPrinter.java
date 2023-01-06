@@ -48,6 +48,31 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
+        K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
+
+        beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
+
+        JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
+        if (pkg != null) {
+            visit(pkg.getElement(), p);
+            visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
+        }
+
+        for (JRightPadded<J.Import> imprt : cu.getPadding().getImports()) {
+            visitRightPadded(imprt, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
+        }
+
+        for (JRightPadded<Statement> statement : cu.getPadding().getStatements()) {
+            visitRightPadded(statement, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
+        }
+
+        visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
+        afterSyntax(cu, p);
+        return cu;
+    }
+
+    @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p);

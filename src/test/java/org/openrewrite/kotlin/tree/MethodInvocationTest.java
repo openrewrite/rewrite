@@ -63,7 +63,7 @@ public class MethodInvocationTest implements RewriteTest {
                     fun id ( id : String ) : Spec = delegate . id ( id )
                 }
                 public infix fun Spec . version ( version : String ) : Spec = version ( version )
-                public inline val SpecScope . `java-version` : Spec get ( ) = id("org.gradle.java-library")
+                public inline val SpecScope . `java-library` : Spec get ( ) = id("org.gradle.java-library")
             """
           ),
           kotlin("""
@@ -76,9 +76,22 @@ public class MethodInvocationTest implements RewriteTest {
           ),
           kotlin("""
                 fun method ( ) {
-                    DSL ( ) . plugins {
-                        `java-version`
-                        id ( " someId " ) version "10"
+                    DSL ( ) .
+                    
+                    plugins {
+                        `java-library`
+                    
+                        id("nebula.release") version "16.0.0"
+                    
+                        id("nebula.maven-manifest") version "18.4.0"
+                        id("nebula.maven-nebula-publish") version "18.4.0"
+                        id("nebula.maven-resolved-dependencies") version "18.4.0"
+                    
+                        id("nebula.contacts") version "6.0.0"
+                        id("nebula.info") version "11.3.3"
+                    
+                        id("nebula.javadoc-jar") version "18.4.0"
+                        id("nebula.source-jar") version "18.4.0"
                     }
                 }
             """
