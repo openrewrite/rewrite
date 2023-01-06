@@ -148,4 +148,22 @@ public class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parameterAssignment() {
+        rewriteRun(
+          kotlin("""
+                fun apply ( plugin: String ? = null) {
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun method() {
+                    apply( plugin = "something" )
+                }
+            """
+          )
+        );
+    }
 }

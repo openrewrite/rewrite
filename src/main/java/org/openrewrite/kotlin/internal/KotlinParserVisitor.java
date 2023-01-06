@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -572,7 +573,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         convertAll(argumentsExpression.getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             } else if (firExpression instanceof FirConstExpression ||
                     firExpression instanceof FirPropertyAccessExpression ||
-                    firExpression instanceof FirFunctionCall) {
+                    firExpression instanceof FirFunctionCall ||
+                    firExpression instanceof FirNamedArgumentExpression) {
                 args = JContainer.build(sourceBefore("("), convertAll(singletonList(firExpression), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             } else {
                 throw new IllegalStateException("Implement me.");
@@ -753,6 +755,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         J j = visitElement(lambdaArgumentExpression.getExpression(), ctx);
         return j.withPrefix(prefix);
+    }
+
+    @Override
+    public J visitNamedArgumentExpression(FirNamedArgumentExpression namedArgumentExpression, ExecutionContext ctx) {
+        Space prefix = whitespace();
+        return new J.Assignment(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                convertToIdentifier(namedArgumentExpression.getName().toString()),
+                padLeft(sourceBefore("="), convert(namedArgumentExpression.getExpression(), ctx)),
+                null); // TODO
     }
 
     @Override
@@ -1394,6 +1408,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitFunctionTypeRef((FirFunctionTypeRef) firElement, ctx);
         } else if (firElement instanceof FirLambdaArgumentExpression) {
             return visitLambdaArgumentExpression((FirLambdaArgumentExpression) firElement, ctx);
+        } else if (firElement instanceof FirNamedArgumentExpression) {
+            return visitNamedArgumentExpression((FirNamedArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirProperty) {
             return visitProperty((FirProperty) firElement, ctx);
         } else if (firElement instanceof FirPropertyAccessExpression) {
