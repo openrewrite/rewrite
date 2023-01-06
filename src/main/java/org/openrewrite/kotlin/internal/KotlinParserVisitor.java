@@ -378,7 +378,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 implementings,
                 null,
                 body, // TODO
-                null // TODO
+                (JavaType.FullyQualified) typeMapping.type(firRegularClass)
         );
     }
 
@@ -728,12 +728,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         cursor += "package".length();
         Space space = whitespace();
 
+        String packageName = packageDirective.getPackageFqName().asString();
+        skip(packageName);
         return new J.Package(
                 randomId(),
                 pkgPrefix,
                 Markers.EMPTY,
-                TypeTree.build(packageDirective.getPackageFqName().asString())
-                        .withPrefix(space),
+                TypeTree.build(packageName).withPrefix(space),
                 emptyList());
     }
 
@@ -755,18 +756,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
         markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
 
-        JRightPadded<NameTree> reciever = null;
+        JRightPadded<NameTree> receiver = null;
         if (property.getReceiverTypeRef() != null) {
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
-            NameTree recieverName = (NameTree) visitElement(property.getReceiverTypeRef(), ctx);
-            reciever = JRightPadded.build(recieverName)
-                    .withAfter(whitespace());
-            skip(".");
+            NameTree receiverName = (NameTree) visitElement(property.getReceiverTypeRef(), ctx);
+            receiver = JRightPadded.build(receiverName)
+                    .withAfter(sourceBefore("."));
         }
-
-//        if (property.getBackingField() != null && property.getBackingField().getStatus().isInline()) {
-//            System.out.println();
-//        }
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
 
@@ -1252,7 +1248,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Markers.EMPTY,
                 convert(variableAssignment.getLValue(), ctx),
                 padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
-                typeMapping.type(variableAssignment));
+                null); // TODO
     }
 
     @Override

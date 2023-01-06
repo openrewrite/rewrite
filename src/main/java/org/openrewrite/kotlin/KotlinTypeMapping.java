@@ -15,6 +15,11 @@
  */
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.descriptors.ClassKind;
+import org.jetbrains.kotlin.fir.FirElement;
+import org.jetbrains.kotlin.fir.declarations.FirClass;
+import org.jetbrains.kotlin.fir.declarations.FirDeclarationStatus;
+import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol;
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType;
 import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.StandardClassIds;
@@ -24,21 +29,53 @@ import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.JavaType;
 
-public class KotlinTypeMapping implements JavaTypeMapping<Object> {
+public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
+    private final KotlinTypeSignatureBuilder signatureBuilder = new KotlinTypeSignatureBuilder();
     private final JavaTypeCache typeCache;
     private final JavaReflectionTypeMapping reflectionTypeMapping;
+
 
     public KotlinTypeMapping(JavaTypeCache typeCache) {
         this.typeCache = typeCache;
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
-    public JavaType type(@Nullable Object type) {
-//        if (type == null) {
+    public JavaType type(@Nullable FirElement type) {
+        if (type == null) {
             return JavaType.Class.Unknown.getInstance();
-//        }
+        }
 
-//        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+        String signature = signatureBuilder.signature(type);
+        JavaType existing = typeCache.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        if (type instanceof FirClass) {
+            return classType((FirClass) type, signature);
+        }
+
+        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+    }
+
+    private JavaType.FullyQualified classType(FirClass firClass, String signature) {
+        FirClassSymbol<? extends FirClass> sym = firClass.getSymbol();
+
+        String classFqn = sym.getClassId().asFqNameString();
+
+        JavaType.FullyQualified fq = typeCache.get(classFqn);
+        JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
+        if (clazz == null) {
+            clazz = new JavaType.Class(
+                    null,
+                    convertToFlagsBitMap(firClass.getStatus()),
+                    classFqn,
+                    convertToClassKind(firClass.getClassKind()),
+                    null, null, null, null, null, null, null
+            );
+        }
+
+        return clazz;
     }
 
     public JavaType.Primitive primitive(ConeClassLikeType type) {
@@ -66,5 +103,22 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         throw new UnsupportedOperationException("Unknown primitive type " + type);
+    }
+
+    private long convertToFlagsBitMap(FirDeclarationStatus status) {
+        // TODO ... map status to eq flags.
+        return 0;
+    }
+
+    private JavaType.FullyQualified.Kind convertToClassKind(ClassKind classKind) {
+        if (ClassKind.CLASS == classKind) {
+            return JavaType.FullyQualified.Kind.Class;
+        } else if (ClassKind.ANNOTATION_CLASS == classKind) {
+            return JavaType.FullyQualified.Kind.Annotation;
+        } else if (ClassKind.ENUM_CLASS == classKind) {
+            return JavaType.FullyQualified.Kind.Enum;
+        }
+
+        throw new UnsupportedOperationException("Unknown class kind" + classKind.name());
     }
 }

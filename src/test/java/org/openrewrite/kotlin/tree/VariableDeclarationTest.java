@@ -59,12 +59,12 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Confirm where the RecieveType should be added.")
+    @Disabled
     @Test
     void inline() {
         rewriteRun(
           kotlin("class Spec"),
-          kotlin("inline val Spec . `java-base` : String get ( ) = \"\"")
+          kotlin("inline val Spec . `java-base` : String get ( ) = \"  \"")
         );
     }
 
@@ -83,6 +83,17 @@ public class VariableDeclarationTest implements RewriteTest {
     void quotedIdentifier() {
         rewriteRun(
           kotlin("val `quoted-id` = true")
+        );
+    }
+
+    @Disabled
+    @Test
+    void stringVariableReference() {
+        rewriteRun(
+          kotlin("""
+              val valA = "word"
+              val valB = "other ${valA}"
+          """)
         );
     }
 }

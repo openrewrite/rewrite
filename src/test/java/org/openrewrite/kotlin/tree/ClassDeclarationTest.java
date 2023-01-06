@@ -29,6 +29,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+                package some.package.name
                 class A {}
                 class B {}
             """

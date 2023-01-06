@@ -27,7 +27,7 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
+                fun method ( ) {
                 }
             """
           )
@@ -39,7 +39,7 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method(i: Int) {
+                fun method ( i : Int ) {
                 }
             """
           )
@@ -75,7 +75,7 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method(arg: String.() -> String) {
+                fun method ( arg : String . ( ) -> String ) {
                 }
             """
           )
@@ -87,7 +87,7 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() : Boolean = true
+                fun method ( ) : Boolean = true
             """
           )
         );
@@ -98,7 +98,7 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() : Boolean {
+                fun method ( ) : Boolean {
                     return true
                 }
             """
@@ -112,7 +112,7 @@ public class MethodDeclarationTest implements RewriteTest {
           kotlin(
             """
                 class A {
-                  fun method() {
+                  fun method ( ) {
                   }
                 }
             """
@@ -126,7 +126,7 @@ public class MethodDeclarationTest implements RewriteTest {
           kotlin(
             """
                 class A {
-                  fun method() {
+                  fun method ( ) {
                   }
                 }
             """
@@ -141,7 +141,7 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun `some quoted id`() {
+                fun `some quoted id` ( ) {
                 }
             """
           )
