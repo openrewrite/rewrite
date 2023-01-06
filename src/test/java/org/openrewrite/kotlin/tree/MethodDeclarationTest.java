@@ -124,4 +124,16 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void quotedIdentifier() {
+        rewriteRun(
+          kotlin(
+            """
+                fun `some quoted id`() {
+                }
+            """
+          )
+        );
+    }
 }

@@ -78,4 +78,11 @@ public class VariableDeclarationTest implements RewriteTest {
           """)
         );
     }
+
+    @Test
+    void quotedIdentifier() {
+        rewriteRun(
+          kotlin("val `quoted-id` = true")
+        );
+    }
 }

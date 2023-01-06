@@ -323,8 +323,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         // TODO: add type mapping
-        J.Identifier name = new J.Identifier(randomId(), sourceBefore(firRegularClass.getName().asString()),
-                Markers.EMPTY, firRegularClass.getName().asString(), null, null);
+        J.Identifier name = convertToIdentifier(firRegularClass.getName().asString());
 
         JContainer<J.TypeParameter> typeParams = firRegularClass.getTypeParameters().isEmpty() ? null : JContainer.build(
                 sourceBefore("<"),
@@ -768,15 +767,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 //        }
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
-        Space namePrefix = sourceBefore(property.getName().asString());
 
-        J.Identifier name = new J.Identifier(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                property.getName().asString(),
-                null, // TODO: add type mapping and set type
-                null); // TODO: add type mapping and set variable type
+        Space namePrefix = whitespace();
+        J.Identifier name = convertToIdentifier(property.getName().asString());
 
         TypeTree typeExpression = null;
         if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
@@ -1012,13 +1005,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             methodName = simpleFunction.getName().asString();
         }
 
-        J.Identifier name = new J.Identifier(
-                randomId(),
-                sourceBefore(simpleFunction.getName().asString()),
-                Markers.EMPTY,
-                methodName,
-                null,
-                null);
+        J.Identifier name = convertToIdentifier(simpleFunction.getName().asString());
 
         JContainer<Statement> params;
         Space paramFmt = sourceBefore("(");
@@ -1201,16 +1188,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         } else {
             valueName = valueParameter.getName().asString();
-            namePrefix = sourceBefore(valueName);
+            namePrefix = whitespace();
         }
-
-        J.Identifier name = new J.Identifier(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                valueName,
-                null, // TODO: add type mapping and set type
-                null); // TODO: add type mapping and set variable type
+        J.Identifier name = convertToIdentifier(valueName);
 
         TypeTree typeExpression = null;
         if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef) {
@@ -1593,6 +1573,35 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return modifiers;
+    }
+
+    private J.Identifier convertToIdentifier(String name) {
+        return convertToIdentifier(name, null, null);
+    }
+
+    private J.Identifier convertToIdentifier(String name, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
+        Space prefix = whitespace();
+        boolean isQuotedSymbol = source.startsWith("`", cursor);
+        String value = "";
+        if (isQuotedSymbol) {
+            skip("`");
+            value = source.substring(cursor, cursor + source.substring(cursor).indexOf('`'));
+            skip(value);
+            skip("`");
+            value = "`" + value + "`";
+        } else {
+            value = name;
+            skip(value);
+        }
+
+        return new J.Identifier(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                value,
+                type,
+                fieldType
+        );
     }
 
     private J.Annotation convertToAnnotation(K.Modifier modifier) {

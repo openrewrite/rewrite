@@ -126,4 +126,16 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void quotedIdentifier() {
+        rewriteRun(
+          kotlin(
+            """
+                class `Quoted id here`
+            """
+          )
+        );
+    }
+
 }
