@@ -63,6 +63,7 @@ public class MethodInvocationTest implements RewriteTest {
                     fun id ( id : String ) : Spec = delegate . id ( id )
                 }
                 public infix fun Spec . version ( version : String ) : Spec = version ( version )
+                public inline val SpecScope . `java-version` : Spec get ( ) = id("org.gradle.java-library")
             """
           ),
           kotlin("""
@@ -76,6 +77,7 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("""
                 fun method ( ) {
                     DSL ( ) . plugins {
+                        `java-version`
                         id ( " someId " ) version "10"
                     }
                 }

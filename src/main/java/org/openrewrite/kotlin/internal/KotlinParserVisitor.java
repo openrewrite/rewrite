@@ -273,6 +273,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
             }
 
+            if (!(expr instanceof Statement) && expr instanceof Expression) {
+                expr = new K.ExpressionStatement(randomId(), (Expression) expr);
+            }
+
             JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
             saveCursor = cursor;
             Space beforeSemicolon = whitespace();
@@ -855,7 +859,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 propertyAccessExpression.getExplicitReceiver() != null ||
                 !(propertyAccessExpression.getDispatchReceiver() instanceof FirNoReceiverExpression ||
                         propertyAccessExpression.getDispatchReceiver() instanceof FirThisReceiverExpression) ||
-                !(propertyAccessExpression.getExtensionReceiver() instanceof FirNoReceiverExpression)) {
+                !(propertyAccessExpression.getExtensionReceiver() instanceof FirNoReceiverExpression ||
+                        propertyAccessExpression.getExtensionReceiver() instanceof FirThisReceiverExpression)) {
             throw new IllegalStateException("Implement me.");
         }
 
@@ -939,12 +944,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitResolvedNamedReference(FirResolvedNamedReference resolvedNamedReference, ExecutionContext ctx) {
         String name = resolvedNamedReference.getName().asString();
-        return new J.Identifier(randomId(),
-                sourceBefore(name),
-                Markers.EMPTY,
-                name,
-                null,
-                null);
+        return convertToIdentifier(name);
     }
 
     @Override
