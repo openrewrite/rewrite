@@ -356,6 +356,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(":");
                 }
                 visit(multiVariable.getTypeExpression(), p);
+                IsNullable isNullable = multiVariable.getTypeExpression().getMarkers().findFirst(IsNullable.class).orElse(null);
+                if (isNullable != null) {
+                    KotlinPrinter.this.visitSpace(isNullable.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p);
+                    p.append("?");
+                }
             }
 
             boolean implicitEquals = variable.getInitializer() instanceof K.StatementExpression &&

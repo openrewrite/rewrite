@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin.tree;
+package org.openrewrite.kotlin.marker;
 
-public class KSpace {
-    public enum Location {
-        TODO,
-        FUNCTION_TYPE_RECEIVER,
-        INFIX_FUNCTION_DECLARATION_RECEIVER,
-        IS_NULLABLE_PREFIX,
-        TOP_LEVEL_STATEMENT,
-        TYPE_REFERENCE_PREFIX
-    }
+import lombok.Value;
+import lombok.With;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Marker;
+
+import java.util.UUID;
+
+@Value
+@With
+public class IsNullable implements Marker {
+    UUID id;
+    Space prefix;
 }

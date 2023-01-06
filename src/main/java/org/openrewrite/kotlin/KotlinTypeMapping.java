@@ -100,6 +100,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
             return JavaType.Primitive.String;
         } else if (StandardClassIds.INSTANCE.getUnit().equals(classId)) {
             return JavaType.Primitive.Void;
+        } else if (StandardClassIds.INSTANCE.getNothing().equals(classId)) {
+            return JavaType.Primitive.Null;
         }
 
         throw new UnsupportedOperationException("Unknown primitive type " + type);

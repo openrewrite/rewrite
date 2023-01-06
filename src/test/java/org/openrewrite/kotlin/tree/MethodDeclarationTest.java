@@ -147,4 +147,16 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void defaults() {
+        rewriteRun(
+          kotlin(
+            """
+                fun apply ( plugin: String ? = null) {
+                }
+            """
+          )
+        );
+    }
 }

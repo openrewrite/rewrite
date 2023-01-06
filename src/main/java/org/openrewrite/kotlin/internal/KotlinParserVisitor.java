@@ -1145,6 +1145,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitUserTypeRef(FirUserTypeRef userTypeRef, ExecutionContext ctx) {
         JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
+        Markers markers = Markers.EMPTY;
         if (userTypeRef.getQualifier().size() == 1) {
             FirQualifierPart part = userTypeRef.getQualifier().get(0);
             Space prefix = sourceBefore(part.getName().asString());
@@ -1168,15 +1169,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     ));
                 }
 
+                if (userTypeRef.isMarkedNullable()) {
+                    markers = markers.addIfAbsent(new IsNullable(randomId(), sourceBefore("?")));
+                }
+
                 return new J.ParameterizedType(
                         randomId(),
                         prefix,
-                        Markers.EMPTY,
+                        markers,
                         ident,
                         JContainer.build(typeArgPrefix, parameters, Markers.EMPTY)
                 );
             } else {
-                return ident.withPrefix(prefix);
+                if (userTypeRef.isMarkedNullable()) {
+                    markers = markers.addIfAbsent(new IsNullable(randomId(), sourceBefore("?")));
+                }
+
+                return ident.withPrefix(prefix)
+                        .withMarkers(markers);
             }
         } else {
             throw new IllegalStateException("Implement me.");
@@ -1235,6 +1245,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
         List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
 
+        FirExpression initializer = valueParameter.getInitializer() != null ? valueParameter.getInitializer() : valueParameter.getDefaultValue() != null ? valueParameter.getDefaultValue() : null;
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
                 new J.VariableDeclarations.NamedVariable(
                         randomId(),
@@ -1242,7 +1253,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         Markers.EMPTY,
                         name,
                         dimensionsAfterName,
-                        valueParameter.getInitializer() != null ? padLeft(sourceBefore("="), (Expression) visitExpression(valueParameter.getInitializer(), ctx)) : null,
+                        initializer != null ? padLeft(sourceBefore("="), (Expression) visitExpression(initializer, ctx)) : null,
                         null // TODO: add type mapping
                 )
         );
