@@ -23,6 +23,6 @@ import java.util.UUID;
 
 @Value
 @With
-public class InfixFunction implements Marker {
+public class ReceiverType implements Marker {
     UUID id;
 }

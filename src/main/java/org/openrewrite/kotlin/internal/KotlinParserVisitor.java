@@ -38,7 +38,6 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.name.Name;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
@@ -66,7 +65,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
-import static java.lang.Math.sin;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
@@ -503,7 +501,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             Markers markers = Markers.EMPTY;
             if (isInfix) {
-                markers = markers.addIfAbsent(new InfixFunction(randomId()));
+                markers = markers.addIfAbsent(new ReceiverType(randomId()));
             }
 
             TypeTree name = (J.Identifier) visitElement(namedReference, null);
@@ -753,15 +751,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         boolean isVal = property.isVal();
         List<J.Annotation> annotations = mapModifiers(isVal ? ModifierScope.VAL : ModifierScope.VAR, property.getAnnotations());
-        Markers markers = Markers.EMPTY;
 
+        Markers markers = Markers.EMPTY;
         markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
 
-//        NameTree receiver = null;
-//        if (property.getReceiverTypeRef() != null) {
-//            receiver = (NameTree) visitElement(property.getReceiverTypeRef(), ctx);
-//        }
-//
+        JRightPadded<NameTree> reciever = null;
+        if (property.getReceiverTypeRef() != null) {
+            markers = markers.addIfAbsent(new ReceiverType(randomId()));
+            NameTree recieverName = (NameTree) visitElement(property.getReceiverTypeRef(), ctx);
+            reciever = JRightPadded.build(recieverName)
+                    .withAfter(whitespace());
+            skip(".");
+        }
+
 //        if (property.getBackingField() != null && property.getBackingField().getStatus().isInline()) {
 //            System.out.println();
 //        }
@@ -828,7 +830,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                emptyList(),
+                annotations,
                 emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
                 typeExpression,
                 null,
@@ -984,7 +986,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             // Infix functions are desugared during the backend phase of the compiler.
             // The desugaring process moves the infix receiver to the first position of the method declaration.
             // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
-            markers = markers.addIfAbsent(new InfixFunction(randomId()));
+            markers = markers.addIfAbsent(new ReceiverType(randomId()));
             J.Identifier receiver = (J.Identifier) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
             infixReceiver = JRightPadded.build(new J.VariableDeclarations.NamedVariable(
                     randomId(),
@@ -1018,7 +1020,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             J.VariableDeclarations implicitParam = new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
-                    Markers.EMPTY.addIfAbsent(new InfixFunction(randomId())),
+                    Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
                     emptyList(),
                     emptyList(),
                     null,

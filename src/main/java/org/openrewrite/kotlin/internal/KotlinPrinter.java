@@ -184,7 +184,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitModifier(m, p);
             }
 
-            boolean isInfix = method.getMarkers().findFirst(InfixFunction.class).isPresent();
+            boolean isInfix = method.getMarkers().findFirst(ReceiverType.class).isPresent();
             if (isInfix) {
                 J.VariableDeclarations infixReceiver = (J.VariableDeclarations) method.getParameters().get(0);
                 JRightPadded<J.VariableDeclarations.NamedVariable> receiver = infixReceiver.getPadding().getVariables().get(0);
@@ -226,7 +226,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
-            if (method.getSelect() != null && !method.getMarkers().findFirst(InfixFunction.class).isPresent()) {
+            if (method.getSelect() != null && !method.getMarkers().findFirst(ReceiverType.class).isPresent()) {
                 p.out.append(".");
             }
 

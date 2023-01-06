@@ -59,12 +59,12 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @Disabled("Confirm where the RecieveType should be added.")
     @Test
     void inline() {
         rewriteRun(
           kotlin("class Spec"),
-          kotlin("inline val Spec . `java-base`: String get ( ) = \"\"")
+          kotlin("inline val Spec . `java-base` : String get ( ) = \"\"")
         );
     }
 
