@@ -83,6 +83,17 @@ public class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void assignment() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method() : Boolean = true
+            """
+          )
+        );
+    }
+
+    @Test
     void returnType() {
         rewriteRun(
           kotlin(
