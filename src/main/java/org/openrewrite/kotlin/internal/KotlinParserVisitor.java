@@ -64,6 +64,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.lang.Math.E;
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -756,15 +757,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
         markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
 
-        JRightPadded<NameTree> receiver = null;
+        JRightPadded<J.VariableDeclarations.NamedVariable> receiver = null;
         if (property.getReceiverTypeRef() != null) {
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
-            NameTree receiverName = (NameTree) visitElement(property.getReceiverTypeRef(), ctx);
-            receiver = JRightPadded.build(receiverName)
-                    .withAfter(sourceBefore("."));
+            J.Identifier receiverName = (J.Identifier) visitElement(property.getReceiverTypeRef(), ctx);
+
+            // Temporary wrapper to move foward ...
+            receiver = JRightPadded.build(
+                    new J.VariableDeclarations.NamedVariable(
+                            randomId(),
+                            receiverName.getPrefix(),
+                            Markers.EMPTY,
+                            receiverName.withPrefix(EMPTY),
+                            emptyList(),
+                            null,
+                            null)
+            ).withAfter(sourceBefore("."));
         }
 
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1 + (receiver == null ? 0 : 1)); // adjust size if necessary
+        if (receiver != null) {
+            vars.add(receiver);
+        }
 
         Space namePrefix = whitespace();
         J.Identifier name = convertToIdentifier(property.getName().asString());
@@ -827,7 +841,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 prefix,
                 markers,
                 annotations,
-                emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
+                emptyList(),
                 typeExpression,
                 null,
                 dimensionsAfterName,
@@ -880,6 +894,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 skip(":");
                 markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), nextPrefix));
                 returnTypeExpression = (TypeTree) visitElement(propertyAccessor.getReturnTypeRef(), ctx);
+            } else {
+                cursor = saveCursor;
             }
 
             J.Block body = null;

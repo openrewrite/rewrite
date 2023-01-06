@@ -311,7 +311,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append(isVal ? "val" : "var");
             }
 
-            J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(0);
+            boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(ReceiverType.class).isPresent();
+            int variablePos = 0;
+            if (containsTypeReceiver) {
+                JRightPadded<J.VariableDeclarations.NamedVariable> receiver = multiVariable.getPadding().getVariables().get(0);
+                visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, p);
+                p.out.append(".");
+                variablePos = 1;
+            }
+
+            J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(variablePos);
             beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
             visit(variable.getName(), p);
 

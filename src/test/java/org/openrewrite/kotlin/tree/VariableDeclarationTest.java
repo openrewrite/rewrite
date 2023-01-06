@@ -59,7 +59,6 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void inline() {
         rewriteRun(
