@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -166,7 +165,7 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                inline fun <reified T> method(value: T) {
+                inline fun < reified T > method(value: T) {
                 }
             """
           )

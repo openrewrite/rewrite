@@ -66,6 +66,10 @@ dependencies {
 
     implementation(platform(kotlin("bom", "1.7.22")))
     implementation(kotlin("compiler-embeddable"))
+    implementation(kotlin("sam-with-receiver-compiler-plugin"))
+    implementation(kotlin("kotlin-scripting-compiler-embeddable"))
+    implementation(kotlin("kotlin-scripting-common"))
+
     implementation(kotlin("stdlib"))
 
     testImplementation("org.assertj:assertj-core:latest.release")

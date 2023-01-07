@@ -88,10 +88,8 @@ import static org.jetbrains.kotlin.cli.jvm.compiler.KotlinToJVMBytecodeCompilerK
 import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.compileModuleToAnalyzedFir;
 import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.convertAnalyzedFirToIr;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
-import static org.jetbrains.kotlin.config.CommonConfigurationKeys.LANGUAGE_VERSION_SETTINGS;
-import static org.jetbrains.kotlin.config.CommonConfigurationKeys.USE_FIR;
-import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
-import static org.jetbrains.kotlin.config.JVMConfigurationKeys.FRIEND_PATHS;
+import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
+import static org.jetbrains.kotlin.config.JVMConfigurationKeys.*;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser<K.CompilationUnit> {
@@ -175,8 +173,12 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
 
         configureJdkClasspathRoots(compilerConfiguration);
-        addJvmClasspathRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
+
+//        addJvmClasspathRoots(javaClassPath)
+
+        // Add KotlinSources ContentRoots.kt.#addKotlinSourceRoots
+//        addKotlinSourceRoots
 
         Disposable disposable = Disposer.newDisposable();
         try {
@@ -286,10 +288,14 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
         compilerConfiguration.put(USE_FIR,  true);
         compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT,  true);
+        compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS,  true);
 
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());
+
+        compilerConfiguration.put(SAM_CONVERSIONS, JvmClosureGenerationScheme.CLASS);
+        addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7, ApiVersion.KOTLIN_1_7));
         return compilerConfiguration;

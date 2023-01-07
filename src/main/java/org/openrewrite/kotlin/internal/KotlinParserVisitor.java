@@ -1020,7 +1020,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 .anyMatch(it -> "infix".equals(it.getSimpleName()));
 
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
-        if (isInfix) {
+        if (isInfix && simpleFunction.getReceiverTypeRef() != null) {
             // Infix functions are desugared during the backend phase of the compiler.
             // The desugaring process moves the infix receiver to the first position of the method declaration.
             // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
@@ -1037,9 +1037,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     .withAfter(sourceBefore("."));
         }
 
-        J.TypeParameters typeParameters = new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
+        J.TypeParameters typeParameters = simpleFunction.getTypeParameters().isEmpty() ? null :
+                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
                 emptyList(),
                 convertAll(simpleFunction.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
+
         String methodName = "";
         if ("<no name provided>".equals(simpleFunction.getName().asString())) {
             // Extract name from source.
@@ -1147,13 +1149,23 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
-        List<J.Annotation> annotations = emptyList();
+        List<J.Annotation> annotations = new ArrayList<>(typeParameter.getAnnotations().size() + (typeParameter.isReified() ? 1 : 0));
 
         if (typeParameter.isReified()) {
-            // Assumes there is no whitespace before `refied`, maybe this should be an Annotation instead?
-            markers = markers.addIfAbsent(new Reified(randomId()));
-            skip("reified");
+            // Add reified as an annotation to preserve whitespace.
+            J.Identifier name = new J.Identifier(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    "reified",
+                    null,
+                    null
+            );
+
+            J.Annotation reified = new J.Annotation(randomId(), sourceBefore("reified"), Markers.EMPTY.addIfAbsent(new Modifier(randomId())), name, JContainer.empty());
+            annotations.add(reified);
         }
+
         Expression name = buildName(typeParameter.getName().asString())
                 .withPrefix(sourceBefore(typeParameter.getName().asString()));
 
