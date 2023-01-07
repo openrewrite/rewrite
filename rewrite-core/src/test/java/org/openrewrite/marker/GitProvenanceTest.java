@@ -157,6 +157,28 @@ class GitProvenanceTest {
         }
     }
 
+    private static Stream<String> baseUrls() {
+        return Stream.of(
+          "ssh://git@gitlab.com",
+          "http://gitlab.com/",
+          "gitlab.com"
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("baseUrls")
+    void multiplePathSegments(String baseUrl) {
+        GitProvenance provenance = new GitProvenance(randomId(),
+          "http://gitlab.com/group/subgroup1/subgroup2/repo.git",
+          "master",
+          "1234567890abcdef1234567890abcdef12345678",
+          null,
+          null);
+
+        assertThat(provenance.getOrganizationName(baseUrl)).isEqualTo("group/subgroup1/subgroup2");
+        assertThat(provenance.getRepositoryName()).isEqualTo("repo");
+    }
+
     @Disabled("Does not work the same way in CI")
     @Test
     void shallowCloneDetachedHead(@TempDir Path projectDir) throws IOException, GitAPIException {

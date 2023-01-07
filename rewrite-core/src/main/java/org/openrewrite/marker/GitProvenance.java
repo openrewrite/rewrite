@@ -49,13 +49,47 @@ public class GitProvenance implements Marker {
     String branch;
 
     String change;
-    
+
     @Nullable
     AutoCRLF autocrlf;
 
     @Nullable
     EOL eol;
 
+    /**
+     * Extract the organization name, including sub-organizations for git hosting services which support such a concept,
+     * from the origin URL. Needs to be supplied with the
+     *
+     * @param baseUrl the portion of the URL which precedes the organization
+     * @return the portion of the git origin URL which corresponds to the organization the git repository is organized under
+     */
+    @Nullable
+    public String getOrganizationName(String baseUrl) {
+        if(origin == null) {
+            return null;
+        }
+        int schemeEndIndex = baseUrl.indexOf("://");
+        if(schemeEndIndex != -1) {
+            baseUrl = baseUrl.substring(schemeEndIndex + 3);
+        }
+        if(baseUrl.startsWith("git@")) {
+            baseUrl = baseUrl.substring(4);
+        }
+        String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length());
+        if(remainder.startsWith("/")) {
+            remainder = remainder.substring(1);
+        }
+
+        return remainder.substring(0, remainder.lastIndexOf('/'));
+    }
+
+    /**
+     * There is too much variability in how different git hosting services arrange their organizations to reliably
+     * determine the organization component of the URL without additional information. The version of this method
+     * which accepts a "baseUrl" parameter should be used instead
+     *
+     */
+    @Deprecated()
     @Nullable
     public String getOrganizationName() {
         if (origin == null) {
