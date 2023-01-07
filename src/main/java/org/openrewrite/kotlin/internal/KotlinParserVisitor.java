@@ -1037,6 +1037,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     .withAfter(sourceBefore("."));
         }
 
+        J.TypeParameters typeParameters = new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
+                emptyList(),
+                convertAll(simpleFunction.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
         String methodName = "";
         if ("<no name provided>".equals(simpleFunction.getName().asString())) {
             // Extract name from source.
@@ -1045,7 +1048,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             methodName = simpleFunction.getName().asString();
         }
 
-        J.Identifier name = convertToIdentifier(simpleFunction.getName().asString());
+        J.Identifier name = convertToIdentifier(methodName);
 
         JContainer<Statement> params;
         Space paramFmt = sourceBefore("(");
@@ -1108,7 +1111,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers,
                 annotations, // TODO
                 emptyList(),
-                null, // TODO
+                typeParameters,
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params, // TODO
@@ -1143,18 +1146,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
         List<J.Annotation> annotations = emptyList();
 
+        if (typeParameter.isReified()) {
+            // Assumes there is no whitespace before `refied`, maybe this should be an Annotation instead?
+            markers = markers.addIfAbsent(new Reified(randomId()));
+            skip("reified");
+        }
         Expression name = buildName(typeParameter.getName().asString())
                 .withPrefix(sourceBefore(typeParameter.getName().asString()));
 
         // TODO: add support for bounds. Bounds often exist regardless of if bounds are specified.
-        JContainer<TypeTree> bounds = JContainer.empty();
+        JContainer<TypeTree> bounds = null;
 //        JContainer<TypeTree> bounds = typeParameter.getBounds().isEmpty() ? null :
 //                JContainer.build(whitespace(),
 //                        convertAll(typeParameter.getBounds(), t -> sourceBefore(","), noDelim, ctx), Markers.EMPTY);
 
-        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, annotations, name, bounds);
+        return new J.TypeParameter(randomId(), prefix, markers, annotations, name, bounds);
     }
 
     @Override
@@ -1737,20 +1746,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new K.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
     }
 
-    private J mapSourceElement(KtSourceElement sourceElement) {
-        if (sourceElement instanceof KtRealPsiSourceElement) {
-            PsiElement psiElement = ((KtRealPsiSourceElement) sourceElement).getPsi();
-            if (psiElement instanceof KtTypeReference) {
-                return mapTypeReference((KtTypeReference) psiElement);
-            }
+    private JContainer<J.TypeParameter> visitTypeParameters(List<FirTypeParameter> firElements, ExecutionContext ctx) {
+        Space prefix = sourceBefore("<");
+        List<JRightPadded<J.TypeParameter>> typeParameters = new ArrayList<>(firElements.size());
+        for (int i = 0; i < firElements.size(); i++) {
+            typeParameters.add(JRightPadded.build((J.TypeParameter) visitElement(firElements.get(i), ctx))
+                    .withAfter(
+                            i < typeParameters.size() - 1 ?
+                                    sourceBefore(",") :
+                                    sourceBefore(">")
+                    ));
         }
-        throw new IllegalStateException("Implement me.");
-    }
-
-    private J mapNameReferenceExpression(KtNameReferenceExpression nameReferenceExpression) {
-        Space prefix = sourceBefore(nameReferenceExpression.getReferencedName());
-        String name = nameReferenceExpression.getReferencedName();
-        return new J.Identifier(randomId(), prefix, Markers.EMPTY, name, null, null); // TODO add types.
+        return JContainer.build(prefix, typeParameters, Markers.EMPTY);
     }
 
     private J mapTypeReference(KtTypeReference typeReference) {

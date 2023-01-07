@@ -217,9 +217,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.out.append(".");
             }
 
+            J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
+            if (typeParameters != null) {
+                visit(typeParameters.getAnnotations(), p);
+                visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
+                visitMarkers(typeParameters.getMarkers(), p);
+                p.append("<");
+                visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
+                p.append(">");
+            }
+
             visit(method.getName(), p);
 
-            // visitContainer("(", method.getPadding().getParameters(), JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",", ")", p);
             JContainer<Statement> params = method.getPadding().getParameters();
             beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
             p.append("(");
@@ -397,7 +406,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
             if (marker instanceof Semicolon) {
                 p.out.append(';');
+            } else if (marker instanceof Reified) {
+                p.out.append("reified");
             }
+
             return super.visitMarker(marker, p);
         }
     }

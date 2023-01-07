@@ -161,7 +161,6 @@ public class MethodDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void reifiedGeneric() {
         rewriteRun(
