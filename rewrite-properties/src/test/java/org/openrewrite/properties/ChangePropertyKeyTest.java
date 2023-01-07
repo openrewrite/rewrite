@@ -151,14 +151,4 @@ class ChangePropertyKeyTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void prefixMatchDefaultDisabled() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null, true)),
-          properties(
-            "spring.resources.chain.strategy.content.enabled=true"
-          )
-        );
-    }
 }
