@@ -17,7 +17,10 @@ package org.openrewrite.java.search;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -27,8 +30,9 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
@@ -86,11 +90,13 @@ public class FindMissingTypes extends Recipe {
 
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
 
+        private final Set<JavaType> seenTypes = new HashSet<>();
+
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
-            if (!isWellFormedType(identifier.getType()) && !isAllowedToHaveNullType(identifier)) {
+            if (!isWellFormedType(identifier.getType(), seenTypes) && !isAllowedToHaveNullType(identifier)) {
                 identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
             }
             return identifier;
@@ -103,7 +109,7 @@ public class FindMissingTypes extends Recipe {
             // Avoid over-reporting the same problem by checking the invocation only when its elements are well-formed
             if (mi == method) {
                 JavaType.Method type = mi.getMethodType();
-                if (!isWellFormedType(type)) {
+                if (!isWellFormedType(type, seenTypes)) {
                     mi = SearchResult.found(mi, "MethodInvocation type is missing or malformed");
                 } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
                     mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
@@ -116,7 +122,7 @@ public class FindMissingTypes extends Recipe {
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
-            if (!isWellFormedType(type)) {
+            if (!isWellFormedType(type, seenTypes)) {
                 md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
@@ -128,7 +134,7 @@ public class FindMissingTypes extends Recipe {
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
             JavaType.FullyQualified t = cd.getType();
-            if (!isWellFormedType(t)) {
+            if (!isWellFormedType(t, seenTypes)) {
                 return SearchResult.found(cd, "ClassDeclaration type is missing or malformed");
             }
             if (!cd.getKind().name().equals(t.getKind().name())) {
@@ -149,7 +155,7 @@ public class FindMissingTypes extends Recipe {
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
             J.NewClass n = super.visitNewClass(newClass, executionContext);
-            if (n == newClass && !isWellFormedType(n.getType())) {
+            if (n == newClass && !isWellFormedType(n.getType(), seenTypes)) {
                 n = SearchResult.found(n, "NewClass type is missing or malformed");
             }
             return n;
@@ -157,8 +163,8 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName()
-                   || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
-                   || isNewClass(ident) || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField(ident);
+                    || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
+                    || isNewClass(ident) || isTypeParameter() || isMemberReference() || isCaseLabel() || isLabel() || isAnnotationField(ident);
         }
 
         private boolean inPackageDeclaration() {
@@ -187,7 +193,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isFieldAccess(J.Identifier ident) {
             J.FieldAccess parent = getCursor().firstEnclosing(J.FieldAccess.class);
             return parent != null
-                   && (parent.getName().equals(ident) || parent.getTarget().equals(ident));
+                    && (parent.getName().equals(ident) || parent.getTarget().equals(ident));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
@@ -207,7 +213,7 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isTypeParameter() {
             return getCursor().getParent() != null
-                   && getCursor().getParent().getValue() instanceof J.TypeParameter;
+                    && getCursor().getParent().getValue() instanceof J.TypeParameter;
         }
 
         private boolean isMemberReference() {
@@ -225,7 +231,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
             return parent != null && parent.getValue() instanceof J.Assignment
-                   && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
+                    && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
     }
