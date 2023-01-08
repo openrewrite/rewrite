@@ -76,6 +76,10 @@ class IsEmptyCallOnCollectionsTest implements RewriteTest {
                           // empty body
                       } else if (l.size() != 0 || 0 != l.size()) {
                           // empty body
+                      } else if (l.size() > 0 || l.size() < 0) {
+                          // empty body
+                      } else if (0 < l.size() || 0 > l.size()) {
+                          // empty body
                       }
                   }
               }
@@ -88,6 +92,10 @@ class IsEmptyCallOnCollectionsTest implements RewriteTest {
                       if (l.isEmpty() || l.isEmpty()) {
                           // empty body
                       } else if (!l.isEmpty() || !l.isEmpty()) {
+                          // empty body
+                      } else if (!l.isEmpty() || l.size() < 0) {
+                          // empty body
+                      } else if (!l.isEmpty() || 0 > l.size()) {
                           // empty body
                       }
                   }
