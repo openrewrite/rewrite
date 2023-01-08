@@ -171,4 +171,16 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void genericTypeParameters() {
+        rewriteRun(
+          kotlin(
+            """
+                fun <T: Number> method(type: T) {
+                }
+            """
+          )
+        );
+    }
 }

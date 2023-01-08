@@ -166,4 +166,22 @@ public class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void typeParameters() {
+        rewriteRun(
+          kotlin("""
+                fun < T : Number > method ( type : T ) {
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun method() {
+                    method < Int > ( 10 )
+                }
+            """
+          )
+        );
+    }
 }

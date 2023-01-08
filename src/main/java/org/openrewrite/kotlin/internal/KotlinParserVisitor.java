@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -37,9 +36,12 @@ import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.types.*;
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.KtFunctionType;
+import org.jetbrains.kotlin.psi.KtNameReferenceExpression;
+import org.jetbrains.kotlin.psi.KtTypeReference;
 import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.ExecutionContext;
@@ -65,7 +67,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static java.lang.Math.E;
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -1169,11 +1170,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Expression name = buildName(typeParameter.getName().asString())
                 .withPrefix(sourceBefore(typeParameter.getName().asString()));
 
-        // TODO: add support for bounds. Bounds often exist regardless of if bounds are specified.
-        JContainer<TypeTree> bounds = null;
-//        JContainer<TypeTree> bounds = typeParameter.getBounds().isEmpty() ? null :
-//                JContainer.build(whitespace(),
-//                        convertAll(typeParameter.getBounds(), t -> sourceBefore(","), noDelim, ctx), Markers.EMPTY);
+        List<FirTypeRef> nonImplicitParams = typeParameter.getBounds().stream().filter(it -> !(it instanceof FirImplicitNullableAnyTypeRef)).collect(Collectors.toList());
+        JContainer<TypeTree> bounds = nonImplicitParams.isEmpty() ? null :
+                JContainer.build(sourceBefore(":"),
+                        convertAll(nonImplicitParams, t -> sourceBefore(","), noDelim, ctx), Markers.EMPTY);
 
         return new J.TypeParameter(randomId(), prefix, markers, annotations, name, bounds);
     }

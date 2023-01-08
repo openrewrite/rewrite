@@ -38,7 +38,11 @@ repositories {
     maven {
         url = uri("https://oss.sonatype.org/content/repositories/snapshots/")
     }
+    maven {
+        url = uri("https://repo.gradle.org/gradle/libs-releases-local/")
+    }
     mavenCentral()
+    gradlePluginPortal()
 }
 
 configurations.all {
@@ -54,6 +58,8 @@ val latest = if (project.hasProperty("releasing")) {
     "latest.integration"
 }
 
+val kotlinVersion = "1.7.22"
+
 dependencies {
     annotationProcessor("org.projectlombok:lombok:latest.release")
 
@@ -64,11 +70,13 @@ dependencies {
     implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:${latest}"))
     implementation("org.openrewrite:rewrite-java")
 
-    implementation(platform(kotlin("bom", "1.7.22")))
+    implementation(platform(kotlin("bom", kotlinVersion)))
     implementation(kotlin("compiler-embeddable"))
-    implementation(kotlin("sam-with-receiver-compiler-plugin"))
-    implementation(kotlin("kotlin-scripting-compiler-embeddable"))
-    implementation(kotlin("kotlin-scripting-common"))
+//    implementation("org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:${kotlinVersion}")
+
+//    implementation("org.gradle:gradle-kotlin-dsl:latest.release")
+//    implementation("org.gradle:gradle-language-java:latest.release")
+    implementation("org.gradle:gradle-core-api:latest.release")
 
     implementation(kotlin("stdlib"))
 

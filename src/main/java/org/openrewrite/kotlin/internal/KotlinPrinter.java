@@ -264,8 +264,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.out.append(".");
             }
 
-            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
             visit(method.getName(), p);
+            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
             JContainer<Expression> argContainer = method.getPadding().getArguments();
 
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
@@ -327,6 +327,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 return retrn;
             }
             return super.visitReturn(retrn, p);
+        }
+
+        @Override
+        public J visitTypeParameter(J.TypeParameter typeParam, PrintOutputCapture<P> p) {
+            beforeSyntax(typeParam, Space.Location.TYPE_PARAMETERS_PREFIX, p);
+            visit(typeParam.getAnnotations(), p);
+            visit(typeParam.getName(), p);
+            visitContainer(":", typeParam.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
+            afterSyntax(typeParam, p);
+            return typeParam;
         }
 
         @Override

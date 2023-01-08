@@ -50,6 +50,7 @@ import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory;
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
+import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.modules.TargetId;
 import org.jetbrains.kotlin.platform.CommonPlatforms;
@@ -178,9 +179,9 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 //        addJvmClasspathRoots(javaClassPath)
 
         // Add KotlinSources ContentRoots.kt.#addKotlinSourceRoots
-//        addKotlinSourceRoots
 
         Disposable disposable = Disposer.newDisposable();
+
         try {
             KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                     disposable,
@@ -237,7 +238,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 We might want to extract the generation of `platformSources` later on.
              */
             sources.forEach(it -> {
-                VirtualFile vFile = new LightVirtualFile(it.getPath().getFileName().toString(), it.getSource().readFully());
+                VirtualFile vFile = new LightVirtualFile(it.getPath().getFileName().toString(), KotlinFileType.INSTANCE, it.getSource().readFully());
                 platformSources.add(new KtVirtualFileSourceFile(vFile));
             });
 

@@ -21,7 +21,7 @@ public class ParserAssertions {
     }
 
     public static Consumer<SourceSpec<K.CompilationUnit>> isFullyParsed() {
-        return spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
+        return spec -> spec.path("build.gradle").afterRecipe(cu -> new JavaVisitor<Integer>() {
             @Override
             public Space visitSpace(Space space, Space.Location loc, Integer integer) {
                 assertThat(space.getWhitespace().trim()).isEmpty();
