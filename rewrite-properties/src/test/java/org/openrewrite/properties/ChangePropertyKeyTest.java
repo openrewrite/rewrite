@@ -139,7 +139,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     }
 
     @Test
-    void prefixMatch() {
+    void regexMatch() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null, true)),
           properties(
@@ -148,6 +148,17 @@ class ChangePropertyKeyTest implements RewriteTest {
           ),
           properties(
             "springzresourceszchain.strategy.content.enabled=true"
+          )
+        );
+    }
+
+
+    @Test
+    void regexMatchDefaultDisabled() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null, null)),
+          properties(
+            "spring.resources.chain.strategy.content.enabled=true"
           )
         );
     }
