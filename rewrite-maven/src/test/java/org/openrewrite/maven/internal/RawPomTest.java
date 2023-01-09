@@ -75,6 +75,91 @@ class RawPomTest {
         assertThat(pom.getRepositories().getRepositories()).hasSize(1);
     }
 
+    @Test
+    void serializePluginFlags() {
+        RawPom pom = RawPom.parse(
+          new ByteArrayInputStream("""
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                    
+                    <groupId>com.mycompany.app</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1</version>
+                    <properties>
+                    <allowExtensions>true</allowExtensions>
+                    <isInherited>true</isInherited>
+                    </properties>
+                    <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>2.22.1</version>
+                              <extensions>${allowExtensions}</extensions>
+                              <inherited>${isInherited}</inherited>
+                              <configuration>
+                                  <includes>
+                                          <include>**/*Tests.java</include>
+                                          <include>**/*Test.java</include>
+                                  </includes>
+                                  <excludes>
+                                          <exclude>**/Abstract*.java</exclude>
+                                  </excludes>
+                                  <argLine>hello</argLine>
+                              </configuration>
+                              <executions>
+                                  <execution>
+                                      <id>agent</id>
+                                      <goals>
+                                          <goal>prepare-agent</goal>
+                                      </goals>
+                                      <inherited>${isInherited}</inherited>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                          <plugin>
+                              <groupId>org.jacoco</groupId>
+                              <artifactId>jacoco-maven-plugin</artifactId>
+                              <extensions>false</extensions>
+                              <inherited>false</inherited>
+                              <executions>
+                                  <execution>
+                                      <id>agent</id>
+                                      <inherited>false</inherited>
+                                      <goals>
+                                          <goal>prepare-agent</goal>
+                                      </goals>
+                                  </execution>
+                                  <execution>
+                                          <id>report</id>
+                                          <phase>test</phase>
+                                          <goals>
+                                              <goal>report</goal>
+                                          </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                    </build>
+                </project>
+            """.getBytes()),
+          null
+        );
+
+        for (Plugin plugin : pom.toPom(null, null).getPlugins()) {
+            if ("maven-surefire-plugin".equals(plugin.getArtifactId())) {
+                assertThat(plugin.getExtensions()).isEqualTo("${allowExtensions}");
+                assertThat(plugin.getInherited()).isEqualTo("${isInherited}");
+                assertThat(plugin.getExecutions().get(0).getInherited()).isEqualTo("${isInherited}");
+            } else {
+                assertThat(plugin.getExtensions()).isEqualTo("false");
+                assertThat(plugin.getInherited()).isEqualTo("false");
+                assertThat(plugin.getExecutions().get(0).getInherited()).isEqualTo("false");
+            }
+        }
+    }
+
+
     @SuppressWarnings("ConstantConditions")
     @Test
     void deserializePom() throws JsonProcessingException {
