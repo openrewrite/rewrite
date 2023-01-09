@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.KtVirtualFileSourceFile;
 import org.jetbrains.kotlin.cli.common.CommonCompilerPerformanceManager;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.config.ContentRoot;
+import org.jetbrains.kotlin.cli.common.config.ContentRootsKt;
 import org.jetbrains.kotlin.cli.common.config.KotlinSourceRoot;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
@@ -81,6 +82,7 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.*;
+import static org.jetbrains.kotlin.cli.common.config.ContentRootsKt.addKotlinSourceRoot;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.compiler.CoreEnvironmentUtilsKt.applyModuleProperties;
@@ -174,11 +176,14 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
 
         configureJdkClasspathRoots(compilerConfiguration);
+
+        // Replace with JavaParser.dependencies(... kotlin-stdlib)?
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
-//        addJvmClasspathRoots(javaClassPath)
+        addJvmClasspathRoots(compilerConfiguration, classpath.stream().map(Path::toFile).collect(toList()));
 
-        // Add KotlinSources ContentRoots.kt.#addKotlinSourceRoots
+        // Add kotlin sources.
+//        addKotlinSourceRoot(compilerConfiguration, "add path", true);
 
         Disposable disposable = Disposer.newDisposable();
 

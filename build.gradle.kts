@@ -74,10 +74,6 @@ dependencies {
     implementation(kotlin("compiler-embeddable"))
 //    implementation("org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable:${kotlinVersion}")
 
-//    implementation("org.gradle:gradle-kotlin-dsl:latest.release")
-//    implementation("org.gradle:gradle-language-java:latest.release")
-    implementation("org.gradle:gradle-core-api:latest.release")
-
     implementation(kotlin("stdlib"))
 
     testImplementation("org.assertj:assertj-core:latest.release")
@@ -86,6 +82,11 @@ dependencies {
     testImplementation("org.openrewrite:rewrite-test")
 
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
+
+//    testImplementation("org.gradle:gradle-kotlin-dsl:latest.release")
+//    testImplementation("org.gradle:gradle-language-java:latest.release")
+//    testImplementation("org.gradle:gradle-core-api:latest.release")
+//    testImplementation("org.gradle:gradle-plugins:latest.release")
 }
 
 tasks.named<Test>("test") {
