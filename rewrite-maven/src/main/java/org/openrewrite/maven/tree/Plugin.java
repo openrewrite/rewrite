@@ -16,12 +16,9 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.TreeNode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AccessLevel;
-import lombok.Data;
-import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Incubating;
@@ -30,9 +27,6 @@ import org.openrewrite.maven.internal.MavenXmlMapper;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Incubating(since = "7.22.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -46,10 +40,10 @@ public class Plugin {
     String version;
 
     @Nullable
-    Boolean extensions;
+    String extensions;
 
     @Nullable
-    Boolean inherited;
+    String inherited;
 
     JsonNode configuration;
 
@@ -66,7 +60,7 @@ public class Plugin {
         String phase;
 
         @Nullable
-        Boolean inherited;
+        String inherited;
 
         @Nullable
         JsonNode configuration;
