@@ -233,10 +233,10 @@ public class RawPom {
         String version;
 
         @Nullable
-        Boolean extensions;
+        String extensions;
 
         @Nullable
-        Boolean inherited;
+        String inherited;
 
         @Nullable
         JsonNode configuration;
@@ -267,7 +267,7 @@ public class RawPom {
         String phase;
 
         @Nullable
-        Boolean inherited;
+        String inherited;
 
         @Nullable
         JsonNode configuration;
