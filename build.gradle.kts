@@ -4,6 +4,8 @@ import nebula.plugin.contacts.ContactsExtension
 plugins {
     `java-library`
 
+    id("org.openrewrite.build.language-library")
+
     id("nebula.release") version "16.0.0"
 
     id("nebula.maven-manifest") version "18.4.0"

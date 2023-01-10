@@ -24,6 +24,25 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 @SuppressWarnings("GrUnnecessaryPublicModifier")
 class ClassDeclarationTest implements RewriteTest {
 
+    // Update KotlinTypeGoat and add type mapping/signature tests.
+    // Temp test to sort out typemapping and signature building requirements.
+    @Test
+    void typeMappingBase() {
+        rewriteRun(
+          kotlin(
+            """
+                package some.name.here
+                class A {
+                    val field = 10
+                    val a: Any = 10
+                    fun method(arg: Int): Int {
+                        return arg
+                    }
+                }
+            """
+          )
+        );
+    }
     @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
@@ -71,6 +90,20 @@ class ClassDeclarationTest implements RewriteTest {
                 class A {}
                 class B : A() {}
             """
+          )
+        );
+    }
+
+    @Test
+    void innerClass() {
+        rewriteRun(
+          kotlin(
+            """
+              interface C {
+                  class Inner {
+                  }
+              }
+              """
           )
         );
     }

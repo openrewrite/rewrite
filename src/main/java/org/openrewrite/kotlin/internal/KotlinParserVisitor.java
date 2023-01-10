@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
+import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter;
@@ -92,13 +93,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public KotlinParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
+    public KotlinParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, FirSession firSession, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
-        this.typeMapping = new KotlinTypeMapping(typeCache);
+        this.typeMapping = new KotlinTypeMapping(typeCache, firSession);
         this.ctx = ctx;
     }
 
@@ -314,17 +315,25 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
 
-        List<J.Annotation> kindAnnotations = mapModifiers(ModifierScope.CLASS, firRegularClass.getAnnotations()); // TODO: the last annotations in modifiersAndAnnotations should be added to the class.
-
-        J.ClassDeclaration.Kind kind;
         ClassKind classKind = klass.getClassKind();
+        ModifierScope modifierScope = null;
         if (ClassKind.INTERFACE == classKind) {
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Interface);
+            modifierScope = ModifierScope.INTERFACE;
         } else if (ClassKind.CLASS == classKind || ClassKind.ENUM_CLASS == classKind || ClassKind.ANNOTATION_CLASS == classKind) {
-            // Enums and Interfaces are modifiers in kotlin and require the modifier prefix to preserve source code.
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+            modifierScope = ModifierScope.CLASS;
         } else {
             throw new IllegalStateException("Implement me.");
+        }
+
+        // TODO: the last annotations in modifiersAndAnnotations should be added to the class.
+        List<J.Annotation> kindAnnotations = mapModifiers(modifierScope, firRegularClass.getAnnotations());
+
+        J.ClassDeclaration.Kind kind;
+        if (ClassKind.INTERFACE == classKind) {
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Interface);
+        } else {
+            // Enums and Interfaces are modifiers in kotlin and require the modifier prefix to preserve source code.
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
         // TODO: add type mapping
@@ -1605,7 +1614,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private enum ModifierScope {
-        CLASS("class"), FUNCTION("fun"), VAL("val"), VAR("var");
+        CLASS("class"), FUNCTION("fun"), INTERFACE("interface"), VAL("val"), VAR("var");
 
         private String keyword;
         ModifierScope(String keyword) {

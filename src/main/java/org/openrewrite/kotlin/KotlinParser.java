@@ -26,7 +26,6 @@ import org.jetbrains.kotlin.KtVirtualFileSourceFile;
 import org.jetbrains.kotlin.cli.common.CommonCompilerPerformanceManager;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
 import org.jetbrains.kotlin.cli.common.config.ContentRoot;
-import org.jetbrains.kotlin.cli.common.config.ContentRootsKt;
 import org.jetbrains.kotlin.cli.common.config.KotlinSourceRoot;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
@@ -50,6 +49,7 @@ import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory;
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
+import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.modules.Module;
@@ -82,7 +82,6 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.*;
-import static org.jetbrains.kotlin.cli.common.config.ContentRootsKt.addKotlinSourceRoot;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.compiler.CoreEnvironmentUtilsKt.applyModuleProperties;
@@ -140,8 +139,10 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     public List<K.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
-        List<CompiledKotlinSource> compilerCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
-        List<K.CompilationUnit> cus = new ArrayList<>(compilerCus.size());
+        Map<FirSession, List<CompiledKotlinSource>> firSessionToCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
+        FirSession firSession = firSessionToCus.keySet().toArray(new FirSession[1])[0];
+        List<CompiledKotlinSource> compilerCus = firSessionToCus.get(firSession);
+        List<K.CompilationUnit> cus = new ArrayList<>(firSessionToCus.get(firSession).size());
 
         for (CompiledKotlinSource compiled : compilerCus) {
             try {
@@ -150,6 +151,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                         compiled.getInput().getFileAttributes(),
                         compiled.getInput().getSource(ctx),
                         typeCache,
+                        firSession,
                         ctx
                 );
 
@@ -165,7 +167,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         return cus;
     }
 
-    private List<CompiledKotlinSource> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
+    private Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
 
         File buildFile = null;
@@ -282,7 +284,9 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 cus.add(new CompiledKotlinSource(input, firFile));
             }
 
-            return cus;
+            Map<FirSession, List<CompiledKotlinSource>> sessionToCus = new HashMap<>();
+            sessionToCus.put(output.getSession(), cus);
+            return sessionToCus;
         } finally {
             disposable.dispose();
         }
