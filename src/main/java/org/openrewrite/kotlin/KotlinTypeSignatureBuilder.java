@@ -3,6 +3,7 @@ package org.openrewrite.kotlin;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
+import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
@@ -38,7 +39,15 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof FirClass) {
             return ((FirClass) type).getTypeParameters().size() > 0 ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof FirResolvedTypeRef) {
-            return resolvedTypeRef(type);
+            ConeKotlinType coneKotlinType = ((FirResolvedTypeRef) type).getType();
+            if (coneKotlinType instanceof ConeTypeParameterType) {
+                FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);
+                if (classifierSymbol != null && classifierSymbol.getFir() instanceof FirTypeParameter) {
+                    return genericSignature(classifierSymbol.getFir());
+                }
+            } else {
+                return coneKotlinType.getTypeArguments().length > 0 ? parameterizedTypeRef(coneKotlinType) : typeRefClassSignature(coneKotlinType);
+            }
         } else if (type instanceof FirValueParameter) {
             return signature(((FirValueParameter) type).getReturnTypeRef());
         } else if (type instanceof FirTypeParameter) {
@@ -61,6 +70,38 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         FirClassSymbol<? extends FirClass> symbol = ((FirClass) type).getSymbol();
         return symbol.getClassId().asFqNameString();
+    }
+
+    @Override
+    public String parameterizedSignature(Object type) {
+        StringBuilder s = new StringBuilder(classSignature(type));
+        StringJoiner joiner = new StringJoiner(", ", "<", ">");
+        for (FirTypeParameterRef tp : ((FirClass) type).getTypeParameters()) {
+            String signature = signature(tp);
+            joiner.add(signature);
+        }
+        s.append(joiner);
+        return s.toString();
+    }
+
+    public String typeRefClassSignature(ConeKotlinType type) {
+        ClassId classId = ConeTypeUtilsKt.getClassId(type);
+        return classId == null ? "{undefined}" : classId.asFqNameString();
+    }
+
+    public String parameterizedTypeRef(ConeKotlinType type) {
+        ClassId classId = ConeTypeUtilsKt.getClassId(type);
+        String fq = classId == null ? "{undefined}" : classId.asFqNameString();
+
+        StringBuilder s = new StringBuilder(fq);
+        StringJoiner joiner = new StringJoiner(", ", "<", ">");
+        for (ConeTypeProjection argument : type.getTypeArguments()) {
+            String signature = coneTypeProjectionSignature(argument);
+            joiner.add(signature);
+        }
+
+        s.append(joiner);
+        return s.toString();
     }
 
     @Override
@@ -93,15 +134,30 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s.append("}").toString();
     }
 
-    @Override
-    public String parameterizedSignature(Object type) {
-        StringBuilder s = new StringBuilder(classSignature(type));
-        StringJoiner joiner = new StringJoiner(", ", "<", ">");
-        for (FirTypeParameterRef tp : ((FirClass) type).getTypeParameters()) {
-            String signature = signature(tp);
-            joiner.add(signature);
+    public String coneTypeProjectionSignature(ConeTypeProjection type) {
+        String typeSignature = "{undefined}";
+        StringBuilder s = new StringBuilder();
+        if (type instanceof ConeKotlinTypeProjectionIn) {
+            ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
+            throw new IllegalStateException("Implement super type generics");
+        } else if (type instanceof ConeKotlinTypeProjectionOut) {
+            ConeKotlinTypeProjectionOut out = (ConeKotlinTypeProjectionOut) type;
+            s.append("? extends ");
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(out.getType(), firSession);
+            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+        } else if (type instanceof ConeClassLikeType) {
+            ConeClassLikeType classLikeType = (ConeClassLikeType) type;
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(classLikeType, firSession);
+            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+        } else if (type instanceof ConeTypeParameterType) {
+            ConeTypeParameterType typeParameterType = (ConeTypeParameterType) type;
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(typeParameterType, firSession);
+            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+        } else {
+            throw new IllegalStateException("Implement me.");
         }
-        s.append(joiner);
+
+        s.append(typeSignature);
         return s.toString();
     }
 

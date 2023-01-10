@@ -36,7 +36,6 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
 
@@ -98,7 +97,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
                     convertToClassKind(firClass.getClassKind()),
                     null, null, null, null, null, null, null
             );
-            typeCache.put(signature, clazz);
+            typeCache.put(classFqn, clazz);
 
             FirTypeRef superTypeRef = null;
             List<FirTypeRef> interfaceTypeRefs = null;
@@ -131,10 +130,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirRegularClass) {
                     // TODO: unsure what to do with this yet.
-                    System.out.println("fix fir class declaration FirRegularClass");
+//                    System.out.println("fix fir class declaration FirRegularClass");
                 } else if (declaration instanceof FirEnumEntry) {
                     // TODO: unsure what to do with this yet.
-                    System.out.println("fix fir class declaration FirEnumEntry");
+//                    System.out.println("fix fir class declaration FirEnumEntry");
                 } else {
                     throw new IllegalStateException("Implement me.");
                 }
@@ -176,6 +175,22 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
             List<JavaType.FullyQualified> annotations = getAnnotations(firClass.getAnnotations());
 //
             clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
+        }
+
+        if (!firClass.getTypeParameters().isEmpty()) {
+            JavaType.Parameterized pt = typeCache.get(signature);
+            if (pt == null) {
+                pt = new JavaType.Parameterized(null, null, null);
+                typeCache.put(signature, pt);
+
+                List<JavaType> typeParameters = new ArrayList<>(firClass.getTypeParameters().size());
+                for (FirTypeParameterRef tParam : firClass.getTypeParameters()) {
+                    typeParameters.add(type(tParam));
+                }
+
+                pt.unsafeSet(clazz, typeParameters);
+            }
+            return pt;
         }
 
         return clazz;

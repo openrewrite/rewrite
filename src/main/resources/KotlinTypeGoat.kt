@@ -13,5 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-class KotlinTypeGoat {
+package org.openrewrite.kotlin
+
+abstract class KotlinTypeGoat<T> {
 }
