@@ -16,10 +16,9 @@
 package org.openrewrite.kotlin
 
 abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
-    val parameterizedField: PT<TypeA> = object : PT<TypeA>
+    val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
 
-    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C {
-    }
+    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 
     enum class EnumTypeA {
         FOO, BAR(),
