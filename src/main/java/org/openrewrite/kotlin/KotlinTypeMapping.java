@@ -100,23 +100,35 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
             );
             typeCache.put(signature, clazz);
 
-            // Assumes super type will always exist at pos 0.
-            FirTypeRef superType = firClass.getSuperTypeRefs().isEmpty() ? null : firClass.getSuperTypeRefs().get(0);
-            JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(superType));
+            FirTypeRef superTypeRef = null;
+            List<FirTypeRef> interfaceTypeRefs = null;
+            for (FirTypeRef typeRef : firClass.getSuperTypeRefs()) {
+                FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(typeRef), firSession);
+                if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
+                    superTypeRef = typeRef;
+                } else if (symbol != null && ClassKind.INTERFACE == symbol.getFir().getClassKind()) {
+                    if (interfaceTypeRefs == null) {
+                        interfaceTypeRefs = new ArrayList<>();
+                    }
+                    interfaceTypeRefs.add(typeRef);
+                }
+            }
+
+            JavaType.FullyQualified supertype = superTypeRef == null ? null : TypeUtils.asFullyQualified(type(superTypeRef));
 
             // TODO: figure out how to access the class owner .. the name exists on the Sym, but there isn't a link through the classId.
             JavaType.FullyQualified owner = null;
 
             List<FirProperty> properties = new ArrayList<>(firClass.getDeclarations().size());
-            List<FirSimpleFunction> functions = new ArrayList<>(firClass.getDeclarations().size());
+            List<FirFunction> functions = new ArrayList<>(firClass.getDeclarations().size());
             for (FirDeclaration declaration : firClass.getDeclarations()) {
                 if (declaration instanceof FirProperty) {
                     properties.add((FirProperty) declaration);
                 } else if (declaration instanceof FirSimpleFunction) {
                     functions.add((FirSimpleFunction) declaration);
                 } else if (declaration instanceof FirConstructor) {
-                    // TODO: sort out how to detect generated and declared constructor
-                    System.out.println("fix fir class declaration FirConstructor");
+                    // TODO: identify generated constructors.
+                    functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirRegularClass) {
                     // TODO: unsure what to do with this yet.
                     System.out.println("fix fir class declaration FirRegularClass");
@@ -137,29 +149,30 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
                     // TODO: detect and filter out synthetic
                     fields.add(propertyType(property.getSymbol(), clazz));
                 }
-
             }
 
             List<JavaType.Method> methods = null;
             if(!functions.isEmpty()) {
                 methods = new ArrayList<>(functions.size());
-                for (FirSimpleFunction function : functions) {
+                for (FirFunction function : functions) {
                     // TODO: detect and filter out synthetic
-                    methods.add(functionDeclarationType(function.getSymbol(), clazz));
+                    methods.add(methodDeclarationType(function.getSymbol(), clazz));
                 }
             }
 
             List<JavaType.FullyQualified> interfaces = null;
-//            if (node.getInterfaces().length > 0) {
-//                interfaces = new ArrayList<>(node.getInterfaces().length);
-//                for (ClassNode iParam : node.getInterfaces()) {
-//                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
-//                    if (javaType != null) {
-//                        interfaces.add(javaType);
-//                    }
-//                }
-//            }
-//
+            // TODO: interfaces need to be detected through superTypeRefs with ClassKind
+
+            if (interfaceTypeRefs != null && !interfaceTypeRefs.isEmpty()) {
+                interfaces = new ArrayList<>(interfaceTypeRefs.size());
+                for (FirTypeRef iParam : interfaceTypeRefs) {
+                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(iParam));
+                    if (javaType != null) {
+                        interfaces.add(javaType);
+                    }
+                }
+            }
+
             List<JavaType.FullyQualified> annotations = getAnnotations(firClass.getAnnotations());
 //
             clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
@@ -177,7 +190,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
     }
 
     @Nullable
-    public JavaType.Method functionDeclarationType(@Nullable FirNamedFunctionSymbol functionSymbol, @Nullable JavaType.FullyQualified declaringType) {
+    public JavaType.Method methodDeclarationType(@Nullable FirFunctionSymbol<? extends FirFunction> functionSymbol, @Nullable JavaType.FullyQualified declaringType) {
         if (functionSymbol == null) {
             return null;
         }
@@ -197,21 +210,11 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
             }
         }
         List<String> defaultValues = null;
-//        if (methodSymbol.getDefaultValue() != null) {
-//            if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
-//                defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
-//                        .map(attr -> attr.getValue().toString())
-//                        .collect(Collectors.toList());
-//            } else {
-//                defaultValues = Collections.singletonList(methodSymbol.getDefaultValue().getValue().toString());
-//            }
-//        }
         JavaType.Method method = new JavaType.Method(
                 null,
                 convertToFlagsBitMap(functionSymbol.getResolvedStatus()),
                 null,
-//                methodSymbol.isConstructor() ? "<constructor>" :
-                        functionSymbol.getName().asString(),
+                functionSymbol instanceof FirConstructorSymbol ? "<constructor>" : functionSymbol.getName().asString(),
                 null,
                 paramNames,
                 null, null, null,
@@ -225,6 +228,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
 //                ((Type.ForAll) methodSymbol.type).qtype :
                 convertToRegularClass(functionSymbol.getDispatchReceiverType());
 
+        // TODO: thrown exceptions don't exist in Kotlin, but may be specified as annotations to apply to java classes.
+        // The annotations will be created ... should the annotations be placed here to align with JavaTypes?
         List<JavaType.FullyQualified> exceptionTypes = null;
 
         FirRegularClass selectType = null;
@@ -233,67 +238,28 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
 //            selectType = ((Type.ForAll) selectType).qtype;
 //        }
 
-//        if (selectType instanceof Type.MethodType) {
-//            Type.MethodType methodType = (Type.MethodType) selectType;
-//            if (!methodType.thrown.isEmpty()) {
-//                exceptionTypes = new ArrayList<>(methodType.thrown.size());
-//                for (Type exceptionType : methodType.thrown) {
-//                    JavaType.FullyQualified javaType = TypeUtils.asFullyQualified(type(exceptionType));
-//                    if (javaType == null) {
-//                        // if the type cannot be resolved to a class (it might not be on the classpath, or it might have
-//                        // been mapped to cyclic)
-//                        if (exceptionType instanceof Type.ClassType) {
-//                            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) exceptionType.tsym;
-//                            javaType = new JavaType.Class(null, Flag.Public.getBitMask(), sym.flatName().toString(), JavaType.Class.Kind.Class,
-//                                    null, null, null, null, null, null, null);
-//                        }
-//                    }
-//                    if (javaType != null) {
-//                        // if the exception type is not resolved, it is not added to the list of exceptions
-//                        exceptionTypes.add(javaType);
-//                    }
-//                }
-//            }
-//        }
-
         JavaType.FullyQualified resolvedDeclaringType = declaringType;
-//        if (declaringType == null) {
-//            if (methodSymbol.owner instanceof Symbol.ClassSymbol || methodSymbol.owner instanceof Symbol.TypeVariableSymbol) {
-//                resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.owner.type));
-//            }
-//        }
-
-        if (resolvedDeclaringType == null) {
-            return null;
+        if (declaringType == null) {
+            throw new UnsupportedOperationException("Find owner and resolve declaring type.");
         }
+
+//        if (resolvedDeclaringType == null) {
+//            return null;
+//        }
 
         JavaType returnType = type(functionSymbol.getResolvedReturnTypeRef());
         List<JavaType> parameterTypes = null;
-//
-//        if (signatureType instanceof Type.ForAll) {
-//            signatureType = ((Type.ForAll) signatureType).qtype;
-//        }
-//        if (signatureType instanceof Type.MethodType) {
-//            Type.MethodType mt = (Type.MethodType) signatureType;
-//
-//            if (!mt.argtypes.isEmpty()) {
-//                parameterTypes = new ArrayList<>(mt.argtypes.size());
-//                for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
-//                    if (argtype != null) {
-//                        JavaType javaType = type(argtype);
-//                        parameterTypes.add(javaType);
-//                    }
-//                }
-//            }
-//
-//            returnType = type(mt.restype);
-//        } else {
-//            throw new UnsupportedOperationException("Unexpected method signature type" + signatureType.getClass().getName());
-//        }
+
+        if (!functionSymbol.getTypeParameterSymbols().isEmpty()) {
+            parameterTypes = new ArrayList<>(functionSymbol.getTypeParameterSymbols().size());
+            for (FirTypeParameterSymbol typeParameterSymbol : functionSymbol.getTypeParameterSymbols()) {
+                JavaType javaType = type(typeParameterSymbol.getFir());
+                parameterTypes.add(javaType);
+            }
+        }
 
         method.unsafeSet(resolvedDeclaringType,
-//                methodSymbol.isConstructor() ? resolvedDeclaringType :
-                        returnType,
+                functionSymbol instanceof FirConstructorSymbol ? resolvedDeclaringType : returnType,
                 parameterTypes, exceptionTypes, getAnnotations(functionSymbol.getAnnotations()));
         return method;
     }

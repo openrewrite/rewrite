@@ -143,23 +143,20 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';
     }
 
-    public String methodSignature(FirNamedFunctionSymbol symbol) {
+    public String methodSignature(FirFunctionSymbol<? extends FirFunction> symbol) {
         String s = classSignature(convertToRegularClass(symbol.getDispatchReceiverType()));
 
-        String returnType = signature(symbol.getResolvedReturnTypeRef());
-        s += "{name=" + symbol.getName().asString() + ",return=" + returnType;
-        // TODO: figure out how to detect the fun is a constructor ... but it is probably a different AST element.
-//        if (symbol.isConstructor()) {
-//            s += "{name=<constructor>,return=" + s;
-//        } else {
-//            s += "{name=" + symbol.getSimpleName().toString() +
-//                    ",return=" + returnType;
-//        }
+        if (symbol instanceof FirConstructorSymbol) {
+            s += "{name=<constructor>,return=" + s;
+        } else {
+            s += "{name=" + symbol.getName().asString() +
+                    ",return=" + signature(symbol.getResolvedReturnTypeRef());
+        }
 
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
     }
 
-    private String methodArgumentSignature(FirNamedFunctionSymbol sym) {
+    private String methodArgumentSignature(FirFunctionSymbol<? extends FirFunction> sym) {
         // TODO:
 //        if (sym.isStaticOrInstanceInit()) {
 //            return "[]";
