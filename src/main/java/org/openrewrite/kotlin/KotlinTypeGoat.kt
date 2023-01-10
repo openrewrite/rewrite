@@ -15,5 +15,67 @@
  */
 package org.openrewrite.kotlin
 
-abstract class KotlinTypeGoat<T> {
+abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
+    val parameterizedField: PT<TypeA> = object : PT<TypeA>
+
+    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C {
+    }
+
+    enum class EnumTypeA {
+        FOO, BAR(),
+        @AnnotationWithRuntimeRetention
+        FUZ
+    }
+
+    enum class EnumTypeB(label: TypeA) {
+        FOO(TypeA());
+
+        private val label: TypeA
+
+        init {
+            this.label = label
+        }
+    }
+
+    abstract class Extension<U : Extension<U>>
+
+    open class TypeA
+    class TypeB
+
+    @AnnotationWithRuntimeRetention
+    @AnnotationWithSourceRetention
+    abstract fun clazz(n: C)
+    abstract fun primitive(n: Int)
+    abstract fun array(n: Array<Array<C>>)
+    abstract fun parameterized(n: PT<C>): PT<C>
+    abstract fun parameterizedRecursive(n: PT<PT<C>>): PT<PT<C>>
+    abstract fun generic(n: PT<out C>): PT<out C>
+    abstract fun genericContravariant(n: PT<in C>): PT<in C>
+    abstract fun <U : KotlinTypeGoat<U, *>> genericRecursive(n: KotlinTypeGoat<out Array<U>, *>): KotlinTypeGoat<out Array<U>, *>
+    abstract fun <U> genericUnbounded(n: PT<U>): PT<U>
+    abstract fun genericArray(n: Array<PT<C>>)
+    abstract fun inner(n: org.openrewrite.kotlin.C.Inner)
+    abstract fun enumTypeA(n: EnumTypeA)
+    abstract fun enumTypeB(n: EnumTypeB)
+    abstract fun <U> inheritedJavaTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
+    abstract fun <U> genericIntersection(n: U): U where U : TypeA, U : PT<U>, U : C
+    abstract fun genericT(n: T): T // remove after signatures are common.
+
+    abstract fun <U> recursiveIntersection(n: U) where U : KotlinTypeGoat.Extension<U>, U : Intersection<U>
 }
+
+interface C {
+    class Inner
+}
+
+interface PT<T>
+
+internal interface Intersection<T> where T : KotlinTypeGoat.Extension<T>, T : Intersection<T> {
+    val intersectionType: T
+}
+
+@Retention(AnnotationRetention.SOURCE)
+internal annotation class AnnotationWithSourceRetention
+
+@Retention(AnnotationRetention.RUNTIME)
+internal annotation class AnnotationWithRuntimeRetention 

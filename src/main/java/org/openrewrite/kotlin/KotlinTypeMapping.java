@@ -173,7 +173,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
             }
 
             List<JavaType.FullyQualified> annotations = getAnnotations(firClass.getAnnotations());
-//
+
             clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
         }
 
