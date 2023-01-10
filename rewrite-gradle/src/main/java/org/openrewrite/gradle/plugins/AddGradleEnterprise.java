@@ -15,9 +15,9 @@
  */
 package org.openrewrite.gradle.plugins;
 
-import org.openrewrite.*;
-import org.openrewrite.gradle.IsSettingsGradle;
-import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.Incubating;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 
 @Incubating(since = "7.33.0")
 public class AddGradleEnterprise extends Recipe {
@@ -29,6 +29,7 @@ public class AddGradleEnterprise extends Recipe {
 
     public AddGradleEnterprise(String version) {
         this.version = version;
+        doNext(new AddSettingsPlugin("com.gradle.enterprise", version, null));
         doNext(new UpgradePluginVersion("com.gradle.enterprise", version, null));
     }
 
@@ -40,15 +41,5 @@ public class AddGradleEnterprise extends Recipe {
     @Override
     public String getDescription() {
         return "Add the Gradle Enterprise plugin to `settings.gradle(.kts)`.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsSettingsGradle<>();
-    }
-
-    @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
-        return new AddPluginVisitor("com.gradle.enterprise", version, null);
     }
 }

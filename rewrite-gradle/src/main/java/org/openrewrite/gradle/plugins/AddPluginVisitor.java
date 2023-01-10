@@ -35,6 +35,7 @@ import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -106,9 +107,15 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .getStatements();
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
-                Space leadingSpace = Space.firstPrefix(cu.getStatements());
-                return cu.withStatements(ListUtils.concatAll(statements,
-                        Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
+                if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))) {
+                    Space leadingSpace = Space.firstPrefix(cu.getStatements());
+                    return cu.withStatements(ListUtils.concatAll(ListUtils.concat(cu.getStatements().get(0), Space.formatFirstPrefix(statements, leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))),
+                            Space.formatFirstPrefix(cu.getStatements().subList(1, cu.getStatements().size()), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
+                } else {
+                    Space leadingSpace = Space.firstPrefix(cu.getStatements());
+                    return cu.withStatements(ListUtils.concatAll(statements,
+                            Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
+                }
             } else {
                 MethodMatcher buildPluginsMatcher = new MethodMatcher("RewriteGradleProject plugins(groovy.lang.Closure)");
                 MethodMatcher settingsPluginsMatcher = new MethodMatcher("RewriteSettings plugins(groovy.lang.Closure)");
