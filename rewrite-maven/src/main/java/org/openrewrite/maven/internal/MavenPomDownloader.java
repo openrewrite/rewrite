@@ -639,6 +639,14 @@ public class MavenPomDownloader {
             if (repository.isKnownToExist()) {
                 return repository;
             }
+
+            // If a repository URI contains an unresolved property placeholder, do not continue.
+            // There is also an edge case in which this condition is transient during `resolveParentPropertiesAndRepositoriesRecursively()`
+            // and therefore, we do not want to cache a null normalization result.
+            if (repository.getUri().contains("${")) {
+                return null;
+            }
+
             String originalUrl = repository.getUri();
             if ("file".equals(URI.create(originalUrl).getScheme())) {
                 return repository;

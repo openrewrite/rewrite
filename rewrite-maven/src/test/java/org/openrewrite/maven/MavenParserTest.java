@@ -66,6 +66,29 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2603")
+    void repositoryWithPropertyPlaceholder() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>org.eclipse.persistence</groupId>
+                          <artifactId>org.eclipse.persistence.moxy</artifactId>
+                          <version>4.0.0</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void invalidRange() {
         assertThatExceptionOfType(MavenParsingException.class).isThrownBy(() ->
           rewriteRun(
