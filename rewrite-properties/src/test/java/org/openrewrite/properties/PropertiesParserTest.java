@@ -178,6 +178,33 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
+    @Issue("")
+    @Test
+    void printWithNullDelimiter() {
+        rewriteRun(
+          properties(
+            """
+              ke\\=y=value1
+              key\\:2=value2
+              key3=val\\=ue3
+              key4=val\\:ue4
+              """,
+            spec -> spec.beforeRecipe(props -> {
+                Properties.File p = (Properties.File) new PropertiesVisitor<Integer>() {
+                    @Override
+                    public Properties visitEntry(Properties.Entry entry, Integer integer) {
+                        return entry.withDelimiter(null);
+                    }
+                }.visit(props, 1);
+
+                assert p != null;
+                p.printAll();
+
+            })
+          )
+        );
+    }
+
     private static Consumer<SourceSpec<Properties.File>> containsValues(String... valueAssertions) {
         return spec -> spec.beforeRecipe(props -> {
             List<String> values = TreeVisitor.collect(new PropertiesVisitor<>() {

@@ -111,8 +111,15 @@ public interface Properties extends Tree {
         Markers markers;
         String key;
         String beforeEquals;
+
+        @Nullable
         Delimiter delimiter;
+
         Value value;
+
+        public Delimiter getDelimiter() {
+            return delimiter == null ? Delimiter.EQUALS : delimiter;
+        }
 
         @Override
         public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
