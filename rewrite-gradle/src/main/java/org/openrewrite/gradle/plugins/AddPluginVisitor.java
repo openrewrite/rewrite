@@ -107,7 +107,9 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .getStatements();
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
-                if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))) {
+                if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))
+                        && cu.getStatements().get(0) instanceof J.MethodInvocation
+                        && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
                     Space leadingSpace = Space.firstPrefix(cu.getStatements());
                     return cu.withStatements(ListUtils.concatAll(ListUtils.concat(cu.getStatements().get(0), Space.formatFirstPrefix(statements, leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))),
                             Space.formatFirstPrefix(cu.getStatements().subList(1, cu.getStatements().size()), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
