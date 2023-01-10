@@ -16,6 +16,7 @@ repositories {
 
 dependencies {
     api(project(":rewrite-groovy"))
+    api(project(":rewrite-maven"))
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
     implementation("org.codehaus.groovy:groovy:latest.release")
