@@ -99,7 +99,7 @@ public class GradleParserTest implements RewriteTest {
     }
 
     @Test
-    void dontClobberLeadingComments() {
+    void dontDropLeadingComments() {
         rewriteRun(
           buildGradle(
             """
@@ -108,6 +108,20 @@ public class GradleParserTest implements RewriteTest {
                */
               import org.gradle.api.Project
 
+              dependencies {
+                  testImplementation "junit:junit:4.13"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontClobberExistingComments() {
+        rewriteRun(
+          buildGradle(
+            """
+              // Some comment
               dependencies {
                   testImplementation "junit:junit:4.13"
               }

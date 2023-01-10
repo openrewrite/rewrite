@@ -68,7 +68,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                 G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
                 List<Comment> comments = g.getStatements().get(0).getComments();
                 return g.withStatements(ListUtils.mapFirst(g.getStatements().subList(DefaultImportsCustomizer.DEFAULT_IMPORTS.length, g.getStatements().size()),
-                        s -> s.withComments(comments)));
+                        s -> s.withComments(ListUtils.concatAll(comments, s.getComments()))));
             }
         };
 
