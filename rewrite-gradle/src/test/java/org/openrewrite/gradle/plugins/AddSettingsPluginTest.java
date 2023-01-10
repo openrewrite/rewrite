@@ -77,4 +77,40 @@ class AddSettingsPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPluginWithPluginManagementBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null)),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+              }
+
+              rootProject.name = 'my-project'
+              """,
+            spec -> spec.after(actual -> {
+                assertThat(actual).isNotNull();
+                Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
+                assertThat(version.find()).isTrue();
+                return """
+                  pluginManagement {
+                      repositories {
+                          gradlePluginPortal()
+                      }
+                  }
+
+                  plugins {
+                      id 'com.gradle.enterprise' version '%s'
+                  }
+
+                  rootProject.name = 'my-project'
+                  """.formatted(version.group(0));
+            })
+          )
+        );
+    }
 }
