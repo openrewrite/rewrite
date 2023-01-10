@@ -70,16 +70,19 @@ public class IsEmptyCallOnCollections extends Recipe {
             public J visitBinary(J.Binary binary, ExecutionContext ctx) {
                 if (isZero(binary.getLeft()) || isZero(binary.getRight())) {
                     boolean zeroRight = isZero(binary.getRight());
-                    J.MethodInvocation maybeSizeCall = (J.MethodInvocation) (zeroRight ? binary.getLeft() : binary.getRight());
+                    J maybeSizeCall = zeroRight ? binary.getLeft() : binary.getRight();
                     if (binary.getOperator() == J.Binary.Type.Equal || binary.getOperator() == J.Binary.Type.NotEqual
                         || zeroRight && binary.getOperator() == J.Binary.Type.GreaterThan
                         || !zeroRight && binary.getOperator() == J.Binary.Type.LessThan) {
-                        if (COLLECTION_SIZE.matches(maybeSizeCall)) {
-                            String op = binary.getOperator() == J.Binary.Type.Equal ? "" : "!";
-                            return (maybeSizeCall.getSelect() == null ?
-                                    maybeSizeCall.withTemplate(isEmptyNoReceiver, maybeSizeCall.getCoordinates().replace(), op) :
-                                    maybeSizeCall.withTemplate(isEmpty, maybeSizeCall.getCoordinates().replace(), op, maybeSizeCall.getSelect())
-                            ).withPrefix(binary.getPrefix());
+                        if(maybeSizeCall instanceof J.MethodInvocation) {
+                            J.MethodInvocation maybeSizeCallMethod = (J.MethodInvocation) maybeSizeCall;
+                            if (COLLECTION_SIZE.matches(maybeSizeCallMethod)) {
+                                String op = binary.getOperator() == J.Binary.Type.Equal ? "" : "!";
+                                return (maybeSizeCallMethod.getSelect() == null ?
+                                        maybeSizeCallMethod.withTemplate(isEmptyNoReceiver, maybeSizeCallMethod.getCoordinates().replace(), op) :
+                                        maybeSizeCallMethod.withTemplate(isEmpty, maybeSizeCallMethod.getCoordinates().replace(), op, maybeSizeCallMethod.getSelect())
+                                ).withPrefix(binary.getPrefix());
+                            }
                         }
                     }
                 }
