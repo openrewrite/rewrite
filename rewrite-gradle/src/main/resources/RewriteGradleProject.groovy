@@ -15,150 +15,27 @@
  */
 //file:noinspection UnstableApiUsage
 
-import org.gradle.*
-import org.gradle.api.*
-import org.gradle.api.artifacts.*
-import org.gradle.api.artifacts.component.*
-import org.gradle.api.artifacts.dsl.*
-import org.gradle.api.artifacts.ivy.*
-import org.gradle.api.artifacts.maven.*
-import org.gradle.api.artifacts.query.*
-import org.gradle.api.artifacts.repositories.*
-import org.gradle.api.artifacts.result.*
-import org.gradle.api.artifacts.transform.*
-import org.gradle.api.artifacts.type.*
-import org.gradle.api.artifacts.verification.*
-import org.gradle.api.attributes.*
-import org.gradle.api.attributes.java.*
-import org.gradle.api.attributes.plugin.*
-import org.gradle.api.capabilities.*
-import org.gradle.api.component.*
-import org.gradle.api.credentials.*
-import org.gradle.api.distribution.*
-import org.gradle.api.distribution.plugins.*
-import org.gradle.api.execution.*
-import org.gradle.api.file.*
-import org.gradle.api.initialization.*
-import org.gradle.api.initialization.definition.*
-import org.gradle.api.initialization.dsl.*
-import org.gradle.api.initialization.resolve.*
-import org.gradle.api.invocation.*
-import org.gradle.api.java.archives.*
-import org.gradle.api.jvm.*
-import org.gradle.api.logging.*
-import org.gradle.api.logging.configuration.*
-import org.gradle.api.model.*
-import org.gradle.api.plugins.*
-import org.gradle.api.plugins.antlr.*
-import org.gradle.api.plugins.catalog.*
-import org.gradle.api.plugins.jvm.*
-import org.gradle.api.plugins.quality.*
-import org.gradle.api.plugins.scala.*
-import org.gradle.api.provider.*
-import org.gradle.api.publish.*
-import org.gradle.api.publish.ivy.*
-import org.gradle.api.publish.ivy.plugins.*
-import org.gradle.api.publish.ivy.tasks.*
-import org.gradle.api.publish.maven.*
-import org.gradle.api.publish.maven.plugins.*
-import org.gradle.api.publish.maven.tasks.*
-import org.gradle.api.publish.plugins.*
-import org.gradle.api.publish.tasks.*
-import org.gradle.api.reflect.*
-import org.gradle.api.reporting.*
-import org.gradle.api.reporting.components.*
-import org.gradle.api.reporting.dependencies.*
-import org.gradle.api.reporting.dependents.*
-import org.gradle.api.reporting.model.*
-import org.gradle.api.reporting.plugins.*
-import org.gradle.api.resources.*
-import org.gradle.api.services.*
-import org.gradle.api.specs.*
-import org.gradle.api.tasks.*
-import org.gradle.api.tasks.ant.*
-import org.gradle.api.tasks.application.*
-import org.gradle.api.tasks.bundling.*
-import org.gradle.api.tasks.compile.*
-import org.gradle.api.tasks.diagnostics.*
-import org.gradle.api.tasks.incremental.*
-import org.gradle.api.tasks.javadoc.*
-import org.gradle.api.tasks.options.*
-import org.gradle.api.tasks.scala.*
-import org.gradle.api.tasks.testing.*
-import org.gradle.api.tasks.testing.junit.*
-import org.gradle.api.tasks.testing.junitplatform.*
-import org.gradle.api.tasks.testing.testng.*
-import org.gradle.api.tasks.util.*
-import org.gradle.api.tasks.wrapper.*
-import org.gradle.authentication.*
-import org.gradle.authentication.aws.*
-import org.gradle.authentication.http.*
-import org.gradle.build.event.*
-import org.gradle.buildinit.*
-import org.gradle.buildinit.plugins.*
-import org.gradle.buildinit.tasks.*
-import org.gradle.caching.*
-import org.gradle.caching.configuration.*
-import org.gradle.caching.http.*
-import org.gradle.caching.local.*
-import org.gradle.concurrent.*
-import org.gradle.external.javadoc.*
-import org.gradle.ivy.*
-import org.gradle.jvm.*
-import org.gradle.jvm.application.scripts.*
-import org.gradle.jvm.application.tasks.*
-import org.gradle.jvm.tasks.*
-import org.gradle.jvm.toolchain.*
-import org.gradle.language.*
-import org.gradle.language.assembler.*
-import org.gradle.language.assembler.plugins.*
-import org.gradle.language.assembler.tasks.*
-import org.gradle.language.base.*
-import org.gradle.language.base.artifact.*
-import org.gradle.language.base.compile.*
-import org.gradle.language.base.plugins.*
-import org.gradle.language.base.sources.*
-import org.gradle.language.java.artifact.*
-import org.gradle.language.jvm.tasks.*
-import org.gradle.language.plugins.*
-import org.gradle.language.rc.*
-import org.gradle.language.rc.plugins.*
-import org.gradle.language.rc.tasks.*
-import org.gradle.maven.*
-import org.gradle.model.*
-import org.gradle.normalization.*
-import org.gradle.platform.base.*
-import org.gradle.platform.base.binary.*
-import org.gradle.platform.base.component.*
-import org.gradle.platform.base.plugins.*
-import org.gradle.plugin.devel.*
-import org.gradle.plugin.devel.plugins.*
-import org.gradle.plugin.devel.tasks.*
-import org.gradle.plugin.management.*
-import org.gradle.plugin.use.*
-import org.gradle.plugins.ear.*
-import org.gradle.plugins.ear.descriptor.*
-import org.gradle.plugins.ide.*
-import org.gradle.plugins.ide.api.*
-import org.gradle.plugins.ide.eclipse.*
-import org.gradle.plugins.ide.idea.*
-import org.gradle.plugins.signing.*
-import org.gradle.plugins.signing.signatory.*
-import org.gradle.plugins.signing.signatory.pgp.*
-import org.gradle.plugins.signing.type.*
-import org.gradle.plugins.signing.type.pgp.*
-import org.gradle.process.*
-import org.gradle.testing.base.*
-import org.gradle.testing.base.plugins.*
-import org.gradle.testing.jacoco.plugins.*
-import org.gradle.testing.jacoco.tasks.*
-import org.gradle.testing.jacoco.tasks.rules.*
-import org.gradle.testkit.runner.*
-import org.gradle.util.*
-import org.gradle.vcs.*
-import org.gradle.vcs.git.*
-import org.gradle.work.*
-import org.gradle.workers.*
+import org.gradle.api.Action
+import org.gradle.api.JavaVersion
+import org.gradle.api.Project
+import org.gradle.api.Task
+import org.gradle.api.artifacts.Dependency
+import org.gradle.api.artifacts.ModuleDependency
+import org.gradle.api.artifacts.dsl.DependencyHandler
+import org.gradle.api.artifacts.dsl.RepositoryHandler
+import org.gradle.api.artifacts.repositories.IvyArtifactRepository
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+import org.gradle.api.file.FileCollection
+import org.gradle.api.file.FileTree
+import org.gradle.api.file.FileTreeElement
+import org.gradle.api.specs.Spec
+import org.gradle.api.tasks.testing.TestFilter
+import org.gradle.api.tasks.testing.TestFrameworkOptions
+import org.gradle.api.tasks.testing.junit.JUnitOptions
+import org.gradle.api.tasks.testing.junitplatform.JUnitPlatformOptions
+import org.gradle.api.tasks.testing.testng.TestNGOptions
+import org.gradle.process.JavaForkOptions
+import org.gradle.process.ProcessForkOptions
 
 interface PluginSpec {
     Plugin id(String i)
@@ -313,7 +190,7 @@ interface RewriteTestSpec {
     void filter(Action<TestFilter> action)
 }
 
-abstract class RewriteGradleProject implements Project {
+abstract class RewriteGradleProject extends groovy.lang.Script implements Project {
     Map ext;
 
     // It would be more correct for ext to delegate to ExtraPropertiesExtension, but StaticTypeCheckingVisitor has problems with that
@@ -342,6 +219,4 @@ abstract class RewriteGradleProject implements Project {
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)
     abstract <T extends Task> T task(String name, Class<T> type, Action<? super T> configuration)
-
-    void __script__() {
-}}
+}

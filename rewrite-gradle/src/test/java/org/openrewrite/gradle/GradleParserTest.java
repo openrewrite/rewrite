@@ -16,8 +16,11 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 public class GradleParserTest implements RewriteTest {
@@ -39,6 +42,58 @@ public class GradleParserTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void allowImports() {
+        rewriteRun(
+          buildGradle(
+            """
+              import org.gradle.api.Project
+              
+              dependencies {
+                  implementation "org.openrewrite:rewrite-java:latest.release"
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getStatements()).hasSize(2);
+                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Import.class);
+                J.Import i = (J.Import) cu.getStatements().get(0);
+                assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
+                assertThat(cu.getStatements().get(1)).isInstanceOf(J.MethodInvocation.class);
+                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(1);
+                assertThat(m.getMethodType()).isNotNull();
+                assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
+            })
+          )
+        );
+    }
+
+    @Test
+    void allowMethodDeclaration() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation "org.openrewrite:rewrite-java:latest.release"
+              }
+              
+              def greet() {
+                  return "Hello, world!"
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getStatements()).hasSize(2);
+                assertThat(cu.getStatements().get(0)).isInstanceOf(J.MethodInvocation.class);
+                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(0);
+                assertThat(m.getMethodType()).isNotNull();
+                assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
+                assertThat(cu.getStatements().get(1)).isInstanceOf(J.MethodDeclaration.class);
+                J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(1);
+                assertThat(d.getSimpleName()).isEqualTo("greet");
+            })
           )
         );
     }

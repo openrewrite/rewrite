@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,6 +60,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     private final List<NamedStyles> styles;
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
+    private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
 
     @Override
     public List<G.CompilationUnit> parse(@Language("groovy") String... sources) {
@@ -136,6 +138,9 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                         }
                     })
                     .collect(toList()));
+            for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
+                compilerCustomizer.accept(configuration);
+            }
 
             ErrorCollector errorCollector = new ErrorCollector(configuration);
             SourceUnit unit = new SourceUnit(
@@ -202,6 +207,10 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         return new Builder();
     }
 
+    public static Builder builder(Builder base) {
+        return new Builder(base);
+    }
+
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<Path> classpath = JavaParser.runtimeClasspath();
@@ -209,9 +218,18 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
         private final List<NamedStyles> styles = new ArrayList<>();
+        private final List<Consumer<CompilerConfiguration>> compilerCustomizers = new ArrayList<>();
 
         public Builder() {
             super(G.CompilationUnit.class);
+        }
+
+        public Builder(Builder base) {
+            super(G.CompilationUnit.class);
+            this.typeCache = base.typeCache;
+            this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
+            this.styles.addAll(base.styles);
+            this.compilerCustomizers.addAll(base.compilerCustomizers);
         }
 
         public Builder logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -241,8 +259,19 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
+        public Builder compilerCustomizers(Consumer<CompilerConfiguration>... compilerCustomizers) {
+            return compilerCustomizers(Arrays.asList(compilerCustomizers));
+        }
+
+        public Builder compilerCustomizers(Iterable<Consumer<CompilerConfiguration>> compilerCustomizers) {
+            for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
+                this.compilerCustomizers.add(compilerCustomizer);
+            }
+            return this;
+        }
+
         public GroovyParser build() {
-            return new GroovyParser(classpath, styles, logCompilationWarningsAndErrors, typeCache);
+            return new GroovyParser(classpath, styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
         }
 
         @Override
