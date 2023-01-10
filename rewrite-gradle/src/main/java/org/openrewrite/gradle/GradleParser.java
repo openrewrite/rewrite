@@ -24,7 +24,9 @@ import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.Comment;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -64,7 +66,9 @@ public class GradleParser implements Parser<G.CompilationUnit> {
             @Override
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
                 G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                return g.withStatements(g.getStatements().subList(DefaultImportsCustomizer.DEFAULT_IMPORTS.length, g.getStatements().size()));
+                List<Comment> comments = g.getStatements().get(0).getComments();
+                return g.withStatements(ListUtils.mapFirst(g.getStatements().subList(DefaultImportsCustomizer.DEFAULT_IMPORTS.length, g.getStatements().size()),
+                        s -> s.withComments(comments)));
             }
         };
 

@@ -52,7 +52,7 @@ public class GradleParserTest implements RewriteTest {
           buildGradle(
             """
               import org.gradle.api.Project
-              
+
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
@@ -79,7 +79,7 @@ public class GradleParserTest implements RewriteTest {
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
-              
+
               def greet() {
                   return "Hello, world!"
               }
@@ -94,6 +94,24 @@ public class GradleParserTest implements RewriteTest {
                 J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(1);
                 assertThat(d.getSimpleName()).isEqualTo("greet");
             })
+          )
+        );
+    }
+
+    @Test
+    void dontClobberLeadingComments() {
+        rewriteRun(
+          buildGradle(
+            """
+              /*
+               * LICENSE
+               */
+              import org.gradle.api.Project
+
+              dependencies {
+                  testImplementation "junit:junit:4.13"
+              }
+              """
           )
         );
     }
