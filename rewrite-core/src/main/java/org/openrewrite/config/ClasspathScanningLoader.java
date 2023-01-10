@@ -103,6 +103,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
                 yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
             });
+            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
+                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
+            });
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
