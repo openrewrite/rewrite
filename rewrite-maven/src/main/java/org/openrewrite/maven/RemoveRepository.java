@@ -78,12 +78,12 @@ public class RemoveRepository extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove Repository";
+        return "Remove repository";
     }
 
     @Override
     public String getDescription() {
-        return "Removes a matching repository.";
+        return "Removes a matching Maven repository.";
     }
 
     @Override
