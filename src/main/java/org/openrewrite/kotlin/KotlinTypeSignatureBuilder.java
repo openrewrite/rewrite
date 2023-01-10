@@ -139,10 +139,11 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         StringBuilder s = new StringBuilder();
         if (type instanceof ConeKotlinTypeProjectionIn) {
             ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
+            s.append("in ");
             throw new IllegalStateException("Implement super type generics");
         } else if (type instanceof ConeKotlinTypeProjectionOut) {
             ConeKotlinTypeProjectionOut out = (ConeKotlinTypeProjectionOut) type;
-            s.append("? extends ");
+            s.append("out ");
             FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(out.getType(), firSession);
             typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
         } else if (type instanceof ConeClassLikeType) {
@@ -178,7 +179,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         throw new UnsupportedOperationException("TODO");
     }
 
-    public String propertySignature(FirPropertySymbol symbol) {
+    public String variableSignature(FirVariableSymbol<? extends FirVariable> symbol) {
         String owner;
         ConeSimpleKotlinType kotlinType = symbol.getDispatchReceiverType();
 
@@ -193,7 +194,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         } else {
-            throw new UnsupportedOperationException("TODO");
+            owner = symbol.getCallableId().getClassId().asFqNameString();
+            if (owner.contains("<")) {
+                owner = owner.substring(0, owner.indexOf('<'));
+            }
         }
 
         return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';

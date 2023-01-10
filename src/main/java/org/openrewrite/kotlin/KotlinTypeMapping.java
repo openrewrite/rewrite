@@ -120,20 +120,25 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
 
             List<FirProperty> properties = new ArrayList<>(firClass.getDeclarations().size());
             List<FirFunction> functions = new ArrayList<>(firClass.getDeclarations().size());
+            List<FirEnumEntry> enumEntries = new ArrayList<>(firClass.getDeclarations().size());
+
             for (FirDeclaration declaration : firClass.getDeclarations()) {
                 if (declaration instanceof FirProperty) {
-                    properties.add((FirProperty) declaration);
+                    // TODO: enums contain an entries property tied to the default getting ... this must be filtered out unless the user explicitly created it.
+                    // temp hack until properties are understood in enums.
+                    if (!(JavaType.FullyQualified.Class.Kind.Enum == clazz.getKind())) {
+                        properties.add((FirProperty) declaration);
+                    }
                 } else if (declaration instanceof FirSimpleFunction) {
-                    functions.add((FirSimpleFunction) declaration);
+                    functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirConstructor) {
                     // TODO: identify generated constructors.
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirRegularClass) {
-                    // TODO: unsure what to do with this yet.
-//                    System.out.println("fix fir class declaration FirRegularClass");
+                    // TODO: Companion Objects and possible inner classes.
+                    System.out.println();
                 } else if (declaration instanceof FirEnumEntry) {
-                    // TODO: unsure what to do with this yet.
-//                    System.out.println("fix fir class declaration FirEnumEntry");
+                    enumEntries.add((FirEnumEntry) declaration);
                 } else {
                     throw new IllegalStateException("Implement me.");
                 }
@@ -141,12 +146,23 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
 
             // May be helpful.
 //            FirStatusUtilsKt
+
             List<JavaType.Variable> fields = null;
+            if (!enumEntries.isEmpty()) {
+                fields = new ArrayList<>(properties.size() + enumEntries.size());
+                for (FirEnumEntry enumEntry : enumEntries) {
+                    fields.add(variableType(enumEntry.getSymbol(), clazz));
+                }
+            }
+
             if (!properties.isEmpty()) {
-                fields = new ArrayList<>(properties.size());
+                if (fields == null) {
+                    fields = new ArrayList<>(properties.size());
+                }
+
                 for (FirProperty property : properties) {
                     // TODO: detect and filter out synthetic
-                    fields.add(propertyType(property.getSymbol(), clazz));
+                    fields.add(variableType(property.getSymbol(), clazz));
                 }
             }
 
@@ -280,17 +296,17 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
     }
 
     @Nullable
-    public JavaType.Variable propertyType(@Nullable FirPropertySymbol symbol) {
-        return propertyType(symbol, null);
+    public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol) {
+        return variableType(symbol, null);
     }
 
     @Nullable
-    public JavaType.Variable propertyType(@Nullable FirPropertySymbol symbol, @Nullable JavaType.FullyQualified owner) {
+    public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol, @Nullable JavaType.FullyQualified owner) {
         if (symbol == null) {
             return null;
         }
 
-        String signature = signatureBuilder.propertySignature(symbol);
+        String signature = signatureBuilder.variableSignature(symbol);
         JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;

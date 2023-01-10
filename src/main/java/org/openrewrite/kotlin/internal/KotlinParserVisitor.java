@@ -339,6 +339,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // TODO: add type mapping
         J.Identifier name = convertToIdentifier(firRegularClass.getName().asString());
 
+        // KotlinTypeParameters with multiple bounds are defined outside the TypeParameter container.
+        // KotlinTypeGoat<T, S> where S: PT<S>, S: C
         JContainer<J.TypeParameter> typeParams = firRegularClass.getTypeParameters().isEmpty() ? null : JContainer.build(
                 sourceBefore("<"),
                 convertAll(firRegularClass.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx),
