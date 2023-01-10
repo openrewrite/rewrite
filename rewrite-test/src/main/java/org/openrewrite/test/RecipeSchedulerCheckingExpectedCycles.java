@@ -55,7 +55,7 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
                         assertThat(afterList.get(i).printAllTrimmed())
                                 .as(
                                         "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                                "but took at least one more cycle. Between the last two executed cycles there were changes."
+                                                "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.get(i).getSourcePath() + "\""
                                 )
                                 .isEqualTo(before.get(i).printAllTrimmed());
                     }

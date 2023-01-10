@@ -354,7 +354,7 @@ public interface RewriteTest extends SourceSpecs {
                         String expected = sourceSpec.noTrim ?
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
-                        assertThat(actual).isEqualTo(expected);
+                        assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
                         continue nextSourceSpec;
                     }
                 }
@@ -414,7 +414,7 @@ public interface RewriteTest extends SourceSpecs {
                             String expected = sourceSpec.noTrim ?
                                     expectedAfter :
                                     trimIndentPreserveCRLF(expectedAfter);
-                            assertThat(actual).isEqualTo(expected);
+                            assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
                             if (result.diff().isEmpty() && !(result.getAfter() instanceof Remote)) {
@@ -423,7 +423,7 @@ public interface RewriteTest extends SourceSpecs {
 
                             assert result.getBefore() != null;
                             assertThat(result.getAfter().printAll(out.clone()))
-                                    .as("The recipe must not make changes")
+                                    .as("The recipe must not make changes to \"" + result.getBefore().getSourcePath() + "\"")
                                     .isEqualTo(result.getBefore().printAll(out.clone()));
                         }
                     } else if (result.getAfter() == null) {
@@ -463,10 +463,9 @@ public interface RewriteTest extends SourceSpecs {
                         .as("To assert that a Recipe makes no change, supply only \"before\" source.")
                         .isNotEqualTo(before);
                 assertThat(before)
-                        .as("The recipe should have made the following change.")
+                        .as("The recipe should have made the following change to \"" + specForSourceFile.getKey().getSourcePath() + "\"")
                         .isEqualTo(expected);
             }
-
             //noinspection unchecked
             ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(specForSourceFile.getKey());
         }
