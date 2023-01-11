@@ -16,13 +16,13 @@
 package org.openrewrite.java;
 
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindReferencedTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.tree.Space.EMPTY;
 
 /**
  * Deletes standalone statements. Does not include deletion of control statements present in for loops.
@@ -35,12 +35,23 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public @Nullable Statement visitStatement(Statement statement, P p) {
+        Statement s = super.visitStatement(statement, p);
+
+        if (this.statement.isScope(s)) {
+            return s instanceof J.Block ? emptyBlock() : null;
+        }
+
+        return s;
+    }
+
+    @Override
     public J.If visitIf(J.If iff, P p) {
         J.If i = super.visitIf(iff, p);
 
         if (statement.isScope(i.getThenPart())) {
             i = i.withThenPart(emptyBlock());
-        } else if (i.getElsePart() != null && statement.isScope(i.getElsePart())) {
+        } else if (i.getElsePart() != null && statement.isScope(i.getElsePart().getBody())) {
             i = i.withElsePart(i.getElsePart().withBody(emptyBlock()));
         }
 
@@ -55,10 +66,20 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
+        return control;
+    }
+
+    @Override
     public J.ForEachLoop visitForEachLoop(J.ForEachLoop forEachLoop, P p) {
         return statement.isScope(forEachLoop.getBody()) ?
                 forEachLoop.withBody(emptyBlock()) :
                 super.visitForEachLoop(forEachLoop, p);
+    }
+
+    @Override
+    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
+        return control;
     }
 
     @Override

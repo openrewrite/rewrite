@@ -131,10 +131,10 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 if (readReferences.isEmpty()) {
                     List<Statement> assignmentReferences = References.findLhsReferences(parentScope.getValue(), variable.getName());
                     for (Statement ref : assignmentReferences) {
-                        doAfterVisit(new DeleteStatement<>(ref));
-                        if(ref instanceof J.Assignment) {
+                        if (ref instanceof J.Assignment) {
                             doAfterVisit(new PruneAssignmentExpression((J.Assignment) ref));
                         }
+                        doAfterVisit(new DeleteStatement<>(ref));
                     }
                     return null;
                 }
