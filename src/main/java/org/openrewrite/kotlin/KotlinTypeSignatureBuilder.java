@@ -140,12 +140,15 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (type instanceof ConeKotlinTypeProjectionIn) {
             ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
             s.append("in ");
-            throw new IllegalStateException("Implement super type generics");
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(in.getType(), firSession);
+            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
         } else if (type instanceof ConeKotlinTypeProjectionOut) {
             ConeKotlinTypeProjectionOut out = (ConeKotlinTypeProjectionOut) type;
             s.append("out ");
             FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(out.getType(), firSession);
             typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+        } else if (type instanceof ConeStarProjection) {
+            s.append("*");
         } else if (type instanceof ConeClassLikeType) {
             ConeClassLikeType classLikeType = (ConeClassLikeType) type;
             FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(classLikeType, firSession);

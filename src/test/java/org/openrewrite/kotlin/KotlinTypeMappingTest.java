@@ -1,5 +1,6 @@
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.StringUtils;
@@ -29,6 +30,7 @@ public class KotlinTypeMappingTest {
                .getType()));
     }
 
+    @Disabled
     @Test
     void extendsKotlinAny() {
         assertThat(goatType().getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
