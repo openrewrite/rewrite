@@ -195,9 +195,8 @@ class PropertiesParserTest implements RewriteTest {
                     public Properties visitEntry(Properties.Entry entry, Integer integer) {
                         return entry.withDelimiter(null);
                     }
-                }.visit(props, 1);
+                }.visitNonNull(props, 1);
 
-                assert p != null;
                 p.printAll();
 
             })
