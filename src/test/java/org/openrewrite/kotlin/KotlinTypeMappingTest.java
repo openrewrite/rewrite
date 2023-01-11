@@ -235,7 +235,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(supertype.toString()).isEqualTo("kotlin.Enum<org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB>");
     }
 
-    @Disabled("Annotations are missing")
     @Override
     @Test
     public void ignoreSourceRetentionAnnotations() {
