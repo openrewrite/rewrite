@@ -31,17 +31,13 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.*;
-import org.rocksdb.Options;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-import org.rocksdb.WriteOptions;
+import org.rocksdb.*;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -67,6 +63,9 @@ import java.util.Optional;
  */
 @SuppressWarnings("OptionalAssignedToNull")
 public class RocksdbMavenPomCache implements MavenPomCache {
+
+    private static final String MODEL_VERSION_KEY = "org.openrewrite.maven.internal.Pom.version";
+
     static ObjectMapper mapper;
 
     //The RocksDB instance is thread safe, the first call to create a database for a workspace will open the database
@@ -100,6 +99,13 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
     static synchronized RocksCache getCache(String pomCacheDir) {
         return cacheMap.computeIfAbsent(pomCacheDir, RocksCache::new);
+    }
+
+    static synchronized void closeCache(String pomCacheDir) {
+        RocksCache cache = cacheMap.remove(pomCacheDir);
+        if (cache != null) {
+            cache.close();
+        }
     }
 
     private final RocksCache cache;
@@ -161,7 +167,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         try {
             cache.put(serialize(gav.toString().getBytes(StandardCharsets.UTF_8)), serialize(pom));
         } catch (RocksDBException e) {
-            e.printStackTrace();
+            throw new IllegalStateException("Failed to save POM into RocksDB cache", e);
         }
     }
 
@@ -186,26 +192,10 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
     }
 
-    static Optional<MavenRepository> deserializeMavenRepository(byte[] bytes) {
-        try {
-            return bytes == null ? null : Optional.of(mapper.readValue(bytes, MavenRepository.class));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
     @Nullable
     static Optional<Pom> deserializePom(byte[] bytes) {
         try {
             return bytes == null ? null : Optional.of(mapper.readValue(bytes, Pom.class));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    static Optional<MavenMetadata> deserializeMavenMetadata(byte[] bytes) {
-        try {
-            return bytes == null ? null : Optional.of(mapper.readValue(bytes, MavenMetadata.class));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -220,7 +210,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
      */
     static class RocksCache {
 
-        private final RocksDB database;
+        private RocksDB database;
         private final Options options;
         private final WriteOptions writeOptions;
         private final String cacheFolder;
@@ -253,19 +243,72 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             }
         }
 
-        private void cleanCacheIfCorrupt(String pomCacheDir) throws IOException {
+        private void cleanCacheIfCorrupt(String pomCacheDir) {
+            boolean clearCache = false;
             try {
                 database.verifyChecksum();
             } catch (RocksDBException ex) {
-                try (DirectoryStream<Path> paths = Files.newDirectoryStream(Paths.get(pomCacheDir), "*")) {
-                    paths.forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException ioException) {
-                            throw new IllegalStateException("Unable to delete maven pom cache at " + path, ioException);
-                        }
-                    });
+                clearCache = true;
+            }
+
+            if (!clearCache) {
+
+                // Validate the model version used by the cache matches the version of RawMaven
+                clearCache = !modelVersionMatches();
+            }
+
+            if (clearCache) {
+                database.close();
+                try {
+                    //Delete the contents of the database.
+                    RocksDB.destroyDB(pomCacheDir, options);
+                } catch (RocksDBException exception) {
+                    throw new IllegalStateException("Unable to clear maven pom cache at " + pomCacheDir, exception);
                 }
+                // Re-open the database anew
+                try {
+                    database = RocksDB.open(options, pomCacheDir);
+                } catch (RocksDBException exception) {
+                    throw new IllegalStateException("Unable to clear maven pom cache at " + pomCacheDir, exception);
+                }
+            }
+            // Update the model version key
+            updateDatabaseModelVersion(Pom.getModelVersion());
+
+        }
+
+        private boolean modelVersionMatches() {
+
+            // Check if there are any keys in the database, there is no need to check the model version if
+            // this is a new database.
+            RocksIterator iterator = database.newIterator();
+            iterator.seekToFirst();
+
+            try {
+                if (iterator.isValid()) {
+                    // Check the model version used by the cache, if the version does not match the version in RawPom,
+                    // clear the database.
+                    try {
+                        byte[] rawVersion = database.get(serialize(MODEL_VERSION_KEY));
+                        Integer databaseVersion = rawVersion == null ? null : mapper.readValue(rawVersion, Integer.class);
+                        if (databaseVersion == null || Pom.getModelVersion() != databaseVersion) {
+                            return false;
+                        }
+                    } catch (IOException exception) {
+                        throw new IllegalStateException("Unable to deserialize database model version.", exception);
+                    }
+                }
+            } catch (RocksDBException rocksException) {
+                throw new IllegalStateException("Unable verify database model version.", rocksException);
+            }
+            return true;
+        }
+
+        protected void updateDatabaseModelVersion(Integer newVersion) {
+            try {
+                put(serialize(MODEL_VERSION_KEY), serialize(newVersion));
+            } catch (RocksDBException e) {
+                throw new IllegalStateException("Unable to update database model version.");
             }
         }
 
@@ -284,6 +327,12 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             if (Files.exists(Paths.get(cacheFolder))) {
                 //Attempting to close the database if the file has been deleted underneath it prevents the process
                 //from exiting.
+                try {
+                    database.flush(new FlushOptions());
+                } catch (RocksDBException e) {
+                    //Error while flushing the database (before close), this means that any interim changes in memory
+                    //will not be persisted. This is non-fatal.
+                }
                 database.close();
             }
             writeOptions.close();
