@@ -965,6 +965,37 @@ public interface JavaType {
             return declaringType;
         }
 
+        public boolean isOverride() {
+            if (declaringType instanceof JavaType.Unknown) {
+                return false;
+            }
+
+            Stack<FullyQualified> interfaces = new Stack<>();
+            interfaces.addAll(declaringType.getInterfaces());
+
+            while (!interfaces.isEmpty()) {
+                FullyQualified declaring = interfaces.pop();
+                interfaces.addAll(declaring.getInterfaces());
+
+                nextMethod:
+                for (Method method : declaring.getMethods()) {
+                    if (method.getName().equals(name)) {
+                        List<JavaType> params = method.getParameterTypes();
+                        if (getParameterTypes().size() != method.getParameterTypes().size()) {
+                            continue;
+                        }
+                        for (int i = 0; i < params.size(); i++) {
+                            if (!TypeUtils.isOfType(getParameterTypes().get(i), params.get(i))) {
+                                continue nextMethod;
+                            }
+                        }
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         public boolean isInheritedFrom(String fullyQualifiedTypeName) {
             if (declaringType instanceof JavaType.Unknown) {
                 return false;

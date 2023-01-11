@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.List;
 
@@ -31,7 +32,8 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipe(new DeclarationSiteTypeVariance(
           List.of("java.util.function.Function<IN, OUT>"),
-          List.of("java.lang.*")
+          List.of("java.lang.*"),
+          true
         ));
     }
 
@@ -39,7 +41,8 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
     void validation() {
         assertThat(new DeclarationSiteTypeVariance(
           List.of("java.util.function.Function<INVALID, OUT>"),
-          List.of("java.lang.*")
+          List.of("java.lang.*"),
+          null
         ).validate().isInvalid()).isTrue();
     }
 
@@ -108,7 +111,8 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new DeclarationSiteTypeVariance(
             List.of("java.util.function.Function<INVARIANT, OUT>"),
-            List.of("java.lang.*")
+            List.of("java.lang.*"),
+            null
           )),
           java(
             """
@@ -171,6 +175,37 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
               import java.util.function.Function;
               class Test {
                   void test(Function<In, ? extends Out> f) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void overriddenMethods() {
+        rewriteRun(
+          java(
+            """
+              interface In {}
+              interface Out {}
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              interface TestInterface {
+                  void test(Function<In, Out> f);
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              class TestImpl implements TestInterface {
+                  @Override
+                  public void test(Function<In, Out> f) {
                   }
               }
               """

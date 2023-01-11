@@ -48,6 +48,12 @@ public class DeclarationSiteTypeVariance extends Recipe {
     @Nullable
     List<String> excludedBounds;
 
+    @Option(displayName = "Exclude final classes",
+            description = "If true, do not add variance to final classes.",
+            required = false)
+    @Nullable
+    Boolean excludeFinalClasses;
+
     @Override
     public String getDisplayName() {
         return "Properly use declaration-site type variance";
@@ -82,6 +88,9 @@ public class DeclarationSiteTypeVariance extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                if (m.getMethodType() != null && m.getMethodType().isOverride()) {
+                    return m;
+                }
                 return m.withParameters(ListUtils.map(m.getParameters(), param -> {
                     if (param instanceof J.VariableDeclarations) {
                         J.VariableDeclarations varParam = (J.VariableDeclarations) param;
@@ -117,7 +126,7 @@ public class DeclarationSiteTypeVariance extends Recipe {
                                 }
                             }
                         }
-                        if (fq.getFlags().contains(Flag.Final)) {
+                        if (Boolean.TRUE.equals(excludeFinalClasses) && fq.getFlags().contains(Flag.Final)) {
                             return tp;
                         }
                     }
