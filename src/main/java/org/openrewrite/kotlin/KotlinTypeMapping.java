@@ -101,7 +101,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
         FirClassSymbol<? extends FirClass> sym = firClass.getSymbol();
 
-        String classFqn = sym.getClassId().asFqNameString();
+        String classFqn = convertClassIdToFqn(sym.getClassId());
 
         JavaType.FullyQualified fq = typeCache.get(classFqn);
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
@@ -345,6 +345,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return variable;
     }
 
+    private String convertClassIdToFqn(ClassId classId) {
+        return classId.toString().replace(".", "$").replace("/", ".");
+    }
+
     public JavaType.Primitive primitive(ConeClassLikeType type) {
         ClassId classId = type.getLookupTag().getClassId();
         if (StandardClassIds.INSTANCE.getByte().equals(classId)) {
@@ -396,11 +400,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         } else if (type instanceof ConeClassLikeType) {
             ConeClassLikeType classLikeType = (ConeClassLikeType) type;
             FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(classLikeType, firSession);
-            bounds = new ArrayList<>(1);
-            bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
+            return classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance();
         } else if (type instanceof ConeTypeParameterType) {
-            ConeTypeParameterType typeParameterType = (ConeTypeParameterType) type;
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(typeParameterType, firSession);
             name = type.toString();
         } else {
             throw new IllegalStateException("Implement me.");

@@ -55,7 +55,7 @@ abstract class KotlinTypeGoat<T, S> {
     abstract fun inner(n: org.openrewrite.kotlin.C.Inner)
     abstract fun enumTypeA(n: EnumTypeA)
     abstract fun enumTypeB(n: EnumTypeB)
-//    abstract fun <U> inheritedJavaTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
+//    abstract fun <U> inheritedKotlinTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
 //    abstract fun <U> genericIntersection(n: U): U where U : TypeA, U : PT<U>, U : C
     abstract fun genericT(n: T): T // remove after signatures are common.
 
