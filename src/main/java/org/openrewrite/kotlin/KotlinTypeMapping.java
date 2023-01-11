@@ -65,9 +65,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         if (type instanceof FirClass) {
-            return classType((FirClass) type, signature);
-        } else if (type instanceof ConeTypeProjection) {
-            System.out.println();
+            return classType(type, signature);
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
             if (coneKotlinType instanceof ConeTypeParameterType) {
@@ -76,7 +74,9 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                     return generic((FirTypeParameter) classifierSymbol.getFir(), signature);
                 }
             }
-            return resolvedTypeRef((FirResolvedTypeRef) type, signature);
+            return classType(type, signature);
+        } else if (type instanceof ConeTypeProjection) {
+            return generic((ConeTypeProjection) type, signature);
         } else if (type instanceof FirTypeParameter) {
             return generic((FirTypeParameter) type, signature);
         } else if (type instanceof FirValueParameter) {
@@ -86,7 +86,19 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
-    private JavaType.FullyQualified classType(FirClass firClass, String signature) {
+    private JavaType.FullyQualified classType(Object classType, String signature) {
+        FirClass firClass;
+        FirResolvedTypeRef resolvedTypeRef = null;
+        if (classType instanceof FirResolvedTypeRef) {
+            resolvedTypeRef = (FirResolvedTypeRef) classType;
+            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(resolvedTypeRef.getType(), firSession);
+            if (symbol == null) {
+                throw new IllegalStateException("Fix me.");
+            }
+            firClass = symbol.getFir();
+        } else {
+            firClass = (FirClass) classType;
+        }
         FirClassSymbol<? extends FirClass> sym = firClass.getSymbol();
 
         String classFqn = sym.getClassId().asFqNameString();
@@ -203,8 +215,14 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 typeCache.put(signature, pt);
 
                 List<JavaType> typeParameters = new ArrayList<>(firClass.getTypeParameters().size());
-                for (FirTypeParameterRef tParam : firClass.getTypeParameters()) {
-                    typeParameters.add(type(tParam));
+                if (resolvedTypeRef != null && resolvedTypeRef.getType().getTypeArguments().length > 0) {
+                    for (ConeTypeProjection typeArgument : resolvedTypeRef.getType().getTypeArguments()) {
+                         typeParameters.add(type(typeArgument));
+                    }
+                } else {
+                    for (FirTypeParameterRef tParam : firClass.getTypeParameters()) {
+                        typeParameters.add(type(tParam));
+                    }
                 }
 
                 pt.unsafeSet(clazz, typeParameters);
@@ -213,14 +231,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         return clazz;
-    }
-
-    public JavaType.FullyQualified resolvedTypeRef(FirResolvedTypeRef resolvedTypeRef, String signature) {
-        FirRegularClass firRegularClass = convertToRegularClass(resolvedTypeRef.getType());
-        if (firRegularClass == null) {
-            throw new IllegalStateException("unexpected null symbol");
-        }
-        return classType(firRegularClass, signature);
     }
 
     @Nullable
@@ -362,6 +372,46 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         throw new UnsupportedOperationException("Unknown primitive type " + type);
+    }
+
+    private JavaType generic(ConeTypeProjection type, String signature) {
+        // TODO: fix for multiple bounds.
+        String name = "";
+        JavaType.GenericTypeVariable.Variance variance = INVARIANT;
+        List<JavaType> bounds = null;
+        if (type instanceof ConeKotlinTypeProjectionIn) {
+            ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
+            variance = CONTRAVARIANT;
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(in.getType(), firSession);
+            bounds = new ArrayList<>(1);
+            bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
+        } else if (type instanceof ConeKotlinTypeProjectionOut) {
+            ConeKotlinTypeProjectionOut out = (ConeKotlinTypeProjectionOut) type;
+            variance = COVARIANT;
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(out.getType(), firSession);
+            bounds = new ArrayList<>(1);
+            bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
+        } else if (type instanceof ConeStarProjection) {
+            name = "*";
+        } else if (type instanceof ConeClassLikeType) {
+            ConeClassLikeType classLikeType = (ConeClassLikeType) type;
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(classLikeType, firSession);
+            bounds = new ArrayList<>(1);
+            bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
+        } else if (type instanceof ConeTypeParameterType) {
+            ConeTypeParameterType typeParameterType = (ConeTypeParameterType) type;
+            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(typeParameterType, firSession);
+            name = type.toString();
+        } else {
+            throw new IllegalStateException("Implement me.");
+        }
+
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
+                name, variance, null);
+        typeCache.put(signature, gtv);
+
+        gtv.unsafeSet(variance, bounds);
+        return gtv;
     }
 
     private JavaType generic(FirTypeParameter typeParameter, String signature) {

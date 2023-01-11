@@ -28,13 +28,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     @Override
-    public String signature(@Nullable Object t) {
-        return signature((FirElement) t);
-    }
-    // this may be helpful later.
-//            ConeTypeUtilsKt.getClassId(coneType);
-
-    private String signature(@Nullable FirElement type) {
+    public String signature(@Nullable Object type) {
         if (type == null) {
             return "{undefined}";
         } else if (type instanceof FirClass) {
@@ -52,6 +46,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return genericSignature(type);
         } else if (type instanceof FirValueParameter) {
             return signature(((FirValueParameter) type).getReturnTypeRef());
+        } else if (type instanceof FirValueParameterSymbol) {
+            return signature(((FirValueParameterSymbol) type).getResolvedReturnType());
+        } else if (type instanceof ConeTypeProjection) {
+            return coneTypeProjectionSignature((ConeTypeProjection) type);
         }
 
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
@@ -127,7 +125,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
         String boundSigStr = boundSigs.toString();
         if (!boundSigStr.isEmpty()) {
-            s.append(" : ").append(boundSigStr);
+            s.append(": ").append(boundSigStr);
         }
 
         typeVariableNameStack.remove(name);
@@ -135,33 +133,45 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String coneTypeProjectionSignature(ConeTypeProjection type) {
-        String typeSignature = "{undefined}";
+        String typeSignature;
         StringBuilder s = new StringBuilder();
         if (type instanceof ConeKotlinTypeProjectionIn) {
             ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
-            s.append("in ");
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(in.getType(), firSession);
-            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+            s.append("Generic{in ");
+            s.append(signature(in.getType()));
+            s.append("}");
         } else if (type instanceof ConeKotlinTypeProjectionOut) {
             ConeKotlinTypeProjectionOut out = (ConeKotlinTypeProjectionOut) type;
-            s.append("out ");
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(out.getType(), firSession);
-            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+            s.append("Generic{out ");
+            s.append(signature(out.getType()));
+            s.append("}");
         } else if (type instanceof ConeStarProjection) {
-            typeSignature = "*";
+            s.append("Generic{*}");
         } else if (type instanceof ConeClassLikeType) {
             ConeClassLikeType classLikeType = (ConeClassLikeType) type;
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(classLikeType, firSession);
-            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+            s.append(classLikeType.getLookupTag().getClassId().asFqNameString());
+            if (classLikeType.getTypeArguments().length > 0) {
+                s.append("<");
+                ConeTypeProjection[] typeArguments = classLikeType.getTypeArguments();
+                for (int i = 0; i < typeArguments.length; i++) {
+                    ConeTypeProjection typeArgument = typeArguments[i];
+                    s.append(signature(typeArgument));
+                    if (i < typeArguments.length - 1) {
+                        s.append(", ");
+                    }
+                }
+                s.append(">");
+            }
         } else if (type instanceof ConeTypeParameterType) {
             ConeTypeParameterType typeParameterType = (ConeTypeParameterType) type;
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(typeParameterType, firSession);
-            typeSignature = classSymbol != null ? signature(classSymbol.getFir()) : type.toString();
+            s.append("Generic{");
+            typeSignature = typeParameterType.toString().replace("/", ".").replace("?", "");
+            s.append(typeSignature);
+            s.append("}");
         } else {
             throw new IllegalStateException("Implement me.");
         }
 
-        s.append(typeSignature);
         return s.toString();
     }
 
@@ -226,11 +236,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 //        }
 
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
-//        if (sym.getFir() == null) {
-//            genericArgumentTypes.add("{undefined}");
-//        } else {
         for (FirValueParameterSymbol parameterSymbol : sym.getValueParameterSymbols()) {
-                genericArgumentTypes.add(signature(parameterSymbol.getFir()));
+                genericArgumentTypes.add(signature(parameterSymbol));
         }
 //        }
         return genericArgumentTypes.toString();
