@@ -286,8 +286,7 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
             try {
                 if (iterator.isValid()) {
-                    // Check the model version used by the cache, if the version does not match the version in RawPom,
-                    // clear the database.
+                    // Check the model version used by the cache against the in-memory version
                     try {
                         byte[] rawVersion = database.get(serialize(MODEL_VERSION_KEY));
                         Integer databaseVersion = rawVersion == null ? null : mapper.readValue(rawVersion, Integer.class);
