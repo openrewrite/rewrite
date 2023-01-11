@@ -49,7 +49,8 @@ public class DeclarationSiteTypeVariance extends Recipe {
     List<String> excludedBounds;
 
     @Option(displayName = "Exclude final classes",
-            description = "If true, do not add variance to final classes.",
+            description = "If true, do not add `? extends` variance to final classes. " +
+                          "`? super` variance will be added regardless of finality.",
             required = false)
     @Nullable
     Boolean excludeFinalClasses;
@@ -126,7 +127,8 @@ public class DeclarationSiteTypeVariance extends Recipe {
                                 }
                             }
                         }
-                        if (Boolean.TRUE.equals(excludeFinalClasses) && fq.getFlags().contains(Flag.Final)) {
+                        if (Boolean.TRUE.equals(excludeFinalClasses) && fq.getFlags().contains(Flag.Final) &&
+                            variance == VariantTypeSpec.Variance.OUT) {
                             return tp;
                         }
                     }

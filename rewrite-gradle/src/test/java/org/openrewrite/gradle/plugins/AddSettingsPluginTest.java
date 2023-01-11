@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class AddSettingsPluginTest implements RewriteTest {
+
     @Test
     void addPluginToNewBlock() {
         rewriteRun(
@@ -37,6 +38,7 @@ class AddSettingsPluginTest implements RewriteTest {
                 assertThat(actual).isNotNull();
                 Matcher version = Pattern.compile("3.11(.\\d+)?").matcher(actual);
                 assertThat(version.find()).isTrue();
+                //language=groovy
                 return """
                   plugins {
                       id 'com.gradle.enterprise' version '%s'
@@ -65,12 +67,13 @@ class AddSettingsPluginTest implements RewriteTest {
                 assertThat(actual).isNotNull();
                 Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
                 assertThat(version.find()).isTrue();
+                //language=groovy
                 return """
                   plugins {
                       id 'org.openrewrite' version '1'
                       id 'com.gradle.enterprise' version '%s'
                   }
-                  
+                                    
                   rootProject.name = 'my-project'
                   """.formatted(version.group(0));
             })
@@ -96,6 +99,7 @@ class AddSettingsPluginTest implements RewriteTest {
                 assertThat(actual).isNotNull();
                 Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
                 assertThat(version.find()).isTrue();
+                //language=groovy
                 return """
                   pluginManagement {
                       repositories {
