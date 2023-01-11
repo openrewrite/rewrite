@@ -41,7 +41,7 @@ import static java.util.Collections.emptyMap;
 public class Pom {
 
     /**
-     * The model version is used can be used to verify the structure of the serialized object, in cache, is compatible
+     * The model version can be used to verify the structure of the serialized object, in cache, is compatible
      * with the current model loaded by the JVM.
      *
      * @return Model version
