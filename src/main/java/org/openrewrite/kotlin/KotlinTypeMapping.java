@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin;
 
 import org.jetbrains.kotlin.descriptors.ClassKind;
+import org.jetbrains.kotlin.descriptors.Modality;
+import org.jetbrains.kotlin.descriptors.Visibility;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
@@ -387,8 +389,40 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
     }
 
     private long convertToFlagsBitMap(FirDeclarationStatus status) {
+        long bitMask = 0;
+        Visibility visibility = status.getVisibility();
+        if ("public".equals(visibility.getName())) {
+            bitMask += 1L;
+        } else if ("private".equals(visibility.getName())) {
+            bitMask += 1L << 1;
+        } else if ("protected".equals(visibility.getName())) {
+            bitMask += 1L << 2;
+        } else if ("internal".equals(visibility.getName())) {
+            // Kotlin specific
+        } else {
+            // are there more?
+            System.out.println();
+        }
+        Modality modality = status.getModality();
+        if (Modality.FINAL == modality) {
+            bitMask += 1L << 4;
+        } else if (Modality.ABSTRACT == modality) {
+            bitMask += 1L << 10;
+        } else if (Modality.OPEN == modality) {
+            // Kotlin specific
+        } else if (Modality.SEALED == modality) {
+            // Kotlin specific
+        }
+
+        if (status.isStatic()) {
+            // Not sure how this happens, since Kotlin does not have a static modifier.
+            bitMask += 1L << 3;
+        }
+
+
+
         // TODO ... map status to eq flags.
-        return 0;
+        return bitMask;
     }
 
     private JavaType.FullyQualified.Kind convertToClassKind(ClassKind classKind) {
