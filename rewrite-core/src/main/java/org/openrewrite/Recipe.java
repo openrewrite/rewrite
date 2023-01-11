@@ -135,7 +135,7 @@ public abstract class Recipe implements Cloneable {
      */
     @Nullable
     public Duration getEstimatedEffortPerOccurrence() {
-        return null;
+        return Duration.ofMinutes(5);
     }
 
     public final RecipeDescriptor getDescriptor() {
