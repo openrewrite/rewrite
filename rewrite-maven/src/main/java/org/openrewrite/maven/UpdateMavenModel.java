@@ -43,7 +43,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
         if (properties.isPresent()) {
             for (final Xml.Tag propertyTag : properties.get().getChildren()) {
                 requested.getProperties().put(propertyTag.getName(),
-                        propertyTag.getValue().orElseThrow(() -> new IllegalStateException("Maven property tag must have String value")));
+                        propertyTag.getValue().orElse(""));
             }
         }
 
