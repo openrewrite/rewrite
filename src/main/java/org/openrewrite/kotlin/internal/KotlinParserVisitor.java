@@ -161,12 +161,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         skip("@");
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
-        if (!annotationCall.getArgumentList().getArguments().isEmpty()) {
-            throw new IllegalStateException("Implement me.");
+        JContainer<Expression> args = null;
+        if (annotationCall.getArgumentList().getArguments().size() > 0) {
+            Space argsPrefix = sourceBefore("(");
+            List<JRightPadded<Expression>> expressions;
+            if (annotationCall.getArgumentList().getArguments().size() == 1) {
+                FirExpression arg = annotationCall.getArgumentList().getArguments().get(0);
+                expressions = singletonList(convert(arg, t -> sourceBefore(")"), ctx));
+            } else {
+                expressions = convertAll(annotationCall.getArgumentList().getArguments(), commaDelim, t -> sourceBefore(")"), ctx);
+            }
+
+            args = JContainer.build(argsPrefix, expressions, Markers.EMPTY);
         }
 
-        JContainer<Expression> arguments = null;
-        return new J.Annotation(randomId(), prefix, Markers.EMPTY, name, arguments);
+        return new J.Annotation(randomId(), prefix, Markers.EMPTY, name, args);
     }
 
     @Override
@@ -987,13 +996,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitPropertyAccessExpression(FirPropertyAccessExpression propertyAccessExpression, ExecutionContext ctx) {
-        if (!propertyAccessExpression.getAnnotations().isEmpty() ||
-                !propertyAccessExpression.getTypeArguments().isEmpty() ||
-                propertyAccessExpression.getExplicitReceiver() != null ||
-                !(propertyAccessExpression.getDispatchReceiver() instanceof FirNoReceiverExpression ||
-                        propertyAccessExpression.getDispatchReceiver() instanceof FirThisReceiverExpression) ||
-                !(propertyAccessExpression.getExtensionReceiver() instanceof FirNoReceiverExpression ||
-                        propertyAccessExpression.getExtensionReceiver() instanceof FirThisReceiverExpression)) {
+        if (!(propertyAccessExpression.getAnnotations().isEmpty() ||
+                propertyAccessExpression.getTypeArguments().isEmpty() ||
+                (propertyAccessExpression.getExplicitReceiver() == null || propertyAccessExpression.getExplicitReceiver() instanceof FirResolvedQualifier) ||
+                (propertyAccessExpression.getDispatchReceiver() instanceof FirNoReceiverExpression || propertyAccessExpression.getDispatchReceiver() instanceof FirThisReceiverExpression) ||
+                (propertyAccessExpression.getExtensionReceiver() instanceof FirNoReceiverExpression || propertyAccessExpression.getExtensionReceiver() instanceof FirThisReceiverExpression))) {
             throw new IllegalStateException("Implement me.");
         }
 

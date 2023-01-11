@@ -30,7 +30,6 @@ public class KotlinTypeMappingTest {
                .getType()));
     }
 
-    @Disabled
     @Test
     void extendsKotlinAny() {
         assertThat(goatType().getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
