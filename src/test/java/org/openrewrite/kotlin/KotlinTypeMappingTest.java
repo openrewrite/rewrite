@@ -70,7 +70,7 @@ public class KotlinTypeMappingTest {
     @Test
     void parameterized() {
         JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
-        assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.java.PT");
-        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+        assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
+        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 }

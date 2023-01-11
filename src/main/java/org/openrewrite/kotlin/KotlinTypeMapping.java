@@ -18,7 +18,6 @@ package org.openrewrite.kotlin;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.Modality;
 import org.jetbrains.kotlin.descriptors.Visibility;
-import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation;
@@ -38,10 +37,9 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.COVARIANT;
-import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.INVARIANT;
+import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
-public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
+public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private final KotlinTypeSignatureBuilder signatureBuilder;
     private final JavaTypeCache typeCache;
     private final FirSession firSession;
@@ -55,7 +53,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
-    public JavaType type(@Nullable FirElement type) {
+    public JavaType type(@Nullable Object type) {
         if (type == null) {
             return JavaType.Class.Unknown.getInstance();
         }
@@ -68,6 +66,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
 
         if (type instanceof FirClass) {
             return classType((FirClass) type, signature);
+        } else if (type instanceof ConeTypeProjection) {
+            System.out.println();
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
             if (coneKotlinType instanceof ConeTypeParameterType) {
@@ -371,17 +371,17 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
         typeCache.put(signature, gtv);
 
         List<JavaType> bounds = null;
-        JavaType.GenericTypeVariable.Variance variance = null;
-        if (!"INVARIANT".equals(typeParameter.getVariance().name())) {
+        JavaType.GenericTypeVariable.Variance variance = INVARIANT;
+        if (!(typeParameter.getBounds().size() == 1 && typeParameter.getBounds().get(0) instanceof FirImplicitNullableAnyTypeRef)) {
             bounds = new ArrayList<>(typeParameter.getBounds().size());
             for (FirTypeRef bound : typeParameter.getBounds()) {
-                if (!(bound instanceof FirImplicitNullableAnyTypeRef)) {
-                    bounds.add(type(bound));
-                }
+                bounds.add(type(bound));
             }
-            variance = COVARIANT;
-        } else {
-            variance = INVARIANT;
+            if ("out".equals(typeParameter.getVariance().getLabel())) {
+                variance = COVARIANT;
+            } else if ("in".equals(typeParameter.getVariance().getLabel())) {
+                variance = CONTRAVARIANT;
+            }
         }
 
         gtv.unsafeSet(variance, bounds);
