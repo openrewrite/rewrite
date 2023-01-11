@@ -3,6 +3,7 @@ package org.openrewrite.kotlin;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
+import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
@@ -207,7 +208,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String methodSignature(FirFunctionSymbol<? extends FirFunction> symbol) {
-        String s = classSignature(convertToRegularClass(symbol.getDispatchReceiverType()));
+        String s = symbol instanceof FirConstructorSymbol ? symbol.getName().asString() : classSignature(convertToRegularClass(symbol.getDispatchReceiverType()));
 
         if (symbol instanceof FirConstructorSymbol) {
             s += "{name=<constructor>,return=" + s;

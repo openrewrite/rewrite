@@ -1,6 +1,5 @@
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.StringUtils;
@@ -60,5 +59,11 @@ public class KotlinTypeMappingTest {
         JavaType.Method methodType = methodType("clazz");
         assertThat(clazz.getFlags()).contains(Flag.Abstract);
         assertThat(methodType.getFlags()).contains(Flag.Abstract);
+    }
+
+    @Test
+    void constructor() {
+        JavaType.Method ctor = methodType("<constructor>");
+        assertThat(ctor.getDeclaringType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
     }
 }
