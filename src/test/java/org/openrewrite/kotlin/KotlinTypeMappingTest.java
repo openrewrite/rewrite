@@ -20,10 +20,6 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
-    public JavaType.FullyQualified classType(String fqn) {
-        throw new UnsupportedOperationException("TODO");
-    }
-
     public JavaType.Parameterized goatType() {
         //noinspection ConstantConditions
         return requireNonNull(TypeUtils.asParameterized(KotlinParser.builder()
@@ -50,24 +46,23 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         return methodType(methodName).getParameterTypes().get(0);
     }
 
-    @Disabled
     @Override
-    @Test
     public void array() {
         throw new UnsupportedOperationException("Not applicable.");
     }
 
-    @Disabled
     @Override
-    @Test
     public void genericArray() {
         throw new UnsupportedOperationException("Not applicable.");
     }
 
-    @Disabled
     @Override
-    @Test
     public void extendsJavaLangObject() {
+        throw new UnsupportedOperationException("Not applicable.");
+    }
+
+    @Override
+    public JavaType.FullyQualified classType(String fqn) {
         throw new UnsupportedOperationException("Not applicable.");
     }
 
