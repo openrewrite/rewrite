@@ -39,6 +39,18 @@ import static java.util.Collections.emptyMap;
 @Value
 @With
 public class Pom {
+
+    /**
+     * The model version can be used to verify the structure of the serialized object, in cache, is compatible
+     * with the current model loaded by the JVM.
+     *
+     * @return Model version
+     */
+    public static int getModelVersion() {
+        //NOTE: This value should be incremented if there are any model changes to Pom (or one of its referenced types)
+        return 1;
+    }
+
     @Nullable
     Path sourcePath;
 
