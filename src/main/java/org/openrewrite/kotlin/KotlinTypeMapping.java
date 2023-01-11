@@ -21,7 +21,12 @@ import org.jetbrains.kotlin.descriptors.Visibility;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.FirAnnotation;
+import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall;
+import org.jetbrains.kotlin.fir.expressions.FirExpression;
+import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression;
+import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
+import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
@@ -504,7 +509,29 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
     private List<JavaType.FullyQualified> getAnnotations(List<FirAnnotation> firAnnotations) {
         List<JavaType.FullyQualified> annotations = new ArrayList<>(firAnnotations.size());
+        // TODO: find a cleaner way to access to retention policy of annotations from a reference. There isn't time to sort this out properly.
+        outer:
         for (FirAnnotation firAnnotation : firAnnotations) {
+            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(firAnnotation.getTypeRef()), firSession);
+            if (symbol != null) {
+                for (FirAnnotation annotation : symbol.getAnnotations()) {
+                    if (annotation instanceof FirAnnotationCall && !((FirAnnotationCall) annotation).getArgumentList().getArguments().isEmpty()) {
+                        for (FirExpression argument : ((FirAnnotationCall) annotation).getArgumentList().getArguments()) {
+                            if (argument instanceof FirPropertyAccessExpression) {
+                                FirPropertyAccessExpression accessExpression = (FirPropertyAccessExpression) argument;
+                                FirBasedSymbol<?> callRefSymbol = (((FirResolvedNamedReference) accessExpression.getCalleeReference()).getResolvedSymbol());
+                                if (callRefSymbol instanceof FirEnumEntrySymbol) {
+                                    FirEnumEntrySymbol enumEntrySymbol = (FirEnumEntrySymbol) callRefSymbol;
+                                    if ("kotlin.annotation.AnnotationRetention$SOURCE".equals(KotlinTypeSignatureBuilder.convertKotlinFqToJavaFq(enumEntrySymbol.getCallableId().toString()))) {
+                                        continue outer;
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+                }
+            }
             JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(convertToRegularClass(firAnnotation.getTypeRef()));
             annotations.add(fullyQualified);
         }
