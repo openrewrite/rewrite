@@ -33,6 +33,9 @@ abstract class KotlinTypeGoat<T, S> {
         FOO(TypeA());
     }
 
+    // sort out how to do this.
+//    abstract class ExtendsJavaTypeGoat : KotlinTypeGoat<T, S>()
+
     abstract class Extension<U : Extension<U>>
 
     open class TypeA

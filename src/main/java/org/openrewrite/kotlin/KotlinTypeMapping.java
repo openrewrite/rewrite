@@ -44,6 +44,7 @@ import java.util.List;
 
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertClassIdToFqn;
+import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertKotlinFqToJavaFq;
 
 public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private final KotlinTypeSignatureBuilder signatureBuilder;
@@ -349,10 +350,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         variable.unsafeSet(resolvedOwner, type(symbol.getResolvedReturnTypeRef()), annotations);
 
         return variable;
-    }
-
-    private String convertClassIdToFqn(ClassId classId) {
-        return classId.toString().replace(".", "$").replace("/", ".");
     }
 
     public JavaType.Primitive primitive(ConeClassLikeType type) {

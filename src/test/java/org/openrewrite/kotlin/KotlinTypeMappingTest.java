@@ -34,9 +34,9 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
 
     public JavaType.Method methodType(String methodName) {
         JavaType.Method type = goatType().getMethods().stream()
-          .filter(m -> m.getName().equals(methodName))
-          .findFirst()
-          .orElseThrow(() -> new IllegalStateException("Expected to find matching method named " + methodName));
+               .filter(m -> m.getName().equals(methodName))
+               .findFirst()
+               .orElseThrow(() -> new IllegalStateException("Expected to find matching method named " + methodName));
         assertThat(type.getDeclaringType().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
         return type;
     }
@@ -44,26 +44,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     @Override
     public JavaType firstMethodParameter(String methodName) {
         return methodType(methodName).getParameterTypes().get(0);
-    }
-
-    @Override
-    public void array() {
-        throw new UnsupportedOperationException("Not applicable.");
-    }
-
-    @Override
-    public void genericArray() {
-        throw new UnsupportedOperationException("Not applicable.");
-    }
-
-    @Override
-    public void extendsJavaLangObject() {
-        throw new UnsupportedOperationException("Not applicable.");
-    }
-
-    @Override
-    public JavaType.FullyQualified classType(String fqn) {
-        throw new UnsupportedOperationException("Not applicable.");
     }
 
     @Test
@@ -248,5 +228,26 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     public void recursiveIntersection() {
         JavaType.GenericTypeVariable clazz = TypeUtils.asGeneric(firstMethodParameter("recursiveIntersection"));
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}");
+    }
+
+
+    @Override
+    public void array() {
+        throw new UnsupportedOperationException("Not applicable.");
+    }
+
+    @Override
+    public void genericArray() {
+        throw new UnsupportedOperationException("Not applicable.");
+    }
+
+    @Override
+    public void extendsJavaLangObject() {
+        throw new UnsupportedOperationException("Not applicable.");
+    }
+
+    @Override
+    public JavaType.FullyQualified classType(String fqn) {
+        throw new UnsupportedOperationException("Not applicable.");
     }
 }

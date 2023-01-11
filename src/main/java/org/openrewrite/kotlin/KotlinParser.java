@@ -167,7 +167,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         return cus;
     }
 
-    private Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
+    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
 
         File buildFile = null;

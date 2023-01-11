@@ -1,9 +1,7 @@
 package org.openrewrite.kotlin;
 
-import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
-import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
