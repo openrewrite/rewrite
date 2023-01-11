@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.PathUtils;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -1332,7 +1333,7 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             spec -> spec.path("a/b/Original.java").afterRecipe(cu ->
-              assertThat(cu.getSourcePath().toString()).isEqualTo("x/y/Target.java"))
+              assertThat(cu.getSourcePath().toString()).isEqualTo(PathUtils.separatorsToSystem("x/y/Target.java")))
           )
         );
     }
