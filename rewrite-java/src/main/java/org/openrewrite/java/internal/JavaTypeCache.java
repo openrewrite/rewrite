@@ -17,21 +17,26 @@ package org.openrewrite.java.internal;
 
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.JavaType;
 import org.xerial.snappy.Snappy;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 public class JavaTypeCache implements Cloneable {
+
+    // empirical value: below this size, the compressed key is larger or only slightly smaller
+    // although also note that a String object has a 24 bytes overhead vs. the 16 bytes of a BytesKey object
+    public static final int COMPRESSION_THRESHOLD = 50;
+
     @Value
     private static class BytesKey {
         byte[] data;
     }
 
-    Map<BytesKey, Object> typeCache = new HashMap<>();
+    Map<Object, Object> typeCache = new HashMap<>();
 
     @Nullable
     public <T> T get(String signature) {
@@ -43,12 +48,15 @@ public class JavaTypeCache implements Cloneable {
         typeCache.put(key(signature), o);
     }
 
-    private BytesKey key(String signature) {
-        try {
-            return new BytesKey(Snappy.compress(signature));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+    private Object key(String signature) {
+        if (signature.length() > COMPRESSION_THRESHOLD) {
+            try {
+                return new BytesKey(Snappy.compress(signature.getBytes(StandardCharsets.UTF_8)));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
+        return signature;
     }
 
     public void clear() {
