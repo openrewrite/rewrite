@@ -169,7 +169,48 @@ final class ControlFlowVisualizationVisitor<P> extends JavaIsoVisitor<P> {
         private static String labelTag(J j) {
             if (j instanceof J.Binary) {
                 J.Binary binary = (J.Binary) j;
-                return binary.getOperator().getKeyword();
+                switch (binary.getOperator()) {
+                    case And:
+                        return "&&";
+                    case Or:
+                        return "||";
+                    case Addition:
+                        return "+";
+                    case Subtraction:
+                        return "-";
+                    case Multiplication:
+                        return "*";
+                    case Division:
+                        return "/";
+                    case Modulo:
+                        return "%";
+                    case LessThan:
+                        return "<";
+                    case LessThanOrEqual:
+                        return "<=";
+                    case GreaterThan:
+                        return ">";
+                    case GreaterThanOrEqual:
+                        return ">=";
+                    case Equal:
+                        return "==";
+                    case NotEqual:
+                        return "!=";
+                    case BitAnd:
+                        return "&";
+                    case BitOr:
+                        return "|";
+                    case BitXor:
+                        return "^";
+                    case LeftShift:
+                        return "<<";
+                    case RightShift:
+                        return ">>";
+                    case UnsignedRightShift:
+                        return ">>>";
+                    default:
+                        throw new IllegalStateException("Unexpected value: " + binary.getOperator());
+                }
             }
             return null;
         }

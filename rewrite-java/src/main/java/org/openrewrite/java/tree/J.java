@@ -648,29 +648,26 @@ public interface J extends Tree {
             return sideEffects;
         }
 
-        @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public enum Type {
-            Addition("+"),
-            Subtraction("-"),
-            Multiplication("*"),
-            Division("/"),
-            Modulo("%"),
-            LessThan("<"),
-            GreaterThan(">"),
-            LessThanOrEqual("<="),
-            GreaterThanOrEqual(">="),
-            Equal("=="),
-            NotEqual("!="),
-            BitAnd("&"),
-            BitOr("|"),
-            BitXor("^"),
-            LeftShift("<<"),
-            RightShift(">>"),
-            UnsignedRightShift(">>>"),
-            Or("||"),
-            And("&&");
-            @Getter
-            final String keyword;
+            Addition,
+            Subtraction,
+            Multiplication,
+            Division,
+            Modulo,
+            LessThan,
+            GreaterThan,
+            LessThanOrEqual,
+            GreaterThanOrEqual,
+            Equal,
+            NotEqual,
+            BitAnd,
+            BitOr,
+            BitXor,
+            LeftShift,
+            RightShift,
+            UnsignedRightShift,
+            Or,
+            And
         }
 
         public Padding getPadding() {
@@ -2610,7 +2607,7 @@ public interface J extends Tree {
                 String name = part.getSimpleName();
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                            "." + name);
+                                       "." + name);
                     break;
                 } else {
                     part = (FieldAccess) part.getTarget();
@@ -3430,8 +3427,8 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return "MethodDeclaration{" +
-                    (getMethodType() == null ? "unknown" : getMethodType()) +
-                    "}";
+                   (getMethodType() == null ? "unknown" : getMethodType()) +
+                   "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
