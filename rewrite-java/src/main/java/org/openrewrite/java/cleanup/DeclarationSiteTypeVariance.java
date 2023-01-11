@@ -104,9 +104,15 @@ public class DeclarationSiteTypeVariance extends Recipe {
                         variance == VariantTypeSpec.Variance.INVARIANT) {
                         return tp;
                     }
-                    for (String excludedBound : excludedBounds) {
-                        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(tp.getType());
-                        if (fq != null && StringUtils.matchesGlob(fq.getFullyQualifiedName(), excludedBound)) {
+
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(tp.getType());
+                    if (fq != null) {
+                        for (String excludedBound : excludedBounds) {
+                            if (StringUtils.matchesGlob(fq.getFullyQualifiedName(), excludedBound)) {
+                                return tp;
+                            }
+                        }
+                        if (fq.getFlags().contains(Flag.Final)) {
                             return tp;
                         }
                     }

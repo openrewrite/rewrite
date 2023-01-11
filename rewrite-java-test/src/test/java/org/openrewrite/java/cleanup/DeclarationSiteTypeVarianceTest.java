@@ -116,4 +116,32 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void finalClasses() {
+        rewriteRun(
+          java(
+            """
+              final class In {}
+              interface Out {}
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              class Test {
+                  void test(Function<In, Out> f) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              class Test {
+                  void test(Function<In, ? extends Out> f) {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
