@@ -110,7 +110,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteT
                           <dependency>
                               <groupId>jakarta.activation</groupId>
                               <artifactId>jakarta.activation-api</artifactId>
-                              <version>2.1.0</version>
+                              <version>2.1.1</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
