@@ -178,7 +178,7 @@ class PropertiesParserTest implements RewriteTest {
         );
     }
 
-    @Issue("")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2607")
     @Test
     void printWithNullDelimiter() {
         rewriteRun(
