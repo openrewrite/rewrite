@@ -85,7 +85,7 @@ public class RocksdbMavenCacheTest {
         mavenCache.putPom(pom.getGav(), pom);
         RocksdbMavenPomCache.closeCache(pathString);
 
-        //Re-open, the versions do not match, expect the database to be purged and no entry should be present
+        //Re-open and ensure cached value is correct.
         mavenCache = new RocksdbMavenPomCache(tempDir);
 
         Optional<Pom> cached = mavenCache.getPom(pom.getGav());
