@@ -38,6 +38,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
+import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertClassIdToFqn;
 
 public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private final KotlinTypeSignatureBuilder signatureBuilder;
@@ -297,7 +298,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         if (!functionSymbol.getValueParameterSymbols().isEmpty()) {
             parameterTypes = new ArrayList<>(functionSymbol.getValueParameterSymbols().size());
             for (FirValueParameterSymbol valueParameterSymbol : functionSymbol.getValueParameterSymbols()) {
-                JavaType javaType = type(valueParameterSymbol.getFir());
+                JavaType javaType = type(valueParameterSymbol.getResolvedReturnTypeRef());
                 parameterTypes.add(javaType);
             }
         }

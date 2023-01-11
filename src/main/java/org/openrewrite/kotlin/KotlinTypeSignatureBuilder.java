@@ -67,7 +67,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         FirClassSymbol<? extends FirClass> symbol = ((FirClass) type).getSymbol();
-        return symbol.getClassId().asFqNameString();
+        return convertClassIdToFqn(symbol.getClassId());
     }
 
     @Override
@@ -84,12 +84,12 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     public String typeRefClassSignature(ConeKotlinType type) {
         ClassId classId = ConeTypeUtilsKt.getClassId(type);
-        return classId == null ? "{undefined}" : classId.asFqNameString();
+        return classId == null ? "{undefined}" : convertClassIdToFqn(classId);
     }
 
     public String parameterizedTypeRef(ConeKotlinType type) {
         ClassId classId = ConeTypeUtilsKt.getClassId(type);
-        String fq = classId == null ? "{undefined}" : classId.asFqNameString();
+        String fq = classId == null ? "{undefined}" : convertClassIdToFqn(classId);
 
         StringBuilder s = new StringBuilder(fq);
         StringJoiner joiner = new StringJoiner(", ", "<", ">");
@@ -184,7 +184,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             // TODO: this may not work 100% for generics with bounds ... test with bounds.
             return coneKotlinType.toString();
         }
-        return classId.asFqNameString();
+        return convertClassIdToFqn(classId);
     }
 
     @Override
@@ -207,7 +207,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
         } else {
-            owner = symbol.getCallableId().getClassId().asFqNameString();
+            owner = convertClassIdToFqn(symbol.getCallableId().getClassId());
             if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
@@ -263,5 +263,13 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         return null;
+    }
+
+    public static String convertClassIdToFqn(ClassId classId) {
+        return convertKotlinFqToJavaFq(classId.toString());
+    }
+
+    public static String convertKotlinFqToJavaFq(String kotlinFqn) {
+        return kotlinFqn.replace(".", "$").replace("/", ".").replace("?", "");
     }
 }

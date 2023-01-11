@@ -50,11 +50,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         return methodType(methodName).getParameterTypes().get(0);
     }
 
-    @Test
-    void extendsKotlinAny() {
-        assertThat(goatType().getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
-    }
-
     @Disabled
     @Override
     @Test
@@ -74,6 +69,11 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     @Test
     public void extendsJavaLangObject() {
         throw new UnsupportedOperationException("Not applicable.");
+    }
+
+    @Test
+    void extendsKotlinAny() {
+        assertThat(goatType().getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
     }
 
     @Test
