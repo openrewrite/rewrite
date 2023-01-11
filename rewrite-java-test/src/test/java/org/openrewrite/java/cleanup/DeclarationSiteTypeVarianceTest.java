@@ -159,8 +159,8 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              final class In {}
-              interface Out {}
+              interface In {}
+              final class Out {}
               """
           ),
           java(
@@ -174,7 +174,7 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
             """
               import java.util.function.Function;
               class Test {
-                  void test(Function<In, ? extends Out> f) {
+                  void test(Function<? super In, Out> f) {
                   }
               }
               """
