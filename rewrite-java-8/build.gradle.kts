@@ -1,5 +1,6 @@
 plugins {
     id("org.openrewrite.build.language-library")
+    id("jvm-test-suite")
 }
 
 val compiler = javaToolchains.compilerFor {
@@ -47,20 +48,31 @@ tasks.withType<Javadoc>().configureEach {
     }.get().executablePath.toString()
 }
 
-val testTask = tasks.register<Test>("compatibilityTest") {
-    description = "Test parser compatibility."
-    group = "verification"
-    useJUnitPlatform {
-        excludeTags("java11", "java17")
+testing {
+    suites {
+        val test by getting(JvmTestSuite::class)
+
+        register("compatibilityTest", JvmTestSuite::class) {
+            dependencies {
+                implementation(project)
+                implementation(project(":rewrite-java-tck"))
+            }
+
+            targets {
+                all {
+                    testTask.configure {
+                        useJUnitPlatform {
+                            excludeTags("java11", "java17")
+                        }
+                        jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
+                        shouldRunAfter(test)
+                    }
+                }
+            }
+        }
     }
-    jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
-    val tckSourceSet = project(":rewrite-java-tck").sourceSets.getByName("main")
-    testClassesDirs = tckSourceSet.output.classesDirs
-    classpath = tckSourceSet.runtimeClasspath
-            .plus(sourceSets.getByName("test").runtimeClasspath)
-            .plus(sourceSets.getByName("main").output.classesDirs)
-    shouldRunAfter(tasks.test)
 }
-tasks.test {
-    dependsOn(testTask)
+
+tasks.named("check") {
+    dependsOn(testing.suites.named("compatibilityTest"))
 }

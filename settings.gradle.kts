@@ -1,7 +1,7 @@
 pluginManagement {
     resolutionStrategy {
         eachPlugin {
-            if (requested.id.namespace!!.startsWith("org.openrewrite.build")) {
+            if (requested.id.namespace != null && requested.id.namespace!!.startsWith("org.openrewrite.build")) {
                 useVersion("1.4.0")
             }
         }
@@ -39,7 +39,9 @@ val allProjects = listOf(
 val includedProjects = file("IDE.properties").let {
     if (it.exists()) {
         val props = java.util.Properties()
-        props.load(it.reader())
+        it.reader().use { reader ->
+            props.load(reader)
+        }
         allProjects.intersect(props.keys)
     } else {
         allProjects
