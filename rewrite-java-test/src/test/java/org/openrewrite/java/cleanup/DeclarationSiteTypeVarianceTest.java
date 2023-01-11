@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.Environment;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -45,6 +46,38 @@ class DeclarationSiteTypeVarianceTest implements RewriteTest {
     @Test
     void inOutVariance() {
         rewriteRun(
+          java(
+            """
+              interface In {}
+              interface Out {}
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              class Test {
+                  void test(Function<In, Out> f) {
+                  }
+              }
+              """,
+            """
+              import java.util.function.Function;
+              class Test {
+                  void test(Function<? super In, ? extends Out> f) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void commonVariances() {
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder()
+            .scanRuntimeClasspath("org.openrewrite.java")
+            .build()
+            .activateRecipes("org.openrewrite.java.cleanup.CommonDeclarationSiteTypeVariances")),
           java(
             """
               interface In {}

@@ -48,3 +48,32 @@ recipeList:
       newMethodName: start
 tags:
   - RSPEC-1217
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.cleanup.CommonDeclarationSiteTypeVariances
+displayName: "Properly use declaration-site type variance for well-known types."
+description: "When using a method parameter like `Function<IN, OUT>`, it should rather be `Function<? super IN, ? extends OUT>`. This recipe checks for method parameters of well-known types."
+recipeList:
+  - org.openrewrite.java.cleanup.DeclarationSiteTypeVariance:
+      variantTypes:
+        - java.util.function.Consumer<IN>
+        - java.util.function.BiPredicate<IN, IN>
+        - java.util.function.DoubleFunction<OUT>
+        - java.util.function.Function<IN, OUT>
+        - java.util.function.IntFunction<OUT>
+        - java.util.function.LongFunction<OUT>
+        - java.util.function.ObjDoubleConsumer<IN>
+        - java.util.function.ObjIntConsumer<IN>
+        - java.util.function.ObjLongConsumer<IN>
+        - java.util.function.Predicate<IN>
+        - java.util.function.Supplier<OUT>
+        - java.util.function.ToDoubleBiFunction<IN, IN>
+        - java.util.function.ToDoubleFunction<IN>
+        - java.util.function.ToIntBiFunction<IN, IN>
+        - java.util.function.ToIntFunction<IN>
+        - java.util.function.ToLongBiFunction<IN, IN>
+        - java.util.function.ToLongFunction<IN>
+      excludeBounds:
+        - java.lang.*
+tags:
+  - RSPEC-1217

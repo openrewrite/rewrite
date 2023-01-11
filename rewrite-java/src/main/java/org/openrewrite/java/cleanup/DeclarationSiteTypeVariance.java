@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -42,12 +43,14 @@ public class DeclarationSiteTypeVariance extends Recipe {
 
     @Option(displayName = "Excluded bounds",
             description = "A list of bounds that should not receive explicit variance. Globs supported.",
-            example = "java.lang.*")
+            example = "java.lang.*",
+            required = false)
+    @Nullable
     List<String> excludedBounds;
 
     @Override
     public String getDisplayName() {
-        return "Check proper use of declaration-site type variance";
+        return "Properly use declaration-site type variance";
     }
 
     @Override
@@ -107,9 +110,11 @@ public class DeclarationSiteTypeVariance extends Recipe {
 
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(tp.getType());
                     if (fq != null) {
-                        for (String excludedBound : excludedBounds) {
-                            if (StringUtils.matchesGlob(fq.getFullyQualifiedName(), excludedBound)) {
-                                return tp;
+                        if (excludedBounds != null) {
+                            for (String excludedBound : excludedBounds) {
+                                if (StringUtils.matchesGlob(fq.getFullyQualifiedName(), excludedBound)) {
+                                    return tp;
+                                }
                             }
                         }
                         if (fq.getFlags().contains(Flag.Final)) {
