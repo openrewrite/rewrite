@@ -254,66 +254,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitBinary(Binary binary, PrintOutputCapture<P> p) {
-        String keyword = "";
-        switch (binary.getOperator()) {
-            case Addition:
-                keyword = "+";
-                break;
-            case Subtraction:
-                keyword = "-";
-                break;
-            case Multiplication:
-                keyword = "*";
-                break;
-            case Division:
-                keyword = "/";
-                break;
-            case Modulo:
-                keyword = "%";
-                break;
-            case LessThan:
-                keyword = "<";
-                break;
-            case GreaterThan:
-                keyword = ">";
-                break;
-            case LessThanOrEqual:
-                keyword = "<=";
-                break;
-            case GreaterThanOrEqual:
-                keyword = ">=";
-                break;
-            case Equal:
-                keyword = "==";
-                break;
-            case NotEqual:
-                keyword = "!=";
-                break;
-            case BitAnd:
-                keyword = "&";
-                break;
-            case BitOr:
-                keyword = "|";
-                break;
-            case BitXor:
-                keyword = "^";
-                break;
-            case LeftShift:
-                keyword = "<<";
-                break;
-            case RightShift:
-                keyword = ">>";
-                break;
-            case UnsignedRightShift:
-                keyword = ">>>";
-                break;
-            case Or:
-                keyword = "||";
-                break;
-            case And:
-                keyword = "&&";
-                break;
-        }
+        String keyword = binary.getOperator().getKeyword();
         beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);
         visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
