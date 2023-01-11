@@ -160,7 +160,7 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(generic.getBounds()).isEmpty();
     }
 
-    @Disabled("Fix me. U is set to T")
+    @Disabled("Requires use of KotlinConeType to preserve the type reference and a mechanism to prevent SOE on recursive cone like types")
     @Override
     @Test
     public void genericRecursive() {
