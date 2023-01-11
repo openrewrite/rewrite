@@ -77,6 +77,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
             return resolvedTypeRef((FirResolvedTypeRef) type, signature);
         } else if (type instanceof FirTypeParameter) {
             return generic((FirTypeParameter) type, signature);
+        } else if (type instanceof FirValueParameter) {
+            return type(((FirValueParameter) type).getReturnTypeRef());
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
@@ -136,7 +138,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirRegularClass) {
                     // TODO: Companion Objects and possible inner classes.
-                    System.out.println();
                 } else if (declaration instanceof FirEnumEntry) {
                     enumEntries.add((FirEnumEntry) declaration);
                 } else {
@@ -281,10 +282,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<FirElement> {
         JavaType returnType = type(functionSymbol.getResolvedReturnTypeRef());
         List<JavaType> parameterTypes = null;
 
-        if (!functionSymbol.getTypeParameterSymbols().isEmpty()) {
-            parameterTypes = new ArrayList<>(functionSymbol.getTypeParameterSymbols().size());
-            for (FirTypeParameterSymbol typeParameterSymbol : functionSymbol.getTypeParameterSymbols()) {
-                JavaType javaType = type(typeParameterSymbol.getFir());
+        if (!functionSymbol.getValueParameterSymbols().isEmpty()) {
+            parameterTypes = new ArrayList<>(functionSymbol.getValueParameterSymbols().size());
+            for (FirValueParameterSymbol valueParameterSymbol : functionSymbol.getValueParameterSymbols()) {
+                JavaType javaType = type(valueParameterSymbol.getFir());
                 parameterTypes.add(javaType);
             }
         }
