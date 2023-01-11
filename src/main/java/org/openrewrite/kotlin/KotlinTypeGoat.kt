@@ -46,14 +46,12 @@ abstract class KotlinTypeGoat<T, S> {
     @AnnotationWithSourceRetention
     abstract fun clazz(n: C)
     abstract fun primitive(n: Int)
-    abstract fun array(n: Array<Array<C>>)
     abstract fun parameterized(n: PT<C>): PT<C>
     abstract fun parameterizedRecursive(n: PT<PT<C>>): PT<PT<C>>
     abstract fun generic(n: PT<out C>): PT<out C>
     abstract fun genericContravariant(n: PT<in C>): PT<in C>
     abstract fun <U : KotlinTypeGoat<U, *>> genericRecursive(n: KotlinTypeGoat<out Array<U>, *>): KotlinTypeGoat<out Array<U>, *>
     abstract fun <U> genericUnbounded(n: PT<U>): PT<U>
-    abstract fun genericArray(n: Array<PT<C>>)
     abstract fun inner(n: org.openrewrite.kotlin.C.Inner)
     abstract fun enumTypeA(n: EnumTypeA)
     abstract fun enumTypeB(n: EnumTypeB)

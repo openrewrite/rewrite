@@ -66,4 +66,11 @@ public class KotlinTypeMappingTest {
         JavaType.Method ctor = methodType("<constructor>");
         assertThat(ctor.getDeclaringType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
     }
+
+    @Test
+    void parameterized() {
+        JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
+        assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.java.PT");
+        assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.java.C");
+    }
 }
