@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindReferencedTypes;
@@ -25,7 +26,29 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 /**
- * Deletes standalone statements. Does not include deletion of control statements present in for loops.
+ * Deletes standalone statements.
+ * <p/>
+ * Does not include deletion of:
+ * <ul>
+ *     <li>control statements present in for loops.</li>
+ *     <li>control statements present in while loops.</li>
+ *     <li>control statements present in do while loops.</li>
+ *     <li>control statements present in if statements.</li>
+ *     <li>control statements present in switch statements.</li>
+ *     <li>statements that would render the closest parent non {@link J.Block} statement unable to be compiled</li>
+ * </ul>
+ * <p/>
+ *
+ * For example, the statement <code>isPotato()</code> would not be removed from any of the following code:
+ * <pre>
+ * {@code
+ *     if (isPotato()) { }
+ *     while (isPotato()) { }
+ *     do { } while (isPotato());
+ *     boolean potato = isPotato();
+ *     boolean notPotato = !isPotato();
+ * }
+ * </pre>
  */
 public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     private final Statement statement;
@@ -37,6 +60,13 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     @Override
     public @Nullable Statement visitStatement(Statement statement, P p) {
         Statement s = super.visitStatement(statement, p);
+
+        // Only remove a statement directly if it appears as top-level statement in a script file
+        // Otherwise, allow this statement to be removed by #visitBlock
+        // This prevents the visitor from removing statements that are not top-level statements or direct children of a block.
+        if (!(getCursor().getParentOrThrow().getValue() instanceof SourceFile)) {
+            return s;
+        }
 
         if (this.statement.isScope(s)) {
             return s instanceof J.Block ? emptyBlock() : null;

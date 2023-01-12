@@ -402,4 +402,31 @@ class DeleteStatementTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void deleteStatementInNegation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+                  if (m.getSimpleName().equals("b")) {
+                      doAfterVisit(new DeleteStatement<>(m));
+                  }
+                  return m;
+              }
+          })),
+          java(
+            """
+              public abstract class A {
+                  public void a() {
+                      boolean a = !b();
+                  }
+                  
+                  abstract boolean b();
+              }
+              """
+          )
+        );
+    }
 }
