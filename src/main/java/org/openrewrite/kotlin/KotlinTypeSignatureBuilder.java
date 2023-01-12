@@ -268,6 +268,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public static String convertKotlinFqToJavaFq(String kotlinFqn) {
-        return kotlinFqn.replace(".", "$").replace("/", ".").replace("?", "");
+        return kotlinFqn
+                .replaceFirst("/", "")
+                .replace(".", "$")
+                .replace("/", ".")
+                .replace("?", "");
     }
 }

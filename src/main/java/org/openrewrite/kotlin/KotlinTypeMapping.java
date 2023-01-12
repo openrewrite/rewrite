@@ -155,16 +155,13 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 } else if (declaration instanceof FirConstructor) {
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirRegularClass) {
-                    // TODO: Companion Objects and possible inner classes.
+                    // Skipped since inner classes don't exist on the JavaType$Class.
                 } else if (declaration instanceof FirEnumEntry) {
                     enumEntries.add((FirEnumEntry) declaration);
                 } else {
                     throw new IllegalStateException("Implement me.");
                 }
             }
-
-            // May be helpful.
-//            FirStatusUtilsKt
 
             List<JavaType.Variable> fields = null;
             if (!enumEntries.isEmpty()) {
@@ -204,7 +201,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             }
 
             List<JavaType.FullyQualified> annotations = getAnnotations(firClass.getAnnotations());
-
             clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
         }
 
@@ -224,7 +220,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                         typeParameters.add(type(tParam));
                     }
                 }
-
                 pt.unsafeSet(clazz, typeParameters);
             }
             return pt;
@@ -267,20 +262,9 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
         typeCache.put(signature, method);
 
-        FirRegularClass signatureType =
-//                functionSymbol.type instanceof Type.ForAll ?
-//                ((Type.ForAll) methodSymbol.type).qtype :
-                convertToRegularClass(functionSymbol.getDispatchReceiverType());
-
         // TODO: thrown exceptions don't exist in Kotlin, but may be specified as annotations to apply to java classes.
         // The annotations will be created ... should the annotations be placed here to align with JavaTypes?
         List<JavaType.FullyQualified> exceptionTypes = null;
-
-        FirRegularClass selectType = null;
-//        Type selectType = functionSymbol.getC.type;
-//        if (selectType instanceof Type.ForAll) {
-//            selectType = ((Type.ForAll) selectType).qtype;
-//        }
 
         JavaType.FullyQualified resolvedDeclaringType = declaringType;
         if (declaringType == null) {
@@ -339,7 +323,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
         JavaType resolvedOwner = owner;
         if (owner == null) {
-            throw new IllegalStateException("implement me.");
+            throw new UnsupportedOperationException("Unexpected null variable type owner.");
         }
 
         List<JavaType.FullyQualified> annotations = getAnnotations(symbol.getAnnotations());
@@ -470,9 +454,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             bitMask += 1L << 3;
         }
 
-
-
-        // TODO ... map status to eq flags.
         return bitMask;
     }
 
