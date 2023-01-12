@@ -49,6 +49,15 @@ public class ResolvedDependency {
 
     List<License> licenses;
 
+    @Nullable
+    String type;
+
+    @Nullable
+    String classifier;
+
+    @Nullable
+    Boolean optional;
+
     int depth;
 
     /**
@@ -76,16 +85,18 @@ public class ResolvedDependency {
     }
 
     public String getType() {
+        if (type != null) {
+            return type;
+        }
         return requested.getType() == null ? "jar" : requested.getType();
     }
 
-    @Nullable
-    public String getClassifier() {
-        return requested.getClassifier();
+    public @Nullable String getClassifier() {
+        return classifier != null ? classifier : requested.getClassifier();
     }
 
     public boolean isOptional() {
-        return requested.isOptional();
+        return optional != null ? optional : Boolean.valueOf(requested.getOptional());
     }
 
     public boolean isDirect() {

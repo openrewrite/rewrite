@@ -40,7 +40,8 @@ public class Dependency {
     List<GroupArtifact> exclusions;
 
     @With
-    boolean optional;
+    @Nullable
+    String optional;
 
     @Nullable
     public String getGroupId() {

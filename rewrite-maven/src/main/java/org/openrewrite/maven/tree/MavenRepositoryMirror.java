@@ -66,8 +66,8 @@ public class MavenRepositoryMirror {
         if (matches(repo) && !(repo.getUri().equals(url) && id.equals(repo.getId()))) {
             return repo.withUri(url)
                     .withId(id)
-                    .withReleases(!Boolean.FALSE.equals(releases))
-                    .withSnapshots(Boolean.TRUE.equals(snapshots));
+                    .withReleases(!Boolean.FALSE.equals(releases) ? "true" : "false")
+                    .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false");
         } else {
             return repo;
         }

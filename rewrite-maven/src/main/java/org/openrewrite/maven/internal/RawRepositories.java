@@ -53,10 +53,12 @@ public class RawRepositories {
     @EqualsAndHashCode
     @Getter
     public static class ArtifactPolicy {
-        boolean enabled;
 
-        public ArtifactPolicy(@Nullable Boolean enabled) {
-            this.enabled = enabled == null || enabled;
+        @Nullable
+        String enabled;
+
+        public ArtifactPolicy(@Nullable String enabled) {
+            this.enabled = enabled;
         }
 
         /**
@@ -64,7 +66,7 @@ public class RawRepositories {
          */
         @SuppressWarnings("unused")
         public ArtifactPolicy() {
-            this(true);
+            this("true");
         }
     }
 }

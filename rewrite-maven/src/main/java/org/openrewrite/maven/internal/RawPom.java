@@ -133,7 +133,7 @@ public class RawPom {
         String classifier;
 
         @Nullable
-        Boolean optional;
+        String optional;
 
         @Nullable
         @JacksonXmlElementWrapper
@@ -405,8 +405,8 @@ public class RawPom {
                 pomRepositories = new ArrayList<>(unmappedRepos.size());
                 for (RawRepositories.Repository r : unmappedRepos) {
                     pomRepositories.add(new MavenRepository(r.getId(), r.getUrl(),
-                            r.getReleases() == null || r.getReleases().isEnabled(),
-                            r.getSnapshots() == null || r.getSnapshots().isEnabled(),
+                            r.getReleases() == null ? null : r.getReleases().getEnabled(),
+                            r.getSnapshots() == null ? null : r.getSnapshots().getEnabled(),
                             false, null, null, null));
                 }
 
@@ -443,7 +443,7 @@ public class RawPom {
                 for (Dependency d : unmappedDependencies) {
                     GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
                     dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
-                            d.getOptional() != null && d.getOptional()));
+                            d.getOptional()));
                 }
             }
         }
@@ -457,7 +457,7 @@ public class RawPom {
             for (Dependency d : rawDependencies) {
                 GroupArtifactVersion dGav = new GroupArtifactVersion(d.getGroupId(), d.getArtifactId(), d.getVersion());
                 dependencies.add(new org.openrewrite.maven.tree.Dependency(dGav, d.getClassifier(), d.getType(), d.getScope(), d.getExclusions(),
-                        d.getOptional() != null && d.getOptional()));
+                        d.getOptional()));
             }
         }
         return dependencies;
