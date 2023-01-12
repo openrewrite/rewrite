@@ -82,83 +82,23 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return resolveType(type, signature);
     }
 
-    @Nullable
-    public JavaType.Method methodDeclarationType(@Nullable FirFunction function, @Nullable JavaType.FullyQualified declaringType) {
-        FirFunctionSymbol<?> methodSymbol = function == null ? null : function.getSymbol();
-        if (methodSymbol != null) {
-            String signature = signatureBuilder.methodSignature(function.getSymbol());
-            JavaType.Method existing = typeCache.get(signature);
-            if (existing != null) {
-                return existing;
-            }
-
-            List<String> paramNames = null;
-            if (!methodSymbol.getValueParameterSymbols().isEmpty()) {
-                paramNames = new ArrayList<>(methodSymbol.getValueParameterSymbols().size());
-                for (FirValueParameterSymbol p : methodSymbol.getValueParameterSymbols()) {
-                    String s = p.getName().asString();
-                    paramNames.add(s);
-                }
-            }
-            List<String> defaultValues = null;
-
-            JavaType.Method method = new JavaType.Method(
-                    null,
-                    convertToFlagsBitMap(methodSymbol.getResolvedStatus()),
-                    null,
-                    methodSymbol instanceof FirConstructorSymbol ? "<constructor>" : methodSymbol.getName().asString(),
-                    null,
-                    paramNames,
-                    null, null, null,
-                    defaultValues
-            );
-            typeCache.put(signature, method);
-
-            List<JavaType.FullyQualified> exceptionTypes = null;
-
-            JavaType.FullyQualified resolvedDeclaringType = declaringType;
-            if (declaringType == null) {
-                if (methodSymbol instanceof FirConstructorSymbol) {
-                    JavaType type = type(methodSymbol.getResolvedReturnType());
-                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
-                } else if (methodSymbol.getDispatchReceiverType() != null) {
-                    JavaType type = type(methodSymbol.getDispatchReceiverType());
-                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
-                }
-                // Find a means to distinguish the owner when a method is declared in a root.
-            }
-
-            if (resolvedDeclaringType == null) {
-                return null;
-            }
-
-            JavaType returnType = type(methodSymbol.getResolvedReturnTypeRef());
-            List<JavaType> parameterTypes = null;
-
-            method.unsafeSet(resolvedDeclaringType,
-                    methodSymbol instanceof FirConstructorSymbol ? resolvedDeclaringType : returnType,
-                    parameterTypes, exceptionTypes, listAnnotations(methodSymbol.getAnnotations()));
-            return method;
-        }
-
-        return null;
-    }
-
-    @Nullable
-    public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall, @Nullable String signature) {
-        JavaType.Method methodType = null;
-        return methodType;
-    }
-
-    @Nullable
-    public JavaType.Variable variableType(@Nullable FirVariable variable, @Nullable String signature) {
-        JavaType.Variable variableType = null;
-
-        return variableType;
-    }
-
     private JavaType resolveType(Object type, String signature) {
-        if (type instanceof FirResolvedTypeRef) {
+        if (type instanceof FirResolvedNamedReference) {
+            FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
+            if (resolvedSymbol instanceof FirConstructorSymbol) {
+                return type(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirEnumEntrySymbol) {
+                return type(((FirEnumEntrySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirNamedFunctionSymbol) {
+                return type(((FirNamedFunctionSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirPropertySymbol) {
+                return type(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
+                return type(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType());
+            } else {
+                throw new IllegalStateException("fix me.");
+            }
+        } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
             if (coneKotlinType instanceof ConeClassLikeType) {
                 return classType(type, signature);
@@ -180,6 +120,19 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+    }
+
+    @Nullable
+    public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall, @Nullable String signature) {
+        JavaType.Method methodType = null;
+        return methodType;
+    }
+
+    @Nullable
+    public JavaType.Variable variableType(@Nullable FirVariable variable, @Nullable String signature) {
+        JavaType.Variable variableType = null;
+
+        return variableType;
     }
 
     private JavaType.FullyQualified classType(Object classType, String signature) {
@@ -274,7 +227,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if(!functions.isEmpty()) {
                 methods = new ArrayList<>(functions.size());
                 for (FirFunction function : functions) {
-                    methods.add(methodDeclarationType(function.getSymbol(), clazz));
+                    methods.add(methodDeclarationType(function, clazz));
                 }
             }
 
@@ -318,72 +271,73 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     }
 
     @Nullable
-    public JavaType.Method methodDeclarationType(@Nullable FirFunctionSymbol<? extends FirFunction> functionSymbol, @Nullable JavaType.FullyQualified declaringType) {
-        if (functionSymbol == null) {
-            return null;
-        }
-
-        String signature = signatureBuilder.methodSignature(functionSymbol);
-        JavaType.Method existing = typeCache.get(signature);
-        if (existing != null) {
-            return existing;
-        }
-
-        List<String> paramNames = null;
-        if (!functionSymbol.getValueParameterSymbols().isEmpty()) {
-            paramNames = new ArrayList<>(functionSymbol.getValueParameterSymbols().size());
-            for (FirValueParameterSymbol p : functionSymbol.getValueParameterSymbols()) {
-                String s = p.getName().asString();
-                paramNames.add(s);
+    public JavaType.Method methodDeclarationType(@Nullable FirFunction function, @Nullable JavaType.FullyQualified declaringType) {
+        FirFunctionSymbol<?> methodSymbol = function == null ? null : function.getSymbol();
+        if (methodSymbol != null) {
+            String signature = signatureBuilder.methodSignature(function.getSymbol());
+            JavaType.Method existing = typeCache.get(signature);
+            if (existing != null) {
+                return existing;
             }
-        }
-        List<String> defaultValues = null;
-        JavaType.Method method = new JavaType.Method(
-                null,
-                convertToFlagsBitMap(functionSymbol.getResolvedStatus()),
-                null,
-                functionSymbol instanceof FirConstructorSymbol ? "<constructor>" : functionSymbol.getName().asString(),
-                null,
-                paramNames,
-                null, null, null,
-                defaultValues
-        );
 
-        typeCache.put(signature, method);
-
-        // TODO: thrown exceptions don't exist in Kotlin, but may be specified as annotations to apply to java classes.
-        // The annotations will be created ... should the annotations be placed here to align with JavaTypes?
-        List<JavaType.FullyQualified> exceptionTypes = null;
-
-        JavaType.FullyQualified resolvedDeclaringType = declaringType;
-        if (declaringType == null) {
-            throw new UnsupportedOperationException("Find owner and resolve declaring type.");
-        }
-
-//        if (resolvedDeclaringType == null) {
-//            return null;
-//        }
-
-        JavaType returnType = type(functionSymbol.getResolvedReturnTypeRef());
-        List<JavaType> parameterTypes = null;
-
-        if (!functionSymbol.getValueParameterSymbols().isEmpty()) {
-            parameterTypes = new ArrayList<>(functionSymbol.getValueParameterSymbols().size());
-            for (FirValueParameterSymbol valueParameterSymbol : functionSymbol.getValueParameterSymbols()) {
-                JavaType javaType = type(valueParameterSymbol.getResolvedReturnTypeRef());
-                parameterTypes.add(javaType);
+            List<String> paramNames = null;
+            if (!methodSymbol.getValueParameterSymbols().isEmpty()) {
+                paramNames = new ArrayList<>(methodSymbol.getValueParameterSymbols().size());
+                for (FirValueParameterSymbol p : methodSymbol.getValueParameterSymbols()) {
+                    String s = p.getName().asString();
+                    paramNames.add(s);
+                }
             }
+            List<String> defaultValues = null;
+
+            JavaType.Method method = new JavaType.Method(
+                    null,
+                    convertToFlagsBitMap(methodSymbol.getResolvedStatus()),
+                    null,
+                    methodSymbol instanceof FirConstructorSymbol ? "<constructor>" : methodSymbol.getName().asString(),
+                    null,
+                    paramNames,
+                    null, null, null,
+                    defaultValues
+            );
+            typeCache.put(signature, method);
+
+            List<JavaType.FullyQualified> exceptionTypes = null;
+
+            JavaType.FullyQualified resolvedDeclaringType = declaringType;
+            if (declaringType == null) {
+                if (methodSymbol instanceof FirConstructorSymbol) {
+                    JavaType type = type(methodSymbol.getResolvedReturnType());
+                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+                } else if (methodSymbol.getDispatchReceiverType() != null) {
+                    JavaType type = type(methodSymbol.getDispatchReceiverType());
+                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+                }
+                // Find a means to distinguish the owner when a method is declared in a root.
+            }
+
+            if (resolvedDeclaringType == null) {
+                return null;
+            }
+
+            JavaType returnType = type(methodSymbol.getResolvedReturnTypeRef());
+            List<JavaType> parameterTypes = null;
+            if (!methodSymbol.getValueParameterSymbols().isEmpty()) {
+                parameterTypes = new ArrayList<>(methodSymbol.getValueParameterSymbols().size());
+                for (FirValueParameterSymbol valueParameterSymbol : methodSymbol.getValueParameterSymbols()) {
+                    JavaType javaType = type(valueParameterSymbol.getResolvedReturnTypeRef());
+                    parameterTypes.add(javaType);
+                }
+            }
+
+            method.unsafeSet(resolvedDeclaringType,
+                    methodSymbol instanceof FirConstructorSymbol ? resolvedDeclaringType : returnType,
+                    parameterTypes, exceptionTypes, listAnnotations(methodSymbol.getAnnotations()));
+            return method;
         }
 
-        method.unsafeSet(resolvedDeclaringType,
-                functionSymbol instanceof FirConstructorSymbol ? resolvedDeclaringType : returnType,
-                parameterTypes, exceptionTypes, listAnnotations(functionSymbol.getAnnotations()));
-        return method;
+        return null;
     }
-
-//    public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
-//
-//    }
 
     @Nullable
     public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol) {

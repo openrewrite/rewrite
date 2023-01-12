@@ -45,7 +45,7 @@ public class KotlinTypeSignatureBuilderTest {
         return new KotlinTypeSignatureBuilder(null);
     }
 
-public Object firstMethodParameter(String methodName) {
+    public Object firstMethodParameter(String methodName) {
         return methodType(methodName).getParameterTypes().get(0);
     }
 

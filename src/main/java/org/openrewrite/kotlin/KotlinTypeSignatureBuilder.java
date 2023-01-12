@@ -4,9 +4,15 @@ import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall;
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall;
+import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression;
+import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression;
+import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
+import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitAnyTypeRef;
+import org.jetbrains.kotlin.fir.types.impl.FirImplicitBuiltinTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.name.ClassId;
 import org.openrewrite.internal.lang.Nullable;
@@ -46,7 +52,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     @Nullable
     public String methodDeclarationType(FirFunction function) {
         String signature = convertKotlinFqToJavaFq(function.getSymbol().toString());
-        System.out.println(signature);
         return signature;
     }
 
@@ -66,7 +71,22 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return "{undefined}";
         }
 
-        if (type instanceof FirResolvedTypeRef) {
+        if (type instanceof FirResolvedNamedReference) {
+            FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
+            if (resolvedSymbol instanceof FirConstructorSymbol) {
+                return signature(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirEnumEntrySymbol) {
+                return signature(((FirEnumEntrySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirNamedFunctionSymbol) {
+                return signature(((FirNamedFunctionSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirPropertySymbol) {
+                return signature(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+            } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
+                return signature(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType());
+            } else {
+                throw new IllegalStateException("fix me.");
+            }
+        } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = ((FirResolvedTypeRef) type).getType();
             if (coneKotlinType instanceof ConeTypeParameterType) {
                 FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);
@@ -85,6 +105,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return coneTypeProjectionSignature((ConeTypeProjection) type);
         } else if (type instanceof FirEqualityOperatorCall) {
             return signature(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirQualifiedAccessExpression) {
+            return signature(((FirQualifiedAccessExpression) type).getTypeRef());
         }
 
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());

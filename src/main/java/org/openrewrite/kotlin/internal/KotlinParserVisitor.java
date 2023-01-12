@@ -148,7 +148,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         KtNameReferenceExpression nameReferenceExpression = (KtNameReferenceExpression) ((KtRealPsiSourceElement) errorNamedReference.getSource()).getPsi();
-        String name = nameReferenceExpression.getIdentifier().getText();
+        String name = nameReferenceExpression.getIdentifier() == null ? "{error}" : nameReferenceExpression.getIdentifier().getText();
         Space prefix = sourceBefore(name);
         return new J.Identifier(
                 randomId(),
@@ -1010,7 +1010,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         Space namePrefix = whitespace();
-        J.Identifier name = convertToIdentifier(property.getName().asString());
+        J.Identifier name = convertToIdentifier(property.getName().asString(), property);
 
         TypeTree typeExpression = null;
         if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
@@ -1107,7 +1107,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     EMPTY,
                     Markers.EMPTY,
                     methodName,
-                    null,
+                    typeMapping.type(propertyAccessor),
                     null);
 
             JContainer<Statement> params;
@@ -1167,7 +1167,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitResolvedNamedReference(FirResolvedNamedReference resolvedNamedReference, ExecutionContext ctx) {
         String name = resolvedNamedReference.getName().asString();
-        return convertToIdentifier(name);
+        return convertToIdentifier(name, resolvedNamedReference);
     }
 
     @Override
@@ -1247,7 +1247,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             methodName = simpleFunction.getName().asString();
         }
 
-        J.Identifier name = convertToIdentifier(methodName);
+        J.Identifier name = convertToIdentifier(methodName, simpleFunction);
 
         JContainer<Statement> params;
         Space paramFmt = sourceBefore("(");
@@ -1336,12 +1336,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitThisReceiverExpression(FirThisReceiverExpression thisReceiverExpression, ExecutionContext ctx) {
         Space prefix = sourceBefore("this");
 
-        JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
         return new J.Identifier(randomId(),
                 prefix,
                 Markers.EMPTY,
                 "this",
-                type,
+                typeMapping.type(thisReceiverExpression),
                 null);
     }
 
@@ -1370,8 +1369,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             annotations.add(reified);
         }
 
-        Expression name = buildName(typeParameter.getName().asString())
-                .withPrefix(sourceBefore(typeParameter.getName().asString()));
+        Expression name = convertToIdentifier(typeParameter.getName().asString(), typeParameter);
 
         List<FirTypeRef> nonImplicitParams = typeParameter.getBounds().stream().filter(it -> !(it instanceof FirImplicitNullableAnyTypeRef)).collect(Collectors.toList());
         JContainer<TypeTree> bounds = null;
@@ -1470,7 +1468,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             valueName = valueParameter.getName().asString();
             namePrefix = whitespace();
         }
-        J.Identifier name = convertToIdentifier(valueName);
+        J.Identifier name = convertToIdentifier(valueName, valueParameter);
 
         TypeTree typeExpression = null;
         if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef) {
@@ -1706,44 +1704,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             throw new IllegalStateException("Unexpected null source ... fix me.");
         }
         return t.getSource().getEndOffset();
-    }
-
-    private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
-        String[] parts = fullyQualifiedName.split("\\.");
-
-        String fullName = "";
-        Expression expr = null;
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
-            if (i == 0) {
-                fullName = part;
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, part, null, null);
-            } else {
-                fullName += "." + part;
-
-                int endOfPrefix = indexOfNextNonWhitespace(0, part);
-                Space identFmt = endOfPrefix > 0 ? format(part.substring(0, endOfPrefix)) : EMPTY;
-
-                Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
-                //noinspection ResultOfMethodCallIgnored
-                whitespaceSuffix.matches();
-                Space namePrefix = i == parts.length - 1 ? Space.EMPTY : format(whitespaceSuffix.group(1));
-
-                expr = new J.FieldAccess(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        expr,
-                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, part.trim(), null, null)),
-                        (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                JavaType.ShallowClass.build(fullName) :
-                                null
-                );
-            }
-        }
-
-        //noinspection unchecked,ConstantConditions
-        return (T) expr;
     }
 
     @SuppressWarnings("unchecked")
@@ -1995,10 +1955,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         skip(type.name().toLowerCase());
         return new K.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
-    }
-
-    private J mapFunctionType(KtFunctionType functionType) {
-        throw new IllegalStateException("Implement me.");
     }
 
     private int positionOfNext(String untilDelim) {
