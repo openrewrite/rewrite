@@ -182,9 +182,10 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         // Replace with JavaParser.dependencies(... kotlin-stdlib)?
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
-        if (classpath != null) {
-            addJvmClasspathRoots(compilerConfiguration, classpath.stream().map(Path::toFile).collect(toList()));
-        }
+        // Figure out how to add the classpath performantly.
+//        if (classpath != null) {
+//            addJvmClasspathRoots(compilerConfiguration, classpath.stream().map(Path::toFile).collect(toList()));
+//        }
 
         // Add kotlin sources.
 //        addKotlinSourceRoot(compilerConfiguration, "add path", true);

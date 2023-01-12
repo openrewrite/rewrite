@@ -353,8 +353,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
             }
 
-            if (!(expr instanceof Statement) && expr instanceof Expression) {
-                expr = new K.ExpressionStatement(randomId(), (Expression) expr);
+            if (!(expr instanceof Statement)) {
+                if (expr instanceof Expression) {
+                    expr = new K.ExpressionStatement(randomId(), (Expression) expr);
+                } else {
+                    throw new UnsupportedOperationException("Unexpected statement type.");
+                }
             }
 
             JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
@@ -407,8 +411,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
-        // TODO: add type mapping
-        J.Identifier name = convertToIdentifier(firRegularClass.getName().asString());
+        J.Identifier name = convertToIdentifier(firRegularClass.getName().asString(), firRegularClass);
 
         // KotlinTypeParameters with multiple bounds are defined outside the TypeParameter container.
         // KotlinTypeGoat<T, S> where S: PT<S>, S: C
@@ -448,7 +451,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             EMPTY,
                             element.withPrefix(EMPTY),
                             JContainer.build(sourceBefore("("),
-                                    singletonList(JRightPadded.build((Expression) new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
+                                    singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
                                     Markers.EMPTY),
                             null,
                             null
@@ -474,9 +477,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if (declaration instanceof FirPrimaryConstructor) {
                 firPrimaryConstructor = (FirPrimaryConstructor) declaration;
             } else {
-                // Temporary hack until there is a means to identify generated code.
-                // AST origin generated field is set to false and the fromSource is set to true.
-                if (ClassKind.ENUM_CLASS == classKind && declaration instanceof FirProperty) {
+                if (ClassKind.ENUM_CLASS == classKind && declaration.getSource() != null &&
+                        declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
                     continue;
                 }
                 membersMultiVariablesSeparated.add(declaration);
@@ -541,13 +543,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             for (FirElement firElement : membersMultiVariablesSeparated) {
                 if (!(firElement instanceof FirEnumEntry)) {
-                    // Temporary hack until there is a means to identify generated code.
-                    // AST origin generated field is set to false and the fromSource is set to true.
-                    if (ClassKind.ENUM_CLASS == classKind && firElement instanceof FirSimpleFunction) {
-                        FirSimpleFunction function = (FirSimpleFunction) firElement;
-                        if ("values".equals(function.getName().asString()) || "valueOf".equals(function.getName().asString())) {
-                            continue;
-                        }
+                    if (ClassKind.ENUM_CLASS == classKind && firElement.getSource() != null &&
+                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.EnumGeneratedDeclaration) {
+                        continue;
                     }
                     members.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));
                 }

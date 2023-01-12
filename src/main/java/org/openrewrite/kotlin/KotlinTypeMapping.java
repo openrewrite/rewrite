@@ -71,7 +71,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         if (type instanceof FirClass) {
             return classType(type, signature);
         }
-        // TODO.
+
 //        else if (type instanceof FirFunction) {
 //            return methodDeclarationType((FirFunction) type, signature);
 //        } else if (type instanceof FirFunctionCall) {
@@ -105,7 +105,9 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private JavaType resolveType(Object type, String signature) {
         if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
-            if (coneKotlinType instanceof ConeTypeParameterType) {
+            if (coneKotlinType instanceof ConeClassLikeType) {
+                return classType(type, signature);
+            } else if (coneKotlinType instanceof ConeTypeParameterType) {
                 FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);
                 if (classifierSymbol != null && classifierSymbol.getFir() instanceof FirTypeParameter) {
                     return generic((FirTypeParameter) classifierSymbol.getFir(), signature);
