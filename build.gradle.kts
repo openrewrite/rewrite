@@ -80,8 +80,6 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:latest.release")
     testImplementation("org.junit.jupiter:junit-jupiter-params:latest.release")
     testImplementation("org.openrewrite:rewrite-test")
-    // Temp to view JavaTypeMappingTest.
-    testImplementation("org.openrewrite:rewrite-java-test")
 
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 

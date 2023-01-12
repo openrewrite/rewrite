@@ -21,10 +21,7 @@ import org.jetbrains.kotlin.descriptors.Modality;
 import org.jetbrains.kotlin.descriptors.Visibility;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
-import org.jetbrains.kotlin.fir.expressions.FirAnnotation;
-import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall;
-import org.jetbrains.kotlin.fir.expressions.FirExpression;
-import org.jetbrains.kotlin.fir.expressions.FirPropertyAccessExpression;
+import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
@@ -73,7 +70,40 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
         if (type instanceof FirClass) {
             return classType(type, signature);
-        } else if (type instanceof FirResolvedTypeRef) {
+        }
+        // TODO.
+//        else if (type instanceof FirFunction) {
+//            return methodDeclarationType((FirFunction) type, signature);
+//        } else if (type instanceof FirFunctionCall) {
+//            return methodInvocationType((FirFunctionCall) type, signature);
+//        } else if (type instanceof FirVariable) {
+//            return variableType((FirVariable) type, signature);
+//        }
+
+        return resolveType(type, signature);
+    }
+
+    @Nullable
+    public JavaType.Method methodDeclarationType(FirFunction function, String signature) {
+        JavaType.Method methodType = null;
+        return methodType;
+    }
+
+    @Nullable
+    public JavaType.Method methodInvocationType(FirFunctionCall functionCall, String signature) {
+        JavaType.Method methodType = null;
+        return methodType;
+    }
+
+    @Nullable
+    public JavaType.Variable variableType(FirVariable variable, String signature) {
+        JavaType.Variable variableType = null;
+
+        return variableType;
+    }
+
+    private JavaType resolveType(Object type, String signature) {
+        if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
             if (coneKotlinType instanceof ConeTypeParameterType) {
                 FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);

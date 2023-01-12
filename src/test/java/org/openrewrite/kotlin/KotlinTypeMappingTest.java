@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @SuppressWarnings("ConstantConditions")
-public class KotlinTypeMappingTest implements JavaTypeMappingTest {
+public class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
     public JavaType.Parameterized goatType() {
@@ -41,7 +41,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         return type;
     }
 
-    @Override
     public JavaType firstMethodParameter(String methodName) {
         return methodType(methodName).getParameterTypes().get(0);
     }
@@ -56,14 +55,12 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(goatType().getSupertype().getSupertype()).isNull();
     }
 
-    @Override
     @Test
     public void className() {
         JavaType.Class clazz = (JavaType.Class)this.firstMethodParameter("clazz");
         Assertions.assertThat(TypeUtils.asFullyQualified(clazz).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
-    @Override
     @Test
     public void interfacesContainImplicitAbstractFlag() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("clazz");
@@ -72,14 +69,12 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(methodType.getFlags()).contains(Flag.Abstract);
     }
 
-    @Override
     @Test
     public void constructor() {
         JavaType.Method ctor = methodType("<constructor>");
         assertThat(ctor.getDeclaringType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
     }
 
-    @Override
     @Test
     public void parameterized() {
         JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
@@ -87,14 +82,12 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
-    @Override
     @Test
     public void primitive() {
         JavaType.Class kotlinBasicType = (JavaType.Class) firstMethodParameter("primitive");
         assertThat(kotlinBasicType.getFullyQualifiedName()).isEqualTo("kotlin.Int");
     }
 
-    @Override
     @Test
     public void generic() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().get(0);
@@ -103,7 +96,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
-    @Override
     @Test
     public void genericContravariant() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().get(0);
@@ -114,7 +106,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     }
 
     @Disabled("Requires parsing intersection types")
-    @Override
     @Test
     public void genericMultipleBounds() {
         List<JavaType> typeParameters = goatType().getTypeParameters();
@@ -126,7 +117,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
           isEqualTo("org.openrewrite.kotlin.C");
     }
 
-    @Override
     @Test
     public void genericUnbounded() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericUnbounded")).getTypeParameters().get(0);
@@ -136,7 +126,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     }
 
     @Disabled
-    @Override
     @Test
     public void genericRecursive() {
         JavaType.Parameterized param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
@@ -152,7 +141,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(elemType.getBounds()).hasSize(1);
     }
 
-    @Override
     @Test
     public void innerClass() {
         JavaType.FullyQualified clazz = TypeUtils.asFullyQualified(firstMethodParameter("inner"));
@@ -160,7 +148,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     }
 
     @Disabled("Requires parsing intersection types")
-    @Override
     @Test
     public void inheritedJavaTypeGoat() {
         JavaType.Parameterized clazz = (JavaType.Parameterized) firstMethodParameter("InheritedKotlinTypeGoat");
@@ -170,7 +157,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     }
 
     @Disabled("Requires parsing intersection types")
-    @Override
     @Test
     public void genericIntersectionType() {
         JavaType.GenericTypeVariable clazz = (JavaType.GenericTypeVariable) firstMethodParameter("genericIntersection");
@@ -180,7 +166,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}");
     }
 
-    @Override
     @Test
     public void enumTypeA() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
@@ -195,7 +180,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(supertype.toString()).isEqualTo("kotlin.Enum<org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeA>");
     }
 
-    @Override
     @Test
     public void enumTypeB() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
@@ -210,7 +194,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(supertype.toString()).isEqualTo("kotlin.Enum<org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB>");
     }
 
-    @Override
     @Test
     public void ignoreSourceRetentionAnnotations() {
         JavaType.Parameterized goat = goatType();
@@ -223,31 +206,9 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
     }
 
     @Disabled("Requires parsing intersection types")
-    @Override
     @Test
     public void recursiveIntersection() {
         JavaType.GenericTypeVariable clazz = TypeUtils.asGeneric(firstMethodParameter("recursiveIntersection"));
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}");
-    }
-
-
-    @Override
-    public void array() {
-        throw new UnsupportedOperationException("Not applicable.");
-    }
-
-    @Override
-    public void genericArray() {
-        throw new UnsupportedOperationException("Not applicable.");
-    }
-
-    @Override
-    public void extendsJavaLangObject() {
-        throw new UnsupportedOperationException("Not applicable.");
-    }
-
-    @Override
-    public JavaType.FullyQualified classType(String fqn) {
-        throw new UnsupportedOperationException("Not applicable.");
     }
 }
