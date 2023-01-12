@@ -68,14 +68,15 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Fix type attribution on super types.")
     @Test
     void classImplements() {
         rewriteRun(
           kotlin(
             """
                 interface A
-                class C : A
+                interface B
+                class C : A, B
+                class D : B, A
             """
           )
         );

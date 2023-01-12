@@ -37,6 +37,7 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
 import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
@@ -87,7 +88,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final boolean charsetBomMarked;
     private final KotlinTypeMapping typeMapping;
     private final ExecutionContext ctx;
-
+    private final FirSession firSession;
     private int cursor = 0;
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
@@ -100,6 +101,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new KotlinTypeMapping(typeCache, firSession);
         this.ctx = ctx;
+        this.firSession = firSession;
     }
 
     @Override
@@ -421,11 +423,42 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(" where S: PT<S>, S: C");
         }
 
+        FirTypeRef superTypeRef = null;
+        List<FirTypeRef> interfaceTypeRefs = null;
+        for (FirTypeRef typeRef : firRegularClass.getSuperTypeRefs()) {
+            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(typeRef), firSession);
+            // Filter out generated super classes.
+            if (typeRef.getSource() != null && !(typeRef.getSource().getKind() instanceof KtFakeSourceElementKind)) {
+                if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
+                    superTypeRef = typeRef;
+                } else if (symbol != null && ClassKind.INTERFACE == symbol.getFir().getClassKind()) {
+                    if (interfaceTypeRefs == null) {
+                        interfaceTypeRefs = new ArrayList<>();
+                    }
+                    interfaceTypeRefs.add(typeRef);
+                }
+            }
+        }
+
         // TODO: fix: super type references are resolved as error kind.
         JLeftPadded<TypeTree> extendings = null;
+        if (superTypeRef != null) {
+
+        }
 
         // TODO: fix: super type references are resolved as error kind.
         JContainer<TypeTree> implementings = null;
+        if (interfaceTypeRefs != null) {
+            Markers markers = Markers.EMPTY;
+            Space beforeImplements = whitespace();
+            if (source.startsWith(":", cursor)) {
+                skip(":");
+            }
+            implementings = JContainer.build(
+                    beforeImplements,
+                    convertAll(interfaceTypeRefs, commaDelim, t -> EMPTY, ctx),
+                    markers);
+        }
 
         List<FirElement> membersMultiVariablesSeparated = new ArrayList<>(firRegularClass.getDeclarations().size());
         List<FirDeclaration> jcEnums = new ArrayList<>(klass.getDeclarations().size());
