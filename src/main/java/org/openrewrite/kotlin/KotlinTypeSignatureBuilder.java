@@ -191,20 +191,18 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String variableSignature(FirVariableSymbol<? extends FirVariable> symbol) {
-        String owner;
+        String owner = "{undefined}";
         ConeSimpleKotlinType kotlinType = symbol.getDispatchReceiverType();
 
         if (kotlinType instanceof ConeClassLikeType) {
             FirRegularClass regularClass = convertToRegularClass(kotlinType);
-            if (regularClass == null) {
-                owner = "{undefined}";
-            } else {
+            if (regularClass != null) {
                 owner = signature(regularClass);
             }
             if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
-        } else {
+        } else if (symbol.getCallableId().getClassId() != null) {
             owner = convertClassIdToFqn(symbol.getCallableId().getClassId());
             if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'));
