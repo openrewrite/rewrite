@@ -704,6 +704,11 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * A block of statements, enclosed in curly braces.
+     * <p>
+     * To create an empty block, use {@link #createEmptyBlock()}.
+     */
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -795,6 +800,17 @@ public interface J extends Tree {
             public Block withStatements(List<JRightPadded<Statement>> statements) {
                 return t.statements == statements ? t : new Block(t.id, t.prefix, t.markers, t.statik, statements, t.end);
             }
+        }
+
+        public static J.Block createEmptyBlock() {
+            return new J.Block(
+                    Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    JRightPadded.build(false),
+                    Collections.emptyList(),
+                    Space.EMPTY
+            );
         }
 
         @SelfLoathing(name = "Jonathan Leitschuh")
