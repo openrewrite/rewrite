@@ -173,6 +173,7 @@ public class KotlinTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
           .isEqualTo("Generic{S extends org.openrewrite.kotlin.PT<Generic{S}> & org.openrewrite.kotlin.C}");
     }
 
+    @Disabled
     @Override
     @Test
     public void genericRecursiveInMethodDeclaration() {

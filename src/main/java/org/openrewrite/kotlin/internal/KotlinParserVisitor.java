@@ -417,17 +417,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 convertAll(firRegularClass.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx),
                 Markers.EMPTY);
 
-        // TODO: FIX ME!!! temp hack to differ parsing type parameters with multiple bounds.
-        if ("KotlinTypeGoat".equals(firRegularClass.getName().asString())) {
-            skip(" where S: PT<S>, S: C");
-        }
-
         JContainer<TypeTree> implementings = null;
         List<JRightPadded<TypeTree>> superTypes = null;
 
         int saveCursor = cursor;
         Space before = whitespace();
-        Markers superMarkers = Markers.EMPTY;
         if (source.startsWith(":", cursor)) {
             skip(":");
         }
@@ -445,7 +439,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
 
                 TypeTree element = (TypeTree) visitElement(typeRef, ctx);
-                JRightPadded<TypeTree> padded = JRightPadded.build(element);
                 if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
                     J.NewClass newClass = new J.NewClass(
                             randomId(),
@@ -577,7 +570,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 null,
                 implementings,
                 null,
-                body, // TODO
+                body,
                 (JavaType.FullyQualified) typeMapping.type(firRegularClass)
         );
     }
@@ -598,7 +591,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             ConeClassLikeType coneClassLikeType = (ConeClassLikeType) ((FirResolvedTypeRef) constExpression.getTypeRef()).getType();
             type = typeMapping.primitive(coneClassLikeType);
         } else {
-            throw new IllegalStateException("Implement me.");
+            throw new UnsupportedOperationException("Unresolved primitive type.");
         }
 
         return new J.Literal(
@@ -649,10 +642,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J.Annotation> annotations = mapAnnotations(enumEntry.getAnnotations());
 
         J.NewClass initializer = null;
-//        if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
-//            initializer = convert(node.getInitializer());
-//        }
-
         return new J.EnumValue(
                 randomId(),
                 prefix,
@@ -684,8 +673,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 name = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, name, mapTypeArguments(functionCall.getTypeArguments()));
             }
 
-            JContainer<Expression> args = args = mapFunctionalCallArguments(functionCall);
-            J.Block body = null; // TODO
+            JContainer<Expression> args = mapFunctionalCallArguments(functionCall);
+            J.Block body = null;
             return new J.NewClass(
                     randomId(),
                     prefix,
@@ -768,7 +757,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     null); // TODO
         }
 
-        throw new IllegalStateException("Implement me.");
+        throw new UnsupportedOperationException("Unsupported function call.");
     }
 
     private JContainer<Expression> mapFunctionalCallArguments(FirFunctionCall functionCall) {
@@ -1877,6 +1866,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private J.Identifier convertToIdentifier(String name) {
         return convertToIdentifier(name, null, null);
+    }
+
+    private J.Identifier convertToIdentifier(String name, FirElement firElement) {
+        return convertToIdentifier(name, typeMapping.type(firElement), null);
     }
 
     private J.Identifier convertToIdentifier(String name, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {

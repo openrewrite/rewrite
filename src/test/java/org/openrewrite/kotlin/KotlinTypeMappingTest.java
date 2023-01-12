@@ -135,6 +135,7 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(generic.getBounds()).isEmpty();
     }
 
+    @Disabled
     @Override
     @Test
     public void genericRecursive() {

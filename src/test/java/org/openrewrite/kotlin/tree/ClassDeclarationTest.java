@@ -196,4 +196,35 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void singleBoundedTypeParameters() {
+        rewriteRun(
+          kotlin(
+            """
+              interface A
+              interface B
+              
+              class KotlinTypeGoat<T: A, S: B>
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void multipleBounds() {
+        rewriteRun(
+          kotlin(
+            """
+              interface A
+              interface B
+              interface C
+              interface D
+              
+              class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
+              """
+          )
+        );
+    }
 }
