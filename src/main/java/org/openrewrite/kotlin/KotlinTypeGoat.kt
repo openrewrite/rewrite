@@ -18,7 +18,7 @@ package org.openrewrite.kotlin
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> {
-//abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
+    //abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
     val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
 
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
@@ -29,14 +29,8 @@ abstract class KotlinTypeGoat<T, S> {
         FUZ
     }
 
-    enum class EnumTypeB(label: TypeA) {
+    enum class EnumTypeB(val label: TypeA) {
         FOO(TypeA());
-
-        private val label: TypeA
-
-        init {
-            this.label = label
-        }
     }
 
     // sort out how to do this.
@@ -60,7 +54,7 @@ abstract class KotlinTypeGoat<T, S> {
     abstract fun inner(n: org.openrewrite.kotlin.C.Inner)
     abstract fun enumTypeA(n: EnumTypeA)
     abstract fun enumTypeB(n: EnumTypeB)
-//    abstract fun <U> inheritedKotlinTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
+    //    abstract fun <U> inheritedJavaTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
 //    abstract fun <U> genericIntersection(n: U): U where U : TypeA, U : PT<U>, U : C
     abstract fun genericT(n: T): T // remove after signatures are common.
 
@@ -81,4 +75,4 @@ interface PT<T>
 internal annotation class AnnotationWithSourceRetention
 
 @Retention(AnnotationRetention.RUNTIME)
-internal annotation class AnnotationWithRuntimeRetention 
+internal annotation class AnnotationWithRuntimeRetention
