@@ -68,6 +68,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.lang.Math.E;
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -423,43 +424,56 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(" where S: PT<S>, S: C");
         }
 
-        FirTypeRef superTypeRef = null;
-        List<FirTypeRef> interfaceTypeRefs = null;
-        for (FirTypeRef typeRef : firRegularClass.getSuperTypeRefs()) {
+        JContainer<TypeTree> implementings = null;
+        List<JRightPadded<TypeTree>> superTypes = null;
+
+        int saveCursor = cursor;
+        Space before = whitespace();
+        Markers superMarkers = Markers.EMPTY;
+        if (source.startsWith(":", cursor)) {
+            skip(":");
+        }
+
+        // Kotlin declared super class and interfaces differently than java. All types declared after the `:` are added into implementings.
+        // This should probably exist on a K.ClassDeclaration view where the getters return the appropriate types.
+        // The J.ClassDeclaration view should have the super type set in extending and the J.NewClass should be unwrapped.
+        for (int i = 0; i < firRegularClass.getSuperTypeRefs().size(); i++) {
+            FirTypeRef typeRef = firRegularClass.getSuperTypeRefs().get(i);
             FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(typeRef), firSession);
             // Filter out generated super classes.
             if (typeRef.getSource() != null && !(typeRef.getSource().getKind() instanceof KtFakeSourceElementKind)) {
-                if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
-                    superTypeRef = typeRef;
-                } else if (symbol != null && ClassKind.INTERFACE == symbol.getFir().getClassKind()) {
-                    if (interfaceTypeRefs == null) {
-                        interfaceTypeRefs = new ArrayList<>();
-                    }
-                    interfaceTypeRefs.add(typeRef);
+                if (superTypes == null) {
+                    superTypes = new ArrayList<>(firRegularClass.getSuperTypeRefs().size());
                 }
+
+                TypeTree element = (TypeTree) visitElement(typeRef, ctx);
+                JRightPadded<TypeTree> padded = JRightPadded.build(element);
+                if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
+                    J.NewClass newClass = new J.NewClass(
+                            randomId(),
+                            element.getPrefix(),
+                            Markers.EMPTY,
+                            null,
+                            EMPTY,
+                            element.withPrefix(EMPTY),
+                            JContainer.build(sourceBefore("("),
+                                    singletonList(JRightPadded.build((Expression) new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
+                                    Markers.EMPTY),
+                            null,
+                            null
+                    );
+                    element = new K.FunctionType(randomId(), newClass, null);
+                }
+                superTypes.add(JRightPadded.build(element)
+                        .withAfter(i == firRegularClass.getSuperTypeRefs().size() - 1 ? EMPTY : sourceBefore(",")));
             }
         }
 
-        // TODO: fix: super type references are resolved as error kind.
-        JLeftPadded<TypeTree> extendings = null;
-        if (superTypeRef != null) {
-
+        if (superTypes == null) {
+            cursor = saveCursor;
+        } else {
+            implementings = JContainer.build(before, superTypes, Markers.EMPTY);
         }
-
-        // TODO: fix: super type references are resolved as error kind.
-        JContainer<TypeTree> implementings = null;
-        if (interfaceTypeRefs != null) {
-            Markers markers = Markers.EMPTY;
-            Space beforeImplements = whitespace();
-            if (source.startsWith(":", cursor)) {
-                skip(":");
-            }
-            implementings = JContainer.build(
-                    beforeImplements,
-                    convertAll(interfaceTypeRefs, commaDelim, t -> EMPTY, ctx),
-                    markers);
-        }
-
         List<FirElement> membersMultiVariablesSeparated = new ArrayList<>(firRegularClass.getDeclarations().size());
         List<FirDeclaration> jcEnums = new ArrayList<>(klass.getDeclarations().size());
         FirPrimaryConstructor firPrimaryConstructor = null;
@@ -478,7 +492,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         }
 
-        int saveCursor = cursor;
+        saveCursor = cursor;
         Space bodyPrefix = whitespace();
         JContainer<Statement> primaryConstructor = null;
         boolean inlineConstructor = source.startsWith("(", cursor) && firPrimaryConstructor != null;
@@ -562,7 +576,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 name,
                 typeParams,
                 primaryConstructor,
-                extendings, // TODO
+                null,
                 implementings,
                 null,
                 body, // TODO
