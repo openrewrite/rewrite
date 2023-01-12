@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.Modality;
 import org.jetbrains.kotlin.descriptors.Visibility;
@@ -99,7 +100,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             resolvedTypeRef = (FirResolvedTypeRef) classType;
             FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(resolvedTypeRef.getType(), firSession);
             if (symbol == null) {
-                throw new IllegalStateException("Fix me.");
+                throw new UnsupportedOperationException("Symbol was not resolved for " + resolvedTypeRef.getType());
             }
             firClass = symbol.getFir();
         } else {
@@ -146,15 +147,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
             for (FirDeclaration declaration : firClass.getDeclarations()) {
                 if (declaration instanceof FirProperty) {
-                    // TODO: enums contain an entries property tied to the default getting ... this must be filtered out unless the user explicitly created it.
-                    // temp hack until properties are understood in enums.
-                    if (!(JavaType.FullyQualified.Class.Kind.Enum == clazz.getKind())) {
+                    if (declaration.getSource() == null || !(declaration.getSource().getKind() instanceof KtFakeSourceElementKind)) {
                         properties.add((FirProperty) declaration);
                     }
                 } else if (declaration instanceof FirSimpleFunction) {
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirConstructor) {
-                    // TODO: identify generated constructors.
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirRegularClass) {
                     // TODO: Companion Objects and possible inner classes.
@@ -182,7 +180,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 }
 
                 for (FirProperty property : properties) {
-                    // TODO: detect and filter out synthetic
                     fields.add(variableType(property.getSymbol(), clazz));
                 }
             }
@@ -191,14 +188,11 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if(!functions.isEmpty()) {
                 methods = new ArrayList<>(functions.size());
                 for (FirFunction function : functions) {
-                    // TODO: detect and filter out synthetic
                     methods.add(methodDeclarationType(function.getSymbol(), clazz));
                 }
             }
 
             List<JavaType.FullyQualified> interfaces = null;
-            // TODO: interfaces need to be detected through superTypeRefs with ClassKind
-
             if (interfaceTypeRefs != null && !interfaceTypeRefs.isEmpty()) {
                 interfaces = new ArrayList<>(interfaceTypeRefs.size());
                 for (FirTypeRef iParam : interfaceTypeRefs) {
@@ -493,12 +487,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         } else if (ClassKind.INTERFACE == classKind) {
             kind = JavaType.FullyQualified.Kind.Interface;
         } else if (ClassKind.OBJECT == classKind) {
-            // TODO: fix me ... public object Name
-            /*
-                public object Unit {
-                    override fun toString() = "kotlin.Unit"
-                }
-             */
             kind = JavaType.FullyQualified.Kind.Class;
         } else {
             throw new UnsupportedOperationException("Unexpected classKind: " + classKind.name());

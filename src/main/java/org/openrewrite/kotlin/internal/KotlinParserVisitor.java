@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -310,8 +311,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<FirStatement> firStatements = new ArrayList<>(block.getStatements().size());
         for (FirStatement s : block.getStatements()) {
-            // TODO: filter out synthetic statements.
-            firStatements.add(s);
+            if (s.getSource() == null || !(s.getSource().getKind() instanceof KtFakeSourceElementKind)) {
+                firStatements.add(s);
+            }
         }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
@@ -373,10 +375,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitClass(FirClass klass, ExecutionContext ctx) {
-        if (!(klass instanceof FirRegularClass)) {
-            throw new IllegalStateException("Implement me.");
-        }
-
         FirRegularClass firRegularClass = (FirRegularClass) klass;
         Space prefix = whitespace();
 
@@ -387,14 +385,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         ModifierScope modifierScope = null;
         if (ClassKind.INTERFACE == classKind) {
             modifierScope = ModifierScope.INTERFACE;
-        } else if (ClassKind.CLASS == classKind || ClassKind.ENUM_CLASS == classKind || ClassKind.ANNOTATION_CLASS == classKind) {
-            modifierScope = ModifierScope.CLASS;
         } else {
-            throw new IllegalStateException("Implement me.");
+            modifierScope = ModifierScope.CLASS;
         }
 
         List<J.Annotation> leadingAnnotation = mapModifiers(modifierScope, firRegularClass.getAnnotations());
-        // TODO: the last annotations in modifiersAndAnnotations should be added to the class.
         List<J.Annotation> kindAnnotations = emptyList();
 
         J.ClassDeclaration.Kind kind;
@@ -462,8 +457,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             bodyPrefix = whitespace();
         }
 
-        OmitBraces omitBraces = null;
-        J.Block body = null;
+        OmitBraces omitBraces;
+        J.Block body;
         if (source.substring(cursor).isEmpty() || !source.substring(cursor).startsWith("{")) {
             cursor = saveCursor;
             omitBraces = new OmitBraces(randomId());
@@ -523,10 +518,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 prefix,
                 Markers.EMPTY,
                 leadingAnnotation,
-                emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
+                emptyList(), // Requires a K view to add K specific modifiers. Modifiers specific to Kotlin are added as annotations for now.
                 kind,
-                name, // TODO
-                null, // TODO
+                name,
+                typeParams,
                 primaryConstructor,
                 extendings, // TODO
                 implementings,

@@ -135,7 +135,6 @@ public class KotlinTypeMappingTest implements JavaTypeMappingTest {
         assertThat(generic.getBounds()).isEmpty();
     }
 
-    @Disabled("Requires use of KotlinConeType to preserve the type reference and a mechanism to prevent SOE on recursive cone like types")
     @Override
     @Test
     public void genericRecursive() {

@@ -172,4 +172,14 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void typeArguments() {
+        rewriteRun(
+          kotlin(
+            """
+              open class B<T> {}
+              """
+          )
+        );
+    }
 }
