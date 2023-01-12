@@ -57,6 +57,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
+    @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Object type) {
         if (type == null) {
             return JavaType.Class.Unknown.getInstance();
@@ -83,14 +84,63 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
     @Nullable
     public JavaType.Method methodDeclarationType(@Nullable FirFunction function, @Nullable JavaType.FullyQualified declaringType) {
-        FirFunctionSymbol<?> symbol = function == null ? null : function.getSymbol();
-        if (symbol != null) {
+        FirFunctionSymbol<?> methodSymbol = function == null ? null : function.getSymbol();
+        if (methodSymbol != null) {
             String signature = signatureBuilder.methodSignature(function.getSymbol());
             JavaType.Method existing = typeCache.get(signature);
             if (existing != null) {
                 return existing;
             }
+
+            List<String> paramNames = null;
+            if (!methodSymbol.getValueParameterSymbols().isEmpty()) {
+                paramNames = new ArrayList<>(methodSymbol.getValueParameterSymbols().size());
+                for (FirValueParameterSymbol p : methodSymbol.getValueParameterSymbols()) {
+                    String s = p.getName().asString();
+                    paramNames.add(s);
+                }
+            }
+            List<String> defaultValues = null;
+
+            JavaType.Method method = new JavaType.Method(
+                    null,
+                    convertToFlagsBitMap(methodSymbol.getResolvedStatus()),
+                    null,
+                    methodSymbol instanceof FirConstructorSymbol ? "<constructor>" : methodSymbol.getName().asString(),
+                    null,
+                    paramNames,
+                    null, null, null,
+                    defaultValues
+            );
+            typeCache.put(signature, method);
+
+            List<JavaType.FullyQualified> exceptionTypes = null;
+
+            JavaType.FullyQualified resolvedDeclaringType = declaringType;
+            if (declaringType == null) {
+                if (methodSymbol instanceof FirConstructorSymbol) {
+                    JavaType type = type(methodSymbol.getResolvedReturnType());
+                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+                } else if (methodSymbol.getDispatchReceiverType() != null) {
+                    JavaType type = type(methodSymbol.getDispatchReceiverType());
+                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+                }
+                // Find a means to distinguish the owner when a method is declared in a root.
+            }
+
+            if (resolvedDeclaringType == null) {
+                return null;
+            }
+
+            JavaType returnType = type(methodSymbol.getResolvedReturnTypeRef());
+            List<JavaType> parameterTypes = null;
+
+            method.unsafeSet(resolvedDeclaringType,
+                    methodSymbol instanceof FirConstructorSymbol ? resolvedDeclaringType : returnType,
+                    parameterTypes, exceptionTypes, listAnnotations(methodSymbol.getAnnotations()));
+            return method;
         }
+
         return null;
     }
 
@@ -239,7 +289,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 }
             }
 
-            List<JavaType.FullyQualified> annotations = getAnnotations(firClass.getAnnotations());
+            List<JavaType.FullyQualified> annotations = listAnnotations(firClass.getAnnotations());
             clazz.unsafeSet(null, supertype, owner, annotations, interfaces, fields, methods);
         }
 
@@ -327,7 +377,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
         method.unsafeSet(resolvedDeclaringType,
                 functionSymbol instanceof FirConstructorSymbol ? resolvedDeclaringType : returnType,
-                parameterTypes, exceptionTypes, getAnnotations(functionSymbol.getAnnotations()));
+                parameterTypes, exceptionTypes, listAnnotations(functionSymbol.getAnnotations()));
         return method;
     }
 
@@ -365,7 +415,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             throw new UnsupportedOperationException("Unexpected null variable type owner.");
         }
 
-        List<JavaType.FullyQualified> annotations = getAnnotations(symbol.getAnnotations());
+        List<JavaType.FullyQualified> annotations = listAnnotations(symbol.getAnnotations());
 
         variable.unsafeSet(resolvedOwner, type(symbol.getResolvedReturnTypeRef()), annotations);
 
@@ -515,7 +565,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return kind;
     }
 
-    private List<JavaType.FullyQualified> getAnnotations(List<FirAnnotation> firAnnotations) {
+    private List<JavaType.FullyQualified> listAnnotations(List<FirAnnotation> firAnnotations) {
         List<JavaType.FullyQualified> annotations = new ArrayList<>(firAnnotations.size());
         // TODO: find a cleaner way to access to retention policy of annotations from a reference. There isn't time to sort this out properly.
         outer:

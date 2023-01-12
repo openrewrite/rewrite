@@ -103,6 +103,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         this.firSession = firSession;
     }
 
+    // TODO: look into FirDeclarationUtilKt.isSynthetic()
     @Override
     public J visitFile(FirFile file, ExecutionContext ctx) {
         JRightPadded<J.Package> pkg = null;

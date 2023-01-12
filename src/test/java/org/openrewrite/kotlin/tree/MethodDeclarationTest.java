@@ -124,6 +124,15 @@ public class MethodDeclarationTest implements RewriteTest {
     void infix() {
         rewriteRun(
           kotlin(
+          """
+                class Spec {
+                    fun version ( version : String) : Spec {
+                        return this
+                    }
+                }
+            """
+          ),
+          kotlin(
             """
                 class A {
                   fun method ( ) {
