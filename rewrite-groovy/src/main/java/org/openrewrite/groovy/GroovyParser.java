@@ -226,6 +226,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
         public Builder(Builder base) {
             super(G.CompilationUnit.class);
+            this.classpath = base.classpath;
             this.typeCache = base.typeCache;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
