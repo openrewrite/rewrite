@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
@@ -68,7 +67,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static java.lang.Math.E;
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -320,7 +318,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<FirStatement> firStatements = new ArrayList<>(block.getStatements().size());
         for (FirStatement s : block.getStatements()) {
-            if (s.getSource() == null || !(s.getSource().getKind() instanceof KtFakeSourceElementKind)) {
+            if (s.getSource() == null || !(s.getSource().getKind() instanceof KtFakeSourceElementKind.ImplicitConstructor)) {
                 firStatements.add(s);
             }
         }
@@ -1394,12 +1392,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     convertAll(nonImplicitParams, t -> sourceBefore(","), noDelim, ctx), Markers.EMPTY);
         }
 
-        // TODO: fix multiple bounds ... this requires extracting visitingTypeParameters and differing the bounds when the size > 1.
-        // Preventing parsing of multiple bounds to stuff the type info into whitespace for now.
-        // The work is non-trivial to preserve whitespace: KotlinTypeGoat<T, S> where S: PT<S>, S: C
-        // The order of the definition of multiple bounds is not guaranteed:
-        // I.E., for <T, S>: A. where S: PT<S>, S: C, T: OtherA, T: OtherB vs where T: OtherA, T: OtherB, S: PT<S>, S: C
-        // The order of each bounds is not guaranteed. T: OtherA, T: OtherB vs T: OtherB, T: OtherA
         return new J.TypeParameter(randomId(), prefix, markers, annotations, name, bounds);
     }
 
