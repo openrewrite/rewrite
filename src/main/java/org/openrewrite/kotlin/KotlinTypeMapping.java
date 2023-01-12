@@ -120,6 +120,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return generic((FirTypeParameter) type, signature);
         } else if (type instanceof FirValueParameter) {
             return type(((FirValueParameter) type).getReturnTypeRef());
+        } else if (type instanceof FirEqualityOperatorCall) {
+            return type(((FirEqualityOperatorCall) type).getTypeRef());
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());

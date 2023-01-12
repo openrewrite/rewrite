@@ -619,7 +619,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 (Expression) visitElement(left, ctx),
                 padLeft(sourceBefore(op.getOperator()), mapOperation(op)),
                 (Expression) visitElement(right, ctx),
-                null); // TODO
+                typeMapping.type(equalityOperatorCall));
     }
 
     private J.Binary.Type mapOperation(FirOperation op) {

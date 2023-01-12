@@ -2,6 +2,7 @@ package org.openrewrite.kotlin;
 
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
+import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
@@ -48,6 +49,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirValueParameterSymbol) type).getResolvedReturnType());
         } else if (type instanceof ConeTypeProjection) {
             return coneTypeProjectionSignature((ConeTypeProjection) type);
+        } else if (type instanceof FirEqualityOperatorCall) {
+            return signature(((FirEqualityOperatorCall) type).getTypeRef());
         }
 
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
