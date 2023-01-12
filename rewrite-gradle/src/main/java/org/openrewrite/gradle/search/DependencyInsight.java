@@ -31,7 +31,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
@@ -86,7 +85,7 @@ public class DependencyInsight extends Recipe {
         return new GroovyIsoVisitor<ExecutionContext>() {
 
             Map<String, List<ResolvedDependency>> configToMatchingDependencies;
-            boolean inDependenciesBlock = false;
+
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile compilationUnit, ExecutionContext executionContext) {
                 GradleProject gp = compilationUnit.getMarkers().findFirst(GradleProject.class).orElse(null);
@@ -124,6 +123,7 @@ public class DependencyInsight extends Recipe {
                     }
                     String groupId = gav[0];
                     String artifactId = gav[1];
+                    //noinspection DuplicatedCode
                     Optional<ResolvedDependency> maybeMatch = configToMatchingDependencies.get(m.getSimpleName()).stream()
                             .filter(dep -> Objects.equals(dep.getGroupId(), groupId) && Objects.equals(dep.getArtifactId(), artifactId))
                             .findAny();

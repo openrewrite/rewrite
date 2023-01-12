@@ -16,7 +16,6 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Tree;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.maven.tree.Dependency;
