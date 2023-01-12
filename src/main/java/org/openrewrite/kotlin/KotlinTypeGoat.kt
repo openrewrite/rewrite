@@ -19,7 +19,7 @@ package org.openrewrite.kotlin
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> {
 //abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
-//    val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
+    val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
 
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 

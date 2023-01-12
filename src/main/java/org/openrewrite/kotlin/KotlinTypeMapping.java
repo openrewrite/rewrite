@@ -44,7 +44,6 @@ import java.util.List;
 
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertClassIdToFqn;
-import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertKotlinFqToJavaFq;
 
 public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private final KotlinTypeSignatureBuilder signatureBuilder;
@@ -314,6 +313,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 parameterTypes, exceptionTypes, getAnnotations(functionSymbol.getAnnotations()));
         return method;
     }
+
+//    public JavaType.Method methodInvocationType(@Nullable com.sun.tools.javac.code.Type selectType, @Nullable Symbol symbol) {
+//
+//    }
 
     @Nullable
     public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol) {

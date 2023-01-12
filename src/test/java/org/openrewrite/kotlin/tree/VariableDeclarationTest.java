@@ -44,6 +44,14 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void anonymousObject() {
+        rewriteRun(
+          kotlin("open class Test"),
+          kotlin("val o : Test = object : Test ( ) { }")
+        );
+    }
+
     @Disabled("Requires size and init to be parsed.")
     @Test
     void diamondOperator() {

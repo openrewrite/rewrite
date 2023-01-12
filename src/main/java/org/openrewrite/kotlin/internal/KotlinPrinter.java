@@ -304,7 +304,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitNewClass(J.NewClass newClass, PrintOutputCapture<P> p) {
+            AnonymousObjectPrefix anonymousObjectPrefix = newClass.getMarkers().findFirst(AnonymousObjectPrefix.class).orElse(null);
+            if (anonymousObjectPrefix != null) {
+                KotlinPrinter.this.visitSpace(anonymousObjectPrefix.getPrefix(), KSpace.Location.ANONYMOUS_OBJECT_PREFIX, p);
+                p.out.append("object");
+            }
+
             beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
+
+            if (anonymousObjectPrefix != null) {
+                p.out.append(":");
+            }
+
             visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
             visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
             visit(newClass.getClazz(), p);

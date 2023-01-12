@@ -93,7 +93,6 @@ public class KotlinTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat,parameters=[]}");
     }
 
-    @Disabled("Requires parsing `object`")
     @Override
     @Test
     public void parameterizedField() {

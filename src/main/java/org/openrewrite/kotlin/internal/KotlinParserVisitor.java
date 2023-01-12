@@ -246,6 +246,55 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitAnonymousObject(FirAnonymousObject anonymousObject, ExecutionContext ctx) {
+        Space objectPrefix = sourceBefore("object");
+        Markers markers = Markers.EMPTY.addIfAbsent(new AnonymousObjectPrefix(randomId(), objectPrefix));
+        Space typeExpressionPrefix = sourceBefore(":");
+        Space prefix = whitespace();
+
+        TypeTree clazz = (TypeTree) visitElement(anonymousObject.getSuperTypeRefs().get(0), ctx);
+        JContainer<Expression> args;
+        if (positionOfNext("(", '{') > -1) {
+            args = JContainer.build(sourceBefore("("),
+                    singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+        } else {
+            args = JContainer.<Expression>empty()
+                    .withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
+        }
+
+        int saveCursor = cursor;
+        J.Block body = null;
+        Space bodyPrefix = whitespace();
+
+        if (source.startsWith("{", cursor)) {
+            skip("{");
+            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                    emptyList(), // TODO
+                    sourceBefore("}"));
+        } else {
+            cursor = saveCursor;
+        }
+
+        return new J.NewClass(
+                randomId(),
+                prefix,
+                markers,
+                null, // TODO
+                typeExpressionPrefix,
+                clazz,
+                args,
+                body,
+                null // TODO
+        );
+    }
+
+    @Override
+    public J visitAnonymousObjectExpression(FirAnonymousObjectExpression anonymousObjectExpression, ExecutionContext ctx) {
+        // Pass through to the anonymous object since it doesn't seem necessary to use the typeRef.
+        return visitElement(anonymousObjectExpression.getAnonymousObject(), ctx);
+    }
+
+    @Override
     public J visitBlock(FirBlock block, ExecutionContext ctx) {
         int saveCursor = cursor;
         Space prefix = whitespace();
@@ -1548,6 +1597,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitAnonymousFunction((FirAnonymousFunction) firElement, ctx);
         } else if (firElement instanceof FirAnonymousFunctionExpression) {
             return visitAnonymousFunctionExpression((FirAnonymousFunctionExpression) firElement, ctx);
+        } else if (firElement instanceof FirAnonymousObject) {
+            return visitAnonymousObject((FirAnonymousObject) firElement, ctx);
+        }  else if (firElement instanceof FirAnonymousObjectExpression) {
+            return visitAnonymousObjectExpression((FirAnonymousObjectExpression) firElement, ctx);
         } else if (firElement instanceof FirBlock) {
             return visitBlock((FirBlock) firElement, ctx);
         }  else if (firElement instanceof FirClass) {
