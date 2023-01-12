@@ -70,33 +70,38 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
         if (type instanceof FirClass) {
             return classType(type, signature);
+        } else if (type instanceof FirFunction) {
+            return methodDeclarationType((FirFunction) type, null);
+        } else if (type instanceof FirFunctionCall) {
+            return methodInvocationType((FirFunctionCall) type, signature);
+        } else if (type instanceof FirVariable) {
+            return variableType((FirVariable) type, signature);
         }
-
-//        else if (type instanceof FirFunction) {
-//            return methodDeclarationType((FirFunction) type, signature);
-//        } else if (type instanceof FirFunctionCall) {
-//            return methodInvocationType((FirFunctionCall) type, signature);
-//        } else if (type instanceof FirVariable) {
-//            return variableType((FirVariable) type, signature);
-//        }
 
         return resolveType(type, signature);
     }
 
     @Nullable
-    public JavaType.Method methodDeclarationType(FirFunction function, String signature) {
+    public JavaType.Method methodDeclarationType(@Nullable FirFunction function, @Nullable JavaType.FullyQualified declaringType) {
+        FirFunctionSymbol<?> symbol = function == null ? null : function.getSymbol();
+        if (symbol != null) {
+            String signature = signatureBuilder.methodSignature(function.getSymbol());
+            JavaType.Method existing = typeCache.get(signature);
+            if (existing != null) {
+                return existing;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall, @Nullable String signature) {
         JavaType.Method methodType = null;
         return methodType;
     }
 
     @Nullable
-    public JavaType.Method methodInvocationType(FirFunctionCall functionCall, String signature) {
-        JavaType.Method methodType = null;
-        return methodType;
-    }
-
-    @Nullable
-    public JavaType.Variable variableType(FirVariable variable, String signature) {
+    public JavaType.Variable variableType(@Nullable FirVariable variable, @Nullable String signature) {
         JavaType.Variable variableType = null;
 
         return variableType;

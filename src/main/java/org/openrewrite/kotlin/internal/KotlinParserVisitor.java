@@ -645,7 +645,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 prefix,
                 Markers.EMPTY,
                 annotations == null ? emptyList() : annotations,
-                convertToIdentifier(enumEntry.getName().asString()),
+                convertToIdentifier(enumEntry.getName().asString(), enumEntry),
                 initializer
         );
     }
@@ -1284,7 +1284,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             returnTypeExpression = (TypeTree) visitElement(simpleFunction.getReturnTypeRef(), ctx);
         }
 
-        J.Block body = null;
+        J.Block body;
         int saveCursor = cursor;
         Space blockPrefix = whitespace();
         if (simpleFunction.getBody() instanceof FirSingleExpressionBlock) {
@@ -1307,16 +1307,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                annotations, // TODO
+                annotations,
                 emptyList(),
                 typeParameters,
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
-                params, // TODO
-                null, // TODO
+                params,
+                null,
                 body,
                 null,
-                null); // TODO
+                typeMapping.methodDeclarationType(simpleFunction, null));
     }
 
     @Override
