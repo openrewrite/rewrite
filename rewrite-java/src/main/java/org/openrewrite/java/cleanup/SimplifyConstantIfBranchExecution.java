@@ -144,7 +144,7 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                  * ```
                  * The above is not valid java and will cause later processing errors.
                  */
-                return emptyJBlock();
+                return J.Block.createEmptyBlock();
             }
         }
 
@@ -181,20 +181,6 @@ public class SimplifyConstantIfBranchExecution extends Recipe {
                 }
             }.visit(iff.getThenPart(), visitedCFKeyword);
             return visitedCFKeyword.get();
-        }
-
-        /**
-         * An empty {@link J.Block} with no contents.
-         */
-        private static J.Block emptyJBlock() {
-            return new J.Block(
-                    Tree.randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    JRightPadded.build(false),
-                    Collections.emptyList(),
-                    Space.EMPTY
-            );
         }
 
         private static boolean isLiteralTrue(@Nullable Expression expression) {

@@ -112,12 +112,6 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     }
 
     private Statement emptyBlock() {
-        return new J.Block(randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                JRightPadded.build(false),
-                emptyList(),
-                Space.EMPTY
-        );
+        return J.Block.createEmptyBlock();
     }
 }
