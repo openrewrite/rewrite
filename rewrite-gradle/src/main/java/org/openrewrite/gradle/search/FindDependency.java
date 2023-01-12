@@ -46,7 +46,7 @@ public class FindDependency extends Recipe {
     String artifactId;
 
     @Option(displayName = "Dependency configuration",
-            description = "The dependency configuration to search for dependencies in.",
+            description = "The dependency configuration to search for dependencies in. If omitted then all configurations will be searched.",
             example = "api",
             required = false)
     @Nullable
