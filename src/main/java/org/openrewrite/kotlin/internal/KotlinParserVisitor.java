@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
@@ -167,8 +168,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space argsPrefix = sourceBefore("(");
             List<JRightPadded<Expression>> expressions;
             if (annotationCall.getArgumentList().getArguments().size() == 1) {
-                FirExpression arg = annotationCall.getArgumentList().getArguments().get(0);
-                expressions = singletonList(convert(arg, t -> sourceBefore(")"), ctx));
+                if (annotationCall.getArgumentList().getArguments().get(0) instanceof FirVarargArgumentsExpression) {
+                    FirVarargArgumentsExpression varargArgumentsExpression = (FirVarargArgumentsExpression) annotationCall.getArgumentList().getArguments().get(0);
+                    expressions = convertAll(varargArgumentsExpression.getArguments(), commaDelim, t -> sourceBefore(")"), ctx);
+                } else {
+                    FirExpression arg = annotationCall.getArgumentList().getArguments().get(0);
+                    expressions = singletonList(convert(arg, t -> sourceBefore(")"), ctx));
+                }
             } else {
                 expressions = convertAll(annotationCall.getArgumentList().getArguments(), commaDelim, t -> sourceBefore(")"), ctx);
             }
@@ -1644,8 +1650,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitUserTypeRef((FirUserTypeRef) firElement, ctx);
         } else if (firElement instanceof FirValueParameter) {
             return visitValueParameter((FirValueParameter) firElement, ctx);
-        } else if (firElement instanceof FirVarargArgumentsExpression) {
-            return visitVarargArgumentsExpression((FirVarargArgumentsExpression) firElement, ctx);
         } else if (firElement instanceof FirVariableAssignment) {
             return visitVariableAssignment((FirVariableAssignment) firElement, ctx);
         }  else if (firElement instanceof FirWhenBranch) {

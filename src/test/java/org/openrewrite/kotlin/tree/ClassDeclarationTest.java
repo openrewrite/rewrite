@@ -141,7 +141,6 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires support for annotation parameters.")
     @Test
     void annotation() {
         rewriteRun(
@@ -149,11 +148,11 @@ class ClassDeclarationTest implements RewriteTest {
             """
                 public @Deprecated("message 0") abstract @Suppress("") class Test
                 
-                @Deprecated("message 1") 
+                @Deprecated("message 1")
                 @Suppress("")
                 class A
                 
-                @Suppress("")
+                @Suppress("unused", "unchecked")
                 @Deprecated("message 2")
                 class B
             """
