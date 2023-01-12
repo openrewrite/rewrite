@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTypeSignatureBuilderTest;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.kotlin.tree.K;
 
 import java.util.List;
 
@@ -17,12 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class KotlinTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
+    private static final K.CompilationUnit cu = KotlinParser.builder()
+      .logCompilationWarningsAndErrors(true)
+      .build()
+      .parse(new InMemoryExecutionContext(), goat)
+      .get(0);
+
     public JavaType.Parameterized goatType() {
-        return requireNonNull(TypeUtils.asParameterized(KotlinParser.builder()
-               .logCompilationWarningsAndErrors(true)
-               .build()
-               .parse(new InMemoryExecutionContext(), goat)
-               .get(0)
+        return requireNonNull(TypeUtils.asParameterized(cu
                .getClasses()
                .get(0)
                .getType()));
@@ -53,8 +57,15 @@ public class KotlinTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
 
     @Override
     public Object innerClassSignature(String innerClassSimpleName) {
-        JavaType javaType = (JavaType) firstMethodParameter("inner");
-        return TypeUtils.asFullyQualified(javaType).toString();
+        return cu.getClasses().stream()
+                .flatMap(it -> it.getBody().getStatements().stream())
+                .filter(it -> it instanceof J.ClassDeclaration)
+                .map(it -> (J.ClassDeclaration) it)
+                .filter(it -> it.getSimpleName().equals(innerClassSimpleName))
+                .findAny()
+                .orElseThrow()
+                .getType()
+                .toString();
     }
 
     @Override
