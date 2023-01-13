@@ -847,7 +847,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     (Expression) left,
                     padLeft(opPrefix, type),
                     (Expression) right,
-                    null);
+                    typeMapping.type(functionCall));
         }
 
         throw new IllegalStateException("Implement me.");
@@ -884,12 +884,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         boolean parenthesized = source.charAt(cursor) == '(';
         skip("(");
 
-        JavaType closureType = null; // TODO
+        JavaType closureType = typeMapping.type(functionTypeRef);
         if (!functionTypeRef.getValueParameters().isEmpty()) {
             List<FirValueParameter> parameters = functionTypeRef.getValueParameters();
             for (int i = 0; i < parameters.size(); i++) {
                 FirValueParameter p = parameters.get(i);
-                JavaType type = null; // TODO
                 J expr = visitElement(p, ctx);
                 JRightPadded<J> param = JRightPadded.build(expr);
                 Space after = i < parameters.size() - 1 ? sourceBefore(",") : (parenthesized ? sourceBefore(")") : EMPTY);
@@ -982,7 +981,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Markers.EMPTY,
                 convertToIdentifier(namedArgumentExpression.getName().toString()),
                 padLeft(sourceBefore("="), convert(namedArgumentExpression.getExpression(), ctx)),
-                null); // TODO
+                typeMapping.type(namedArgumentExpression.getTypeRef()));
     }
 
     @Override
@@ -1070,7 +1069,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         name,
                         dimensionsAfterName,
                         expr == null ? null : padLeft(exprPrefix, (Expression) expr),
-                        null // TODO: add type mapping
+                        typeMapping.variableType(property.getSymbol())
                 )
         );
         vars.add(namedVariable);
@@ -1160,7 +1159,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     null, // TODO
                     body,
                     null,
-                    null); // TODO
+                    typeMapping.methodDeclarationType(propertyAccessor, null));
         }
 
         throw new IllegalStateException("Implement me.");
@@ -1458,8 +1457,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             KtSourceElement sourceElement = valueParameter.getSource();
             if (sourceElement == null) {
                 throw new IllegalStateException("Unexpected null source.");
-            } else {
-                KtLightSourceElement element = (KtLightSourceElement) sourceElement;
             }
         } else {
             valueName = valueParameter.getName().asString();

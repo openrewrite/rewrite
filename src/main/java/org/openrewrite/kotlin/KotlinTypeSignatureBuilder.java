@@ -60,6 +60,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirConstExpression<?>) type).getTypeRef());
         } else if (type instanceof FirEqualityOperatorCall) {
             return signature(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirFunctionTypeRef) {
+            return signature(((FirFunctionTypeRef) type).getReturnTypeRef());
         } else if (type instanceof FirNamedArgumentExpression) {
             return signature(((FirNamedArgumentExpression) type).getTypeRef());
         } else if (type instanceof FirLambdaArgumentExpression) {

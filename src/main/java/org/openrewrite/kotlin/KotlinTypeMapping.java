@@ -88,6 +88,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return type(((FirConstExpression<?>) type).getTypeRef());
         } else if (type instanceof FirEqualityOperatorCall) {
             return type(((FirEqualityOperatorCall) type).getTypeRef());
+        }  else if (type instanceof FirFunctionTypeRef) {
+            return type(((FirFunctionTypeRef) type).getReturnTypeRef());
         } else if (type instanceof FirNamedArgumentExpression) {
             return type(((FirNamedArgumentExpression) type).getTypeRef());
         } else if (type instanceof FirLambdaArgumentExpression) {
