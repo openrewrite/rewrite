@@ -27,11 +27,7 @@ public class EnumTest implements RewriteTest {
     @Test
     void enumEmptyBody() {
         rewriteRun(
-          kotlin(
-            """
-                enum class A
-            """
-          )
+          kotlin("enum class A")
         );
     }
 

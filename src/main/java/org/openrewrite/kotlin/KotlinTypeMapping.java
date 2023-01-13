@@ -83,7 +83,11 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     }
 
     private JavaType resolveType(Object type, String signature) {
-        if (type instanceof FirResolvedNamedReference) {
+        if (type instanceof ConeTypeProjection) {
+            return generic((ConeTypeProjection) type, signature);
+        } else if (type instanceof FirEqualityOperatorCall) {
+            return type(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
                 return type(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef());
@@ -96,27 +100,25 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
                 return type(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType());
             } else {
-                throw new IllegalStateException("fix me.");
+                throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
             }
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
-            if (coneKotlinType instanceof ConeClassLikeType) {
-                return classType(type, signature);
-            } else if (coneKotlinType instanceof ConeTypeParameterType) {
+            if (coneKotlinType instanceof ConeTypeParameterType) {
                 FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);
                 if (classifierSymbol != null && classifierSymbol.getFir() instanceof FirTypeParameter) {
                     return generic((FirTypeParameter) classifierSymbol.getFir(), signature);
                 }
             }
             return classType(type, signature);
-        } else if (type instanceof ConeTypeProjection) {
-            return generic((ConeTypeProjection) type, signature);
         } else if (type instanceof FirTypeParameter) {
             return generic((FirTypeParameter) type, signature);
         } else if (type instanceof FirValueParameter) {
             return type(((FirValueParameter) type).getReturnTypeRef());
-        } else if (type instanceof FirEqualityOperatorCall) {
-            return type(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirVariableAssignment) {
+            return type(((FirVariableAssignment) type).getCalleeReference());
+        } else if (type instanceof FirQualifiedAccessExpression) {
+            return type(((FirQualifiedAccessExpression) type).getTypeRef());
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
@@ -125,14 +127,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     @Nullable
     public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall, @Nullable String signature) {
         JavaType.Method methodType = null;
-        return methodType;
+        throw new UnsupportedOperationException("Implement function call signatures.");
     }
 
     @Nullable
     public JavaType.Variable variableType(@Nullable FirVariable variable, @Nullable String signature) {
-        JavaType.Variable variableType = null;
-
-        return variableType;
+        return variable == null ? null : variableType(variable.getSymbol());
     }
 
     private JavaType.FullyQualified classType(Object classType, String signature) {
@@ -274,7 +274,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     public JavaType.Method methodDeclarationType(@Nullable FirFunction function, @Nullable JavaType.FullyQualified declaringType) {
         FirFunctionSymbol<?> methodSymbol = function == null ? null : function.getSymbol();
         if (methodSymbol != null) {
-            String signature = signatureBuilder.methodSignature(function.getSymbol());
+            String signature = signatureBuilder.methodDeclarationSignature(function.getSymbol());
             JavaType.Method existing = typeCache.get(signature);
             if (existing != null) {
                 return existing;
@@ -364,13 +364,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
         typeCache.put(signature, variable);
 
-        JavaType resolvedOwner = owner;
-        if (owner == null) {
-            throw new UnsupportedOperationException("Unexpected null variable type owner.");
-        }
-
         List<JavaType.FullyQualified> annotations = listAnnotations(symbol.getAnnotations());
 
+        JavaType resolvedOwner = owner;
+        // Resolve owner ... there isn't a clear way to access this yet.
         variable.unsafeSet(resolvedOwner, type(symbol.getResolvedReturnTypeRef()), annotations);
 
         return variable;
@@ -469,28 +466,36 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private long convertToFlagsBitMap(FirDeclarationStatus status) {
         long bitMask = 0;
         Visibility visibility = status.getVisibility();
-        if ("public".equals(visibility.getName())) {
-            bitMask += 1L;
-        } else if ("private".equals(visibility.getName())) {
-            bitMask += 1L << 1;
-        } else if ("protected".equals(visibility.getName())) {
-            bitMask += 1L << 2;
-        } else if ("internal".equals(visibility.getName())) {
-            // Kotlin specific
-        } else {
-            // are there more?
-            System.out.println();
+        switch (visibility.getName()) {
+            case "public":
+                bitMask += 1L;
+                break;
+            case "private":
+                bitMask += 1L << 1;
+                break;
+            case "protected":
+                bitMask += 1L << 2;
+                break;
+            case "internal":
+                // Kotlin specific
+                break;
+            default:
+                // are there more?
+                System.out.println();
+                break;
         }
+
         Modality modality = status.getModality();
         if (Modality.FINAL == modality) {
             bitMask += 1L << 4;
         } else if (Modality.ABSTRACT == modality) {
             bitMask += 1L << 10;
-        } else if (Modality.OPEN == modality) {
-            // Kotlin specific
-        } else if (Modality.SEALED == modality) {
-            // Kotlin specific
         }
+//        else if (Modality.OPEN == modality) {
+            // Kotlin specific
+//        } else if (Modality.SEALED == modality) {
+            // Kotlin specific
+//        }
 
         if (status.isStatic()) {
             // Not sure how this happens, since Kotlin does not have a static modifier.
@@ -544,33 +549,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                     }
                 }
             }
-            JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(convertToRegularClass(firAnnotation.getTypeRef()));
+            JavaType.FullyQualified fullyQualified = (JavaType.FullyQualified) type(firAnnotation.getTypeRef());
             annotations.add(fullyQualified);
         }
 
         return annotations;
-    }
-
-    // This might exist somewhere among Kotlin's many utils.
-    @Nullable
-    public FirRegularClass convertToRegularClass(@Nullable ConeKotlinType kotlinType) {
-        if (kotlinType != null) {
-            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(kotlinType, firSession);
-            if (symbol != null) {
-                return symbol.getFir();
-            }
-        }
-
-        return null;
-    }
-
-    @Nullable
-    public FirRegularClass convertToRegularClass(@Nullable FirTypeRef firTypeRef) {
-        if (firTypeRef != null) {
-            ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType(firTypeRef);
-            return convertToRegularClass(coneKotlinType);
-        }
-
-        return null;
     }
 }

@@ -5,14 +5,12 @@ import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall;
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall;
 import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression;
-import org.jetbrains.kotlin.fir.expressions.FirThisReceiverExpression;
+import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
-import org.jetbrains.kotlin.fir.types.impl.FirImplicitAnyTypeRef;
-import org.jetbrains.kotlin.fir.types.impl.FirImplicitBuiltinTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.name.ClassId;
 import org.openrewrite.internal.lang.Nullable;
@@ -33,6 +31,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         this.firSession = firSession;
     }
 
+    @SuppressWarnings("ConstantConditions")
     public String signature(@Nullable Object type) {
         if (type == null) {
             return "{undefined}";
@@ -41,7 +40,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (type instanceof FirClass) {
             return ((FirClass) type).getTypeParameters().size() > 0 ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof FirFunction) {
-            return methodSignature(((FirFunction) type).getSymbol());
+            return methodDeclarationSignature(((FirFunction) type).getSymbol());
+        }  else if (type instanceof FirFunctionCall) {
+            return methodInvocationSignature((FirFunctionCall) type);
         } else if (type instanceof FirVariable) {
             return variableSignature(((FirVariable) type).getSymbol());
         }
@@ -49,29 +50,12 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return resolveSignature(type);
     }
 
-    @Nullable
-    public String methodDeclarationType(FirFunction function) {
-        String signature = convertKotlinFqToJavaFq(function.getSymbol().toString());
-        return signature;
-    }
-
-    @Nullable
-    public String methodInvocationType(FirFunctionCall functionCall) {
-        String methodType = null;
-        return methodType;
-    }
-
-    @Nullable
-    public String variableType(FirVariable variable) {
-        return convertKotlinFqToJavaFq(variable.getSymbol().toString());
-    }
-
-    private String resolveSignature(@Nullable Object type) {
-        if (type == null) {
-            return "{undefined}";
-        }
-
-        if (type instanceof FirResolvedNamedReference) {
+    private String resolveSignature(Object type) {
+        if (type instanceof ConeTypeProjection) {
+            return coneTypeProjectionSignature((ConeTypeProjection) type);
+        } else if (type instanceof FirEqualityOperatorCall) {
+            return signature(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
                 return signature(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef());
@@ -84,7 +68,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
                 return signature(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType());
             } else {
-                throw new IllegalStateException("fix me.");
+                throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
             }
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = ((FirResolvedTypeRef) type).getType();
@@ -101,15 +85,18 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirValueParameter) type).getReturnTypeRef());
         } else if (type instanceof FirValueParameterSymbol) {
             return signature(((FirValueParameterSymbol) type).getResolvedReturnType());
-        } else if (type instanceof ConeTypeProjection) {
-            return coneTypeProjectionSignature((ConeTypeProjection) type);
-        } else if (type instanceof FirEqualityOperatorCall) {
-            return signature(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirVariableAssignment) {
+            return signature(((FirVariableAssignment) type).getCalleeReference());
         } else if (type instanceof FirQualifiedAccessExpression) {
             return signature(((FirQualifiedAccessExpression) type).getTypeRef());
         }
 
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
+    }
+
+    @Nullable
+    public String methodInvocationSignature(FirFunctionCall functionCall) {
+        throw new UnsupportedOperationException("Implement function call signatures.");
     }
 
     @Override
@@ -190,6 +177,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     }
 
     public String coneTypeProjectionSignature(ConeTypeProjection type) {
+        // TODO: refactor to handle recursive generics.
         String typeSignature;
         StringBuilder s = new StringBuilder();
         if (type instanceof ConeKotlinTypeProjectionIn) {
@@ -232,18 +220,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s.toString();
     }
 
-    public String resolvedTypeRef(Object type) {
-        FirResolvedTypeRef resolvedTypeRef = (FirResolvedTypeRef) type;
-
-        ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType(resolvedTypeRef);
-        ClassId classId = ConeTypeUtilsKt.getClassId(coneKotlinType);
-        if (classId == null) {
-            // TODO: this may not work 100% for generics with bounds ... test with bounds.
-            return coneKotlinType.toString();
-        }
-        return convertClassIdToFqn(classId);
-    }
-
     @Override
     public String primitiveSignature(Object type) {
         throw new UnsupportedOperationException("TODO");
@@ -271,7 +247,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';
     }
 
-    public String methodSignature(FirFunctionSymbol<? extends FirFunction> symbol) {
+    public String methodDeclarationSignature(FirFunctionSymbol<? extends FirFunction> symbol) {
         String s = symbol instanceof FirConstructorSymbol ? signature(symbol.getResolvedReturnTypeRef()) : signature(symbol.getDispatchReceiverType());
 
         if (symbol instanceof FirConstructorSymbol) {
@@ -280,21 +256,14 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s += "{name=" + symbol.getName().asString() +
                     ",return=" + signature(symbol.getResolvedReturnTypeRef());
         }
-
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
     }
 
     private String methodArgumentSignature(FirFunctionSymbol<? extends FirFunction> sym) {
-        // TODO:
-//        if (sym.isStaticOrInstanceInit()) {
-//            return "[]";
-//        }
-
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
         for (FirValueParameterSymbol parameterSymbol : sym.getValueParameterSymbols()) {
                 genericArgumentTypes.add(signature(parameterSymbol));
         }
-//        }
         return genericArgumentTypes.toString();
     }
 
@@ -306,17 +275,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 return symbol.getFir();
             }
         }
-
-        return null;
-    }
-
-    @Nullable
-    public FirRegularClass convertToRegularClass(@Nullable FirTypeRef firTypeRef) {
-        if (firTypeRef != null) {
-            ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType(firTypeRef);
-            return convertToRegularClass(coneKotlinType);
-        }
-
         return null;
     }
 
@@ -324,7 +282,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return convertKotlinFqToJavaFq(classId.toString());
     }
 
-    // Fix me.
     public static String convertKotlinFqToJavaFq(String kotlinFqn) {
         String cleanedFqn = kotlinFqn
                 .replace(".", "$")

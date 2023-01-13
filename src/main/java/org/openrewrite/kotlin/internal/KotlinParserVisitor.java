@@ -199,7 +199,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         Space prefix = sourceBefore("{");
-        JavaType closureType = null; // TODO
+        JavaType closureType = null;
 
         FirAnonymousFunction anonymousFunction = anonymousFunctionExpression.getAnonymousFunction();
         List<JRightPadded<J>> paramExprs = new ArrayList<>(anonymousFunction.getValueParameters().size());
@@ -207,7 +207,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             List<FirValueParameter> parameters = anonymousFunction.getValueParameters();
             for (int i = 0; i < parameters.size(); i++) {
                 FirValueParameter p = parameters.get(i);
-                JavaType type = null; // TODO
                 J expr = visitElement(p, ctx);
                 JRightPadded<J> param = JRightPadded.build(expr);
                 if (i != parameters.size() - 1) {
@@ -244,6 +243,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             body = body.withMarkers(body.getMarkers().removeByType(OmitBraces.class));
         }
 
+        if (body == null) {
+            body = new J.Block(randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                    emptyList(),
+                    EMPTY);
+        }
+
         return new J.Lambda(
                 randomId(),
                 prefix,
@@ -277,8 +285,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         if (source.startsWith("{", cursor)) {
             skip("{");
-            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    emptyList(), // TODO
+            body = new J.Block(
+                    randomId(),
+                    bodyPrefix,
+                    Markers.EMPTY,
+                    new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                    emptyList(),
                     sourceBefore("}"));
         } else {
             cursor = saveCursor;
@@ -293,7 +305,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 clazz,
                 args,
                 body,
-                null // TODO
+                null
         );
     }
 
@@ -1079,14 +1091,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitPropertyAccessExpression(FirPropertyAccessExpression propertyAccessExpression, ExecutionContext ctx) {
-        if (!(propertyAccessExpression.getAnnotations().isEmpty() ||
-                propertyAccessExpression.getTypeArguments().isEmpty() ||
-                (propertyAccessExpression.getExplicitReceiver() == null || propertyAccessExpression.getExplicitReceiver() instanceof FirResolvedQualifier) ||
-                (propertyAccessExpression.getDispatchReceiver() instanceof FirNoReceiverExpression || propertyAccessExpression.getDispatchReceiver() instanceof FirThisReceiverExpression) ||
-                (propertyAccessExpression.getExtensionReceiver() instanceof FirNoReceiverExpression || propertyAccessExpression.getExtensionReceiver() instanceof FirThisReceiverExpression))) {
-            throw new IllegalStateException("Implement me.");
-        }
-
         return convert(propertyAccessExpression.getCalleeReference(), ctx);
     }
 
@@ -1187,21 +1191,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitResolvedTypeRef(FirResolvedTypeRef resolvedTypeRef, ExecutionContext ctx) {
         if (resolvedTypeRef.getDelegatedTypeRef() != null) {
-            return visitElement(resolvedTypeRef.getDelegatedTypeRef(), ctx);
+            J j = visitElement(resolvedTypeRef.getDelegatedTypeRef(), ctx);
+            if (j instanceof TypeTree) {
+                j = ((TypeTree) j).withType(typeMapping.type(resolvedTypeRef));
+            }
+            return j;
         }
-        throw new IllegalStateException("Implement me.");
+        throw new UnsupportedOperationException("Unsupported null delegated type reference.");
     }
 
     @Override
     public J visitResolvedQualifier(FirResolvedQualifier resolvedQualifier, ExecutionContext ctx) {
-        J.Identifier name = new J.Identifier(
-                randomId(),
-                sourceBefore(resolvedQualifier.getRelativeClassFqName().asString()),
-                Markers.EMPTY,
-                resolvedQualifier.getRelativeClassFqName().asString(),
-                null,
-                null);
-        return name;
+        throw new UnsupportedOperationException("Unsupported FirResolvedQualifier.");
     }
 
     @Override
@@ -1265,7 +1266,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     emptyList(),
                     null,
                     null,
-                    null,
+                    emptyList(),
                     singletonList(infixReceiver));
             implicitParam = implicitParam.withMarkers(implicitParam.getMarkers().addIfAbsent(new TypeReferencePrefix(randomId(), EMPTY)));
             List<JRightPadded<Statement>> newStatements = new ArrayList<>(params.getElements().size() + 1);
@@ -1383,13 +1384,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitTypeProjectionWithVariance(FirTypeProjectionWithVariance typeProjectionWithVariance, ExecutionContext ctx) {
-        // TODO: Temp. sort out how type references work and why FirTypeProjectionWithVariance contain variance even when not specified in code. I.E., Int.
         return visitResolvedTypeRef((FirResolvedTypeRef) typeProjectionWithVariance.getTypeRef(), ctx);
     }
 
     @Override
     public J visitUserTypeRef(FirUserTypeRef userTypeRef, ExecutionContext ctx) {
-        JavaType type = null; // TODO: add type mapping. Note: typeRef does not contain a reference to the symbol. The symbol exists on the FIR element.
         Markers markers = Markers.EMPTY;
         StringBuilder name = new StringBuilder();
         List<FirQualifierPart> qualifier = userTypeRef.getQualifier();
@@ -1451,7 +1450,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
 
         List<J> modifiers = emptyList();
-        List<J.Annotation> annotations = emptyList(); // TODO: the last annotations in modifiers should be added.
+        List<J.Annotation> annotations = mapAnnotations(valueParameter.getAnnotations());
         Markers markers = Markers.EMPTY;
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
@@ -1503,7 +1502,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         name,
                         dimensionsAfterName,
                         initializer != null ? padLeft(sourceBefore("="), (Expression) visitExpression(initializer, ctx)) : null,
-                        null // TODO: add type mapping
+                        typeMapping.variableType(valueParameter.getSymbol())
                 )
         );
         vars.add(namedVariable);
@@ -1512,8 +1511,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
+                annotations == null ? emptyList() : annotations,
                 emptyList(),
-                emptyList(), // TODO: requires updates to handle kotlin specific modifiers.
                 typeExpression,
                 null,
                 dimensionsAfterName,
@@ -1529,19 +1528,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Markers.EMPTY,
                 convert(variableAssignment.getLValue(), ctx),
                 padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
-                null); // TODO
+                typeMapping.type(variableAssignment));
     }
 
     @Override
     public J visitWhenBranch(FirWhenBranch whenBranch, ExecutionContext ctx) {
         Space prefix = whitespace();
         if (source.substring(cursor).startsWith("when")) {
-            throw new IllegalStateException("Implement me.");
+            throw new UnsupportedOperationException("When conditions are currently unsupported.");
         } else if (source.substring(cursor).startsWith("if")) {
             skip("if");
         } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
                 whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
-            throw new IllegalStateException("Implement me.");
+            throw new UnsupportedOperationException("Unsupport condition type.");
         }
 
         boolean singleExpression = whenBranch.getResult() instanceof FirSingleExpressionBlock;
@@ -1569,7 +1568,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitWhenExpression(FirWhenExpression whenExpression, ExecutionContext ctx) {
-        // TODO: implement when expressions.
         FirWhenBranch whenBranch = whenExpression.getBranches().get(0);
         J firstElement = visitElement(whenBranch, ctx);
         if (!(firstElement instanceof J.If)) {
@@ -1690,7 +1688,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final Function<FirElement, Space> noDelim = ignored -> EMPTY;
 
     private void skip(@Nullable String token) {
-        if (source.startsWith(token, cursor)) {
+        if (token != null && source.startsWith(token, cursor)) {
             cursor += token.length();
         }
     }
@@ -1769,13 +1767,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
-        return new JRightPadded<>(tree, right, Markers.EMPTY);
+        return new JRightPadded<>(tree, right == null ? EMPTY : right, Markers.EMPTY);
     }
 
     private enum ModifierScope {
         CLASS("class"), FUNCTION("fun"), INTERFACE("interface"), VAL("val"), VAR("var");
 
-        private String keyword;
+        private final String keyword;
         ModifierScope(String keyword) {
             this.keyword = keyword;
         }
@@ -1807,11 +1805,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if (source.startsWith("@", cursor)) {
                 cursor = saveCursor;
                 J.Annotation annotation = mapAnnotation(findMatch);
-                if (annotation != null) {
-                    modifiers.add(annotation);
-                }
+                modifiers.add(annotation);
             } else {
-                // TODO: Move the conversion when views are implemented. K.Modifier should exist on a K type, and the annotation should only exist on the J type.
                 K.Modifier modifier = mapModifier(prefix, emptyList());
                 J.Annotation annotation = convertToAnnotation(modifier);
                 modifiers.add(annotation);

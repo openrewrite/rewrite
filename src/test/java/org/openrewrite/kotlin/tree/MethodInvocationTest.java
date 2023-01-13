@@ -102,11 +102,7 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void methodWithLambda() {
         rewriteRun(
-          kotlin("""
-                fun method(arg: Any) {
-                }
-            """
-          ),
+          kotlin("fun method(arg: Any) {}"),
           kotlin(
             """
               fun callMethodWithLambda() {
@@ -124,7 +120,7 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
                 fun method(arg: Any) {
-                  val l = listOf(1, 2, 3)
+                    val l = listOf(1, 2, 3)
                 }
             """
           )
@@ -134,15 +130,11 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void multipleTypesOfMethodArguments() {
         rewriteRun(
-          kotlin("""
-                fun methodA(a: String, b: int, c: Double) {
-                }
-            """
-          ),
+          kotlin("fun methodA(a: String, b: Int, c: Double) {}"),
           kotlin(
             """
                 fun methodB() {
-                  methodA("a", 1, 2.0)
+                    methodA("a", 1, 2.0)
                 }
             """
           )
@@ -152,11 +144,7 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void parameterAssignment() {
         rewriteRun(
-          kotlin("""
-                fun apply ( plugin: String ? = null) {
-                }
-            """
-          ),
+          kotlin("fun apply ( plugin: String ? = null) {}"),
           kotlin(
             """
                 fun method() {
@@ -170,11 +158,7 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void typeParameters() {
         rewriteRun(
-          kotlin("""
-                fun < T : Number > method ( type : T ) {
-                }
-            """
-          ),
+          kotlin("fun < T : Number > method ( type : T ) {}"),
           kotlin(
             """
                 fun method() {

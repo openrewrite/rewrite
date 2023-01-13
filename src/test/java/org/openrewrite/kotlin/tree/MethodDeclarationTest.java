@@ -25,71 +25,42 @@ public class MethodDeclarationTest implements RewriteTest {
     @Test
     void methodDeclaration() {
         rewriteRun(
-          kotlin(
-            """
-                fun method ( ) {
-                }
-            """
-          )
+          kotlin("fun method ( ) {}")
         );
     }
 
     @Test
     void parameters() {
         rewriteRun(
-          kotlin(
-            """
-                fun method ( i : Int ) {
-                }
-            """
-          )
+          kotlin("fun method ( i : Int ) {}")
         );
     }
 
     @Test
     void functionTypeReference() {
         rewriteRun(
-          kotlin(
-            """
-                fun method( input : (  ) -> String ) {
-                }
-            """
-          )
+          kotlin("fun method( input : (  ) -> String ) {}")
         );
     }
 
     @Test
     void typedFunctionTypeReference() {
         rewriteRun(
-          kotlin(
-            """
-                fun method( input : ( Int, Int ) -> Boolean ) {
-              }
-            """
-          )
+          kotlin("fun method( input : ( Int, Int ) -> Boolean ) {}")
         );
     }
 
     @Test
     void functionTypeWithReceiver() {
         rewriteRun(
-          kotlin(
-            """
-                fun method ( arg : String . ( ) -> String ) {
-                }
-            """
-          )
+          kotlin("fun method ( arg : String . ( ) -> String ) {}")
         );
     }
 
     @Test
     void assignment() {
         rewriteRun(
-          kotlin(
-            """
-                fun method ( ) : Boolean = true
-            """
-          )
+          kotlin("fun method ( ) : Boolean = true")
         );
     }
 
@@ -112,8 +83,8 @@ public class MethodDeclarationTest implements RewriteTest {
           kotlin(
             """
                 class A {
-                  fun method ( ) {
-                  }
+                    fun method ( ) {
+                    }
                 }
             """
           )
@@ -140,7 +111,8 @@ public class MethodDeclarationTest implements RewriteTest {
                 }
             """
           ),
-          kotlin("infix fun Spec . version ( version : String ) : Spec = version ( version )"
+          kotlin(
+            "infix fun Spec . version ( version : String ) : Spec = version ( version )"
           )
         );
     }
@@ -148,48 +120,28 @@ public class MethodDeclarationTest implements RewriteTest {
     @Test
     void quotedIdentifier() {
         rewriteRun(
-          kotlin(
-            """
-                fun `some quoted id` ( ) {
-                }
-            """
-          )
+          kotlin("fun `some quoted id` ( ) {}")
         );
     }
 
     @Test
     void defaults() {
         rewriteRun(
-          kotlin(
-            """
-                fun apply ( plugin: String ? = null) {
-                }
-            """
-          )
+          kotlin("fun apply ( plugin: String ? = null) {}")
         );
     }
 
     @Test
     void reifiedGeneric() {
         rewriteRun(
-          kotlin(
-            """
-                inline fun < reified T > method(value: T) {
-                }
-            """
-          )
+          kotlin("inline fun < reified T > method(value: T) {}")
         );
     }
 
     @Test
     void genericTypeParameters() {
         rewriteRun(
-          kotlin(
-            """
-                fun <T: Number> method(type: T) {
-                }
-            """
-          )
+          kotlin("fun <T: Number> method(type: T) {}")
         );
     }
 }

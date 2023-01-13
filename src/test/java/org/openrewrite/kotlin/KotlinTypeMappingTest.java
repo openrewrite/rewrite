@@ -185,7 +185,7 @@ public class KotlinTypeMappingTest {
         JavaType.Method type = clazz.getMethods().stream()
           .filter(m -> m.getName().equals("<constructor>"))
           .findFirst()
-          .get();
+          .orElseThrow(() -> new IllegalStateException("No constructor found"));;
         assertThat(type.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB,parameters=[org.openrewrite.kotlin.KotlinTypeGoat$TypeA]}");
 
         JavaType.FullyQualified supertype = clazz.getSupertype();

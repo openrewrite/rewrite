@@ -21,11 +21,10 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-@SuppressWarnings("GrUnnecessaryPublicModifier")
 class ClassDeclarationTest implements RewriteTest {
 
     // Update KotlinTypeGoat and add type mapping/signature tests.
-    // Temp test to sort out typemapping and signature building requirements.
+    // Temp test to sort out type mapping and signature building requirements.
     @Test
     void typeMappingBase() {
         rewriteRun(
@@ -43,6 +42,7 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
@@ -75,8 +75,8 @@ class ClassDeclarationTest implements RewriteTest {
             """
                 interface A
                 interface B
-                class C : A, B
-                class D : B, A
+                class C : A , B
+                class D : B , A
             """
           )
         );
@@ -127,9 +127,7 @@ class ClassDeclarationTest implements RewriteTest {
     void modifierOrdering() {
         rewriteRun(
           kotlin(
-            """
-                public abstract class A
-            """
+            "public abstract class A"
           )
         );
     }
@@ -138,9 +136,7 @@ class ClassDeclarationTest implements RewriteTest {
     void annotationClass() {
         rewriteRun(
           kotlin(
-            """
-                annotation class A
-            """
+            "annotation class A"
           )
         );
     }
@@ -149,9 +145,7 @@ class ClassDeclarationTest implements RewriteTest {
     void enumClass() {
         rewriteRun(
           kotlin(
-            """
-                enum class A
-            """
+            "enum class A"
           )
         );
     }
@@ -179,9 +173,7 @@ class ClassDeclarationTest implements RewriteTest {
     void quotedIdentifier() {
         rewriteRun(
           kotlin(
-            """
-                class `Quoted id here`
-            """
+            "class `Quoted id here`"
           )
         );
     }
@@ -190,9 +182,7 @@ class ClassDeclarationTest implements RewriteTest {
     void typeArguments() {
         rewriteRun(
           kotlin(
-            """
-              open class B<T> {}
-              """
+            "open class B<T> {}"
           )
         );
     }
@@ -202,10 +192,10 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              interface A
-              interface B
-              
-              class KotlinTypeGoat<T: A, S: B>
+                  interface A
+                  interface B
+                  
+                  class KotlinTypeGoat<T: A, S: B>
               """
           )
         );
@@ -217,12 +207,12 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              interface A
-              interface B
-              interface C
-              interface D
-              
-              class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
+                  interface A
+                  interface B
+                  interface C
+                  interface D
+                  
+                  class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
               """
           )
         );

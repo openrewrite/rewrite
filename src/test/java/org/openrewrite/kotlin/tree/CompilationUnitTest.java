@@ -25,11 +25,7 @@ public class CompilationUnitTest implements RewriteTest {
     @Test
     void packageDecl() {
         rewriteRun(
-          kotlin(
-            """
-                package kotlin
-            """
-          )
+          kotlin("package kotlin")
         );
     }
 }
