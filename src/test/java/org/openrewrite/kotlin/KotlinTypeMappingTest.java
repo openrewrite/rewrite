@@ -22,20 +22,20 @@ public class KotlinTypeMappingTest {
     public JavaType.Parameterized goatType() {
         //noinspection ConstantConditions
         return requireNonNull(TypeUtils.asParameterized(KotlinParser.builder()
-               .logCompilationWarningsAndErrors(true)
-               .build()
-               .parse(new InMemoryExecutionContext(), goat)
-               .get(0)
-               .getClasses()
-               .get(0)
-               .getType()));
+          .logCompilationWarningsAndErrors(true)
+          .build()
+          .parse(new InMemoryExecutionContext(), goat)
+          .get(0)
+          .getClasses()
+          .get(0)
+          .getType()));
     }
 
     public JavaType.Method methodType(String methodName) {
         JavaType.Method type = goatType().getMethods().stream()
-               .filter(m -> m.getName().equals(methodName))
-               .findFirst()
-               .orElseThrow(() -> new IllegalStateException("Expected to find matching method named " + methodName));
+          .filter(m -> m.getName().equals(methodName))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("Expected to find matching method named " + methodName));
         assertThat(type.getDeclaringType().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
         return type;
     }
@@ -56,7 +56,7 @@ public class KotlinTypeMappingTest {
 
     @Test
     public void className() {
-        JavaType.Class clazz = (JavaType.Class)this.firstMethodParameter("clazz");
+        JavaType.Class clazz = (JavaType.Class) this.firstMethodParameter("clazz");
         Assertions.assertThat(TypeUtils.asFullyQualified(clazz).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
@@ -185,7 +185,7 @@ public class KotlinTypeMappingTest {
         JavaType.Method type = clazz.getMethods().stream()
           .filter(m -> m.getName().equals("<constructor>"))
           .findFirst()
-          .orElseThrow(() -> new IllegalStateException("No constructor found"));;
+          .orElseThrow(() -> new IllegalStateException("No constructor found"));
         assertThat(type.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB,parameters=[org.openrewrite.kotlin.KotlinTypeGoat$TypeA]}");
 
         JavaType.FullyQualified supertype = clazz.getSupertype();
