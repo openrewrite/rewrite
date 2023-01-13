@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
-import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;

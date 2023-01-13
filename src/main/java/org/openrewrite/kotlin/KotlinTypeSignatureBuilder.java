@@ -19,8 +19,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-import static java.util.Collections.singletonList;
-
 public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     private final FirSession firSession;

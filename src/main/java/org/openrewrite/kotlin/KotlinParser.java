@@ -61,6 +61,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.kotlin.internal.KotlinParserVisitor;
 import org.openrewrite.kotlin.tree.K;
@@ -90,7 +91,8 @@ import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.
 import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.convertAnalyzedFirToIr;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
-import static org.jetbrains.kotlin.config.JVMConfigurationKeys.*;
+import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
+import static org.jetbrains.kotlin.config.JVMConfigurationKeys.FRIEND_PATHS;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser<K.CompilationUnit> {
@@ -336,7 +338,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
     public static class Builder extends Parser.Builder {
         @Nullable
-        private Collection<Path> classpath = null;
+        private Collection<Path> classpath = JavaParser.runtimeClasspath();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
@@ -358,7 +360,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         }
 
         public Builder classpath(String... classpath) {
-            this.classpath = null;
+            this.classpath = JavaParser.dependenciesFromClasspath(classpath);
             return this;
         }
 
