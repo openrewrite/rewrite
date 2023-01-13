@@ -723,7 +723,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers = markers.addIfAbsent(new ReceiverType(randomId()));
             }
 
-            TypeTree name = (J.Identifier) visitElement(namedReference, null);
+            J.Identifier name = (J.Identifier) visitElement(namedReference, null);
 
             JContainer<Expression> typeParams = null;
             if (!functionCall.getTypeArguments().isEmpty()) {
@@ -761,9 +761,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     markers,
                     select,
                     typeParams,
-                    (J.Identifier) name,
+                    name,
                     args,
-                    null); // TODO
+                    typeMapping.methodInvocationType(functionCall));
         }
 
         throw new UnsupportedOperationException("Unsupported function call.");

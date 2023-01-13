@@ -34,6 +34,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -73,8 +74,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return classType(type, signature);
         } else if (type instanceof FirFunction) {
             return methodDeclarationType((FirFunction) type, null);
-        } else if (type instanceof FirFunctionCall) {
-            return methodInvocationType((FirFunctionCall) type, signature);
         } else if (type instanceof FirVariable) {
             return variableType((FirVariable) type, signature);
         }
@@ -85,8 +84,14 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private JavaType resolveType(Object type, String signature) {
         if (type instanceof ConeTypeProjection) {
             return generic((ConeTypeProjection) type, signature);
+        }  else if (type instanceof FirConstExpression) {
+            return type(((FirConstExpression<?>) type).getTypeRef());
         } else if (type instanceof FirEqualityOperatorCall) {
             return type(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirNamedArgumentExpression) {
+            return type(((FirNamedArgumentExpression) type).getTypeRef());
+        } else if (type instanceof FirLambdaArgumentExpression) {
+            return type(((FirLambdaArgumentExpression) type).getTypeRef());
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
@@ -113,8 +118,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return classType(type, signature);
         } else if (type instanceof FirTypeParameter) {
             return generic((FirTypeParameter) type, signature);
-        } else if (type instanceof FirValueParameter) {
-            return type(((FirValueParameter) type).getReturnTypeRef());
         } else if (type instanceof FirVariableAssignment) {
             return type(((FirVariableAssignment) type).getCalleeReference());
         } else if (type instanceof FirQualifiedAccessExpression) {
@@ -122,12 +125,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
-    }
-
-    @Nullable
-    public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall, @Nullable String signature) {
-        JavaType.Method methodType = null;
-        throw new UnsupportedOperationException("Implement function call signatures.");
     }
 
     @Nullable
@@ -337,6 +334,91 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         return null;
+    }
+
+    @Nullable
+    public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall) {
+        if (functionCall == null) {
+            return null;
+        }
+
+        String signature = signatureBuilder.methodSignature(functionCall);
+        JavaType.Method existing = typeCache.get(signature);
+        if (existing != null) {
+            return existing;
+        }
+
+        // Time constrained.
+        FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol();
+        FirConstructor constructor = null;
+        FirSimpleFunction simpleFunction = null;
+        if (symbol instanceof FirConstructorSymbol) {
+            constructor = (FirConstructor) symbol.getFir();
+        } else {
+            simpleFunction = (FirSimpleFunction) symbol.getFir();
+        }
+
+        List<String> paramNames = null;
+        if (simpleFunction != null && !simpleFunction.getValueParameters().isEmpty()) {
+            paramNames = new ArrayList<>(simpleFunction.getValueParameters().size());
+            for (FirValueParameter p : simpleFunction.getValueParameters()) {
+                String s = p.getName().asString();
+                paramNames.add(s);
+            }
+        } else if (constructor != null && !constructor.getValueParameters().isEmpty()) {
+            paramNames = new ArrayList<>(constructor.getValueParameters().size());
+            for (FirValueParameter p : constructor.getValueParameters()) {
+                String s = p.getName().asString();
+                paramNames.add(s);
+            }
+        }
+
+        JavaType.Method method = new JavaType.Method(
+                null,
+                convertToFlagsBitMap(constructor != null ? constructor.getStatus() : simpleFunction.getStatus()),
+                null,
+                constructor != null ? "<constructor>" : simpleFunction.getName().asString(),
+                null,
+                paramNames,
+                null, null, null, null
+        );
+        typeCache.put(signature, method);
+
+        JavaType returnType = null;
+        List<JavaType> parameterTypes = null;
+        List<JavaType.FullyQualified> exceptionTypes = null;
+
+//        if (selectType instanceof Type.MethodType) {
+//            Type.MethodType methodType = (Type.MethodType) selectType;
+
+            if (constructor != null && !constructor.getValueParameters().isEmpty()) {
+                parameterTypes = new ArrayList<>(constructor.getValueParameters().size());
+                for (FirValueParameter argtype : constructor.getValueParameters()) {
+                    if (argtype != null) {
+                        JavaType javaType = type(argtype);
+                        parameterTypes.add(javaType);
+                    }
+                }
+            }
+
+//            returnType = type(methodType.restype);
+
+//        } else if (selectType instanceof Type.UnknownType) {
+//            returnType = JavaType.Unknown.getInstance();
+//        }
+
+        // Currently impossible to set.
+        JavaType.FullyQualified resolvedDeclaringType = null;
+        if (resolvedDeclaringType == null) {
+            return null;
+        }
+
+        assert returnType != null;
+
+        method.unsafeSet(resolvedDeclaringType,
+                constructor != null ? resolvedDeclaringType : returnType,
+                parameterTypes, exceptionTypes, listAnnotations(constructor != null ? constructor.getAnnotations() : simpleFunction.getAnnotations()));
+        return method;
     }
 
     @Nullable

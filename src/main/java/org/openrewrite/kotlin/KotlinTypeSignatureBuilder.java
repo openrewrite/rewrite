@@ -2,10 +2,8 @@ package org.openrewrite.kotlin;
 
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
-import org.jetbrains.kotlin.fir.expressions.FirEqualityOperatorCall;
-import org.jetbrains.kotlin.fir.expressions.FirFunctionCall;
-import org.jetbrains.kotlin.fir.expressions.FirQualifiedAccessExpression;
-import org.jetbrains.kotlin.fir.expressions.FirVariableAssignment;
+import org.jetbrains.kotlin.fir.expressions.*;
+import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
@@ -17,8 +15,11 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
+
+import static java.util.Collections.singletonList;
 
 public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
@@ -41,8 +42,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return ((FirClass) type).getTypeParameters().size() > 0 ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof FirFunction) {
             return methodDeclarationSignature(((FirFunction) type).getSymbol());
-        }  else if (type instanceof FirFunctionCall) {
-            return methodInvocationSignature((FirFunctionCall) type);
         } else if (type instanceof FirVariable) {
             return variableSignature(((FirVariable) type).getSymbol());
         }
@@ -57,8 +56,14 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String resolveSignature(Object type) {
         if (type instanceof ConeTypeProjection) {
             return coneTypeProjectionSignature((ConeTypeProjection) type);
+        } else if (type instanceof FirConstExpression) {
+            return signature(((FirConstExpression<?>) type).getTypeRef());
         } else if (type instanceof FirEqualityOperatorCall) {
             return signature(((FirEqualityOperatorCall) type).getTypeRef());
+        } else if (type instanceof FirNamedArgumentExpression) {
+            return signature(((FirNamedArgumentExpression) type).getTypeRef());
+        } else if (type instanceof FirLambdaArgumentExpression) {
+            return signature(((FirLambdaArgumentExpression) type).getTypeRef());
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
@@ -85,8 +90,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return coneKotlinType.getTypeArguments().length > 0 ? parameterizedTypeRef(coneKotlinType) : typeRefClassSignature(coneKotlinType);
         } else if (type instanceof FirTypeParameter) {
             return genericSignature(type);
-        } else if (type instanceof FirValueParameter) {
-            return signature(((FirValueParameter) type).getReturnTypeRef());
         } else if (type instanceof FirValueParameterSymbol) {
             return signature(((FirValueParameterSymbol) type).getResolvedReturnType());
         } else if (type instanceof FirVariableAssignment) {
@@ -96,14 +99,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
-    }
-
-    /**
-     *  Pending signature builder for function calls.
-     */
-    @Nullable
-    public String methodInvocationSignature(FirFunctionCall functionCall) {
-        throw new UnsupportedOperationException("Implement function call signatures.");
     }
 
     /**
@@ -281,6 +276,22 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';
     }
 
+    public String methodSignature(FirFunctionCall functionCall) {
+        // Currently do not know how to get the owner of the element.
+        String s = signature(null);
+
+        FirNamedReference namedReference = functionCall.getCalleeReference();
+        if (namedReference instanceof FirResolvedNamedReference &&
+                ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
+            s += "{name=<constructor>,return=" + s;
+        } else {
+            s += "{name=" + functionCall.getCalleeReference().getName().asString() +
+                    ",return=" + signature(functionCall.getTypeRef());
+        }
+
+        return s + ",parameters=" + methodArgumentSignature(functionCall.getArgumentList().getArguments()) + '}';
+    }
+
     /**
      *  Generate the method declaration signature.
      */
@@ -294,6 +305,24 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                     ",return=" + signature(symbol.getResolvedReturnTypeRef());
         }
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
+    }
+
+    /**
+     *  Generate the method argument signature.
+     */
+    private String methodArgumentSignature(List<FirExpression> argumentsList) {
+        StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
+        if (argumentsList.size() == 1 && argumentsList.get(0) instanceof FirVarargArgumentsExpression) {
+                FirVarargArgumentsExpression varargArgumentsExpression = (FirVarargArgumentsExpression) argumentsList.get(0);
+            for (FirExpression argument : varargArgumentsExpression.getArguments()) {
+                genericArgumentTypes.add(signature(argument));
+            }
+        } else {
+            for (FirExpression firExpression : argumentsList) {
+                genericArgumentTypes.add(signature(firExpression));
+            }
+        }
+        return genericArgumentTypes.toString();
     }
 
     /**
