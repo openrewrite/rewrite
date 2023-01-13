@@ -61,7 +61,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.kotlin.internal.KotlinParserVisitor;
 import org.openrewrite.kotlin.tree.K;
@@ -302,12 +301,13 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         compilerConfiguration.put(USE_FIR,  true);
         compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT,  false);
         compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS,  true);
+        compilerConfiguration.put(INCREMENTAL_COMPILATION,  true);
 
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());
 
-        compilerConfiguration.put(SAM_CONVERSIONS, JvmClosureGenerationScheme.CLASS);
+//        compilerConfiguration.put(SAM_CONVERSIONS, JvmClosureGenerationScheme.CLASS);
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7, ApiVersion.KOTLIN_1_7));
@@ -336,7 +336,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
     public static class Builder extends Parser.Builder {
         @Nullable
-        private Collection<Path> classpath = JavaParser.runtimeClasspath();
+        private Collection<Path> classpath = null;
 
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
@@ -358,7 +358,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         }
 
         public Builder classpath(String... classpath) {
-            this.classpath = JavaParser.dependenciesFromClasspath(classpath);
+            this.classpath = null;
             return this;
         }
 

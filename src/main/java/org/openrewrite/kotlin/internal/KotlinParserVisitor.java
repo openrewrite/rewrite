@@ -41,7 +41,6 @@ import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.psi.KtFunctionType;
 import org.jetbrains.kotlin.psi.KtNameReferenceExpression;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -63,7 +62,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -1551,7 +1549,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else {
             Space controlParenPrefix = whitespace();
             skip("(");
-            J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<Expression>(randomId(), controlParenPrefix, Markers.EMPTY,
+            J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<>(randomId(), controlParenPrefix, Markers.EMPTY,
                         convert(whenBranch.getCondition(), t -> sourceBefore(")"), ctx));
 
             FirElement result = singleExpression ? ((FirSingleExpressionBlock) whenBranch.getResult()).getStatement() : whenBranch.getResult();
