@@ -36,12 +36,12 @@ class ShowGitProvenanceTest implements RewriteTest {
         rewriteRun(
           text("Hello, World!", """
               ~~(GitProvenance:
-                  origin: https://github.com/moderneinc/moderne-scm
+                  origin: https://github.com/openrewrite/rewrite
                   branch: main
                   changeset: 1234567
                   autocrlf: False
                   eol: Native)~~>Hello, World!""",
-            spec -> spec.markers(new GitProvenance(Tree.randomId(), "https://github.com/moderneinc/moderne-scm", "main", "1234567", False, Native))
+            spec -> spec.markers(new GitProvenance(Tree.randomId(), "https://github.com/openrewrite/rewrite", "main", "1234567", False, Native))
           )
         );
     }
