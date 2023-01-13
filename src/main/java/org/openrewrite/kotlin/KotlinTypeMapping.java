@@ -179,13 +179,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
             JavaType.FullyQualified supertype = superTypeRef == null ? null : TypeUtils.asFullyQualified(type(superTypeRef));
 
+            // TODO: figure out how to access the class owner .. the name exists on the Sym, but there isn't a link through the classId.
             JavaType.FullyQualified owner = null;
             if (firClass.getSymbol().getClassId().getOuterClassId() != null) {
                 FirClassLikeSymbol<?> ownerSymbol = FirSymbolProviderKt.getSymbolProvider(firSession)
                         .getClassLikeSymbolByClassId(firClass.getSymbol().getClassId().getOuterClassId());
-                if (ownerSymbol != null) {
-                    owner = TypeUtils.asFullyQualified(type(ownerSymbol.getFir()));
-                }
+                owner = TypeUtils.asFullyQualified(type(ownerSymbol));
             }
 
             List<FirProperty> properties = new ArrayList<>(firClass.getDeclarations().size());
