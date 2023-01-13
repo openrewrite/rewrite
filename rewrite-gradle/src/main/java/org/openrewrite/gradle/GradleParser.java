@@ -21,12 +21,9 @@ import lombok.experimental.Accessors;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
-import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.Comment;
 
 import java.nio.file.Path;
 import java.util.Collections;
@@ -62,16 +59,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
 
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        GroovyIsoVisitor<ExecutionContext> visitor = new GroovyIsoVisitor<ExecutionContext>() {
-            @Override
-            public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
-                G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-                List<Comment> comments = g.getStatements().get(0).getComments();
-                return g.withStatements(ListUtils.mapFirst(g.getStatements().subList(DefaultImportsCustomizer.DEFAULT_IMPORTS.length, g.getStatements().size()),
-                        s -> s.withComments(ListUtils.concatAll(comments, s.getComments()))));
-            }
-        };
-
         return StreamSupport.stream(sources.spliterator(), false)
               .flatMap(source -> {
                   if (source.getPath().endsWith("settings.gradle")) {
@@ -79,7 +66,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
                   }
                   return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
               })
-              .map(cu -> visitor.visitCompilationUnit(cu, ctx))
               .collect(Collectors.toList());
     }
 

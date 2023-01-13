@@ -15,8 +15,10 @@
  */
 package org.openrewrite.groovy.tree;
 
+import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -81,6 +83,30 @@ class CompilationUnitTest implements RewriteTest {
           groovy(
             """
               5
+              """
+          )
+        );
+    }
+
+    @Test
+    void scriptImportsCanBeAnywhere() {
+        rewriteRun(
+          spec -> spec.parser(GroovyParser.builder().compilerCustomizers(config -> {
+              ImportCustomizer imports = new ImportCustomizer();
+              imports.addStarImports("java.nio.file");
+              config.addCompilationCustomizers(imports);
+          })),
+          groovy(
+            """
+              def p = Paths.get("abc")
+
+              import java.io.File
+              def f = new File(p.toFile(), "def")
+
+              import java.io.InputStream
+              f.withInputStream { InputStream io ->
+                io.read()
+              }
               """
           )
         );

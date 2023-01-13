@@ -136,9 +136,14 @@ public class GroovyParserVisitor {
         }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(sortedByPosition.size());
-        for (List<ASTNode> values : sortedByPosition.values()) {
+        for (Map.Entry<LineColumn, List<ASTNode>> entry : sortedByPosition.entrySet()) {
+            if (entry.getKey().getLine() == -1) {
+                // default import
+                continue;
+            }
+
             try {
-                for (ASTNode value : values) {
+                for (ASTNode value : entry.getValue()) {
                     if (value instanceof InnerClassNode) {
                         // Inner classes will be visited as part of visiting their containing class
                         continue;

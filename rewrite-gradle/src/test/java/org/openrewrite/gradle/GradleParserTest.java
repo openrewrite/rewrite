@@ -33,10 +33,10 @@ public class GradleParserTest implements RewriteTest {
               plugins {
                   id 'com.gradle.enterprise' version '3.11.3'
               }
-                                          
+
               gradleEnterprise {
                   server = 'https://enterprise-samples.gradle.com'
-                                          
+
                   buildScan {
                       publishAlways()
                   }
@@ -122,6 +122,25 @@ public class GradleParserTest implements RewriteTest {
           buildGradle(
             """
               // Some comment
+              dependencies {
+                  testImplementation "junit:junit:4.13"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void handleImportsThatArentTheFirstStatement() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id("java-library")
+              }
+
+              import org.gradle.api.Project
+
               dependencies {
                   testImplementation "junit:junit:4.13"
               }
