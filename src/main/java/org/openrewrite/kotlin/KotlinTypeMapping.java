@@ -338,12 +338,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     }
 
     @Nullable
-    public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall, @Nullable FirBasedSymbol<?> ownerSymbol) {
+    public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall) {
         if (functionCall == null) {
             return null;
         }
 
-        String signature = signatureBuilder.methodSignature(functionCall, ownerSymbol);
+        String signature = signatureBuilder.methodSignature(functionCall);
         JavaType.Method existing = typeCache.get(signature);
         if (existing != null) {
             return existing;

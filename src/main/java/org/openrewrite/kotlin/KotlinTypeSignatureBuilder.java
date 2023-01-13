@@ -42,10 +42,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return methodDeclarationSignature(((FirFunction) type).getSymbol());
         } else if (type instanceof FirVariable) {
             return variableSignature(((FirVariable) type).getSymbol());
-        } else if (type instanceof FirBasedSymbol<?>) {
-            return signature(((FirBasedSymbol<?>) type).getFir());
-        } else if (type instanceof FirFile) {
-            return ((FirFile) type).getName();
         }
 
         return resolveSignature(type);
@@ -261,6 +257,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String variableSignature(FirVariableSymbol<? extends FirVariable> symbol) {
         String owner = "{undefined}";
         ConeSimpleKotlinType kotlinType = symbol.getDispatchReceiverType();
+
         if (kotlinType instanceof ConeClassLikeType) {
             FirRegularClass regularClass = convertToRegularClass(kotlinType);
             if (regularClass != null) {
@@ -279,21 +276,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';
     }
 
-    public String methodSignature(FirFunctionCall functionCall, @Nullable FirBasedSymbol<?> ownerSymbol) {
-        String owner = "{undefined}";
-        if (functionCall.getExplicitReceiver() != null) {
-            // Update to class sig once ref resolution is implemented.
-            owner = signature(functionCall.getExplicitReceiver().getTypeRef());
-        } else if (ownerSymbol != null) {
-            if (ownerSymbol instanceof FirFileSymbol) {
-                owner = ((FirFileSymbol) ownerSymbol).getFir().getName();
-            } else if (ownerSymbol instanceof FirNamedFunctionSymbol) {
-                owner = signature(((FirNamedFunctionSymbol) ownerSymbol).getFir());
-            } else if (ownerSymbol instanceof FirRegularClassSymbol) {
-                owner = signature(((FirRegularClassSymbol) ownerSymbol).getFir());
-            }
-        }
-        String s = owner;
+    public String methodSignature(FirFunctionCall functionCall) {
+        // Currently do not know how to get the owner of the element.
+        String s = signature(null);
 
         FirNamedReference namedReference = functionCall.getCalleeReference();
         if (namedReference instanceof FirResolvedNamedReference &&

@@ -19,7 +19,6 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;
-import org.jetbrains.kotlin.fir.ClassMembersKt;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.FirPackageDirective;
 import org.jetbrains.kotlin.fir.FirSession;
@@ -35,10 +34,8 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression;
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
 import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
-import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
-import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
-import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
-import org.jetbrains.kotlin.fir.symbols.impl.*;
+import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
+import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
@@ -90,9 +87,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final FirSession firSession;
     private int cursor = 0;
 
-    //
-    private FirFile currentFile = null;
-
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public KotlinParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, FirSession firSession, ExecutionContext ctx) {
@@ -109,8 +103,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     // TODO: look into FirDeclarationUtilKt.isSynthetic()
     @Override
     public J visitFile(FirFile file, ExecutionContext ctx) {
-        currentFile = file;
-
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
             pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
@@ -702,29 +694,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     body,
                     null);
         } else if (namedReference instanceof FirResolvedNamedReference) {
-            FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
-            FirBasedSymbol<?> owner = null;
-            if (symbol instanceof FirNamedFunctionSymbol) {
-                FirNamedFunctionSymbol namedFunctionSymbol = (FirNamedFunctionSymbol) symbol;
-                ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
-                if (lookupTag != null) {
-                    owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
-                } else {
-                    owner = currentFile.getSymbol();
-                }
-            }
-
             JRightPadded<Expression> select = null;
-            FirElement dispatchReceiver = functionCall.getDispatchReceiver();
-            FirElement extensionReceiver = functionCall.getExtensionReceiver();
+            FirElement dispatchReciever = functionCall.getDispatchReceiver();
+            FirElement extensionReciever = functionCall.getExtensionReceiver();
             if (!(functionCall instanceof FirImplicitInvokeCall) &&
-                    (!(dispatchReceiver instanceof FirNoReceiverExpression || dispatchReceiver instanceof FirThisReceiverExpression)) ||
-                    !(extensionReceiver instanceof FirNoReceiverExpression || extensionReceiver instanceof FirThisReceiverExpression)) {
+                    (!(dispatchReciever instanceof FirNoReceiverExpression || dispatchReciever instanceof FirThisReceiverExpression)) ||
+                    !(extensionReciever instanceof FirNoReceiverExpression || extensionReciever instanceof FirThisReceiverExpression)) {
                 FirElement visit;
-                if (dispatchReceiver instanceof FirFunctionCall || dispatchReceiver instanceof FirPropertyAccessExpression) {
-                    visit = dispatchReceiver;
-                } else if (extensionReceiver instanceof FirFunctionCall || extensionReceiver instanceof FirPropertyAccessExpression) {
-                    visit = extensionReceiver;
+                if (dispatchReciever instanceof FirFunctionCall || dispatchReciever instanceof FirPropertyAccessExpression) {
+                    visit = dispatchReciever;
+                } else if (extensionReciever instanceof FirFunctionCall || extensionReciever instanceof FirPropertyAccessExpression) {
+                    visit = extensionReciever;
                 } else {
                     throw new IllegalStateException("Implement me.");
                 }
@@ -782,7 +762,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeParams,
                     name,
                     args,
-                    typeMapping.methodInvocationType(functionCall, owner));
+                    typeMapping.methodInvocationType(functionCall));
         }
 
         throw new UnsupportedOperationException("Unsupported function call.");
@@ -876,16 +856,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private J.Binary.Type mapFunctionalCallOperator(FirFunctionCall functionCall) {
         String resolvedName = functionCall.getCalleeReference().getName().asString();
         J.Binary.Type op = null;
-        switch (resolvedName) {
-            case "times":
-                op = J.Binary.Type.Multiplication;
-                break;
-            case "minus":
-                op = J.Binary.Type.Subtraction;
-                break;
-            case "plus":
-                op = J.Binary.Type.Addition;
-                break;
+        if ("times".equals(resolvedName)) {
+            op = J.Binary.Type.Multiplication;
+        } else if ("minus".equals(resolvedName)) {
+            op = J.Binary.Type.Subtraction;
+        } else if ("plus".equals(resolvedName)) {
+            op = J.Binary.Type.Addition;
         }
 
         return op;
@@ -895,10 +871,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitFunctionTypeRef(FirFunctionTypeRef functionTypeRef, ExecutionContext ctx) {
 
         List<JRightPadded<J>> paramExprs = new ArrayList<>(functionTypeRef.getValueParameters().size());
-        JRightPadded<NameTree> receiver = null;
+        JRightPadded<NameTree> reciever = null;
         if (functionTypeRef.getReceiverTypeRef() != null) {
-            NameTree receiverName = (NameTree) visitElement(functionTypeRef.getReceiverTypeRef(), ctx);
-            receiver = JRightPadded.build(receiverName)
+            NameTree recieverName = (NameTree) visitElement(functionTypeRef.getReceiverTypeRef(), ctx);
+            reciever = JRightPadded.build(recieverName)
                     .withAfter(whitespace());
             skip(".");
         }
@@ -950,7 +926,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 arrow,
                 body,
                 closureType);
-        return new K.FunctionType(randomId(), lambda, receiver);
+        return new K.FunctionType(randomId(), lambda, reciever);
     }
 
     @Override
@@ -1023,7 +999,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
             J.Identifier receiverName = (J.Identifier) visitElement(property.getReceiverTypeRef(), ctx);
 
-            // Temporary wrapper to move forward ...
+            // Temporary wrapper to move foward ...
             receiver = JRightPadded.build(
                     new J.VariableDeclarations.NamedVariable(
                             randomId(),
@@ -1120,14 +1096,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (propertyAccessor.isGetter()) {
             Markers markers = Markers.EMPTY;
             List<J> modifiers = emptyList();
-            List<J.Annotation> annotations = mapAnnotations(propertyAccessor.getAnnotations());
+            List<J.Annotation> annotations = emptyList();
 
             JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
-
-            J.TypeParameters typeParameters = propertyAccessor.getTypeParameters().isEmpty() ? null :
-                    new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
-                            emptyList(),
-                            convertAll(propertyAccessor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
 
             String methodName = "get";
             skip(methodName);
@@ -1178,13 +1149,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     randomId(),
                     prefix,
                     markers,
-                    annotations == null ? emptyList() : annotations,
+                    annotations, // TODO
                     emptyList(),
-                    typeParameters,
+                    null, // TODO
                     returnTypeExpression,
                     new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
-                    params,
-                    null,
+                    params, // TODO
+                    null, // TODO
                     body,
                     null,
                     typeMapping.methodDeclarationType(propertyAccessor, null));
