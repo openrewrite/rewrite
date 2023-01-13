@@ -15,8 +15,7 @@
  */
 package org.openrewrite;
 
-import lombok.Value;
-import org.intellij.lang.annotations.Language;
+import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,25 +24,28 @@ import java.util.List;
 /**
  * @param <Row> The model type for a single row of this extract.
  */
-@Value
+@Getter
 @Incubating(since = "7.35.0")
 public class DataTable<Row> {
-    Class<Row> type;
+    private final String name;
+    private final Class<Row> type;
+    private final String displayName;
+    private final String description;
 
-    @Language("markdown")
-    String displayName;
+    public DataTable(Recipe recipe, Class<Row> type, String name, String displayName, String description) {
+        this.name = name;
+        this.type = type;
+        this.displayName = displayName;
+        this.description = description;
+        recipe.addDataTable(this);
+    }
 
-    @Language("markdown")
-    String description;
-
-    @SuppressWarnings("UnusedReturnValue")
-    public DataTable<Row> insertRow(ExecutionContext ctx, Row row) {
+    public void insertRow(ExecutionContext ctx, Row row) {
         ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
             //noinspection unchecked
-            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(DataTable.this, c -> new ArrayList<>());
+            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
             dataTablesOfType.add(row);
             return allDataTables;
         });
-        return this;
     }
 }

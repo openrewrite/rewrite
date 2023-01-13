@@ -22,6 +22,8 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.List;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
+
 @Value
 public class RecipeRun {
     RecipeRunStats stats;
@@ -33,8 +35,23 @@ public class RecipeRun {
     Map<DataTable<?>, List<?>> dataTables;
 
     @Nullable
-    public <E> List<E> getDataTable(DataTable<E> dataTable) {
-        //noinspection unchecked
-        return (List<E>) dataTables.get(dataTable);
+    public DataTable<?> getDataTable(String name) {
+        for (DataTable<?> dataTable : dataTables.keySet()) {
+            if (dataTable.getName().equals(name)) {
+                return dataTable;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    public <E> List<E> getDataTableRows(String name) {
+        for (Map.Entry<DataTable<?>, List<?>> dataTableAndRows : dataTables.entrySet()) {
+            if (dataTableAndRows.getKey().getName().equals(name)) {
+                //noinspection unchecked
+                return (List<E>) dataTableAndRows.getValue();
+            }
+        }
+        return emptyList();
     }
 }

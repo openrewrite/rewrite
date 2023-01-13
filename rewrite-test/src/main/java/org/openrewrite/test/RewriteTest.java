@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -50,6 +51,11 @@ public interface RewriteTest extends SourceSpecs {
 
     static AdHocRecipe toRecipe() {
         return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null);
+    }
+
+    static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
+        AdHocRecipe r = toRecipe();
+        return r.withGetVisitor(() -> visitor.apply(r));
     }
 
     static Recipe fromRuntimeClasspath(String recipe) {

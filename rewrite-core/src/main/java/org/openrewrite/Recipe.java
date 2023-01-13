@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
@@ -69,6 +70,9 @@ public abstract class Recipe implements Cloneable {
 
     private transient List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests;
     private transient List<TreeVisitor<?, ExecutionContext>> applicableTests;
+
+    @Nullable
+    private transient List<DataTableDescriptor> dataTables;
 
     public static Recipe noop() {
         return new Noop();
@@ -142,6 +146,10 @@ public abstract class Recipe implements Cloneable {
         return RecipeIntrospectionUtils.recipeDescriptorFromRecipe(this);
     }
 
+    public final List<DataTableDescriptor> getDataTableDescriptors() {
+        return dataTables == null ? emptyList() : dataTables;
+    }
+
     /**
      * @return Describes the language type(s) that this recipe applies to, e.g. java, xml, properties.
      * @deprecated
@@ -165,13 +173,6 @@ public abstract class Recipe implements Cloneable {
 
     @JsonIgnore
     private final List<Recipe> recipeList = new CopyOnWriteArrayList<>();
-
-    /**
-     * @return A list of the types that this recipe may generate data tables for.
-     */
-    public List<DataTable<?>> getDataTables() {
-        return emptyList();
-    }
 
     /**
      * @param recipe {@link Recipe} to add to this recipe's pipeline.
@@ -230,6 +231,14 @@ public abstract class Recipe implements Cloneable {
             applicableTests = new ArrayList<>(1);
         }
         applicableTests.add(test);
+        return this;
+    }
+
+    public Recipe addDataTable(DataTable<?> dataTable) {
+        if (dataTables == null) {
+            dataTables = new ArrayList<>();
+        }
+        dataTables.add(RecipeIntrospectionUtils.dataTableDescriptorFromDataTable(dataTable));
         return this;
     }
 

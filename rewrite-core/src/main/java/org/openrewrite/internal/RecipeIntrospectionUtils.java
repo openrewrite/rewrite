@@ -18,7 +18,6 @@ package org.openrewrite.internal;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.*;
-import org.openrewrite.DataTable;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -88,6 +87,10 @@ public class RecipeIntrospectionUtils {
         }
     }
 
+    public static DataTableDescriptor dataTableDescriptorFromDataTable(DataTable<?> dataTable) {
+        return new DataTableDescriptor(dataTable.getClass().getName(), dataTable.getName(), dataTable.getDescription());
+    }
+
     public static RecipeDescriptor recipeDescriptorFromDeclarativeRecipe(DeclarativeRecipe recipe, URI source) {
         List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe childRecipe : recipe.getRecipeList()) {
@@ -142,16 +145,10 @@ public class RecipeIntrospectionUtils {
             throw new RuntimeException(e);
         }
 
-        List<DataTableDescriptor> extractTypes = new ArrayList<>();
-        for (DataTable<?> dataTable : recipe.getDataTables()) {
-            extractTypes.add(new DataTableDescriptor(dataTable.getClass().getName(), dataTable.getDisplayName(),
-                    dataTable.getDescription()));
-        }
-
         //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(),
                 recipe.getDescription(), recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                options, recipe.getLanguages(), recipeList, extractTypes, recipeSource);
+                options, recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), recipeSource);
     }
 
     public static Recipe constructRecipe(Class<?> recipeClass) {

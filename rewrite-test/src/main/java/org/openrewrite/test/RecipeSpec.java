@@ -36,7 +36,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SuppressWarnings("UnusedReturnValue")
 @Getter
@@ -159,28 +158,34 @@ public class RecipeSpec {
         return this;
     }
 
-    public <E> RecipeSpec dataTable(DataTable<E> dataTable, UncheckedConsumer<List<E>> extract) {
+    public <E> RecipeSpec dataTable(String name, UncheckedConsumer<List<E>> extract) {
         return afterRecipe(run -> {
-            List<E> rows = run.getDataTable(dataTable);
-            assertFalse(rows.isEmpty());
+            List<E> rows = run.getDataTableRows(name);
+            assertThat(rows).isNotNull();
+            assertThat(rows).isNotEmpty();
             extract.accept(rows);
         });
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec dataTable(DataTable<E> dataTable, Function<E, V> map, UncheckedConsumer<List<V>> extract) {
-        return dataTable(dataTable, ex -> extract.accept(ex.stream().map(map).collect(Collectors.toList())));
+    public <E, V> RecipeSpec dataTable(String name, Function<E, V> map, UncheckedConsumer<List<V>> extract) {
+        //noinspection unchecked
+        return dataTable(name, ex -> extract.accept(ex.stream().map(o -> map.apply((E) o)).collect(Collectors.toList())));
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec dataTableAsCsv(DataTable<E> dataTable, String expect) {
-        return dataTable(dataTable, ex -> {
+    public <E, V> RecipeSpec dataTableAsCsv(String name, String expect) {
+        afterRecipe(run -> {
+            DataTable<?> dataTable = run.getDataTable(name);
+            assertThat(dataTable).isNotNull();
+            List<E> rows = run.getDataTableRows(name);
             StringWriter writer = new StringWriter();
             CsvMapper mapper = new CsvMapper();
             CsvSchema schema = mapper.schemaFor(dataTable.getType()).withHeader();
-            mapper.writerFor(dataTable.getType()).with(schema).writeValues(writer).writeAll(ex);
+            mapper.writerFor(dataTable.getType()).with(schema).writeValues(writer).writeAll(rows);
             assertThat(writer.toString()).isEqualTo(expect);
         });
+        return this;
     }
 
     @Incubating(since = "7.35.0")

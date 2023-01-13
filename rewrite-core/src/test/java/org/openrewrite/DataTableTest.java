@@ -28,10 +28,11 @@ public class DataTableTest implements RewriteTest {
 
     @Test
     void dataTable() {
-        DataTable<Word> wordTable = new DataTable<>(Word.class, "Words", "Each word in the text.");
         rewriteRun(
           spec -> spec
-            .recipe(toRecipe(() -> new PlainTextVisitor<>() {
+            .recipe(toRecipe(r -> new PlainTextVisitor<>() {
+                final DataTable<Word> wordTable = new DataTable<>(r, Word.class, "org.openrewrite.Words", "Words", "Each word in the text.");
+
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     int i = 0;
@@ -41,13 +42,13 @@ public class DataTableTest implements RewriteTest {
                     return text;
                 }
             }))
-            .dataTableAsCsv(wordTable, """
+            .dataTableAsCsv("org.openrewrite.Words", """
               position,text
               0,hello
               1,world
               """
             )
-            .dataTable(wordTable, Word::getText, words -> assertThat(words)
+            .dataTable("org.openrewrite.Words", Word::getText, words -> assertThat(words)
               .containsExactly("hello", "world")),
           text("hello world")
         );

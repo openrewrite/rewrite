@@ -19,14 +19,16 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.marker.Markup;
 
-import java.util.List;
-
-import static java.util.Collections.singletonList;
-
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindParseFailures extends Recipe {
-    DataTable<ParseExceptionRow> failures = new DataTable<>(ParseExceptionRow.class, "Parse failures", "A list of files that failed to parse.");
+    DataTable<ParseExceptionRow> failures = new DataTable<>(
+            this,
+            ParseExceptionRow.class,
+            "org.openrewrite.ParseFailures",
+            "Parser failures",
+            "A list of files that failed to parse along with stack traces of their failures."
+    );
 
     @Override
     public String getDisplayName() {
@@ -37,11 +39,6 @@ public class FindParseFailures extends Recipe {
     public String getDescription() {
         return "This recipe explores parse failures after an AST is produced for classifying the types of " +
                "failures that can occur and prioritizing fixes according to the most common problems.";
-    }
-
-    @Override
-    public List<DataTable<?>> getDataTables() {
-        return singletonList(failures);
     }
 
     @Override

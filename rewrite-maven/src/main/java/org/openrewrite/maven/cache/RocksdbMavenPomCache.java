@@ -274,7 +274,6 @@ public class RocksdbMavenPomCache implements MavenPomCache {
             }
             // Update the model version key
             updateDatabaseModelVersion(Pom.getModelVersion());
-
         }
 
         private boolean modelVersionMatches() {
