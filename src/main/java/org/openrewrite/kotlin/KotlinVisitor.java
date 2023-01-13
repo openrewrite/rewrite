@@ -25,6 +25,9 @@ import org.openrewrite.kotlin.tree.KLeftPadded;
 import org.openrewrite.kotlin.tree.KRightPadded;
 import org.openrewrite.kotlin.tree.KSpace;
 
+/**
+ * Visit K types.
+ */
 public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     @Override

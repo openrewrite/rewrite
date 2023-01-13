@@ -50,6 +50,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return resolveSignature(type);
     }
 
+    /**
+     * Interpret various parts of the Kotlin tree for type attribution.
+     * This method should only be called by signature.
+     */
     private String resolveSignature(Object type) {
         if (type instanceof ConeTypeProjection) {
             return coneTypeProjectionSignature((ConeTypeProjection) type);
@@ -94,16 +98,25 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         throw new IllegalStateException("Unexpected type " + type.getClass().getName());
     }
 
+    /**
+     *  Pending signature builder for function calls.
+     */
     @Nullable
     public String methodInvocationSignature(FirFunctionCall functionCall) {
         throw new UnsupportedOperationException("Implement function call signatures.");
     }
 
+    /**
+     * Kotlin does not support dimensioned arrays.
+     */
     @Override
     public String arraySignature(Object type) {
         throw new UnsupportedOperationException("NA");
     }
 
+    /**
+     *  Build a class signature for a FirClass.
+     */
     @Override
     public String classSignature(@Nullable Object type) {
         if (type == null) {
@@ -114,6 +127,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return convertClassIdToFqn(symbol.getClassId());
     }
 
+    /**
+     *  Build a class signature for a parameterized FirClass.
+     */
     @Override
     public String parameterizedSignature(Object type) {
         StringBuilder s = new StringBuilder(classSignature(type));
@@ -126,11 +142,17 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s.toString();
     }
 
+    /**
+     *  Convert the ConeKotlinType to a {@link org.openrewrite.java.tree.JavaType} style FQN.
+     */
     public String typeRefClassSignature(ConeKotlinType type) {
         ClassId classId = ConeTypeUtilsKt.getClassId(type);
         return classId == null ? "{undefined}" : convertClassIdToFqn(classId);
     }
 
+    /**
+     *  Convert the ConeKotlinType to a {@link org.openrewrite.java.tree.JavaType} style FQN.
+     */
     public String parameterizedTypeRef(ConeKotlinType type) {
         ClassId classId = ConeTypeUtilsKt.getClassId(type);
         String fq = classId == null ? "{undefined}" : convertClassIdToFqn(classId);
@@ -146,6 +168,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s.toString();
     }
 
+    /**
+     *  Generate a generic type signature from a FirElement.
+     */
     @Override
     public String genericSignature(Object type) {
         FirTypeParameter typeParameter = (FirTypeParameter) type;
@@ -176,6 +201,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s.append("}").toString();
     }
 
+    /**
+     *  Generate a ConeTypeProject signature.
+     */
     public String coneTypeProjectionSignature(ConeTypeProjection type) {
         // TODO: refactor to handle recursive generics.
         String typeSignature;
@@ -220,11 +248,17 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s.toString();
     }
 
+    /**
+     * Kotlin does not support primitives.
+     */
     @Override
     public String primitiveSignature(Object type) {
         throw new UnsupportedOperationException("TODO");
     }
 
+    /**
+     *  Generate a unique variable type signature.
+     */
     public String variableSignature(FirVariableSymbol<? extends FirVariable> symbol) {
         String owner = "{undefined}";
         ConeSimpleKotlinType kotlinType = symbol.getDispatchReceiverType();
@@ -247,6 +281,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';
     }
 
+    /**
+     *  Generate the method declaration signature.
+     */
     public String methodDeclarationSignature(FirFunctionSymbol<? extends FirFunction> symbol) {
         String s = symbol instanceof FirConstructorSymbol ? signature(symbol.getResolvedReturnTypeRef()) : signature(symbol.getDispatchReceiverType());
 
@@ -259,6 +296,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
     }
 
+    /**
+     *  Generate the method argument signature.
+     */
     private String methodArgumentSignature(FirFunctionSymbol<? extends FirFunction> sym) {
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
         for (FirValueParameterSymbol parameterSymbol : sym.getValueParameterSymbols()) {
@@ -267,6 +307,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return genericArgumentTypes.toString();
     }
 
+    /**
+     *  Converts the ConeKotlinType to it's FirRegularClass.
+     */
     @Nullable
     public FirRegularClass convertToRegularClass(@Nullable ConeKotlinType kotlinType) {
         if (kotlinType != null) {
@@ -278,10 +321,16 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return null;
     }
 
+    /**
+     *  Converts the Kotlin ClassId to a {@link org.openrewrite.java.tree.J} style FQN.
+     */
     public static String convertClassIdToFqn(ClassId classId) {
         return convertKotlinFqToJavaFq(classId.toString());
     }
 
+    /**
+     *  Converts the Kotlin FQN to a {@link org.openrewrite.java.tree.J} style FQN.
+     */
     public static String convertKotlinFqToJavaFq(String kotlinFqn) {
         String cleanedFqn = kotlinFqn
                 .replace(".", "$")

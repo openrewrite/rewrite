@@ -300,7 +300,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
         compilerConfiguration.put(USE_FIR,  true);
-        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT,  true);
+        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT,  false);
         compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS,  true);
 
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
