@@ -21,7 +21,7 @@ import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import java.util.function.Consumer;
 
 public class DefaultImportsCustomizer implements Consumer<CompilerConfiguration> {
-    public static final String[] DEFAULT_IMPORTS = new String[]{
+    private static final String[] DEFAULT_IMPORTS = new String[]{
             "org.gradle",
             "org.gradle.api",
             "org.gradle.api.artifacts",

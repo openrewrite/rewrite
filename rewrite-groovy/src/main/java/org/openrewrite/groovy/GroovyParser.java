@@ -162,7 +162,9 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
                 for (ClassNode aClass : ast.getClasses()) {
                     try {
-                        new StaticTypeCheckingVisitor(unit, aClass).visitClass(aClass);
+                        StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
+                        staticTypeCheckingVisitor.setCompilationUnit(compUnit);
+                        staticTypeCheckingVisitor.visitClass(aClass);
                     } catch (NoClassDefFoundError ignored) {
                     }
                 }
