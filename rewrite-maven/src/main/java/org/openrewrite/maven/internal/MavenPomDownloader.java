@@ -447,7 +447,7 @@ public class MavenPomDownloader {
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
                     gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                    gav.getVersion().equals(projectPom.getVersion())) {
+                    (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
                 return projectPom;
             }
         }
