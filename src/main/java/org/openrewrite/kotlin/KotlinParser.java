@@ -180,11 +180,13 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         configureJdkClasspathRoots(compilerConfiguration);
 
+        // Replace with JavaParser.dependencies(... kotlin-stdlib)?
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
-        if (classpath != null) {
-            addJvmClasspathRoots(compilerConfiguration, classpath.stream().map(Path::toFile).collect(toList()));
-        }
+        // Figure out how to add the classpath performantly.
+//        if (classpath != null) {
+//            addJvmClasspathRoots(compilerConfiguration, classpath.stream().map(Path::toFile).collect(toList()));
+//        }
 
         // Add kotlin sources.
 //        addKotlinSourceRoot(compilerConfiguration, "add path", true);
@@ -208,7 +210,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     packagePartProviderFunction::apply);
 
             if (chunk.size() > 1) {
-                throw new IllegalStateException("Implement me. Expects chunk size of 1, but was " + chunk.size());
+                throw new IllegalStateException("Implement me. Expects chunksize of 1, but was " + chunk.size());
             }
 
             Module module = chunk.get(0);

@@ -117,8 +117,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
             }
 
-            boolean singleExpressionBlock = block.getMarkers().findFirst(SingleExpressionBlock.class).isPresent();
-            if (singleExpressionBlock) {
+            SingleExpressionBlock singleExpressionBlock = block.getMarkers().findFirst(SingleExpressionBlock.class).orElse(null);
+            if (singleExpressionBlock != null) {
                 p.out.append("=");
             }
 
@@ -286,7 +286,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.out.append('(');
                 } else if (i > 0 && omitParens && (
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                                !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent())) {
+                                !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
+                )) {
                     p.out.append(')');
                 } else if (i > 0) {
                     p.out.append(',');

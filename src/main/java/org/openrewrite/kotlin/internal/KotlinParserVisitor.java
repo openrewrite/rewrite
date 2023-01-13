@@ -90,8 +90,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final FirSession firSession;
     private int cursor = 0;
 
-    // Associate top-level function and property declarations to the file.
-    @Nullable
+    //
     private FirFile currentFile = null;
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
@@ -107,6 +106,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         this.firSession = firSession;
     }
 
+    // TODO: look into FirDeclarationUtilKt.isSynthetic()
     @Override
     public J visitFile(FirFile file, ExecutionContext ctx) {
         currentFile = file;
@@ -432,9 +432,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Identifier name = convertToIdentifier(firRegularClass.getName().asString(), firRegularClass);
 
         // KotlinTypeParameters with multiple bounds are defined outside the TypeParameter container.
-        // KotlinTypeGoat<T, S> where S: A, T: B, S: C, T: D.
-        // The order the bounds exist in T and S will be based on the declaration order.
-        // However, each bound may be declared in any order T -> S -> T -> S.
+        // KotlinTypeGoat<T, S> where S: PT<S>, S: C
         JContainer<J.TypeParameter> typeParams = firRegularClass.getTypeParameters().isEmpty() ? null : JContainer.build(
                 sourceBefore("<"),
                 convertAll(firRegularClass.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx),
@@ -451,11 +449,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         // Kotlin declared super class and interfaces differently than java. All types declared after the `:` are added into implementings.
         // This should probably exist on a K.ClassDeclaration view where the getters return the appropriate types.
-        // The J.ClassDeclaration should have the super type set in extending and the J.NewClass should be unwrapped.
+        // The J.ClassDeclaration view should have the super type set in extending and the J.NewClass should be unwrapped.
         for (int i = 0; i < firRegularClass.getSuperTypeRefs().size(); i++) {
             FirTypeRef typeRef = firRegularClass.getSuperTypeRefs().get(i);
             FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(typeRef), firSession);
-            // Filter out generated types.
+            // Filter out generated super classes.
             if (typeRef.getSource() != null && !(typeRef.getSource().getKind() instanceof KtFakeSourceElementKind)) {
                 if (superTypes == null) {
                     superTypes = new ArrayList<>(firRegularClass.getSuperTypeRefs().size());
@@ -463,7 +461,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
                 TypeTree element = (TypeTree) visitElement(typeRef, ctx);
                 if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
-                    // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
                     J.NewClass newClass = new J.NewClass(
                             randomId(),
                             element.getPrefix(),
@@ -489,7 +486,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else {
             implementings = JContainer.build(before, superTypes, Markers.EMPTY);
         }
-
         List<FirElement> membersMultiVariablesSeparated = new ArrayList<>(firRegularClass.getDeclarations().size());
         List<FirDeclaration> jcEnums = new ArrayList<>(klass.getDeclarations().size());
         FirPrimaryConstructor firPrimaryConstructor = null;
@@ -499,7 +495,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if (declaration instanceof FirPrimaryConstructor) {
                 firPrimaryConstructor = (FirPrimaryConstructor) declaration;
             } else {
-                // We aren't interested in the generated values.
                 if (ClassKind.ENUM_CLASS == classKind && declaration.getSource() != null &&
                         declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
                     continue;
@@ -628,7 +623,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitEqualityOperatorCall(FirEqualityOperatorCall equalityOperatorCall, ExecutionContext ctx) {
         if (equalityOperatorCall.getArgumentList().getArguments().size() != 2) {
-            throw new UnsupportedOperationException("Unsupported number of equality operator arguments.");
+            throw new IllegalStateException("Implement me.");
         }
 
         FirElement left = equalityOperatorCall.getArgumentList().getArguments().get(0);
@@ -652,7 +647,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             case NOT_EQ:
                 return J.Binary.Type.NotEqual;
             default:
-                throw new UnsupportedOperationException("Unsupported FirOperation " + op.name());
+                throw new IllegalStateException("Implement me.");
         }
     }
 
@@ -662,13 +657,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> annotations = mapAnnotations(enumEntry.getAnnotations());
 
+        J.NewClass initializer = null;
         return new J.EnumValue(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 annotations == null ? emptyList() : annotations,
                 convertToIdentifier(enumEntry.getName().asString(), enumEntry),
-                null
+                initializer
         );
     }
 
@@ -694,6 +690,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             JContainer<Expression> args = mapFunctionalCallArguments(functionCall);
+            J.Block body = null;
             return new J.NewClass(
                     randomId(),
                     prefix,
@@ -702,9 +699,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     EMPTY,
                     name,
                     args,
-                    null,
+                    body,
                     null);
-
         } else if (namedReference instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
             FirBasedSymbol<?> owner = null;
@@ -713,7 +709,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
                 if (lookupTag != null) {
                     owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
-                } else if (currentFile != null) {
+                } else {
                     owner = currentFile.getSymbol();
                 }
             }
@@ -730,9 +726,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 } else if (extensionReceiver instanceof FirFunctionCall || extensionReceiver instanceof FirPropertyAccessExpression) {
                     visit = extensionReceiver;
                 } else {
-                    throw new UnsupportedOperationException("Unsupported FunctionCall selection type.");
+                    throw new IllegalStateException("Implement me.");
                 }
-
                 Expression selectExpr = (Expression) visitElement(visit, ctx);
                 Space after = whitespace();
                 if (source.startsWith(".", cursor)) {
@@ -810,7 +805,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     firExpression instanceof FirStringConcatenationCall) {
                 args = JContainer.build(sourceBefore("("), convertAll(singletonList(firExpression), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             } else {
-                throw new UnsupportedOperationException("Could not map function call arguments.");
+                throw new IllegalStateException("Implement me.");
             }
         } else {
             args = JContainer.build(sourceBefore("("), firExpressions.isEmpty() ?
@@ -849,10 +844,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space prefix = whitespace();
             J left = visitElement(functionCall.getDispatchReceiver(), ctx);
             if (functionCall.getArgumentList().getArguments().size() != 1) {
-                throw new UnsupportedOperationException("Unexpected function call argument list size.");
+                throw new IllegalStateException("Implement me.");
             }
 
-            Space opPrefix;
+            Space opPrefix = EMPTY;
             if (type == J.Binary.Type.Multiplication) {
                 opPrefix = sourceBefore("*");
             } else if (type == J.Binary.Type.Subtraction) {
@@ -860,7 +855,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if (type == J.Binary.Type.Addition) {
                 opPrefix = sourceBefore("+");
             } else {
-                throw new UnsupportedOperationException("Function call operator is not supported " + type);
+                throw new IllegalStateException("Implement me.");
             }
 
             J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
@@ -874,7 +869,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeMapping.type(functionCall));
         }
 
-        throw new UnsupportedOperationException("Null function call operator type.");
+        throw new IllegalStateException("Implement me.");
     }
 
     @Nullable
@@ -898,6 +893,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionTypeRef(FirFunctionTypeRef functionTypeRef, ExecutionContext ctx) {
+
         List<JRightPadded<J>> paramExprs = new ArrayList<>(functionTypeRef.getValueParameters().size());
         JRightPadded<NameTree> receiver = null;
         if (functionTypeRef.getReceiverTypeRef() != null) {
@@ -1028,7 +1024,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             J.Identifier receiverName = (J.Identifier) visitElement(property.getReceiverTypeRef(), ctx);
 
             // Temporary wrapper to move forward ...
-            // The property receiver should be placed in the getter / setter.
             receiver = JRightPadded.build(
                     new J.VariableDeclarations.NamedVariable(
                             randomId(),
@@ -1086,7 +1081,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
-            throw new UnsupportedOperationException("Explicit setter initialization are not currently supported.");
+            throw new IllegalStateException("Implement setter initialization on Properties.");
         }
 
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
@@ -1171,6 +1166,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     body = convertOrNull(propertyAccessor.getBody(), ctx);
                     body = body.withPrefix(blockPrefix);
                     body = body.withMarkers(body.getMarkers().addIfAbsent(singleExpressionBlock));
+                } else {
+                    throw new IllegalStateException("Implement me.");
                 }
             } else {
                 cursor = saveCursor;
@@ -1193,7 +1190,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeMapping.methodDeclarationType(propertyAccessor, null));
         }
 
-        throw new UnsupportedOperationException("Unsupported property accessor.");
+        throw new IllegalStateException("Implement me.");
     }
 
     @Override
@@ -1207,7 +1204,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (returnExpression.getResult() instanceof FirUnitExpression) {
             Space prefix = whitespace();
             if (source.startsWith("return", cursor)) {
-                throw new IllegalStateException("FirReturnExpression.");
+                throw new IllegalStateException("Implement me.");
             }
 
             return new K.Return(randomId(), prefix, Markers.EMPTY, null);
@@ -1247,8 +1244,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (isInfix && simpleFunction.getReceiverTypeRef() != null) {
-            // Infix functions are de-sugared during the backend phase of the compiler.
-            // The de-sugaring process moves the infix receiver to the first position of the method declaration.
+            // Infix functions are desugared during the backend phase of the compiler.
+            // The desugaring process moves the infix receiver to the first position of the method declaration.
             // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
             J.Identifier receiver = (J.Identifier) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
@@ -1271,7 +1268,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         String methodName = "";
         if ("<no name provided>".equals(simpleFunction.getName().asString())) {
             // Extract name from source.
-            throw new IllegalStateException("Unresolved function.");
+            throw new IllegalStateException("Implement me.");
         } else {
             methodName = simpleFunction.getName().asString();
         }
@@ -1470,7 +1467,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
     }
 
-    // Merge visitValueParameter and visitProperty
+    /**
+     * Merge visitProperty with visitValueParameter.
+     */
     @Override
     public J visitValueParameter(FirValueParameter valueParameter, ExecutionContext ctx) {
         Space prefix = whitespace();
@@ -1747,6 +1746,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return t == null ? null : convert(t, ctx);
     }
 
+    @Nullable
+    private <J2 extends J> JRightPadded<J2> convertOrNull(@Nullable FirElement t, Function<FirElement, Space> suffix, ExecutionContext ctx) {
+        return t == null ? null : convert(t, suffix, ctx);
+    }
+
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends FirElement> elements,
                                                              Function<FirElement, Space> innerSuffix,
                                                              Function<FirElement, Space> suffix,
@@ -1785,7 +1789,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new JLeftPadded<>(left, tree, Markers.EMPTY);
     }
 
-    private <T> JRightPadded<T> padRight(T tree, @Nullable Space right) {
+    private <T> JRightPadded<T> padRight(T tree, Space right) {
         return new JRightPadded<>(tree, right == null ? EMPTY : right, Markers.EMPTY);
     }
 
