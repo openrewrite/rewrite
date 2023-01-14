@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.StandardClassIds;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaReflectionTypeMapping;
@@ -44,6 +45,7 @@ import java.util.List;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertClassIdToFqn;
 
+@Incubating(since = "0")
 public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private final KotlinTypeSignatureBuilder signatureBuilder;
     private final JavaTypeCache typeCache;
@@ -60,52 +62,59 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
     @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Object type) {
+        return type(type, null);
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    public JavaType type(@Nullable Object type, @Nullable FirBasedSymbol<?> ownerFallBack) {
         if (type == null) {
             return JavaType.Class.Unknown.getInstance();
         }
 
-        String signature = signatureBuilder.signature(type);
+        String signature = signatureBuilder.signature(type, ownerFallBack);
         JavaType existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
         }
 
         if (type instanceof FirClass) {
-            return classType(type, signature);
+            return classType(type, signature, ownerFallBack);
         } else if (type instanceof FirFunction) {
-            return methodDeclarationType((FirFunction) type, null);
+            return methodDeclarationType((FirFunction) type, null, ownerFallBack);
         } else if (type instanceof FirVariable) {
-            return variableType((FirVariable) type, signature);
+            return variableType(((FirVariable) type).getSymbol(), null, ownerFallBack);
+        } else if (type instanceof FirFile) {
+            return JavaType.ShallowClass.build(((FirFile) type).getName());
         }
 
-        return resolveType(type, signature);
+        return resolveType(type, signature, ownerFallBack);
     }
 
-    private JavaType resolveType(Object type, String signature) {
+    private JavaType resolveType(Object type, String signature, @Nullable FirBasedSymbol<?> ownerFallBack) {
         if (type instanceof ConeTypeProjection) {
-            return generic((ConeTypeProjection) type, signature);
+            return generic((ConeTypeProjection) type, signature, ownerFallBack);
         }  else if (type instanceof FirConstExpression) {
-            return type(((FirConstExpression<?>) type).getTypeRef());
+            return type(((FirConstExpression<?>) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirEqualityOperatorCall) {
-            return type(((FirEqualityOperatorCall) type).getTypeRef());
+            return type(((FirEqualityOperatorCall) type).getTypeRef(), ownerFallBack);
         }  else if (type instanceof FirFunctionTypeRef) {
-            return type(((FirFunctionTypeRef) type).getReturnTypeRef());
+            return type(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerFallBack);
         } else if (type instanceof FirNamedArgumentExpression) {
-            return type(((FirNamedArgumentExpression) type).getTypeRef());
+            return type(((FirNamedArgumentExpression) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirLambdaArgumentExpression) {
-            return type(((FirLambdaArgumentExpression) type).getTypeRef());
+            return type(((FirLambdaArgumentExpression) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
-                return type(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return type(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerFallBack);
             } else if (resolvedSymbol instanceof FirEnumEntrySymbol) {
-                return type(((FirEnumEntrySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return type(((FirEnumEntrySymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerFallBack);
             } else if (resolvedSymbol instanceof FirNamedFunctionSymbol) {
-                return type(((FirNamedFunctionSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return type(((FirNamedFunctionSymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerFallBack);
             } else if (resolvedSymbol instanceof FirPropertySymbol) {
-                return type(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return type(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerFallBack);
             } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
-                return type(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType());
+                return type(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType(), ownerFallBack);
             } else {
                 throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
             }
@@ -114,27 +123,22 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if (coneKotlinType instanceof ConeTypeParameterType) {
                 FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);
                 if (classifierSymbol != null && classifierSymbol.getFir() instanceof FirTypeParameter) {
-                    return generic((FirTypeParameter) classifierSymbol.getFir(), signature);
+                    return generic((FirTypeParameter) classifierSymbol.getFir(), signature, ownerFallBack);
                 }
             }
-            return classType(type, signature);
+            return classType(type, signature, ownerFallBack);
         } else if (type instanceof FirTypeParameter) {
-            return generic((FirTypeParameter) type, signature);
+            return generic((FirTypeParameter) type, signature, ownerFallBack);
         } else if (type instanceof FirVariableAssignment) {
-            return type(((FirVariableAssignment) type).getCalleeReference());
+            return type(((FirVariableAssignment) type).getCalleeReference(), ownerFallBack);
         } else if (type instanceof FirQualifiedAccessExpression) {
-            return type(((FirQualifiedAccessExpression) type).getTypeRef());
+            return type(((FirQualifiedAccessExpression) type).getTypeRef(), ownerFallBack);
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
-    @Nullable
-    public JavaType.Variable variableType(@Nullable FirVariable variable, @Nullable String signature) {
-        return variable == null ? null : variableType(variable.getSymbol());
-    }
-
-    private JavaType.FullyQualified classType(Object classType, String signature) {
+    private JavaType.FullyQualified classType(Object classType, String signature, @Nullable FirBasedSymbol<?> ownerFallBack) {
         FirClass firClass;
         FirResolvedTypeRef resolvedTypeRef = null;
         if (classType instanceof FirResolvedTypeRef) {
@@ -214,7 +218,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if (!enumEntries.isEmpty()) {
                 fields = new ArrayList<>(properties.size() + enumEntries.size());
                 for (FirEnumEntry enumEntry : enumEntries) {
-                    fields.add(variableType(enumEntry.getSymbol(), clazz));
+                    fields.add(variableType(enumEntry.getSymbol(), clazz, ownerFallBack));
                 }
             }
 
@@ -224,7 +228,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 }
 
                 for (FirProperty property : properties) {
-                    fields.add(variableType(property.getSymbol(), clazz));
+                    fields.add(variableType(property.getSymbol(), clazz, ownerFallBack));
                 }
             }
 
@@ -232,7 +236,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if(!functions.isEmpty()) {
                 methods = new ArrayList<>(functions.size());
                 for (FirFunction function : functions) {
-                    methods.add(methodDeclarationType(function, clazz));
+                    methods.add(methodDeclarationType(function, clazz, ownerFallBack));
                 }
             }
 
@@ -276,7 +280,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     }
 
     @Nullable
-    public JavaType.Method methodDeclarationType(@Nullable FirFunction function, @Nullable JavaType.FullyQualified declaringType) {
+    public JavaType.Method methodDeclarationType(@Nullable FirFunction function, @Nullable JavaType.FullyQualified declaringType, @Nullable FirBasedSymbol<?> ownerFallBack) {
         FirFunctionSymbol<?> methodSymbol = function == null ? null : function.getSymbol();
         if (methodSymbol != null) {
             String signature = signatureBuilder.methodDeclarationSignature(function.getSymbol());
@@ -312,13 +316,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             JavaType.FullyQualified resolvedDeclaringType = declaringType;
             if (declaringType == null) {
                 if (methodSymbol instanceof FirConstructorSymbol) {
-                    JavaType type = type(methodSymbol.getResolvedReturnType());
-                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.getResolvedReturnType()));
                 } else if (methodSymbol.getDispatchReceiverType() != null) {
-                    JavaType type = type(methodSymbol.getDispatchReceiverType());
-                    resolvedDeclaringType = type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(methodSymbol.getDispatchReceiverType()));
+                } else if (ownerFallBack != null) {
+                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(ownerFallBack.getFir()));
                 }
-                // Find a means to distinguish the owner when a method is declared in a root.
             }
 
             if (resolvedDeclaringType == null) {
@@ -429,18 +432,18 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return method;
     }
 
-    @Nullable
-    public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol) {
-        return variableType(symbol, null);
-    }
+//    @Nullable
+//    public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol) {
+//        return variableType(symbol, null, null);
+//    }
 
     @Nullable
-    public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol, @Nullable JavaType.FullyQualified owner) {
+    public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol, @Nullable JavaType.FullyQualified owner, @Nullable FirBasedSymbol<?> ownerFallBack) {
         if (symbol == null) {
             return null;
         }
 
-        String signature = signatureBuilder.variableSignature(symbol);
+        String signature = signatureBuilder.variableSignature(symbol, ownerFallBack);
         JavaType.Variable existing = typeCache.get(signature);
         if (existing != null) {
             return existing;
@@ -492,7 +495,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         throw new UnsupportedOperationException("Unknown primitive type " + type);
     }
 
-    private JavaType generic(ConeTypeProjection type, String signature) {
+    private JavaType generic(ConeTypeProjection type, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
         // TODO: fix for multiple bounds.
         String name = "";
         JavaType.GenericTypeVariable.Variance variance = INVARIANT;
@@ -529,7 +532,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return gtv;
     }
 
-    private JavaType generic(FirTypeParameter typeParameter, String signature) {
+    private JavaType generic(FirTypeParameter typeParameter, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
         String name = typeParameter.getName().asString();
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
                 name, INVARIANT, null);

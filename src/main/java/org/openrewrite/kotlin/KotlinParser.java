@@ -93,6 +93,7 @@ import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.FRIEND_PATHS;
+import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser<K.CompilationUnit> {
@@ -179,14 +180,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
 
         configureJdkClasspathRoots(compilerConfiguration);
-
-        // Replace with JavaParser.dependencies(... kotlin-stdlib)?
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
-
-        // Figure out how to add the classpath performantly.
-//        if (classpath != null) {
-//            addJvmClasspathRoots(compilerConfiguration, classpath.stream().map(Path::toFile).collect(toList()));
-//        }
 
         // Add kotlin sources.
 //        addKotlinSourceRoot(compilerConfiguration, "add path", true);
@@ -248,9 +242,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 `LightVirtualFile` are created to support tests and in the future, Kotlin template.
                 We might want to extract the generation of `platformSources` later on.
              */
-            int test = 0;
             for (Input source : sources) {
-                VirtualFile vFile = new LightVirtualFile("doesntmatter" + test++, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
+                VirtualFile vFile = new LightVirtualFile(randomId().toString(), KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
                 platformSources.add(new KtVirtualFileSourceFile(vFile));
             }
 

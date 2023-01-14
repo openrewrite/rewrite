@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.name.ClassId;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 
@@ -19,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
+@Incubating(since = "0")
 public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     private final FirSession firSession;
@@ -30,8 +32,12 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         this.firSession = firSession;
     }
 
-    @SuppressWarnings("ConstantConditions")
     public String signature(@Nullable Object type) {
+        return signature(type, null);
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    public String signature(@Nullable Object type, @Nullable FirBasedSymbol<?> ownerSymbol) {
         if (type == null) {
             return "{undefined}";
         }
@@ -41,45 +47,45 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof FirFunction) {
             return methodDeclarationSignature(((FirFunction) type).getSymbol());
         } else if (type instanceof FirVariable) {
-            return variableSignature(((FirVariable) type).getSymbol());
+            return variableSignature(((FirVariable) type).getSymbol(), ownerSymbol);
         } else if (type instanceof FirBasedSymbol<?>) {
-            return signature(((FirBasedSymbol<?>) type).getFir());
+            return signature(((FirBasedSymbol<?>) type).getFir(), ownerSymbol);
         } else if (type instanceof FirFile) {
             return ((FirFile) type).getName();
         }
 
-        return resolveSignature(type);
+        return resolveSignature(type, ownerSymbol);
     }
 
     /**
      * Interpret various parts of the Kotlin tree for type attribution.
      * This method should only be called by signature.
      */
-    private String resolveSignature(Object type) {
+    private String resolveSignature(Object type, @Nullable FirBasedSymbol<?> ownerSymbol) {
         if (type instanceof ConeTypeProjection) {
             return coneTypeProjectionSignature((ConeTypeProjection) type);
         } else if (type instanceof FirConstExpression) {
-            return signature(((FirConstExpression<?>) type).getTypeRef());
+            return signature(((FirConstExpression<?>) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirEqualityOperatorCall) {
-            return signature(((FirEqualityOperatorCall) type).getTypeRef());
+            return signature(((FirEqualityOperatorCall) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirFunctionTypeRef) {
-            return signature(((FirFunctionTypeRef) type).getReturnTypeRef());
+            return signature(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerSymbol);
         } else if (type instanceof FirNamedArgumentExpression) {
-            return signature(((FirNamedArgumentExpression) type).getTypeRef());
+            return signature(((FirNamedArgumentExpression) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirLambdaArgumentExpression) {
-            return signature(((FirLambdaArgumentExpression) type).getTypeRef());
+            return signature(((FirLambdaArgumentExpression) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
-                return signature(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return signature(((FirConstructorSymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerSymbol);
             } else if (resolvedSymbol instanceof FirEnumEntrySymbol) {
-                return signature(((FirEnumEntrySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return signature(((FirEnumEntrySymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerSymbol);
             } else if (resolvedSymbol instanceof FirNamedFunctionSymbol) {
-                return signature(((FirNamedFunctionSymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return signature(((FirNamedFunctionSymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerSymbol);
             } else if (resolvedSymbol instanceof FirPropertySymbol) {
-                return signature(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef());
+                return signature(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerSymbol);
             } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
-                return signature(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType());
+                return signature(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType(), ownerSymbol);
             } else {
                 throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
             }
@@ -95,14 +101,14 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof FirTypeParameter) {
             return genericSignature(type);
         } else if (type instanceof FirValueParameterSymbol) {
-            return signature(((FirValueParameterSymbol) type).getResolvedReturnType());
+            return signature(((FirValueParameterSymbol) type).getResolvedReturnType(), ownerSymbol);
         } else if (type instanceof FirVariableAssignment) {
-            return signature(((FirVariableAssignment) type).getCalleeReference());
+            return signature(((FirVariableAssignment) type).getCalleeReference(), ownerSymbol);
         } else if (type instanceof FirQualifiedAccessExpression) {
-            return signature(((FirQualifiedAccessExpression) type).getTypeRef());
+            return signature(((FirQualifiedAccessExpression) type).getTypeRef(), ownerSymbol);
         }
 
-        throw new IllegalStateException("Unexpected type " + type.getClass().getName());
+        throw new UnsupportedOperationException("Unexpected type " + type.getClass().getName());
     }
 
     /**
@@ -118,11 +124,36 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      */
     @Override
     public String classSignature(@Nullable Object type) {
-        if (type == null) {
+        FirClass resolveType = null;
+        if (type instanceof FirClass) {
+            resolveType = (FirClass) type;
+        } else if (type instanceof FirFunction) {
+            if (type instanceof FirConstructor) {
+                resolveType = convertToRegularClass(((FirResolvedTypeRef) ((FirConstructor) type).getReturnTypeRef()).getType());
+            } else {
+                FirFunction function = (FirFunction) type;
+                resolveType = convertToRegularClass(function.getDispatchReceiverType() != null ? function.getDispatchReceiverType() :
+                        ((FirResolvedTypeRef) function.getReturnTypeRef()).getType());
+            }
+        } else if (type instanceof FirResolvedTypeRef) {
+            FirRegularClassSymbol symbol =  TypeUtilsKt.toRegularClassSymbol((((FirResolvedTypeRef)type).getType()), firSession);
+            if (symbol != null) {
+                resolveType = symbol.getFir();
+            }
+        } else if (type instanceof ConeClassLikeType) {
+            FirRegularClassSymbol symbol =  TypeUtilsKt.toRegularClassSymbol(((ConeClassLikeType)type), firSession);
+            if (symbol != null) {
+                resolveType = symbol.getFir();
+            }
+        } else if (type instanceof FirFile) {
+            return ((FirFile) type).getName();
+        }
+
+        if (resolveType == null) {
             return "{undefined}";
         }
 
-        FirClassSymbol<? extends FirClass> symbol = ((FirClass) type).getSymbol();
+        FirClassSymbol<? extends FirClass> symbol = resolveType.getSymbol();
         return convertClassIdToFqn(symbol.getClassId());
     }
 
@@ -134,7 +165,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         StringBuilder s = new StringBuilder(classSignature(type));
         StringJoiner joiner = new StringJoiner(", ", "<", ">");
         for (FirTypeParameterRef tp : ((FirClass) type).getTypeParameters()) {
-            String signature = signature(tp);
+            String signature = signature(tp, ((FirClass) type).getSymbol());
             joiner.add(signature);
         }
         s.append(joiner);
@@ -221,7 +252,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s.append("Generic{*}");
         } else if (type instanceof ConeClassLikeType) {
             ConeClassLikeType classLikeType = (ConeClassLikeType) type;
-            s.append(classLikeType.getLookupTag().getClassId().asFqNameString());
+            s.append(convertClassIdToFqn(classLikeType.getLookupTag().getClassId()));
             if (classLikeType.getTypeArguments().length > 0) {
                 s.append("<");
                 ConeTypeProjection[] typeArguments = classLikeType.getTypeArguments();
@@ -237,7 +268,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof ConeTypeParameterType) {
             ConeTypeParameterType typeParameterType = (ConeTypeParameterType) type;
             s.append("Generic{");
-            typeSignature = typeParameterType.toString().replace("/", ".").replace("?", "");
+            typeSignature = convertKotlinFqToJavaFq(typeParameterType.toString());
             s.append(typeSignature);
             s.append("}");
         } else {
@@ -258,22 +289,24 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     /**
      *  Generate a unique variable type signature.
      */
-    public String variableSignature(FirVariableSymbol<? extends FirVariable> symbol) {
+    public String variableSignature(FirVariableSymbol<? extends FirVariable> symbol, @Nullable FirBasedSymbol<?> ownerSymbol) {
         String owner = "{undefined}";
         ConeSimpleKotlinType kotlinType = symbol.getDispatchReceiverType();
         if (kotlinType instanceof ConeClassLikeType) {
             FirRegularClass regularClass = convertToRegularClass(kotlinType);
             if (regularClass != null) {
                 owner = signature(regularClass);
-            }
-            if (owner.contains("<")) {
-                owner = owner.substring(0, owner.indexOf('<'));
+                if (owner.contains("<")) {
+                    owner = owner.substring(0, owner.indexOf('<'));
+                }
             }
         } else if (symbol.getCallableId().getClassId() != null) {
             owner = convertClassIdToFqn(symbol.getCallableId().getClassId());
             if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'));
             }
+        } else if (ownerSymbol != null) {
+            owner = classSignature(ownerSymbol.getFir());
         }
 
         return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';
@@ -311,7 +344,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      *  Generate the method declaration signature.
      */
     public String methodDeclarationSignature(FirFunctionSymbol<? extends FirFunction> symbol) {
-        String s = symbol instanceof FirConstructorSymbol ? signature(symbol.getResolvedReturnTypeRef()) : signature(symbol.getDispatchReceiverType());
+        String s = symbol instanceof FirConstructorSymbol ? classSignature(symbol.getResolvedReturnTypeRef()) : classSignature(symbol.getDispatchReceiverType());
 
         if (symbol instanceof FirConstructorSymbol) {
             s += "{name=<constructor>,return=" + s;
@@ -346,7 +379,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String methodArgumentSignature(FirFunctionSymbol<? extends FirFunction> sym) {
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
         for (FirValueParameterSymbol parameterSymbol : sym.getValueParameterSymbols()) {
-                genericArgumentTypes.add(signature(parameterSymbol));
+                genericArgumentTypes.add(signature(parameterSymbol.getResolvedReturnType(), sym));
         }
         return genericArgumentTypes.toString();
     }

@@ -1096,7 +1096,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         name,
                         dimensionsAfterName,
                         expr == null ? null : padLeft(exprPrefix, (Expression) expr),
-                        typeMapping.variableType(property.getSymbol())
+                        typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
                 )
         );
         vars.add(namedVariable);
@@ -1189,7 +1189,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     null,
                     body,
                     null,
-                    typeMapping.methodDeclarationType(propertyAccessor, null));
+                    typeMapping.methodDeclarationType(propertyAccessor, null, getCurrentFile()));
         }
 
         throw new UnsupportedOperationException("Unsupported property accessor.");
@@ -1345,7 +1345,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 null,
                 body,
                 null,
-                typeMapping.methodDeclarationType(simpleFunction, null));
+                typeMapping.methodDeclarationType(simpleFunction, null, getCurrentFile()));
     }
 
     @Override
@@ -1525,7 +1525,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         name,
                         dimensionsAfterName,
                         initializer != null ? padLeft(sourceBefore("="), (Expression) visitExpression(initializer, ctx)) : null,
-                        typeMapping.variableType(valueParameter.getSymbol())
+                        typeMapping.variableType(valueParameter.getSymbol(), null, getCurrentFile())
                 )
         );
         vars.add(namedVariable);
@@ -1841,7 +1841,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private J.Identifier convertToIdentifier(String name, FirElement firElement) {
-        return convertToIdentifier(name, typeMapping.type(firElement), null);
+        return convertToIdentifier(name, typeMapping.type(firElement, getCurrentFile()), null);
     }
 
     private J.Identifier convertToIdentifier(String name, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
@@ -1968,6 +1968,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         skip(type.name().toLowerCase());
         return new K.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
+    }
+
+    @Nullable
+    private FirBasedSymbol<?> getCurrentFile() {
+        return currentFile == null ? null : currentFile.getSymbol();
     }
 
     private int positionOfNext(String untilDelim) {
