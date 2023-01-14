@@ -210,7 +210,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                     packagePartProviderFunction::apply);
 
             if (chunk.size() > 1) {
-                throw new IllegalStateException("Implement me. Expects chunksize of 1, but was " + chunk.size());
+                throw new IllegalStateException("Implement me. Expects chunk size of 1, but was " + chunk.size());
             }
 
             Module module = chunk.get(0);
@@ -248,10 +248,11 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 `LightVirtualFile` are created to support tests and in the future, Kotlin template.
                 We might want to extract the generation of `platformSources` later on.
              */
-            sources.forEach(it -> {
-                VirtualFile vFile = new LightVirtualFile(it.getPath().getFileName().toString(), KotlinFileType.INSTANCE, it.getSource().readFully());
+            int test = 0;
+            for (Input source : sources) {
+                VirtualFile vFile = new LightVirtualFile("doesntmatter" + test++, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
                 platformSources.add(new KtVirtualFileSourceFile(vFile));
-            });
+            }
 
             BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
             ModuleCompilerInput compilerInput = new ModuleCompilerInput(

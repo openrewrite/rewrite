@@ -19,10 +19,10 @@ public class KotlinTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
     private static final K.CompilationUnit cu = KotlinParser.builder()
-      .logCompilationWarningsAndErrors(true)
-      .build()
-      .parse(new InMemoryExecutionContext(), goat)
-      .get(0);
+            .logCompilationWarningsAndErrors(true)
+            .build()
+            .parse(new InMemoryExecutionContext(), goat)
+            .get(0);
 
     public JavaType.Parameterized goatType() {
         return requireNonNull(TypeUtils.asParameterized(cu

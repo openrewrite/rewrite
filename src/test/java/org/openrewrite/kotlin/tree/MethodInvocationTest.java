@@ -158,11 +158,11 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void typeParameters() {
         rewriteRun(
-          kotlin("fun < T : Number > method ( type : T ) {}"),
+          kotlin("fun < T : Number > methodA ( type : T ) {}"),
           kotlin(
             """
-                fun method() {
-                    method < Int > ( 10 )
+                fun methodB() {
+                    methodA < Int > ( 10 )
                 }
             """
           )
