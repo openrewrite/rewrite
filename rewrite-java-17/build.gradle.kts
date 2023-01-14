@@ -51,7 +51,7 @@ testing {
 
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
-                implementation(project)
+                implementation(project())
                 implementation(project(":rewrite-java-tck"))
             }
 
