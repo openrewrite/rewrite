@@ -85,24 +85,14 @@ public class ResolvedDependency {
     }
 
     public String getType() {
-        if (type != null) {
-            return type;
-        }
-        return requested.getType() == null ? "jar" : requested.getType();
-    }
-
-    public @Nullable String getClassifier() {
-        return classifier != null ? classifier : requested.getClassifier();
-    }
-
-    public boolean isOptional() {
-        return optional != null ? optional : Boolean.valueOf(requested.getOptional());
+        return type == null ? "jar" : type;
     }
 
     public boolean isDirect() {
         return depth == 0;
     }
 
+    @SuppressWarnings("unused")
     public boolean isTransitive() {
         return depth != 0;
     }

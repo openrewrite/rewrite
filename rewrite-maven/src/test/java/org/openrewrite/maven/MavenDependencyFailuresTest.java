@@ -46,7 +46,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
           spec -> spec
             .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
+              .setRepositories(List.of(MavenRepository.builder().setId("jenkins").setUri("https://repo.jenkins-ci.org/public").build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
@@ -87,7 +87,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
           spec -> spec
             .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
+              .setRepositories(List.of(MavenRepository.builder().setId("jenkins").setUri("https://repo.jenkins-ci.org/public").setKnownToExist(true).build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),
@@ -142,7 +142,8 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             """
         );
 
-        MavenRepository mavenLocal = new MavenRepository("local", localRepository.toUri().toString(), true, false, true, null, null, null);
+        MavenRepository mavenLocal = MavenRepository.builder().setId("local").setUri(localRepository.toUri().toString())
+          .setSnapshots(false).setKnownToExist(true).build();
 
         rewriteRun(
           spec -> spec

@@ -77,9 +77,9 @@ class MavenPomDownloaderTest {
     @Test
     void normalizeOssSnapshots() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
-        MavenRepository oss = downloader.normalizeRepository(new MavenRepository("oss",
-          "https://oss.sonatype.org/content/repositories/snapshots", false, true, false,
-          null, null, null), null);
+        MavenRepository oss = downloader.normalizeRepository(
+          MavenRepository.builder().setId("oss").setUri("https://oss.sonatype.org/content/repositories/snapshots").build(),
+          null);
 
         assertThat(oss).isNotNull();
         assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
@@ -90,12 +90,10 @@ class MavenPomDownloaderTest {
     void normalizeAcceptErrorStatuses(Integer status) {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         mockServer(status, mockRepo -> {
-            var originalRepo = new MavenRepository(
-              "id",
-              "http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()),
-              true, true, false,
-              null, null, false
-            );
+            var originalRepo = MavenRepository.builder()
+              .setId("id")
+              .setUri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+              .build();
             var normalizedRepo = downloader.normalizeRepository(originalRepo, null);
             assertThat(normalizedRepo).isEqualTo(originalRepo);
         });
@@ -105,7 +103,7 @@ class MavenPomDownloaderTest {
     void normalizeRejectConnectException() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         var normalizedRepository = downloader.normalizeRepository(
-          new MavenRepository("id", "https://localhost", true, true, false, null, null, false),
+          MavenRepository.builder().setId("id").setUri("https//localhost").build(),
           null
         );
         assertThat(normalizedRepository).isEqualTo(null);
@@ -118,26 +116,14 @@ class MavenPomDownloaderTest {
         mockServer(500,
           repo1 -> mockServer(400, repo2 -> {
               var repositories = List.of(
-                new MavenRepository(
-                  "id",
-                  "http://%s:%d/maven".formatted(repo1.getHostName(), repo1.getPort()),
-                  true,
-                  true,
-                  false,
-                  null,
-                  null,
-                  false
-                ),
-                new MavenRepository(
-                  "id2",
-                  String.format("http://%s:%d/maven", repo2.getHostName(), repo2.getPort()),
-                  true,
-                  true,
-                  false,
-                  null,
-                  null,
-                  false
-                )
+                MavenRepository.builder()
+                  .setId("id")
+                  .setUri("http://%s:%d/maven".formatted(repo1.getHostName(), repo1.getPort()))
+                  .build(),
+                MavenRepository.builder()
+                  .setId("id2")
+                  .setUri("http://%s:%d/maven".formatted(repo2.getHostName(), repo2.getPort()))
+                  .build()
               );
 
               assertThatThrownBy(() -> downloader.download(gav, null, null, repositories))
@@ -170,15 +156,12 @@ class MavenPomDownloaderTest {
                 }
             });
             mockRepo.start();
-            var repositories = List.of(
-              new MavenRepository("id",
-                "http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()),
-                true,
-                true,
-                false,
-                "user",
-                "pass",
-                false));
+            var repositories = List.of(MavenRepository.builder()
+              .setId("id")
+              .setUri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+              .setUsername("user")
+              .setPassword("pass")
+              .build());
 
             assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
         } catch (IOException e) {
@@ -208,15 +191,12 @@ class MavenPomDownloaderTest {
                 }
             });
             mockRepo.start();
-            var repositories = List.of(
-              new MavenRepository("id",
-                "http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()),
-                true,
-                true,
-                false,
-                "user",
-                "pass",
-                false));
+            var repositories = List.of(MavenRepository.builder()
+              .setId("id")
+              .setUri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+              .setUsername("user")
+              .setPassword("pass")
+              .build());
 
             assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
         } catch (IOException e) {
@@ -340,7 +320,12 @@ class MavenPomDownloaderTest {
         Files.createDirectories(fred.resolve("1.1.0"));
         Files.createDirectories(fred.resolve("2.0.0"));
 
-        MavenRepository repository = new MavenRepository("file-based", repoPath.toUri().toString(), true, true, true, null, null, true);
+        MavenRepository repository = MavenRepository.builder()
+          .setId("file-based")
+          .setUri(repoPath.toUri().toString())
+          .setKnownToExist(true)
+          .setDeriveMetadataIfMissing(true)
+          .build();
         MavenMetadata metaData  = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
           .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
         assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
