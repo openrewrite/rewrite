@@ -81,8 +81,8 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
         }
 
         int pos = (depth - 1) * TAB.length();
-        for (int j = outputLines.size() - 1; j > 0; j--) {
-            StringBuilder line = outputLines.get(j);
+        for (int i = outputLines.size() - 1; i > 0; i--) {
+            StringBuilder line = outputLines.get(i);
             if (pos >= line.length()) {
                 break;
             }
@@ -153,9 +153,9 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
 
         // print current visiting element
         StringBuilder line = new StringBuilder();
-        String typeName = tree instanceof J ? tree.getClass()
-            .getCanonicalName()
-            .substring(tree.getClass().getPackage().getName().length() + 1) : tree.getClass().getCanonicalName();
+        String typeName = tree instanceof J
+            ? tree.getClass().getCanonicalName().substring(tree.getClass().getPackage().getName().length() + 1)
+            : tree.getClass().getCanonicalName();
 
         line.append(leftPadding(depth)).append(typeName);
         String content = printTreeElement(tree);
