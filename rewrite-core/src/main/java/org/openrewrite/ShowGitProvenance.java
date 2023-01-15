@@ -26,10 +26,12 @@ import java.util.Set;
 import java.util.UUID;
 
 public class ShowGitProvenance extends Recipe {
-    private final DataTable<GitProvenanceRow> table = new DataTable<>(this, GitProvenanceRow.class,
+    private final DataTable<GitProvenanceRow> table = new DataTable<>(
+            this, GitProvenanceRow.class,
             "org.openrewrite.GitProvenance",
             "Git provenance",
-            "The git provenance of each source file.");
+            "The git provenance of each source file."
+    );
 
     @Override
     public String getDisplayName() {
