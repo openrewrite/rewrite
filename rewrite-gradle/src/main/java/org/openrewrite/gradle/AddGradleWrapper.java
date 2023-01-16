@@ -47,6 +47,8 @@ import static org.openrewrite.gradle.util.GradleWrapper.*;
 @EqualsAndHashCode(callSuper = true)
 public class AddGradleWrapper extends Recipe {
 
+    public static final String RELEASE = "RELEASE";
+
     @Override
     public String getDisplayName() {
         return "Add Gradle wrapper";
@@ -58,8 +60,10 @@ public class AddGradleWrapper extends Recipe {
     }
 
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "7.x")
+            description = "An exact version number or node-style semver selector used to select the version number. It defaults to the latest RELEASE",
+            example = "7.x",
+            required = false
+    )
     String version;
 
     @Option(displayName = "Distribution type",
@@ -87,6 +91,12 @@ public class AddGradleWrapper extends Recipe {
     public AddGradleWrapper(String version, String distribution) {
         this.version = version;
         this.distribution = distribution;
+    }
+
+    @LoathingOfOthers("JavaDoc")
+    @JsonCreator
+    public AddGradleWrapper() {
+       this(RELEASE,null);
     }
 
     @Override

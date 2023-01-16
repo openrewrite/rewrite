@@ -31,6 +31,7 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -87,15 +88,7 @@ class AddGradleWrapperTest implements RewriteTest {
     void addWrapper() {
         rewriteRun(
           spec -> spec.afterRecipe(run -> {
-              var gradleSh = result(run, PlainText.class, "gradlew");
-              assertThat(gradleSh.getText()).isNotBlank();
-              assertThat(gradleSh.getFileAttributes()).isNotNull();
-              assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
-
-              var gradleBat = result(run, PlainText.class, "gradlew.bat");
-              assertThat(gradleBat.getText()).isNotBlank();
-              assertThat(gradleBat.getFileAttributes()).isNotNull();
-              assertThat(gradleBat.getFileAttributes().isExecutable()).isTrue();
+              validateGradlewFiles(run);
 
               var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
               assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
@@ -107,6 +100,67 @@ class AddGradleWrapperTest implements RewriteTest {
             properties(null, GRADLE_WRAPPER_PROPERTIES, spec -> spec.path(Paths.get("gradle-wrapper.properties")))
           )
         );
+    }
+
+
+    @Test
+    void addWrapperWithReleaseTag() {
+
+        AtomicReference<String> output = new AtomicReference<>("");
+        rewriteRun(
+          spec ->
+            spec
+              .recipe(
+                //language=yaml
+                new ByteArrayInputStream(
+                  """
+                    ---
+                    type: specs.openrewrite.org/v1beta/recipe
+                    name: org.openrewrite.test.AddGradleWrapper
+                    displayName: Adds a Gradle wrapper
+                    description: Adds the latest RELEASE of the gradle wrapper
+                    recipeList:
+                      - org.openrewrite.gradle.AddGradleWrapper
+                    """.getBytes()
+                ),
+                "org.openrewrite.test.AddGradleWrapper"
+              )
+              .afterRecipe(run -> {
+
+                  validateGradlewFiles(run);
+
+                  var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                  assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+                  assertThat(gradleWrapperJar.getUri().toString()).endsWith("-bin.zip");
+
+                  var wrapperProperties =  run.getResults().stream()
+                    .map(Result::getAfter)
+                    .filter(Objects::nonNull)
+                    .filter(r -> r.getSourcePath().endsWith("gradle-wrapper.properties"))
+                    .findFirst().orElseThrow();
+
+                  output.set(wrapperProperties.printAll());
+
+              }),
+
+          buildGradle(""),
+
+          dir(
+            "gradle/wrapper",
+            properties(null, output, spec -> spec.path(Paths.get("gradle-wrapper.properties")))
+          ));
+    }
+
+    private void validateGradlewFiles(RecipeRun run) {
+        var gradleSh = result(run, PlainText.class, "gradlew");
+        assertThat(gradleSh.getText()).isNotBlank();
+        assertThat(gradleSh.getFileAttributes()).isNotNull();
+        assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+
+        var gradleBat = result(run, PlainText.class, "gradlew.bat");
+        assertThat(gradleBat.getText()).isNotBlank();
+        assertThat(gradleBat.getFileAttributes()).isNotNull();
+        assertThat(gradleBat.getFileAttributes().isExecutable()).isTrue();
     }
 
     @Test
