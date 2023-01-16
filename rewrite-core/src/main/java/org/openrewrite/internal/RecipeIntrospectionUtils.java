@@ -88,7 +88,7 @@ public class RecipeIntrospectionUtils {
     }
 
     public static DataTableDescriptor dataTableDescriptorFromDataTable(DataTable<?> dataTable) {
-        return new DataTableDescriptor(dataTable.getClass().getName(), dataTable.getName(), dataTable.getDescription());
+        return new DataTableDescriptor(dataTable.getName(), dataTable.getDisplayName(), dataTable.getDescription());
     }
 
     public static RecipeDescriptor recipeDescriptorFromDeclarativeRecipe(DeclarativeRecipe recipe, URI source) {

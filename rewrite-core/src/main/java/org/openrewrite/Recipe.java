@@ -146,7 +146,7 @@ public abstract class Recipe implements Cloneable {
         return RecipeIntrospectionUtils.recipeDescriptorFromRecipe(this);
     }
 
-    public final List<DataTableDescriptor> getDataTableDescriptors() {
+    public List<DataTableDescriptor> getDataTableDescriptors() {
         return dataTables == null ? emptyList() : dataTables;
     }
 

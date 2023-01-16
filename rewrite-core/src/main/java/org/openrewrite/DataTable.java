@@ -15,7 +15,9 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Getter;
+import org.intellij.lang.annotations.Language;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,13 +28,20 @@ import java.util.List;
  */
 @Getter
 @Incubating(since = "7.35.0")
+@JsonIgnoreType
 public class DataTable<Row> {
     private final String name;
     private final Class<Row> type;
+
+    @Language("markdown")
     private final String displayName;
+
+    @Language("markdown")
     private final String description;
 
-    public DataTable(Recipe recipe, Class<Row> type, String name, String displayName, String description) {
+    public DataTable(Recipe recipe, Class<Row> type, String name,
+                     @Language("markdown") String displayName,
+                     @Language("markdown") String description) {
         this.name = name;
         this.type = type;
         this.displayName = displayName;

@@ -18,6 +18,10 @@ package org.openrewrite.config;
 import org.openrewrite.Recipe;
 
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * A recipe that exists only to wrap other recipes.
@@ -44,5 +48,20 @@ public class CompositeRecipe extends Recipe {
         }
 
         return total;
+    }
+
+    @Override
+    public List<DataTableDescriptor> getDataTableDescriptors() {
+        List<DataTableDescriptor> dataTableDescriptors = null;
+        for (Recipe recipe : getRecipeList()) {
+            List<DataTableDescriptor> dtd = recipe.getDataTableDescriptors();
+            if (!dtd.isEmpty()) {
+                if (dataTableDescriptors == null) {
+                    dataTableDescriptors = new ArrayList<>();
+                }
+                dataTableDescriptors.addAll(dtd);
+            }
+        }
+        return dataTableDescriptors == null ? emptyList() : dataTableDescriptors;
     }
 }
