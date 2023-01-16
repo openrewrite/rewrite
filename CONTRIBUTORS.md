@@ -23,7 +23,7 @@ You must set the `-parameters` compiler flag to run Rewrite tests.
 If your system does not have UTF-8 as its default character encoding (e.g., Windows) you must also add `-encoding utf8`.
 Add these to the "additional command line parameters" field in IntelliJ -> Preferences -> Build, Execution, Deployment -> Compiler -> Java Compiler.
 
-![image](https://user-images.githubusercontent.com/1697736/212771061-e4182eba-f095-4e66-aa2c-7263e3336d33.png)
+<img width="258" alt="image" src="https://user-images.githubusercontent.com/1697736/212771129-c19167ad-17eb-4d75-8b9d-439a03280a88.png">
 
 ### Optimizing your IDE only for modules you want to work on
 
