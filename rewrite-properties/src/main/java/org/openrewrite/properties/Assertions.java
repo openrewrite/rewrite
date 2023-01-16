@@ -16,11 +16,13 @@
 package org.openrewrite.properties;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class Assertions {
@@ -44,7 +46,12 @@ public class Assertions {
 
     public static SourceSpecs properties(@Language("properties") @Nullable String before, @Language("properties") @Nullable String after,
                                    Consumer<SourceSpec<Properties.File>> spec) {
-        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, s -> after);
+        return properties(before,new AtomicReference<>(after),spec);
+    }
+
+    public static SourceSpecs properties(@Language("properties") @Nullable String before, @NonNull AtomicReference<String> after,
+                                         Consumer<SourceSpec<Properties.File>> spec) {
+        SourceSpec<Properties.File> properties = new SourceSpec<>(Properties.File.class, null, PropertiesParser.builder(), before, s -> after.get());
         spec.accept(properties);
         return properties;
     }
