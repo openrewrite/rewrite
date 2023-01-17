@@ -321,12 +321,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 throw e;
             }
 
-            final String visitedLocation = describeLocation(getCursor());
-            if (visitedLocation != null) {
-                throw new RecipeRunException(e, getCursor(),
-                        String.format("Exception while visiting project file '%s'", visitedLocation));
-            }
-            throw new RecipeRunException(e, getCursor());
+            throw new RecipeRunException(e, getCursor(), describeLocation(getCursor()));
         }
 
         //noinspection unchecked
