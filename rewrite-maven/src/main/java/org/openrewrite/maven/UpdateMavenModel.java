@@ -120,9 +120,9 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                     Boolean.TRUE.equals(t.getChild("snapshots").flatMap(s -> s.getChildValue("enabled").map(Boolean::valueOf)).orElse(null)),
                     null,
                     null
-                    )).collect(Collectors.toList()));
+            )).collect(Collectors.toList()));
         } else {
-           requested = requested.withRepositories(Collections.emptyList());
+            requested = requested.withRepositories(Collections.emptyList());
         }
 
         try {

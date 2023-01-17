@@ -18,17 +18,12 @@ package org.openrewrite;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.table.ParseFailures;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindParseFailures extends Recipe {
-    DataTable<ParseExceptionRow> failures = new DataTable<>(
-            this,
-            ParseExceptionRow.class,
-            "org.openrewrite.ParseFailures",
-            "Parser failures",
-            "A list of files that failed to parse along with stack traces of their failures."
-    );
+    ParseFailures failures = new ParseFailures(this);
 
     @Override
     public String getDisplayName() {
@@ -48,7 +43,7 @@ public class FindParseFailures extends Recipe {
             public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
                 return sourceFile.getMarkers().findFirst(ParseExceptionResult.class)
                         .<Tree>map(exceptionResult -> {
-                            failures.insertRow(ctx, new ParseExceptionRow(
+                            failures.insertRow(ctx, new ParseFailures.Row(
                                     sourceFile.getSourcePath().toString(),
                                     exceptionResult.getMessage()
                             ));
@@ -57,11 +52,5 @@ public class FindParseFailures extends Recipe {
                         .orElse(sourceFile);
             }
         };
-    }
-
-    @Value
-    public static class ParseExceptionRow {
-        String sourcePath;
-        String stackTrace;
     }
 }

@@ -20,6 +20,7 @@ import java.util.*;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -32,6 +33,8 @@ import lombok.Value;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     // there are several implicitly defined version properties that we should never attempt to update
     private static final Set<String> implicitlyDefinedVersionProperties = new HashSet<>(Arrays.asList(
@@ -163,7 +166,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
                 }
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
-                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     for (String v : mavenMetadata.getVersioning().getVersions()) {
                         if (versionComparator.isValid(newVersion, v)) {
                             availableVersions.add(v);

@@ -15,23 +15,18 @@
  */
 package org.openrewrite;
 
-import lombok.Value;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.table.DistinctGitProvenance;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-public class ShowGitProvenance extends Recipe {
-    private final DataTable<GitProvenanceRow> table = new DataTable<>(
-            this, GitProvenanceRow.class,
-            "org.openrewrite.GitProvenance",
-            "Git provenance",
-            "The git provenance of each source file."
-    );
+public class FindGitProvenance extends Recipe {
+    private final DistinctGitProvenance distinct = new DistinctGitProvenance(this);
 
     @Override
     public String getDisplayName() {
@@ -57,12 +52,13 @@ public class ShowGitProvenance extends Recipe {
             if (provenance == null || !provenances.add(provenance.withId(dontConsiderIdInHashCode))) {
                 return sourceFile;
             }
-            table.insertRow(ctx, new GitProvenanceRow(
+            distinct.insertRow(ctx, new DistinctGitProvenance.Row(
                     provenance.getOrigin(),
                     provenance.getBranch(),
                     provenance.getChange(),
                     provenance.getAutocrlf(),
-                    provenance.getEol()));
+                    provenance.getEol())
+            );
             return Markup.info(sourceFile, String.format("GitProvenance:\n" +
                                                          "    origin: %s\n" +
                                                          "    branch: %s\n" +
@@ -75,14 +71,5 @@ public class ShowGitProvenance extends Recipe {
                     provenance.getAutocrlf() != null ? provenance.getAutocrlf().toString() : "null",
                     provenance.getEol() != null ? provenance.getEol().toString() : "null"));
         });
-    }
-
-    @Value
-    static class GitProvenanceRow {
-        String origin;
-        String branch;
-        String changeset;
-        GitProvenance.AutoCRLF autoCRLF;
-        GitProvenance.EOL eol;
     }
 }

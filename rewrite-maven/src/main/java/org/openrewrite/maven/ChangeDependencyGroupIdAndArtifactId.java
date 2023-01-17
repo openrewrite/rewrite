@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
@@ -36,6 +37,9 @@ import java.util.*;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
     @Option(displayName = "Old groupId",
             description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
             example = "org.openrewrite.recipe")
@@ -209,7 +213,7 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
                 }
                 if (availableVersions == null) {
                     availableVersions = new ArrayList<>();
-                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     for (String v : mavenMetadata.getVersioning().getVersions()) {
                         if (versionComparator.isValid(newVersion, v)) {
                             availableVersions.add(v);

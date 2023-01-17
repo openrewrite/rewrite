@@ -22,6 +22,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -47,7 +49,9 @@ public class MavenDependencyFailuresTest implements RewriteTest {
               .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
-            .expectedCyclesThatMakeChanges(1),
+            .expectedCyclesThatMakeChanges(1)
+            .dataTable(MavenMetadataFailures.class.getName(), MavenMetadataFailures.Row::getMavenRepositoryUri, uris ->
+                assertThat(uris.stream().distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
           pomXml(
             """
               <project>
@@ -72,7 +76,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
                 //There should be two errors (one for each failed metadata download)
                 assertThat(after.split("Unable to download metadata")).hasSize(3);
                 return after;
-                })
+            })
           )
         );
     }

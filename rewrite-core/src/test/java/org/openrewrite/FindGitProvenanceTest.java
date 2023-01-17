@@ -24,11 +24,11 @@ import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
 import static org.openrewrite.marker.GitProvenance.EOL.Native;
 import static org.openrewrite.test.SourceSpecs.text;
 
-class ShowGitProvenanceTest implements RewriteTest {
+class FindGitProvenanceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ShowGitProvenance());
+        spec.recipe(new FindGitProvenance());
     }
 
     @Test
