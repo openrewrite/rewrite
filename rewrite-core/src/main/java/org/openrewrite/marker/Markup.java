@@ -23,6 +23,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.RecipeScheduler;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ExceptionUtils;
+import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -84,13 +85,17 @@ public interface Markup extends Marker {
 
         @Override
         public String getMessage() {
-            return exception.getMessage();
+            return getCause().getMessage();
         }
 
         @Override
         @NonNull
         public String getDetail() {
-            return ExceptionUtils.sanitizeStackTrace(exception, RecipeScheduler.class);
+            return ExceptionUtils.sanitizeStackTrace(getCause(), RecipeScheduler.class);
+        }
+
+        private Throwable getCause() {
+            return exception instanceof RecipeRunException ? exception.getCause() : exception;
         }
 
         @Override
@@ -115,13 +120,17 @@ public interface Markup extends Marker {
 
         @Override
         public String getMessage() {
-            return exception.getMessage();
+            return getCause().getMessage();
         }
 
         @Override
         @NonNull
         public String getDetail() {
-            return ExceptionUtils.sanitizeStackTrace(exception, RecipeScheduler.class);
+            return ExceptionUtils.sanitizeStackTrace(getCause(), RecipeScheduler.class);
+        }
+
+        private Throwable getCause() {
+            return exception instanceof RecipeRunException ? exception.getCause() : exception;
         }
 
         @Override

@@ -33,7 +33,10 @@ public class RecipeSchedulerTest implements RewriteTest {
           spec -> spec
             .executionContext(new InMemoryExecutionContext())
             .recipe(new BoomRecipe())
-            .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors()).isNotEmpty()),
+            .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
+              .singleElement()
+              .satisfies(t -> assertThat(t.getMessage()).isEqualTo("Exception while visiting project file 'file.txt', caused by: org.openrewrite.BoomException: boom"))
+            ),
           text(
             "hello",
             "~~(boom)~~>hello"

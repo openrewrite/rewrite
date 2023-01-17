@@ -321,7 +321,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 throw e;
             }
 
-            throw new RecipeRunException(e, getCursor());
+            throw new RecipeRunException(e, getCursor(), describeLocation(getCursor()));
         }
 
         //noinspection unchecked
@@ -409,5 +409,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
             throw new IllegalArgumentException(getClass().getSimpleName() + " must be adaptable to " + adaptTo.getName() + ".");
         }
         return TreeVisitorAdapter.adapt(this, adaptTo);
+    }
+
+    @Nullable
+    protected String describeLocation(Cursor cursor) {
+        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
+        if (sourceFile == null) {
+            return null;
+        }
+        return sourceFile.getSourcePath().toString();
     }
 }

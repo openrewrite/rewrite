@@ -28,7 +28,17 @@ public class RecipeRunException extends RuntimeException {
     private final Cursor cursor;
 
     public RecipeRunException(Throwable cause, @Nullable Cursor cursor) {
-        super(cause);
+        this(cause, cursor, null);
+    }
+
+    public RecipeRunException(Throwable cause, @Nullable Cursor cursor, @Nullable String visitedLocation) {
+        super(message(visitedLocation, cause), cause);
         this.cursor = cursor;
+    }
+
+    @Nullable
+    private static String message(@Nullable String visitedLocation, Throwable cause) {
+        return visitedLocation == null ? null
+                : String.format("Exception while visiting project file '%s', caused by: %s", visitedLocation, cause);
     }
 }
