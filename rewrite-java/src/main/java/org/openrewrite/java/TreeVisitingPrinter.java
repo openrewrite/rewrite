@@ -1,0 +1,223 @@
+/*
+ * Copyright 2022 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.java;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Spliterators;
+import java.util.stream.Collectors;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
+
+import static java.util.stream.StreamSupport.*;
+
+
+/**
+ * A visitor to print a tree visiting order and hierarchy in format like below.
+ * <pre>
+ * ----J.CompilationUnit
+ *     |-------J.Import | "..."
+ *     |       \---J.FieldAccess | "..."
+ *     |           ...
+ *     \---J.ClassDeclaration
+ *         |---J.Identifier | "..."
+ *         \---J.Block
+ *              ...
+ * </pre>
+ */
+public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
+    private static final String TAB = "    ";
+    private static final String ELEMENT_PREFIX = "\\---";
+    private static final String CONTINUE_PREFIX = "----";
+    private static final String UNVISITED_PREFIX = "#";
+    private static final char BRANCH_CONTINUE_CHAR = '|';
+    private static final char BRANCH_END_CHAR = '\\';
+
+    private List<Object> lastCursorStack;
+    private final List<StringBuilder> outputLines;
+    private final boolean skipUnvisitedElement;
+
+    protected TreeVisitingPrinter(boolean skipUnvisitedElement) {
+        lastCursorStack = new ArrayList<>();
+        outputLines = new ArrayList<>();
+        this.skipUnvisitedElement = skipUnvisitedElement;
+    }
+
+    /**
+     * print tree with skip unvisited elements
+     */
+    public static String printTree(J j) {
+        TreeVisitingPrinter visitor = new TreeVisitingPrinter(true);
+        visitor.visit(j, new InMemoryExecutionContext());
+        return visitor.print();
+    }
+
+    /**
+     * print tree including all unvisited elements
+     */
+    public static String printTreeAll(J j) {
+        TreeVisitingPrinter visitor = new TreeVisitingPrinter(false);
+        visitor.visit(j, new InMemoryExecutionContext());
+        return visitor.print();
+    }
+
+    private String print() {
+        return String.join("\n", outputLines);
+    }
+
+    /**
+     * print left padding for a line
+     * @param depth, depth starts from 0 (the root)
+     */
+    private static String leftPadding(int depth) {
+        StringBuilder sb = new StringBuilder();
+        int tabCount = depth - 1;
+        if (tabCount > 0) {
+            sb.append(String.join("", Collections.nCopies(tabCount, TAB)));
+        }
+        // only root has not prefix
+        if (depth > 0) {
+            sb.append(ELEMENT_PREFIX);
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Print a vertical line that connects the current element to the latest sibling.
+     * @param depth current element depth
+     */
+    private void connectToLatestSibling(int depth) {
+        if (depth <= 1) {
+            return;
+        }
+
+        int pos = (depth - 1) * TAB.length();
+        for (int i = outputLines.size() - 1; i > 0; i--) {
+            StringBuilder line = outputLines.get(i);
+            if (pos >= line.length()) {
+                break;
+            }
+
+            if (line.charAt(pos) != ' ') {
+                if (line.charAt(pos) == BRANCH_END_CHAR) {
+                    line.setCharAt(pos, BRANCH_CONTINUE_CHAR);
+                }
+                break;
+            }
+            line.setCharAt(pos, BRANCH_CONTINUE_CHAR);
+        }
+    }
+
+    private static String printTreeElement(Tree tree) {
+        // skip some specific types printed in the output to make the output looks clean
+        if (tree instanceof J.CompilationUnit
+                || tree instanceof J.ClassDeclaration
+                || tree instanceof J.Block
+                || tree instanceof J.Empty
+                || tree instanceof J.Literal
+                || tree instanceof J.Try
+                || tree instanceof J.Try.Catch
+                || tree instanceof J.WhileLoop
+        ) {
+            return "";
+        }
+
+        return tree.toString();
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        if (tree == null) {
+            return super.visit((Tree) null, ctx);
+        }
+
+        Cursor cursor = this.getCursor();
+        List<Object> cursorStack =
+                stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
+                        .collect(Collectors.toList());
+        Collections.reverse(cursorStack);
+        int depth = cursorStack.size();
+
+        // Compare lastCursorStack vs cursorStack, find the fork and print the diff
+        int diffPos = -1;
+        for (int i = 0; i < cursorStack.size(); i++) {
+            if (i >= lastCursorStack.size() || cursorStack.get(i) != lastCursorStack.get(i)) {
+                diffPos = i;
+                break;
+            }
+        }
+
+        StringBuilder line = new StringBuilder();
+
+        // print cursor stack diff
+        if (diffPos >= 0) {
+            for (int i = diffPos; i < cursorStack.size(); i++) {
+                Object element = cursorStack.get(i);
+                if (skipUnvisitedElement) {
+                    // skip unvisited elements, just print indents in the line
+                    if (i == diffPos) {
+                        line.append(leftPadding(i));
+                        connectToLatestSibling(i);
+                    } else {
+                        line.append(CONTINUE_PREFIX);
+                    }
+                } else {
+                    // print each unvisited element to a line
+                    connectToLatestSibling(i);
+                    StringBuilder newLine = new StringBuilder()
+                        .append(leftPadding(i))
+                        .append(UNVISITED_PREFIX)
+                        .append(element instanceof String ? element : element.getClass().getSimpleName());
+                    outputLines.add(newLine);
+                }
+            }
+        }
+
+        // print current visiting element
+        String typeName = tree instanceof J
+            ? tree.getClass().getCanonicalName().substring(tree.getClass().getPackage().getName().length() + 1)
+            : tree.getClass().getCanonicalName();
+
+        if (skipUnvisitedElement) {
+            boolean leftPadded = diffPos >= 0;
+            if (leftPadded) {
+                line.append(CONTINUE_PREFIX);
+            } else {
+                connectToLatestSibling(depth);
+                line.append(leftPadding(depth));
+            }
+            line.append(typeName);
+        } else {
+            connectToLatestSibling(depth);
+            line.append(leftPadding(depth)).append(typeName);
+        }
+
+        String content = printTreeElement(tree);
+        if (!content.isEmpty()) {
+            line.append(" | \"").append(content).append("\"");
+        }
+        outputLines.add(line);
+
+        cursorStack.add(tree);
+        lastCursorStack = cursorStack;
+        return super.visit(tree, ctx);
+    }
+}
