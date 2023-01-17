@@ -77,6 +77,7 @@ import static org.openrewrite.java.tree.Space.format;
 import static org.openrewrite.kotlin.marker.PropertyClassifier.ClassifierType.VAL;
 import static org.openrewrite.kotlin.marker.PropertyClassifier.ClassifierType.VAR;
 
+@SuppressWarnings("DataFlowIssue")
 public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> {
     private final Path sourcePath;
 
@@ -842,57 +843,43 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return JContainer.build(prefix, parameters, Markers.EMPTY);
     }
 
+    @SuppressWarnings("ConstantValue")
     private J mapOperatorFunctionCall(FirFunctionCall functionCall) {
-        J.Binary.Type type = mapFunctionalCallOperator(functionCall);
-        if (type != null) {
-            Space prefix = whitespace();
-            J left = visitElement(functionCall.getDispatchReceiver(), ctx);
-            if (functionCall.getArgumentList().getArguments().size() != 1) {
-                throw new UnsupportedOperationException("Unexpected function call argument list size.");
-            }
+        Space prefix = whitespace();
 
-            Space opPrefix;
-            if (type == J.Binary.Type.Multiplication) {
-                opPrefix = sourceBefore("*");
-            } else if (type == J.Binary.Type.Subtraction) {
-                opPrefix = sourceBefore("-");
-            } else if (type == J.Binary.Type.Addition) {
-                opPrefix = sourceBefore("+");
-            } else {
-                throw new UnsupportedOperationException("Function call operator is not supported " + type);
-            }
-
-            J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
-            return new J.Binary(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    (Expression) left,
-                    padLeft(opPrefix, type),
-                    (Expression) right,
-                    typeMapping.type(functionCall));
-        }
-
-        throw new UnsupportedOperationException("Null function call operator type.");
-    }
-
-    @Nullable
-    private J.Binary.Type mapFunctionalCallOperator(FirFunctionCall functionCall) {
-        String resolvedName = functionCall.getCalleeReference().getName().asString();
-        J.Binary.Type op = null;
-        switch (resolvedName) {
+        J.Binary.Type type ;
+        Space opPrefix;
+        switch (functionCall.getCalleeReference().getName().asString()) {
             case "times":
-                op = J.Binary.Type.Multiplication;
+                type = J.Binary.Type.Multiplication;
+                opPrefix = sourceBefore("*");
                 break;
             case "minus":
-                op = J.Binary.Type.Subtraction;
+                type = J.Binary.Type.Subtraction;
+                opPrefix = sourceBefore("-");
                 break;
             case "plus":
-                op = J.Binary.Type.Addition;
+                type = J.Binary.Type.Addition;
+                opPrefix = sourceBefore("+");
                 break;
+            default:
+                throw new UnsupportedOperationException("Null function call operator type.");
         }
 
-        return op;
+        J left = visitElement(functionCall.getDispatchReceiver(), ctx);
+        if (functionCall.getArgumentList().getArguments().size() != 1) {
+            throw new UnsupportedOperationException("Unexpected function call argument list size.");
+        }
+
+        J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+        return new J.Binary(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                (Expression) left,
+                padLeft(opPrefix, type),
+                (Expression) right,
+                typeMapping.type(functionCall));
     }
 
     @Override
@@ -1653,7 +1640,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }  else if (firElement instanceof FirClass) {
             return visitClass((FirClass) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
-            return visitConstExpression((FirConstExpression<? extends Object>) firElement, ctx);
+            return visitConstExpression((FirConstExpression<?>) firElement, ctx);
         } else if (firElement instanceof FirEnumEntry) {
             return visitEnumEntry((FirEnumEntry) firElement, ctx);
         } else if (firElement instanceof FirEqualityOperatorCall) {
@@ -1735,7 +1722,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @SuppressWarnings("unchecked")
     private <J2 extends J> JRightPadded<J2> convert(FirElement t, Function<FirElement, Space> suffix, ExecutionContext ctx) {
         J2 j = (J2) visitElement(t, ctx);
-        @SuppressWarnings("ConstantConditions") JRightPadded<J2> rightPadded = j == null ? null :
+        @SuppressWarnings("ConstantConditions")
+        JRightPadded<J2> rightPadded = j == null ? null :
                 new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
         return rightPadded;
@@ -1784,6 +1772,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new JLeftPadded<>(left, tree, Markers.EMPTY);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private <T> JRightPadded<T> padRight(T tree, @Nullable Space right) {
         return new JRightPadded<>(tree, right == null ? EMPTY : right, Markers.EMPTY);
     }
@@ -1844,6 +1833,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return convertToIdentifier(name, typeMapping.type(firElement, getCurrentFile()), null);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private J.Identifier convertToIdentifier(String name, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
         Space prefix = whitespace();
         boolean isQuotedSymbol = source.startsWith("`", cursor);
@@ -2045,6 +2035,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
      * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
      * <code>untilDelim</code> return the empty String.
      */
+    @SuppressWarnings("SameParameterValue")
     private Space sourceBefore(String untilDelim, @Nullable Character stop) {
         int delimIndex = positionOfNext(untilDelim, stop);
         if (delimIndex < 0) {
