@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,7 +30,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void initValue() {
+    void initializerMadeFinal() {
         rewriteRun(
           java(
             """
@@ -55,7 +56,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void initByMethod() {
+    void initByMethodMadeFinal() {
         rewriteRun(
           java(
             """
@@ -81,7 +82,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void constructorInit() {
+    void InitByConstructorMadeFinal() {
         rewriteRun(
           java(
             """
@@ -99,6 +100,65 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
                 
                     A() {
                         name = "XYZ";
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void multiVariablesMadeFinal() {
+        rewriteRun(
+          java(
+            """
+                class A {
+                    private int a, b;
+                
+                    A() {
+                        a = 0;
+                        b = 1;
+                    }
+                
+                    int func() {
+                        return a + b;
+                    }
+                }
+            """,
+            """
+                class A {
+                    private final int a, b;
+                
+                    A() {
+                        a = 0;
+                        b = 1;
+                    }
+                
+                    int func() {
+                        return a + b;
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void multiVariablesReassigned() {
+        rewriteRun(
+          java(
+            """
+                class A {
+                    private int a, b;
+                
+                    A() {
+                        a = 0;
+                        b = 1;
+                    }
+                
+                    int func(int c) {
+                        b += c;
+                        return a + b;
                     }
                 }
             """
@@ -163,16 +223,209 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void ignoreNonPrivateFields() {
+    void fieldsReassignedInLoops() {
         rewriteRun(
           java(
             """
                 class A {
-                    int num = 10;
+                    private int a;
+                    private int b;
+                    private int c;
+                
+                    A() {
+                        for (int i = 0; i< 10; i++) {
+                            a = i;
+                        }
+                
+                        int k = 0;
+                        while (k < 10) {
+                            b = k;
+                            k++;
+                        }
+                
+                        do {
+                            k--;
+                            c = k;
+                        } while(k > 5);
+                    }
                 }
             """
           )
         );
     }
 
+    @Test
+    void nonPrivateFieldsIgnored() {
+        rewriteRun(
+          java(
+            """
+                class A {
+                    int a = 0;
+                    public int b = 1;
+                    protected int c = 2;
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void staticFieldsMadeFinal() {
+        rewriteRun(
+          java(
+            """
+                class A {
+                    private static int num = 10;
+                    int func() {
+                        return num;
+                    }
+                }
+            """,
+            """
+                class A {
+                    private static final int num = 10;
+                    int func() {
+                        return num;
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void initializerBlock() {
+        rewriteRun(
+          java(
+            """
+                public class Person {
+                    {
+                        name = "N1";
+                        age = 10;
+                        address = "CA";
+                    }
+                
+                    private String name = "N2";
+                    private int age = 15;
+                    private String address;
+                
+                    public Person() {
+                        name = "N3";
+                        age = 20;
+                    }
+                }
+            """,
+            """
+                public class Person {
+                    {
+                        name = "N1";
+                        age = 10;
+                        address = "CA";
+                    }
+                
+                    private String name = "N2";
+                    private int age = 15;
+                    private final String address;
+                
+                    public Person() {
+                        name = "N3";
+                        age = 20;
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void staticInitializerBlock() {
+        rewriteRun(
+          java(
+            """
+                class A {
+                    static {
+                        num = 10;
+                    }
+                    private static int num;
+                
+                    int func() {
+                        return num;
+                    }
+                }
+            """,
+            """
+                class A {
+                    static {
+                        num = 10;
+                    }
+                    private static final int num;
+                
+                    int func() {
+                        return num;
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void innerClassFieldMadeFinal() {
+        rewriteRun(
+          java(
+            """
+                class OuterClass {
+                    int a;
+                
+                    class InnerClass {
+                        private int b = 1;
+                    }
+                }
+            """,
+            """
+                class OuterClass {
+                    int a;
+                
+                    class InnerClass {
+                        private final int b = 1;
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void staticNestedClassFieldMadeFinal() {
+        rewriteRun(
+          java(
+            """
+                class OuterClass {
+                    int a;
+                
+                    static class InnerClass {
+                        private int b = 1;
+                
+                        int func() {
+                            return b;
+                        }
+                    }
+                }
+            """,
+            """
+                class OuterClass {
+                    int a;
+                
+                    static class InnerClass {
+                        private final int b = 1;
+                
+                        int func() {
+                            return b;
+                        }
+                    }
+                }
+            """
+          )
+        );
+    }
 }
