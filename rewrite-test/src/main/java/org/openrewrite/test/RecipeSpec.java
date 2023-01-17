@@ -15,6 +15,8 @@
  */
 package org.openrewrite.test;
 
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
@@ -180,7 +182,9 @@ public class RecipeSpec {
             assertThat(dataTable).isNotNull();
             List<E> rows = run.getDataTableRows(name);
             StringWriter writer = new StringWriter();
-            CsvMapper mapper = new CsvMapper();
+            CsvMapper mapper = CsvMapper.builder()
+                    .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                    .build();
             CsvSchema schema = mapper.schemaFor(dataTable.getType()).withHeader();
             mapper.writerFor(dataTable.getType()).with(schema).writeValues(writer).writeAll(rows);
             assertThat(writer.toString()).isEqualTo(expect);

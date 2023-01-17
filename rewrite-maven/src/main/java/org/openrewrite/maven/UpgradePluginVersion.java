@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.semver.Semver;
@@ -41,6 +42,9 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradePluginVersion extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.openrewrite.maven:rewrite-maven-plugin:VERSION'.",
             example = "org.openrewrite.maven")
@@ -140,7 +144,7 @@ public class UpgradePluginVersion extends Recipe {
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId,
                                                                 String currentVersion, ExecutionContext ctx) throws MavenDownloadingException {
-                MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                 Collection<String> availableVersions = new ArrayList<>();
                 for (String v : mavenMetadata.getVersioning().getVersions()) {
                     if (versionComparator.isValid(currentVersion, v)) {

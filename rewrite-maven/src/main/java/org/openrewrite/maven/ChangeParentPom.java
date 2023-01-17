@@ -24,6 +24,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.maven.utilities.RetainVersions;
 import org.openrewrite.semver.Semver;
@@ -43,6 +44,8 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeParentPom extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Override
     public String getDisplayName() {
@@ -227,7 +230,7 @@ public class ChangeParentPom extends Recipe {
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) throws MavenDownloadingException {
                 if (availableVersions == null) {
-                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(currentVersion, v))
                             .filter(v -> allowVersionDowngrades || versionComparator.compare(currentVersion, currentVersion, v) < 0)

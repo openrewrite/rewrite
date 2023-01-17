@@ -15,16 +15,14 @@
  */
 package org.openrewrite.maven;
 
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.With;
+import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.Semver;
@@ -35,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+
 /**
  * This recipe will detect the presence of Java types (in Java ASTs) to determine if a dependency should be added
  * to a maven build file. Java Provenance information is used to filter the type search to only those java ASTs that
@@ -43,25 +42,26 @@ import java.util.regex.Pattern;
  * <p>
  * NOTE: IF PROVENANCE INFORMATION IS NOT PRESENT, THIS RECIPE WILL DO NOTHING.
  */
-@Getter
-@AllArgsConstructor
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class AddDependency extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.guava")
-    private final String groupId;
+    String groupId;
 
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "guava")
-    private final String artifactId;
+    String artifactId;
 
     @Option(displayName = "Version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
-    private final String version;
+    String version;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
@@ -69,7 +69,7 @@ public class AddDependency extends Recipe {
             example = "-jre",
             required = false)
     @Nullable
-    private String versionPattern;
+    String versionPattern;
 
     @Option(displayName = "Scope",
             description = "A scope to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
@@ -78,19 +78,19 @@ public class AddDependency extends Recipe {
             valid = {"import", "runtime", "provided"},
             required = false)
     @Nullable
-    private final String scope;
+    String scope;
 
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration when using a semver selector",
             example = "true",
             required = false)
     @Nullable
-    private Boolean releasesOnly;
+    Boolean releasesOnly;
 
     @Option(displayName = "Only if using",
             description = "Used to determine if the dependency will be added and in which scope it should be placed.",
             example = "org.junit.jupiter.api.*")
-    private String onlyIfUsing;
+    String onlyIfUsing;
 
     @Option(displayName = "Type",
             description = "The type of dependency to add. If omitted Maven defaults to assuming the type is \"jar\".",
@@ -98,21 +98,21 @@ public class AddDependency extends Recipe {
             example = "jar",
             required = false)
     @Nullable
-    private String type;
+    String type;
 
     @Option(displayName = "Classifier",
             description = "A Maven classifier to add. Most commonly used to select shaded or test variants of a library",
             example = "test",
             required = false)
     @Nullable
-    private String classifier;
+    String classifier;
 
     @Option(displayName = "Optional",
             description = "Set the value of the `<optional>` tag. No `<optional>` tag will be added when this is `null`.",
             example = "true",
             required = false)
     @Nullable
-    private Boolean optional;
+    Boolean optional;
 
     /**
      * A glob expression used to identify other dependencies in the same family as the dependency to be added.
@@ -124,7 +124,7 @@ public class AddDependency extends Recipe {
             required = false)
     @Nullable
     @With
-    private String familyPattern;
+    String familyPattern;
 
     @Override
     public Validated validate() {
@@ -216,7 +216,7 @@ public class AddDependency extends Recipe {
 
                         return new AddDependencyVisitor(
                                 groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
-                                type, classifier, optional, familyPatternCompiled).visitNonNull(s, ctx);
+                                type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(s, ctx);
                     }
                 }.visit(s, ctx))
                 .map(SourceFile.class::cast)

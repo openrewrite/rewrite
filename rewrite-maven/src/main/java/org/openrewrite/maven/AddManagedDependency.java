@@ -15,14 +15,14 @@
  */
 package org.openrewrite.maven;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -36,25 +36,26 @@ import java.util.*;
 import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.20.0")
-@Getter
-@AllArgsConstructor
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class AddManagedDependency extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.apache.logging.log4j:ARTIFACT_ID:VERSION'.",
             example = "org.apache.logging.log4j")
-    private final String groupId;
+    String groupId;
 
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate 'org.apache.logging.log4j:log4j-bom:VERSION'.",
             example = "log4j-bom")
-    private final String artifactId;
+    String artifactId;
 
     @Option(displayName = "Version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "latest.release")
-    private final String version;
+    String version;
 
     @Option(displayName = "Scope",
             description = "An optional scope to use for the dependency management tag.",
@@ -62,8 +63,7 @@ public class AddManagedDependency extends Recipe {
             valid = {"import", "runtime", "provided", "test"},
             required = false)
     @Nullable
-    private final String scope;
-
+    String scope;
 
     @Option(displayName = "Type",
             description = "An optional type to use for the dependency management tag.",
@@ -71,14 +71,14 @@ public class AddManagedDependency extends Recipe {
             example = "pom",
             required = false)
     @Nullable
-    private String type;
+    String type;
 
     @Option(displayName = "Classifier",
             description = "An optional classifier to use for the dependency management tag",
             example = "test",
             required = false)
     @Nullable
-    private String classifier;
+    String classifier;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
@@ -86,28 +86,28 @@ public class AddManagedDependency extends Recipe {
             example = "-jre",
             required = false)
     @Nullable
-    private String versionPattern;
+    String versionPattern;
 
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration when using a semver selector",
             example = "true",
             required = false)
     @Nullable
-    private Boolean releasesOnly;
+    Boolean releasesOnly;
 
     @Option(displayName = "Only if using glob expression for group:artifact",
             description = "Only add managed dependencies to projects having a dependency matching the expression.",
             example = "org.apache.logging.log4j:log4j*",
             required = false)
     @Nullable
-    private String onlyIfUsing;
+    String onlyIfUsing;
 
     @Option(displayName = "Add to the root pom",
             description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
             example = "true",
             required = false)
     @Nullable
-    private Boolean addToRootPom;
+    Boolean addToRootPom;
 
     @Override
     public Validated validate() {
@@ -220,7 +220,7 @@ public class AddManagedDependency extends Recipe {
 
                     @Nullable
                     private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
-                        MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                        MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                         LatestRelease latest = new LatestRelease(versionPattern);
                         return mavenMetadata.getVersioning().getVersions().stream()
                                 .filter(v -> versionComparator.isValid(null, v))

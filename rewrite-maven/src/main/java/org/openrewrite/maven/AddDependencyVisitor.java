@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
+import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.Version;
 import org.openrewrite.semver.ExactVersion;
@@ -65,10 +66,22 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     private final Pattern familyRegex;
 
     @Nullable
+    private final MavenMetadataFailures metadataFailures;
+
+    @Nullable
     private VersionComparator versionComparator;
 
     @Nullable
     private String resolvedVersion;
+
+    public AddDependencyVisitor(String groupId, String artifactId, String version,
+                                @Nullable String versionPattern, @Nullable String scope,
+                                @Nullable Boolean releasesOnly, @Nullable String type,
+                                @Nullable String classifier, @Nullable Boolean optional,
+                                @Nullable Pattern familyRegex) {
+        this(groupId, artifactId, version, versionPattern, scope, releasesOnly, type,
+                classifier, optional, familyRegex, null);
+    }
 
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
@@ -146,7 +159,9 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
                 if (versionComparator == null || versionComparator instanceof ExactVersion) {
                     resolvedVersion = version;
                 } else {
-                    MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, ctx);
+                    MavenMetadata mavenMetadata = metadataFailures == null ?
+                            downloadMetadata(groupId, artifactId, ctx) :
+                            metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     LatestRelease latest = new LatestRelease(versionPattern);
                     resolvedVersion = mavenMetadata.getVersioning().getVersions().stream()
                             .filter(v -> versionComparator.isValid(null, v))
