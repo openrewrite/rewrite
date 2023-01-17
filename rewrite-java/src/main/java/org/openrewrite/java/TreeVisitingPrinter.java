@@ -33,34 +33,48 @@ import static java.util.stream.StreamSupport.*;
 /**
  * A visitor to print a tree visiting order and hierarchy in format like below.
  * <pre>
- * #root
- * \---J.CompilationUnit | "..."
- *     |---#JRightPadded
- *     |   \---J.Import | "..."
- *     \---J.ClassDeclaration | "..."
+ * ----J.CompilationUnit
+ *     |-------J.Import | "..."
+ *     |       \---J.FieldAccess | "..."
+ *     |           ...
+ *     \---J.ClassDeclaration
  *         |---J.Identifier | "..."
- *         \---#JRightPadded
- *             \---J.Return | "..."
+ *         \---J.Block
+ *              ...
  * </pre>
  */
 public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     private static final String TAB = "    ";
-    private static final String PREFIX = "\\---";
-    // this prefix means it will not be visited by a visitX method
-    private static final String SKIPPED_PADDED_PREFIX = "#";
+    private static final String ELEMENT_PREFIX = "\\---";
+    private static final String CONTINUE_PREFIX = "----";
+    private static final String UNVISITED_PREFIX = "#";
     private static final char BRANCH_CONTINUE_CHAR = '|';
     private static final char BRANCH_END_CHAR = '\\';
 
     private List<Object> lastCursorStack;
     private final List<StringBuilder> outputLines;
+    private final boolean skipUnvisitedElement;
 
-    protected TreeVisitingPrinter() {
+    protected TreeVisitingPrinter(boolean skipUnvisitedElement) {
         lastCursorStack = new ArrayList<>();
         outputLines = new ArrayList<>();
+        this.skipUnvisitedElement = skipUnvisitedElement;
     }
 
+    /**
+     * print tree with skip unvisited elements
+     */
     public static String printTree(J j) {
-        TreeVisitingPrinter visitor = new TreeVisitingPrinter();
+        TreeVisitingPrinter visitor = new TreeVisitingPrinter(true);
+        visitor.visit(j, new InMemoryExecutionContext());
+        return visitor.print();
+    }
+
+    /**
+     * print tree including all unvisited elements
+     */
+    public static String printTreeAll(J j) {
+        TreeVisitingPrinter visitor = new TreeVisitingPrinter(false);
         visitor.visit(j, new InMemoryExecutionContext());
         return visitor.print();
     }
@@ -81,7 +95,7 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
         }
         // only root has not prefix
         if (depth > 0) {
-            sb.append(PREFIX);
+            sb.append(ELEMENT_PREFIX);
         }
         return sb.toString();
     }
@@ -151,28 +165,51 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
             }
         }
 
-        // print new added lines in the cursor stack
+        StringBuilder line = new StringBuilder();
+
+        // print cursor stack diff
         if (diffPos >= 0) {
             for (int i = diffPos; i < cursorStack.size(); i++) {
                 Object element = cursorStack.get(i);
-                connectToLatestSibling(i);
-                StringBuilder newLine = new StringBuilder()
+                if (skipUnvisitedElement) {
+                    // skip unvisited elements, just print indents in the line
+                    if (i == diffPos) {
+                        line.append(leftPadding(i));
+                        connectToLatestSibling(i);
+                    } else {
+                        line.append(CONTINUE_PREFIX);
+                    }
+                } else {
+                    // print each unvisited element to a line
+                    connectToLatestSibling(i);
+                    StringBuilder newLine = new StringBuilder()
                         .append(leftPadding(i))
-                        .append(SKIPPED_PADDED_PREFIX)
+                        .append(UNVISITED_PREFIX)
                         .append(element instanceof String ? element : element.getClass().getSimpleName());
-                outputLines.add(newLine);
+                    outputLines.add(newLine);
+                }
             }
         }
 
-        connectToLatestSibling(depth);
-
         // print current visiting element
-        StringBuilder line = new StringBuilder();
         String typeName = tree instanceof J
             ? tree.getClass().getCanonicalName().substring(tree.getClass().getPackage().getName().length() + 1)
             : tree.getClass().getCanonicalName();
 
-        line.append(leftPadding(depth)).append(typeName);
+        if (skipUnvisitedElement) {
+            boolean leftPadded = diffPos >= 0;
+            if (leftPadded) {
+                line.append(CONTINUE_PREFIX);
+            } else {
+                connectToLatestSibling(depth);
+                line.append(leftPadding(depth));
+            }
+            line.append(typeName);
+        } else {
+            connectToLatestSibling(depth);
+            line.append(leftPadding(depth)).append(typeName);
+        }
+
         String content = printTreeElement(tree);
         if (!content.isEmpty()) {
             line.append(" | \"").append(content).append("\"");
