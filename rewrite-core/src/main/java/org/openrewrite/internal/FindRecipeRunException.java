@@ -34,7 +34,7 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
     @Override
     public Tree preVisit(Tree tree, Integer integer) {
         if (tree == nearestTree) {
-            return Markup.error(tree, vt.getCause());
+            return Markup.error(tree, vt);
         }
         return tree;
     }

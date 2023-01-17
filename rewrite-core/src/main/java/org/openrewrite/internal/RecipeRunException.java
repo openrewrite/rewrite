@@ -31,4 +31,9 @@ public class RecipeRunException extends RuntimeException {
         super(cause);
         this.cursor = cursor;
     }
+
+    public RecipeRunException(Throwable cause, @Nullable Cursor cursor, String message) {
+        super(String.format("%s, caused by: %s", message, cause.toString()), cause);
+        this.cursor = cursor;
+    }
 }
