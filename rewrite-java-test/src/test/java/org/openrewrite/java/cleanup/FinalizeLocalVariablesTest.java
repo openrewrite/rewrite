@@ -495,28 +495,28 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Person {
-                      {
-                          int n = 10;
-                          name = "N1";
-                          age = n;
-                      }
-
-                      private String name;
-                      private int age;
+              class Person {
+                  {
+                      int n = 10;
+                      name = "N1";
+                      age = n;
                   }
+
+                  private String name;
+                  private int age;
+              }
               """,
             """
-                  class Person {
-                      {
-                          final int n = 10;
-                          name = "N1";
-                          age = n;
-                      }
-
-                      private String name;
-                      private int age;
+              class Person {
+                  {
+                      final int n = 10;
+                      name = "N1";
+                      age = n;
                   }
+
+                  private String name;
+                  private int age;
+              }
               """
           )
         );

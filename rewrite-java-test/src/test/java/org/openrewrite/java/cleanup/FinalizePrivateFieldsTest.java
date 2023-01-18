@@ -56,22 +56,22 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private String name = initName();
+              class A {
+                  private String name = initName();
 
-                      String initName() {
-                          return "A name";
-                      }
+                  String initName() {
+                      return "A name";
                   }
+              }
               """,
             """
-                  class A {
-                      private final String name = initName();
+              class A {
+                  private final String name = initName();
 
-                      String initName() {
-                          return "A name";
-                      }
+                  String initName() {
+                      return "A name";
                   }
+              }
               """
           )
         );
@@ -82,22 +82,22 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private String name;
+              class A {
+                  private String name;
 
-                      A() {
-                          name = "XYZ";
-                      }
+                  A() {
+                      name = "XYZ";
                   }
+              }
               """,
             """
-                  class A {
-                      private final String name;
+              class A {
+                  private final String name;
 
-                      A() {
-                          name = "XYZ";
-                      }
+                  A() {
+                      name = "XYZ";
                   }
+              }
               """
           )
         );
@@ -108,32 +108,32 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private int a, b;
+              class A {
+                  private int a, b;
 
-                      A() {
-                          a = 0;
-                          b = 1;
-                      }
-
-                      int func() {
-                          return a + b;
-                      }
+                  A() {
+                      a = 0;
+                      b = 1;
                   }
+
+                  int func() {
+                      return a + b;
+                  }
+              }
               """,
             """
-                  class A {
-                      private final int a, b;
+              class A {
+                  private final int a, b;
 
-                      A() {
-                          a = 0;
-                          b = 1;
-                      }
-
-                      int func() {
-                          return a + b;
-                      }
+                  A() {
+                      a = 0;
+                      b = 1;
                   }
+
+                  int func() {
+                      return a + b;
+                  }
+              }
               """
           )
         );
@@ -144,19 +144,19 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private int a, b;
+              class A {
+                  private int a, b;
 
-                      A() {
-                          a = 0;
-                          b = 1;
-                      }
-
-                      int func(int c) {
-                          b += c;
-                          return a + b;
-                      }
+                  A() {
+                      a = 0;
+                      b = 1;
                   }
+
+                  int func(int c) {
+                      b += c;
+                      return a + b;
+                  }
+              }
               """
           )
         );
@@ -167,17 +167,17 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                class A {
-                    private String name = "ABC";
+              class A {
+                  private String name = "ABC";
 
-                    void func() {
-                        name = "XYZ";
-                    }
+                  void func() {
+                      name = "XYZ";
+                  }
 
-                    String getName() {
-                        return name;
-                    }
-                }
+                  String getName() {
+                      return name;
+                  }
+              }
               """
           )
         );
@@ -188,13 +188,13 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private String name = "ABC";
+              class A {
+                  private String name = "ABC";
 
-                      A() {
-                          name = "XYZ";
-                      }
+                  A() {
+                      name = "XYZ";
                   }
+              }
               """
           )
         );
@@ -205,14 +205,14 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private String name;
+              class A {
+                  private String name;
 
-                      A() {
-                          name = "ABC";
-                          name = "XYZ";
-                      }
+                  A() {
+                      name = "ABC";
+                      name = "XYZ";
                   }
+              }
               """
           )
         );
@@ -223,28 +223,28 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private int a;
-                      private int b;
-                      private int c;
+              class A {
+                  private int a;
+                  private int b;
+                  private int c;
 
-                      A() {
-                          for (int i = 0; i< 10; i++) {
-                              a = i;
-                          }
-
-                          int k = 0;
-                          while (k < 10) {
-                              b = k;
-                              k++;
-                          }
-
-                          do {
-                              k--;
-                              c = k;
-                          } while(k > 5);
+                  A() {
+                      for (int i = 0; i< 10; i++) {
+                          a = i;
                       }
+
+                      int k = 0;
+                      while (k < 10) {
+                          b = k;
+                          k++;
+                      }
+
+                      do {
+                          k--;
+                          c = k;
+                      } while(k > 5);
                   }
+              }
               """
           )
         );
@@ -255,11 +255,11 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      int a = 0;
-                      public int b = 1;
-                      protected int c = 2;
-                  }
+              class A {
+                  int a = 0;
+                  public int b = 1;
+                  protected int c = 2;
+              }
               """
           )
         );
@@ -270,9 +270,9 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private final int a = 0;
-                  }
+              class A {
+                  private final int a = 0;
+              }
               """
           )
         );
@@ -283,20 +283,20 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private static int num = 10;
-                      int func() {
-                          return num;
-                      }
+              class A {
+                  private static int num = 10;
+                  int func() {
+                      return num;
                   }
+              }
               """,
             """
-                  class A {
-                      private static final int num = 10;
-                      int func() {
-                          return num;
-                      }
+              class A {
+                  private static final int num = 10;
+                  int func() {
+                      return num;
                   }
+              }
               """
           )
         );
@@ -307,40 +307,40 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public class Person {
-                      {
-                          name = "N1";
-                          age = 10;
-                          address = "CA";
-                      }
-
-                      private String name = "N2";
-                      private int age = 15;
-                      private String address;
-
-                      public Person() {
-                          name = "N3";
-                          age = 20;
-                      }
+              public class Person {
+                  {
+                      name = "N1";
+                      age = 10;
+                      address = "CA";
                   }
+
+                  private String name = "N2";
+                  private int age = 15;
+                  private String address;
+
+                  public Person() {
+                      name = "N3";
+                      age = 20;
+                  }
+              }
               """,
             """
-                  public class Person {
-                      {
-                          name = "N1";
-                          age = 10;
-                          address = "CA";
-                      }
-
-                      private String name = "N2";
-                      private int age = 15;
-                      private final String address;
-
-                      public Person() {
-                          name = "N3";
-                          age = 20;
-                      }
+              public class Person {
+                  {
+                      name = "N1";
+                      age = 10;
+                      address = "CA";
                   }
+
+                  private String name = "N2";
+                  private int age = 15;
+                  private final String address;
+
+                  public Person() {
+                      name = "N3";
+                      age = 20;
+                  }
+              }
               """
           )
         );
@@ -351,28 +351,28 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      static {
-                          num = 10;
-                      }
-                      private static int num;
-
-                      int func() {
-                          return num;
-                      }
+              class A {
+                  static {
+                      num = 10;
                   }
+                  private static int num;
+
+                  int func() {
+                      return num;
+                  }
+              }
               """,
             """
-                  class A {
-                      static {
-                          num = 10;
-                      }
-                      private static final int num;
-
-                      int func() {
-                          return num;
-                      }
+              class A {
+                  static {
+                      num = 10;
                   }
+                  private static final int num;
+
+                  int func() {
+                      return num;
+                  }
+              }
               """
           )
         );
@@ -383,22 +383,22 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class OuterClass {
-                      int a;
+              class OuterClass {
+                  int a;
 
-                      class InnerClass {
-                          private int b = 1;
-                      }
+                  class InnerClass {
+                      private int b = 1;
                   }
+              }
               """,
             """
-                  class OuterClass {
-                      int a;
+              class OuterClass {
+                  int a;
 
-                      class InnerClass {
-                          private final int b = 1;
-                      }
+                  class InnerClass {
+                      private final int b = 1;
                   }
+              }
               """
           )
         );
@@ -409,30 +409,30 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class OuterClass {
-                      int a;
+              class OuterClass {
+                  int a;
 
-                      static class InnerClass {
-                          private int b = 1;
+                  static class InnerClass {
+                      private int b = 1;
 
-                          int func() {
-                              return b;
-                          }
+                      int func() {
+                          return b;
                       }
                   }
+              }
               """,
             """
-                  class OuterClass {
-                      int a;
+              class OuterClass {
+                  int a;
 
-                      static class InnerClass {
-                          private final int b = 1;
+                  static class InnerClass {
+                      private final int b = 1;
 
-                          int func() {
-                              return b;
-                          }
+                      int func() {
+                          return b;
                       }
                   }
+              }
               """
           )
         );
