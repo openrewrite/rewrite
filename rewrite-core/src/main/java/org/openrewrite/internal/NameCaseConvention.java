@@ -95,7 +95,7 @@ public enum NameCaseConvention {
     }
 
     public static boolean matches(NameCaseConvention convention, String str) {
-        return str.matches(format(convention, str));
+        return str.equals(format(convention, str));
     }
 
     /**
