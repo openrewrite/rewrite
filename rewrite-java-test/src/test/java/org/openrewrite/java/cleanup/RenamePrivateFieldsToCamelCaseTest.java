@@ -52,6 +52,19 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         );
     }
 
+    @Test
+    void lowerCaseWithLeadingDollarCharacter() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  private String $t = "";
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2294")
     @Test
     void nameConflict() {
