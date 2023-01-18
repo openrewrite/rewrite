@@ -22,9 +22,9 @@ import io.vavr.CheckedFunction1;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.MavenArtifactCache;
-import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -88,40 +89,46 @@ public class MavenArtifactDownloader {
             return null;
         }
 
-        return mavenArtifactCache.computeArtifact(dependency, () -> {
-            try {
-                String uri = requireNonNull(dependency.getRepository(),
-                            String.format("Respository for dependency '%s' was null.", dependency)).getUri() + "/" +
-                        dependency.getGroupId().replace('.', '/') + '/' +
-                        dependency.getArtifactId() + '/' +
-                        dependency.getVersion() + '/' +
-                        dependency.getArtifactId() + '-' +
-                        (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                        ".jar";
+        try {
+            String uri = requireNonNull(dependency.getRepository(),
+                    String.format("Respository for dependency '%s' was null.", dependency)).getUri() + "/" +
+                         dependency.getGroupId().replace('.', '/') + '/' +
+                         dependency.getArtifactId() + '/' +
+                         dependency.getVersion() + '/' +
+                         dependency.getArtifactId() + '-' +
+                         (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                         ".jar";
 
-                InputStream bodyStream;
+            Callable<@Nullable InputStream> bodyStream;
 
-                if (uri.startsWith("~")) {
-                    bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
-                } else {
+            if (uri.startsWith("~")) {
+                bodyStream = () -> Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
+            } else {
+                bodyStream = () -> {
                     HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
-                    try(HttpSender.Response response = sendRequest.apply(request.build())) {
-                        bodyStream = response.getBody();
-                        if (!response.isSuccessful() || bodyStream == null) {
+                    try {
+                        //noinspection resource
+                        HttpSender.Response response = sendRequest.apply(request.build());
+                        InputStream responseBody = response.getBody();
+                        if (!response.isSuccessful() || responseBody == null) {
                             onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
                                     dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
                                     dependency.getRequested().getGav()));
                             return null;
                         }
+                        return responseBody;
+                    } catch (Throwable t) {
+                        throw new MavenDownloadingException("Unable to download dependency", t,
+                                dependency.getRequested().getGav());
                     }
-                }
-
-                return bodyStream;
-            } catch (Throwable t) {
-                onError.accept(t);
+                };
             }
-            return null;
-        }, onError);
+            return mavenArtifactCache.computeArtifact(dependency, bodyStream, onError);
+
+        } catch (Throwable t) {
+            onError.accept(t);
+        }
+        return null;
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
