@@ -34,9 +34,9 @@ public class FindRecipesTest implements RewriteTest {
               .classpath(JavaParser.runtimeClasspath()))
             .expectedCyclesThatMakeChanges(1)
             .cycles(1)
-            .dataTable(RewriteRecipeSource.class.getName(), rows -> {
+            .dataTable(RewriteRecipeSource.Row.class, rows -> {
                 assertThat(rows).hasSize(1);
-                RewriteRecipeSource.Row row = (RewriteRecipeSource.Row) rows.get(0);
+                RewriteRecipeSource.Row row = rows.get(0);
                 assertThat(row.getDisplayName()).isEqualTo("My recipe");
                 assertThat(row.getDescription()).isEqualTo("This is my recipe.");
             }),

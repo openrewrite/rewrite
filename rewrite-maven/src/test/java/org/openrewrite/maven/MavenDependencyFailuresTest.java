@@ -50,8 +50,8 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
-            .dataTable(MavenMetadataFailures.class.getName(), MavenMetadataFailures.Row::getMavenRepositoryUri, uris ->
-                assertThat(uris.stream().distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
+            .dataTable(MavenMetadataFailures.Row.class, failures ->
+                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
           pomXml(
             """
               <project>

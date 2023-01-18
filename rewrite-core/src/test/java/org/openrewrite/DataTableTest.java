@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -31,47 +32,67 @@ public class DataTableTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(toRecipe(r -> new PlainTextVisitor<>() {
-                final DataTable<Word> wordTable = new DataTable<>(r, Word.class, "org.openrewrite.Words", "Words", "Each word in the text.");
+                final WordTable wordTable = new WordTable(r);
 
                 @Override
                 public PlainText visitText(PlainText text, ExecutionContext ctx) {
                     int i = 0;
                     for (String s : text.getText().split(" ")) {
-                        wordTable.insertRow(ctx, new Word(i++, s));
+                        wordTable.insertRow(ctx, new WordTable.Row(i++, s));
                     }
                     return text;
                 }
             }))
-            .dataTableAsCsv("org.openrewrite.Words", """
+            .dataTableAsCsv(WordTable.class.getName(), """
               position,text
               0,hello
               1,world
               """
             )
-            .dataTable("org.openrewrite.Words", Word::getText, words -> assertThat(words)
+            .dataTable(WordTable.Row.class, rows -> assertThat(rows.stream().map(WordTable.Row::getText))
               .containsExactly("hello", "world")),
           text("hello world")
         );
     }
 
-    static class Word {
-        private int position;
-        private String text;
+    @Test
+    void descriptor() {
+        Recipe recipe = toRecipe();
+        new WordTable(recipe);
 
-        public Word() {
+        assertThat(recipe.getDataTableDescriptors()).hasSize(1);
+        assertThat(recipe.getDataTableDescriptors().get(0).getColumns()).hasSize(2);
+    }
+
+    @JsonIgnoreType
+    static class WordTable extends DataTable<WordTable.Row> {
+        public WordTable(Recipe recipe) {
+            super(recipe, Row.class, WordTable.class.getName(),
+              "Words", "Each word in the text.");
         }
 
-        public Word(int position, String text) {
-            this.position = position;
-            this.text = text;
-        }
+        static class Row {
+            @Column(displayName = "Position", description = "The index position of the word in the text.")
+            private int position;
 
-        public int getPosition() {
-            return position;
-        }
+            @Column(displayName = "Text", description = "The text of the word.")
+            private String text;
 
-        public String getText() {
-            return text;
+            public Row() {
+            }
+
+            public Row(int position, String text) {
+                this.position = position;
+                this.text = text;
+            }
+
+            public int getPosition() {
+                return position;
+            }
+
+            public String getText() {
+                return text;
+            }
         }
     }
 }

@@ -17,6 +17,7 @@ package org.openrewrite.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
+import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
@@ -30,7 +31,10 @@ public class ParseFailures extends DataTable<ParseFailures.Row> {
 
     @Value
     public static class Row {
+        @Column(displayName = "Source path", description = "The file that failed to parse.")
         String sourcePath;
+
+        @Column(displayName = "Stack trace", description = "The stack trace of the failure.")
         String stackTrace;
     }
 }

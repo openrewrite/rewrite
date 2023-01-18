@@ -17,6 +17,7 @@ package org.openrewrite.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
+import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 import org.openrewrite.marker.GitProvenance;
@@ -36,10 +37,20 @@ public class DistinctGitProvenance extends DataTable<DistinctGitProvenance.Row> 
 
     @Value
     public static class Row {
+        @Column(displayName = "Origin", description = "The URL of the git remote.")
         String origin;
+
+        @Column(displayName = "Branch",
+                description = "The branch that was checked out at the time the source file was parsed.")
         String branch;
+
+        @Column(displayName = "Changeset", description = "The commit hash of the changeset that was checked out.")
         String changeset;
+
+        @Column(displayName = "AutoCRLF", description = "The value of the `core.autocrlf` git config setting.")
         GitProvenance.AutoCRLF autoCRLF;
+
+        @Column(displayName = "EOL", description = "The value of the `core.eol` git config setting.")
         GitProvenance.EOL eol;
     }
 }

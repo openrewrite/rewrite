@@ -234,12 +234,11 @@ public abstract class Recipe implements Cloneable {
         return this;
     }
 
-    public Recipe addDataTable(DataTable<?> dataTable) {
+    public void addDataTable(DataTable<?> dataTable) {
         if (dataTables == null) {
             dataTables = new ArrayList<>();
         }
         dataTables.add(RecipeIntrospectionUtils.dataTableDescriptorFromDataTable(dataTable));
-        return this;
     }
 
     public List<TreeVisitor<?, ExecutionContext>> getApplicableTests() {

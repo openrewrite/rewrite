@@ -17,6 +17,7 @@ package org.openrewrite.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
+import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
@@ -34,9 +35,17 @@ public class RewriteRecipeSource extends DataTable<RewriteRecipeSource.Row> {
 
     @Value
     public static class Row {
+        @Column(displayName = "Recipe name", description = "The name of the recipe.")
         String displayName;
+
+        @Column(displayName = "Recipe description", description = "The description of the recipe.")
         String description;
+
+        @Column(displayName = "Recipe type", description = "Differentiate between Java and YAML recipes, as they may be " +
+                                                           "two independent data sets used in LLM fine-tuning.")
         RecipeType recipeType;
+
+        @Column(displayName = "Recipe source code", description = "The full source code of the recipe.")
         String sourceCode;
     }
 

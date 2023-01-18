@@ -17,20 +17,21 @@ package org.openrewrite.config;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-
-import java.util.List;
+import org.openrewrite.internal.lang.Nullable;
 
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class DataTableDescriptor {
+public class ColumnDescriptor {
 
     @EqualsAndHashCode.Include
     String name;
 
+    @EqualsAndHashCode.Include
+    String type;
+
+    @Nullable
     String displayName;
 
+    @Nullable
     String description;
-
-    @EqualsAndHashCode.Include
-    List<ColumnDescriptor> columns;
 }

@@ -16,7 +16,6 @@
 package org.openrewrite.test;
 
 import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
@@ -30,10 +29,7 @@ import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.URI;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Properties;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -160,19 +156,25 @@ public class RecipeSpec {
         return this;
     }
 
-    public <E> RecipeSpec dataTable(String name, UncheckedConsumer<List<E>> extract) {
+    @Incubating(since = "7.35.0")
+    public <E> RecipeSpec dataTable(Class<E> rowType, UncheckedConsumer<List<E>> extract) {
         return afterRecipe(run -> {
-            List<E> rows = run.getDataTableRows(name);
-            assertThat(rows).isNotNull();
-            assertThat(rows).isNotEmpty();
-            extract.accept(rows);
+            for (Map.Entry<DataTable<?>, List<?>> dataTableListEntry : run.getDataTables().entrySet()) {
+                if (dataTableListEntry.getKey().getType().equals(rowType)) {
+                    //noinspection unchecked
+                    List<E> rows = (List<E>) dataTableListEntry.getValue();
+                    assertThat(rows).isNotNull();
+                    assertThat(rows).isNotEmpty();
+                    extract.accept(rows);
+                }
+            }
+
         });
     }
 
     @Incubating(since = "7.35.0")
-    public <E, V> RecipeSpec dataTable(String name, Function<E, V> map, UncheckedConsumer<List<V>> extract) {
-        //noinspection unchecked
-        return dataTable(name, ex -> extract.accept(ex.stream().map(o -> map.apply((E) o)).collect(Collectors.toList())));
+    public <E, V> RecipeSpec dataTableAsCsv(Class<DataTable<?>> dataTableClass, String expect) {
+        return dataTableAsCsv(dataTableClass.getName(), expect);
     }
 
     @Incubating(since = "7.35.0")

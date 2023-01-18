@@ -13,24 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import org.intellij.lang.annotations.Language;
 
-import java.util.List;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-@Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-public class DataTableDescriptor {
-
-    @EqualsAndHashCode.Include
-    String name;
-
-    String displayName;
-
-    String description;
-
-    @EqualsAndHashCode.Include
-    List<ColumnDescriptor> columns;
+@Target({ElementType.FIELD, ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Column {
+    @Language("markdown") String displayName();
+    @Language("markdown") String description();
 }

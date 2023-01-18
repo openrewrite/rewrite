@@ -62,7 +62,7 @@ public class RecipeIntrospectionUtils {
     public static TreeVisitor<?, ExecutionContext> recipeVisitor(Recipe recipe) {
         try {
             Method getVisitor = ReflectionUtils.findMethod(recipe.getClass(), "getVisitor");
-            if(getVisitor == null) {
+            if (getVisitor == null) {
                 throw new RecipeIntrospectionException("Recipe " + recipe.getName() + " does not implement getVisitor()");
             }
             getVisitor.setAccessible(true);
@@ -76,7 +76,7 @@ public class RecipeIntrospectionUtils {
     public static List<SourceFile> recipeVisit(Recipe recipe, List<SourceFile> before, ExecutionContext ctx) {
         try {
             Method visit = ReflectionUtils.findMethod(recipe.getClass(), "visit", List.class, ExecutionContext.class);
-            if(visit == null) {
+            if (visit == null) {
                 throw new RecipeIntrospectionException("Recipe " + recipe.getClass().getName() + " does not implement visit(List<SourceFile>, ExecutionContext)");
             }
             visit.setAccessible(true);
@@ -88,7 +88,8 @@ public class RecipeIntrospectionUtils {
     }
 
     public static DataTableDescriptor dataTableDescriptorFromDataTable(DataTable<?> dataTable) {
-        return new DataTableDescriptor(dataTable.getName(), dataTable.getDisplayName(), dataTable.getDescription());
+        return new DataTableDescriptor(dataTable.getName(), dataTable.getDisplayName(), dataTable.getDescription(),
+                getColumnDescriptors(dataTable));
     }
 
     public static RecipeDescriptor recipeDescriptorFromDeclarativeRecipe(DeclarativeRecipe recipe, URI source) {
@@ -111,7 +112,7 @@ public class RecipeIntrospectionUtils {
             return recipeClass.getConstructors()[0];
         } else {
             for (Constructor<?> constructor : constructors) {
-                for(Annotation annotation : constructor.getAnnotations()) {
+                for (Annotation annotation : constructor.getAnnotations()) {
                     if ("com.fasterxml.jackson.annotation.JsonCreator".equals(annotation.annotationType().getName())) {
                         return constructor;
                     }
@@ -214,6 +215,23 @@ public class RecipeIntrospectionUtils {
         return options;
     }
 
+    private static List<ColumnDescriptor> getColumnDescriptors(DataTable<?> dataTable) {
+        List<ColumnDescriptor> columns = new ArrayList<>();
+
+        for (Field field : dataTable.getType().getDeclaredFields()) {
+            field.setAccessible(true);
+            Column column = field.getAnnotation(Column.class);
+            if (column != null) {
+                Object fieldValue;
+                columns.add(new ColumnDescriptor(field.getName(),
+                        field.getType().getSimpleName(),
+                        column.displayName(),
+                        column.description()));
+            }
+        }
+        return columns;
+    }
+
     private static List<OptionDescriptor> getOptionsDescriptors(Recipe recipe) {
         List<OptionDescriptor> options = new ArrayList<>();
 
@@ -226,7 +244,7 @@ public class RecipeIntrospectionUtils {
                     fieldValue = field.get(recipe);
                 } catch (IllegalAccessException e) {
                     throw new RecipeIntrospectionException("Error getting recipe option value, recipe: " +
-                            recipe.getClass().getName() + ", option: " + field.getName(), e);
+                                                           recipe.getClass().getName() + ", option: " + field.getName(), e);
                 }
                 options.add(new OptionDescriptor(field.getName(),
                         field.getType().getSimpleName(),
