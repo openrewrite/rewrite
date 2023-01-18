@@ -61,13 +61,6 @@ public class MavenArtifactDownloaderTest {
             "            <artifactId>" + recipeGav.getArtifactId() + "</artifactId>" +
             "            <version>" + recipeGav.getVersion() + "</version>" +
             "        </dependency>" +
-            (recipeGav.getGroupId().equals("org.openrewrite") && recipeGav.getArtifactId().equals("rewrite-java") ?
-              "" +
-                "        <dependency>" +
-                "            <groupId>org.openrewrite</groupId>" +
-                "            <artifactId>rewrite-java-17</artifactId>" +
-                "            <version>" + recipeGav.getVersion() + "</version>" +
-                "        </dependency>" : "") +
             "    </dependencies>" +
             "</project>"
         ).get(0);
