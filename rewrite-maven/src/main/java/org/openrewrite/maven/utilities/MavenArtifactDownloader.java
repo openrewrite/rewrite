@@ -28,6 +28,7 @@ import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
 import java.nio.file.Files;
@@ -106,8 +107,9 @@ public class MavenArtifactDownloader {
                 } else {
                     HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
                     try(HttpSender.Response response = sendRequest.apply(request.build())) {
-                        bodyStream = response.getBody();
-                        if (!response.isSuccessful() || bodyStream == null) {
+                        byte[] bodyAsBytes = response.getBodyAsBytes();
+                        bodyStream = new ByteArrayInputStream(bodyAsBytes);
+                        if (!response.isSuccessful() || bodyAsBytes.length == 0) {
                             onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
                                     dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
                                     dependency.getRequested().getGav()));
