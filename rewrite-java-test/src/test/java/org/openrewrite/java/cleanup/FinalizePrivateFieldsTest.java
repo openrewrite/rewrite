@@ -41,13 +41,13 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
               }
               """,
             """
-                class A {
-                    private final String name = "ABC";
+              class A {
+                  private final String name = "ABC";
 
-                    String getName() {
-                        return name;
-                    }
-                }
+                  String getName() {
+                      return name;
+                  }
+              }
               """));
     }
 
