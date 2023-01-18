@@ -89,41 +89,39 @@ public class MavenArtifactDownloader {
             return null;
         }
 
-        return mavenArtifactCache.computeArtifact(dependency, () -> {
-            try {
-                String uri = requireNonNull(dependency.getRepository(),
-                            String.format("Respository for dependency '%s' was null.", dependency)).getUri() + "/" +
-                        dependency.getGroupId().replace('.', '/') + '/' +
-                        dependency.getArtifactId() + '/' +
-                        dependency.getVersion() + '/' +
-                        dependency.getArtifactId() + '-' +
-                        (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                        ".jar";
+        try {
+            String uri = requireNonNull(dependency.getRepository(),
+                        String.format("Respository for dependency '%s' was null.", dependency)).getUri() + "/" +
+                    dependency.getGroupId().replace('.', '/') + '/' +
+                    dependency.getArtifactId() + '/' +
+                    dependency.getVersion() + '/' +
+                    dependency.getArtifactId() + '-' +
+                    (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                    ".jar";
 
-                InputStream bodyStream;
+            InputStream bodyStream;
 
-                if (uri.startsWith("~")) {
-                    bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
-                } else {
-                    HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
-                    try(HttpSender.Response response = sendRequest.apply(request.build())) {
-                        byte[] bodyAsBytes = response.getBodyAsBytes();
-                        bodyStream = new ByteArrayInputStream(bodyAsBytes);
-                        if (!response.isSuccessful() || bodyAsBytes.length == 0) {
-                            onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
-                                    dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
-                                    dependency.getRequested().getGav()));
-                            return null;
-                        }
+            if (uri.startsWith("~")) {
+                bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
+            } else {
+                HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
+                try(HttpSender.Response response = sendRequest.apply(request.build())) {
+                    bodyStream = response.getBody();
+                    if (!response.isSuccessful() || bodyStream == null) {
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
+                                dependency.getRequested().getGav()));
+                        return null;
                     }
+                    return mavenArtifactCache.computeArtifact(dependency, bodyStream, onError);
                 }
-
-                return bodyStream;
-            } catch (Throwable t) {
-                onError.accept(t);
             }
-            return null;
-        }, onError);
+            return mavenArtifactCache.computeArtifact(dependency, bodyStream, onError);
+
+        } catch (Throwable t) {
+            onError.accept(t);
+        }
+        return null;
     }
 
     private HttpSender.Request.Builder applyAuthentication(MavenRepository repository, HttpSender.Request.Builder request) {
