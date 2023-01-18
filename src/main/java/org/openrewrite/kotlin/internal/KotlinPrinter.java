@@ -82,6 +82,36 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         return functionType;
     }
 
+    @Override
+    public J visitKString(K.KString kString, PrintOutputCapture<P> p) {
+        beforeSyntax(kString, KSpace.Location.KSTRING, p);
+
+        String delimiter = kString.getDelimiter();
+        p.out.append(delimiter);
+
+        visit(kString.getStrings(), p);
+        p.out.append(delimiter);
+
+        afterSyntax(kString, p);
+        return kString;
+    }
+
+    @Override
+    public J visitKStringValue(K.KString.Value value, PrintOutputCapture<P> p) {
+        beforeSyntax(value, KSpace.Location.KSTRING, p);
+        if (value.isEnclosedInBraces()) {
+            p.out.append("${");
+        } else {
+            p.out.append("$");
+        }
+        visit(value.getTree(), p);
+        if (value.isEnclosedInBraces()) {
+            p.out.append('}');
+        }
+        afterSyntax(value, p);
+        return value;
+    }
+
     private class KotlinJavaPrinter extends JavaPrinter<P> {
         @Override
         public J visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
@@ -453,6 +483,23 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     private static final UnaryOperator<String> JAVA_MARKER_WRAPPER =
             out -> "/*~~" + out + (out.isEmpty() ? "" : "~~") + ">*/";
+
+    private void beforeSyntax(K k, KSpace.Location loc, PrintOutputCapture<P> p) {
+        beforeSyntax(k.getPrefix(), k.getMarkers(), loc, p);
+    }
+
+    private void beforeSyntax(Space prefix, Markers markers, @Nullable KSpace.Location loc, PrintOutputCapture<P> p) {
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        }
+        if (loc != null) {
+            visitSpace(prefix, loc, p);
+        }
+        visitMarkers(markers, p);
+        for (Marker marker : markers.getMarkers()) {
+            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        }
+    }
 
     private void beforeSyntax(K k, Space.Location loc, PrintOutputCapture<P> p) {
         beforeSyntax(k.getPrefix(), k.getMarkers(), loc, p);

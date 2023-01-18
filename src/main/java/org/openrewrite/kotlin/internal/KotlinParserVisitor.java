@@ -598,12 +598,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public <T> J visitConstExpression(FirConstExpression<T> constExpression, ExecutionContext ctx) {
-        Space prefix = whitespace();
-        String valueSource = null;
-        if (constExpression.getSource() != null) {
-            valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
-            cursor += valueSource.length();
-        }
+        String valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
+        Space prefix = sourceBefore(valueSource);
 
         Object value = constExpression.getValue();
         JavaType.Primitive type;
@@ -847,6 +843,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private J mapOperatorFunctionCall(FirFunctionCall functionCall) {
         Space prefix = whitespace();
 
+        J left = visitElement(functionCall.getDispatchReceiver(), ctx);
+
         J.Binary.Type type ;
         Space opPrefix;
         switch (functionCall.getCalleeReference().getName().asString()) {
@@ -866,12 +864,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 throw new UnsupportedOperationException("Null function call operator type.");
         }
 
-        J left = visitElement(functionCall.getDispatchReceiver(), ctx);
-        if (functionCall.getArgumentList().getArguments().size() != 1) {
-            throw new UnsupportedOperationException("Unexpected function call argument list size.");
-        }
-
         J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+
         return new J.Binary(
                 randomId(),
                 prefix,
@@ -1102,7 +1096,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitPropertyAccessExpression(FirPropertyAccessExpression propertyAccessExpression, ExecutionContext ctx) {
-        return convert(propertyAccessExpression.getCalleeReference(), ctx);
+        JavaType type = typeMapping.type(propertyAccessExpression);
+        if (propertyAccessExpression.getExplicitReceiver() != null) {
+            Space prefix = whitespace();
+            Expression target = (Expression) visitElement(propertyAccessExpression.getExplicitReceiver(), ctx);
+            JLeftPadded<J.Identifier> name = padLeft(sourceBefore("."), (J.Identifier) visitElement(propertyAccessExpression.getCalleeReference(), ctx));
+            return new J.FieldAccess(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    target,
+                    name,
+                    type
+            );
+        } else {
+            return visitElement(propertyAccessExpression.getCalleeReference(), ctx);
+        }
     }
 
     @Override
@@ -1216,7 +1225,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitResolvedQualifier(FirResolvedQualifier resolvedQualifier, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("Unsupported FirResolvedQualifier.");
+        return convertToIdentifier(resolvedQualifier.getRelativeClassFqName().asString(), resolvedQualifier);
     }
 
     @Override
@@ -1344,7 +1353,41 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitStringConcatenationCall(FirStringConcatenationCall stringConcatenationCall, ExecutionContext ctx) {
-        throw new IllegalStateException("Implement me.");
+        Space prefix = whitespace();
+        String delimiter;
+        if (source.startsWith("\"\"\"", cursor)) {
+            delimiter = "\"\"\"";
+        } else if (source.startsWith("$", cursor)) {
+            delimiter = "$";
+        } else {
+            delimiter = "\"";
+        }
+        cursor += delimiter.length();
+        List<J> values = new ArrayList<>(stringConcatenationCall.getArgumentList().getArguments().size());
+        for (FirExpression e : stringConcatenationCall.getArgumentList().getArguments()) {
+            if (source.startsWith("$", cursor)) {
+                skip("$");
+                boolean inBraces = source.startsWith("{", cursor);
+                if (inBraces) {
+                    skip("{");
+                }
+                values.add(new K.KString.Value(randomId(), Markers.EMPTY, visitElement(e, ctx), inBraces));
+                if (inBraces) {
+                    skip("}");
+                }
+            } else {
+                values.add(visitElement(e, ctx));
+            }
+        }
+
+        return new K.KString(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                delimiter,
+                values,
+                typeMapping.type(stringConcatenationCall)
+        );
     }
 
     @Override

@@ -70,6 +70,28 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
+    public J visitKString(K.KString kString, P p) {
+        K.KString k = kString;
+        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.KSTRING, p));
+        k = k.withMarkers(visitMarkers(k.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(k, p);
+        if (!(temp instanceof K.KString)) {
+            return temp;
+        } else {
+            k = (K.KString) temp;
+        }
+        k = k.withStrings(ListUtils.map(k.getStrings(), s -> visit(s, p)));
+        k = k.withType(visitType(k.getType(), p));
+        return k;
+    }
+
+    public J visitKStringValue(K.KString.Value value, P p) {
+        K.KString.Value v = value;
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.withTree(visit(v.getTree(), p));
+        return v;
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }

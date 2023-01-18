@@ -241,133 +241,6 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
-    final class FunctionType implements K, Expression, Statement, TypeTree {
-
-        @With
-        @Getter
-        UUID id;
-
-        @With
-        @Getter
-        TypedTree typedTree;
-
-        @Nullable
-        @With
-        @Getter
-        JRightPadded<NameTree> receiver;
-
-        @Override
-        public Space getPrefix() {
-            return typedTree.getPrefix();
-        }
-
-        @Override
-        public <J2 extends J> J2 withPrefix(Space space) {
-            return (J2) withTypedTree(typedTree.withPrefix(space));
-        }
-
-        @Override
-        public Markers getMarkers() {
-            return typedTree.getMarkers();
-        }
-
-        @Override
-        public <J2 extends Tree> J2 withMarkers(Markers markers) {
-            return (J2) withTypedTree(typedTree.withMarkers(markers));
-        }
-
-        @Override
-        public @Nullable JavaType getType() {
-            return typedTree.getType();
-        }
-
-        @Override
-        public <J2 extends J> J2 withType(@Nullable JavaType type) {
-            return (J2) withTypedTree(typedTree.withType(type));
-        }
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        @Override
-        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            return v.visitFunctionType(this, p);
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class Modifier implements K {
-        public static boolean hasModifier(Collection<K.Modifier> modifiers, K.Modifier.Type modifier) {
-            return modifiers.stream().anyMatch(m -> m.getType() == modifier);
-        }
-
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        K.Modifier.Type type;
-
-        @With
-        @Getter
-        List<Annotation> annotations;
-
-        @Override
-        public String toString() {
-            return type.toString().toLowerCase();
-        }
-
-        /**
-         * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://kotlinlang.org/docs/coding-conventions.html#modifiers-order">KLS</a>.
-         */
-        public enum Type {
-            // TODO: trim as needed.
-            Public,
-            Protected,
-            Private,
-            Internal,
-            Expect,
-            Actual,
-            Final,
-            Open,
-            Abstract,
-            Sealed,
-            Const,
-            External,
-            Override,
-            LateInit,
-            TailRec,
-            Vararg,
-            Suspend,
-            Inner,
-            Enum,
-            Annotation,
-            Fun,
-            Companion,
-            Inline,
-            Value,
-            Infix,
-            Operator,
-            Data
-        }
-    }
-
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -434,6 +307,186 @@ public interface K extends J {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    final class FunctionType implements K, Expression, Statement, TypeTree {
+
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        TypedTree typedTree;
+
+        @Nullable
+        @With
+        @Getter
+        JRightPadded<NameTree> receiver;
+
+        @Override
+        public Space getPrefix() {
+            return typedTree.getPrefix();
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withTypedTree(typedTree.withPrefix(space));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return typedTree.getMarkers();
+        }
+
+        @Override
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withTypedTree(typedTree.withMarkers(markers));
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typedTree.getType();
+        }
+
+        @Override
+        public <J2 extends J> J2 withType(@Nullable JavaType type) {
+            return (J2) withTypedTree(typedTree.withType(type));
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitFunctionType(this, p);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class KString implements K, Statement, Expression {
+        UUID id;
+        Space prefix;
+        Markers markers;
+        String delimiter;
+        List<J> strings;
+
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitKString(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        @With
+        public static final class Value implements K {
+            UUID id;
+            Markers markers;
+            J tree;
+            boolean enclosedInBraces;
+
+            @Override
+            public <J2 extends J> J2 withPrefix(Space space) {
+                //noinspection unchecked
+                return (J2) this;
+            }
+
+            @Override
+            public Space getPrefix() {
+                return Space.EMPTY;
+            }
+
+            @Override
+            public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+                return v.visitKStringValue(this, p);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class Modifier implements K {
+        public static boolean hasModifier(Collection<K.Modifier> modifiers, K.Modifier.Type modifier) {
+            return modifiers.stream().anyMatch(m -> m.getType() == modifier);
+        }
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        K.Modifier.Type type;
+
+        @With
+        @Getter
+        List<Annotation> annotations;
+
+        @Override
+        public String toString() {
+            return type.toString().toLowerCase();
+        }
+
+        /**
+         * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
+         * <a href="https://kotlinlang.org/docs/coding-conventions.html#modifiers-order">KLS</a>.
+         */
+        public enum Type {
+            // TODO: trim as needed.
+            Public,
+            Protected,
+            Private,
+            Internal,
+            Expect,
+            Actual,
+            Final,
+            Open,
+            Abstract,
+            Sealed,
+            Const,
+            External,
+            Override,
+            LateInit,
+            TailRec,
+            Vararg,
+            Suspend,
+            Inner,
+            Enum,
+            Annotation,
+            Fun,
+            Companion,
+            Inline,
+            Value,
+            Infix,
+            Operator,
+            Data
         }
     }
 

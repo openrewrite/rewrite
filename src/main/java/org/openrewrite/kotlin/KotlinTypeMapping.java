@@ -127,6 +127,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 }
             }
             return classType(type, signature, ownerFallBack);
+        }  else if (type instanceof FirStringConcatenationCall) {
+            return type(((FirStringConcatenationCall) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirTypeParameter) {
             return generic((FirTypeParameter) type, signature, ownerFallBack);
         } else if (type instanceof FirVariableAssignment) {

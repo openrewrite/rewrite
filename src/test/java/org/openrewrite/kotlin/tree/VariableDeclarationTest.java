@@ -100,13 +100,65 @@ public class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
-    void stringVariableReference() {
+    void stringTemplate() {
         rewriteRun(
           kotlin("""
-              val valA = "word"
-              val valB = "other ${valA}"
+              val a = "Hello"
+              val b = "World"
+              val c = "${a} ${b}!"
+          """)
+        );
+    }
+
+    @Test
+    void stringTemplateNoBraces() {
+        rewriteRun(
+          kotlin("""
+              val a = "Hello"
+              val b = "World"
+              val c = "$a $b!"
+          """)
+        );
+    }
+
+    @Test
+    void propertyAccessor() {
+        rewriteRun(
+          kotlin("""
+              class Test {
+                  val value = 10
+              }
+              val a = Test()
+              val b = "${a.value}"
+          """)
+        );
+    }
+
+    @Test
+    void multipleFieldAccess() {
+        rewriteRun(
+          kotlin("""
+              class Test {
+                  val testValue = Inner()
+                  class Inner {
+                      val innerValue = 10
+                  }
+              }
+
+              val a = Test()
+              val b = "${a.testValue.innerValue}"
+          """)
+        );
+    }
+
+    @Test
+    void tripleQuotedString() {
+        rewriteRun(
+          kotlin("""
+              val template = \"\"\"
+                Hello world!
+              \"\"\"
           """)
         );
     }

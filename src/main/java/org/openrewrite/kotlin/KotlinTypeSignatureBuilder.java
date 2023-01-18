@@ -98,6 +98,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 }
             }
             return coneKotlinType.getTypeArguments().length > 0 ? parameterizedTypeRef(coneKotlinType) : typeRefClassSignature(coneKotlinType);
+        } else if (type instanceof FirResolvedQualifier) {
+            return signature(((FirResolvedQualifier) type).getSymbol(), ownerSymbol);
+        } else if (type instanceof FirStringConcatenationCall) {
+            return signature(((FirStringConcatenationCall) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirTypeParameter) {
             return genericSignature(type);
         } else if (type instanceof FirValueParameterSymbol) {
