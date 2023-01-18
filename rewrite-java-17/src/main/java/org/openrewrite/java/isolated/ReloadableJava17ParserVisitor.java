@@ -1479,7 +1479,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
             Space namedVarPrefix = sourceBefore(n.getName().toString());
 
-            JavaType type = typeMapping.type(node);
+            JavaType type = typeMapping.type(n);
             J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(),
                     type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
                     type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
