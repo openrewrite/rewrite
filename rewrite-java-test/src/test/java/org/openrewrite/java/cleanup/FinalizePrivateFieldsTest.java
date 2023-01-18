@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -23,7 +22,6 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 public class FinalizePrivateFieldsTest implements RewriteTest {
-
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FinalizePrivateFields());
@@ -36,7 +34,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private String name = "ABC";
-                
+
                     String getName() {
                         return name;
                     }
@@ -45,7 +43,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private final String name = "ABC";
-                
+
                     String getName() {
                         return name;
                     }
@@ -62,7 +60,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private String name = initName();
-                
+
                     String initName() {
                         return "A name";
                     }
@@ -71,7 +69,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private final String name = initName();
-                
+
                     String initName() {
                         return "A name";
                     }
@@ -88,7 +86,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private String name;
-                
+
                     A() {
                         name = "XYZ";
                     }
@@ -97,7 +95,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private final String name;
-                
+
                     A() {
                         name = "XYZ";
                     }
@@ -114,12 +112,12 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private int a, b;
-                
+
                     A() {
                         a = 0;
                         b = 1;
                     }
-                
+
                     int func() {
                         return a + b;
                     }
@@ -128,12 +126,12 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private final int a, b;
-                
+
                     A() {
                         a = 0;
                         b = 1;
                     }
-                
+
                     int func() {
                         return a + b;
                     }
@@ -150,12 +148,12 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private int a, b;
-                
+
                     A() {
                         a = 0;
                         b = 1;
                     }
-                
+
                     int func(int c) {
                         b += c;
                         return a + b;
@@ -173,11 +171,11 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private String name = "ABC";
-                
+
                     void func() {
                         name = "XYZ";
                     }
-                
+
                     String getName() {
                         return name;
                     }
@@ -194,7 +192,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private String name = "ABC";
-                
+
                     A() {
                         name = "XYZ";
                     }
@@ -211,7 +209,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class A {
                     private String name;
-                
+
                     A() {
                         name = "ABC";
                         name = "XYZ";
@@ -231,18 +229,18 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
                     private int a;
                     private int b;
                     private int c;
-                
+
                     A() {
                         for (int i = 0; i< 10; i++) {
                             a = i;
                         }
-                
+
                         int k = 0;
                         while (k < 10) {
                             b = k;
                             k++;
                         }
-                
+
                         do {
                             k--;
                             c = k;
@@ -294,7 +292,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void initializerBlock() {
+    void initializedByInitializerBlock() {
         rewriteRun(
           java(
             """
@@ -304,11 +302,11 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
                         age = 10;
                         address = "CA";
                     }
-                
+
                     private String name = "N2";
                     private int age = 15;
                     private String address;
-                
+
                     public Person() {
                         name = "N3";
                         age = 20;
@@ -322,11 +320,11 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
                         age = 10;
                         address = "CA";
                     }
-                
+
                     private String name = "N2";
                     private int age = 15;
                     private final String address;
-                
+
                     public Person() {
                         name = "N3";
                         age = 20;
@@ -376,7 +374,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class OuterClass {
                     int a;
-                
+
                     class InnerClass {
                         private int b = 1;
                     }
@@ -385,7 +383,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
             """
                 class OuterClass {
                     int a;
-                
+
                     class InnerClass {
                         private final int b = 1;
                     }
@@ -424,6 +422,22 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
                         }
                     }
                 }
+            """
+          )
+        );
+    }
+
+    @Test
+    void notInitializedByClassIgnored() {
+        rewriteRun(
+          java(
+            """
+            class A {
+                private int a;
+                void func() {
+                    a = 1;
+                }
+            }
             """
           )
         );
