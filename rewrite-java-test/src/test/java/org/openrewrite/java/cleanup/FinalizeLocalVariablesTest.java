@@ -492,32 +492,32 @@ class FinalizeLocalVariablesTest implements RewriteTest {
     @Disabled
     @Test
     void localVariableInInitializerBlockMadeFinal() {
-       rewriteRun(
+        rewriteRun(
           java(
             """
-                class Person {
-                    {
-                        int n = 10;
-                        name = "N1";
-                        age = n;
-                    }
+                  class Person {
+                      {
+                          int n = 10;
+                          name = "N1";
+                          age = n;
+                      }
 
-                    private String name;
-                    private int age;
-                }
-            """,
+                      private String name;
+                      private int age;
+                  }
+              """,
             """
-                class Person {
-                    {
-                        final int n = 10;
-                        name = "N1";
-                        age = n;
-                    }
+                  class Person {
+                      {
+                          final int n = 10;
+                          name = "N1";
+                          age = n;
+                      }
 
-                    private String name;
-                    private int age;
-                }
-            """
+                      private String name;
+                      private int age;
+                  }
+              """
           )
         );
     }
