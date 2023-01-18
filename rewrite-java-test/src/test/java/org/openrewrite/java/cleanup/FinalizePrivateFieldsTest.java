@@ -268,6 +268,19 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
+    void finalFieldsIgnored() {
+        rewriteRun(
+          java(
+            """
+                class A {
+                    private final int a = 0;
+                }
+            """
+          )
+        );
+    }
+
+    @Test
     void staticFieldsMadeFinal() {
         rewriteRun(
           java(

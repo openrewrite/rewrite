@@ -155,15 +155,8 @@ public class FinalizePrivateFields extends Recipe {
                 JavaType.Variable v = i.getFieldType();
 
                 if (assignedCountMap.containsKey(v)) {
-                    // filtered by map key, the variable is a private field here
+                    // filtered so the variable is a private field here
                     int assignedCount = assignedCountMap.get(v);
-
-                    if (assignedCount > 0) {
-                        // if the field has been assigned somewhere, return earlier since it can not be final.
-                        assignedCount++;
-                        assignedCountMap.put(v, assignedCount);
-                        return;
-                    }
 
                     // increment count rules are following
                     // (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
