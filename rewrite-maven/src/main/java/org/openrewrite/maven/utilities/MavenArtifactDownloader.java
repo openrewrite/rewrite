@@ -113,10 +113,10 @@ public class MavenArtifactDownloader {
                                 dependency.getRequested().getGav()));
                         return null;
                     }
-                    return mavenArtifactCache.computeArtifact(dependency, bodyStream, onError);
+                    return mavenArtifactCache.computeArtifact(dependency, () -> bodyStream, onError);
                 }
             }
-            return mavenArtifactCache.computeArtifact(dependency, bodyStream, onError);
+            return mavenArtifactCache.computeArtifact(dependency, () -> bodyStream, onError);
 
         } catch (Throwable t) {
             onError.accept(t);

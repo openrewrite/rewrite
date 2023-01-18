@@ -30,18 +30,17 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public class MavenArtifactDownloaderTest {
 
     @Test
-    void itDownloadsDependencies(@TempDir Path tempDir) {
+    void downloadDependencies(@TempDir Path tempDir) {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-          artifactCache, null,  t -> ctx.getOnError().accept(t));
+          artifactCache, null, t -> ctx.getOnError().accept(t));
         ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
           "https://repo1.maven.org/maven2",
           "org.openrewrite.recipe",
@@ -50,34 +49,30 @@ public class MavenArtifactDownloaderTest {
 
         MavenParser mavenParser = MavenParser.builder().build();
         Xml.Document parsed = mavenParser.parse(ctx,
-          "" +
-            "<project>" +
-            "    <groupId>org.openrewrite</groupId>" +
-            "    <artifactId>maven-downloader-test</artifactId>" +
-            "    <version>1</version>" +
-            "    <dependencies>" +
-            "        <dependency>" +
-            "            <groupId>" + recipeGav.getGroupId() + "</groupId>" +
-            "            <artifactId>" + recipeGav.getArtifactId() + "</artifactId>" +
-            "            <version>" + recipeGav.getVersion() + "</version>" +
-            "        </dependency>" +
-            "    </dependencies>" +
-            "</project>"
+          String.format(
+            //language=xml
+            """
+              <project>
+                  <groupId>org.openrewrite</groupId>
+                  <artifactId>maven-downloader-test</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                      <dependency>
+                          <groupId>%s</groupId>
+                          <artifactId>%s</artifactId>
+                          <version>%s</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """.formatted(recipeGav.getGroupId(), recipeGav.getArtifactId(), recipeGav.getVersion()))
         ).get(0);
 
-        MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class)
-          .orElseThrow(() -> new IllegalStateException("No MavenResolutionResult marker on newly parsed Maven AST"));
-
-        assertTrue(!mavenModel.getDependencies().isEmpty());
+        MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+        assertThat(mavenModel.getDependencies()).isNotEmpty();
 
         List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
-
-        List<Path> artifacts = runtimeDependencies
-          .stream()
-          .map(downloader::downloadArtifact)
-          .collect(Collectors.toList());
-
-        artifacts.forEach( artifact -> assertNotNull(artifact));
-
+        for (ResolvedDependency runtimeDependency : runtimeDependencies) {
+            assertThat(downloader.downloadArtifact(runtimeDependency)).isNotNull();
+        }
     }
 }
