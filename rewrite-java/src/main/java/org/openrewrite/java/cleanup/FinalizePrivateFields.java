@@ -140,7 +140,9 @@ public class FinalizePrivateFields extends Recipe {
         @Override
         public J.Unary visitUnary(J.Unary unary, Map<JavaType.Variable, Integer> assignedCountMap) {
             J.Unary u = super.visitUnary(unary, assignedCountMap);
-            updateAssignmentCount(getCursor(), u.getExpression(),assignedCountMap);
+            if (u.getOperator().isModifying()) {
+                updateAssignmentCount(getCursor(), u.getExpression(), assignedCountMap);
+            }
             return u;
         }
 

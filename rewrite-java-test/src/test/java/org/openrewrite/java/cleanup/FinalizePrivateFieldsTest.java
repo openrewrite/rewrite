@@ -304,6 +304,26 @@ class FinalizePrivateFieldsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void fieldReferencedByNonModifyingUnaryOperator() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private int i = 42;
+                  private int j = -i;
+              }
+              """,
+            """
+              class A {
+                  private final int i = 42;
+                  private final int j = -i;
+              }
+              """
+          )
+        );
+    }
+
     @Disabled ("Doesn't support multiple constructors, to be enhanced")
     @Test
     void fieldAssignedInAllAlternateConstructors() {
