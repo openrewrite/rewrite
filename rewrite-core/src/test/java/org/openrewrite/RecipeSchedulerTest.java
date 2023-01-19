@@ -35,7 +35,8 @@ public class RecipeSchedulerTest implements RewriteTest {
             .recipe(new BoomRecipe())
             .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
               .singleElement()
-              .satisfies(t -> assertThat(t.getMessage()).isEqualTo("Exception while visiting project file 'file.txt', caused by: org.openrewrite.BoomException: boom"))
+              .satisfies(t -> assertThat(t.getMessage())
+                .matches("Exception while visiting project file 'file\\.txt', caused by: org\\.openrewrite\\.BoomException: boom, at org\\.openrewrite\\.BoomRecipe\\$1\\.visitText\\(RecipeSchedulerTest\\.java:\\d+\\)"))
             ),
           text(
             "hello",
