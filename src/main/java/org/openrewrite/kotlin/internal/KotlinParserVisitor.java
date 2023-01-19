@@ -810,9 +810,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                         convertAll(argumentsExpression.getArguments(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             } else if (firExpression instanceof FirConstExpression ||
-                    firExpression instanceof FirPropertyAccessExpression ||
+                    firExpression instanceof FirEqualityOperatorCall ||
                     firExpression instanceof FirFunctionCall ||
                     firExpression instanceof FirNamedArgumentExpression ||
+                    firExpression instanceof FirPropertyAccessExpression ||
                     firExpression instanceof FirStringConcatenationCall) {
                 args = JContainer.build(sourceBefore("("), convertAll(singletonList(firExpression), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             } else {
@@ -849,7 +850,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return JContainer.build(prefix, parameters, Markers.EMPTY);
     }
 
-    @SuppressWarnings("ConstantValue")
     private J mapOperatorFunctionCall(FirFunctionCall functionCall) {
         Space prefix = whitespace();
 

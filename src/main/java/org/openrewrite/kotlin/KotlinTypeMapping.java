@@ -22,6 +22,8 @@ import org.jetbrains.kotlin.descriptors.Visibility;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.*;
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod;
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProviderKt;
@@ -29,6 +31,7 @@ import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
+import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef;
 import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.StandardClassIds;
 import org.openrewrite.Incubating;
@@ -99,6 +102,9 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return type(((FirEqualityOperatorCall) type).getTypeRef(), ownerFallBack);
         }  else if (type instanceof FirFunctionTypeRef) {
             return type(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerFallBack);
+        }  else if (type instanceof FirJavaTypeRef) {
+            // TODO: There isn't time to convert the JavaTypeReference to a JavaType.
+            return null;
         } else if (type instanceof FirNamedArgumentExpression) {
             return type(((FirNamedArgumentExpression) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirLambdaArgumentExpression) {
@@ -330,12 +336,20 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 return null;
             }
 
-            JavaType returnType = type(methodSymbol.getResolvedReturnTypeRef());
+            JavaType returnType = function instanceof FirJavaMethod ?
+                    type(methodSymbol.getFir().getDispatchReceiverType()) :
+                    type(methodSymbol.getResolvedReturnTypeRef());
+
             List<JavaType> parameterTypes = null;
             if (!methodSymbol.getValueParameterSymbols().isEmpty()) {
                 parameterTypes = new ArrayList<>(methodSymbol.getValueParameterSymbols().size());
-                for (FirValueParameterSymbol valueParameterSymbol : methodSymbol.getValueParameterSymbols()) {
-                    JavaType javaType = type(valueParameterSymbol.getResolvedReturnTypeRef());
+                for (FirValueParameterSymbol parameterSymbol : methodSymbol.getValueParameterSymbols()) {
+                    JavaType javaType;
+                    if (parameterSymbol.getFir() instanceof FirJavaValueParameter) {
+                        javaType = type(parameterSymbol.getFir().getReturnTypeRef());
+                    } else {
+                        javaType = type(parameterSymbol.getResolvedReturnTypeRef());
+                    }
                     parameterTypes.add(javaType);
                 }
             }

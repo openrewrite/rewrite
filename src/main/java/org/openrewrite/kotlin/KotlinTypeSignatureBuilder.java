@@ -3,6 +3,8 @@ package org.openrewrite.kotlin;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.*;
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod;
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter;
 import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
@@ -10,6 +12,7 @@ import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
+import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef;
 import org.jetbrains.kotlin.name.ClassId;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
@@ -70,6 +73,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirEqualityOperatorCall) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirFunctionTypeRef) {
             return signature(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerSymbol);
+        } else if (type instanceof FirJavaTypeRef) {
+            return type.toString();
         } else if (type instanceof FirNamedArgumentExpression) {
             return signature(((FirNamedArgumentExpression) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirLambdaArgumentExpression) {
@@ -353,8 +358,14 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (symbol instanceof FirConstructorSymbol) {
             s += "{name=<constructor>,return=" + s;
         } else {
+            String returnSignature;
+            if (symbol.getFir() instanceof FirJavaMethod) {
+                returnSignature = signature(symbol.getFir().getDispatchReceiverType());
+            } else {
+                returnSignature = signature(symbol.getResolvedReturnTypeRef());
+            }
             s += "{name=" + symbol.getName().asString() +
-                    ",return=" + signature(symbol.getResolvedReturnTypeRef());
+                    ",return=" + returnSignature;
         }
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
     }
@@ -383,7 +394,13 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String methodArgumentSignature(FirFunctionSymbol<? extends FirFunction> sym) {
         StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
         for (FirValueParameterSymbol parameterSymbol : sym.getValueParameterSymbols()) {
-                genericArgumentTypes.add(signature(parameterSymbol.getResolvedReturnType(), sym));
+            String paramSignature;
+            if (parameterSymbol.getFir() instanceof FirJavaValueParameter) {
+                paramSignature= signature(parameterSymbol.getFir().getReturnTypeRef(), sym);
+            } else {
+                paramSignature = signature(parameterSymbol.getResolvedReturnType(), sym);
+            }
+            genericArgumentTypes.add(paramSignature);
         }
         return genericArgumentTypes.toString();
     }

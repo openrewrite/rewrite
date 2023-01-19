@@ -20,16 +20,18 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class BinaryTest implements RewriteTest {
+public class AssignmentOperationTest implements RewriteTest {
 
     @Test
-    void equals() {
+    void compoundAssignment() {
         rewriteRun(
           kotlin(
             """
                 fun method() {
-                  val n = 0
-                  val b = n == 0
+                  var n = 0
+                  n -= 5
+                  n += 5
+                  n *= 5
                 }
             """
           )

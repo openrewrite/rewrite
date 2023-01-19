@@ -23,26 +23,6 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 class ClassDeclarationTest implements RewriteTest {
 
-    // Update KotlinTypeGoat and add type mapping/signature tests.
-    // Temp test to sort out type mapping and signature building requirements.
-    @Test
-    void typeMappingBase() {
-        rewriteRun(
-          kotlin(
-            """
-                package some.name.here
-                class A {
-                    val field = 10
-                    val a: Any = 10
-                    fun method(arg: Int): Int {
-                        return arg
-                    }
-                }
-            """
-          )
-        );
-    }
-
     @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(

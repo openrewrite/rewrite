@@ -20,16 +20,15 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class BinaryTest implements RewriteTest {
+public class AssertTest implements RewriteTest {
 
     @Test
-    void equals() {
+    void annotationWithDefaultArgument() {
         rewriteRun(
           kotlin(
             """
                 fun method() {
-                  val n = 0
-                  val b = n == 0
+                    assert(1 == 1)
                 }
             """
           )

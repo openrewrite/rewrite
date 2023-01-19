@@ -23,7 +23,6 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class EnumTest implements RewriteTest {
 
-    @Disabled("add enum modifier as annotation.")
     @Test
     void enumEmptyBody() {
         rewriteRun(
@@ -31,7 +30,6 @@ public class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void enumDefinition() {
         rewriteRun(
@@ -46,7 +44,6 @@ public class EnumTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void innerEnum() {
         rewriteRun(
