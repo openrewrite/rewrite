@@ -21,17 +21,34 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-class ClassDeclarationTest implements RewriteTest {
+class CommentTest implements RewriteTest {
 
     @Test
-    void multipleClassDeclarationsInOneCompilationUnit() {
+    void backToBackMultilineComments() {
         rewriteRun(
           kotlin(
             """
-                package some.package.name
-                class A {}
-                class B {}
+                class Test {
+                    /*
+                     * C1
+                     */
+                    /*
+                     * C2
+                     */
+                 }
             """
+          )
+        );
+    }
+
+    @Test
+    void multilineNestedInsideSingleLine() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {// /*
+              }
+              """
           )
         );
     }
