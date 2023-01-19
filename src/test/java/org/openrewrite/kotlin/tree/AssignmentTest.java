@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -23,7 +22,6 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class AssignmentTest implements RewriteTest {
 
-    @Disabled("Requires function call and Convert PSI.")
     @Test
     void unaryMinus() {
         rewriteRun(
@@ -33,6 +31,20 @@ public class AssignmentTest implements RewriteTest {
                 val l = -2L
                 val f = -3.0f
                 val d = -4.0
+            """
+          )
+        );
+    }
+
+    @Test
+    void unaryPlus() {
+        rewriteRun(
+          kotlin(
+            """
+                val i = +1
+                val l = +2L
+                val f = +3.0f
+                val d = +4.0
             """
           )
         );

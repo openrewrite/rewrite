@@ -843,37 +843,61 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private J mapOperatorFunctionCall(FirFunctionCall functionCall) {
         Space prefix = whitespace();
 
-        J left = visitElement(functionCall.getDispatchReceiver(), ctx);
-
-        J.Binary.Type type ;
         Space opPrefix;
-        switch (functionCall.getCalleeReference().getName().asString()) {
-            case "times":
-                type = J.Binary.Type.Multiplication;
-                opPrefix = sourceBefore("*");
-                break;
-            case "minus":
-                type = J.Binary.Type.Subtraction;
-                opPrefix = sourceBefore("-");
-                break;
-            case "plus":
-                type = J.Binary.Type.Addition;
-                opPrefix = sourceBefore("+");
-                break;
-            default:
-                throw new UnsupportedOperationException("Null function call operator type.");
+        String operation = functionCall.getCalleeReference().getName().asString();
+
+        boolean unaryOperation = "unaryMinus".equals(operation) || "unaryPlus".equals(operation);
+        if (unaryOperation) {
+            JLeftPadded<J.Unary.Type> op;
+            Expression expr;
+
+            switch (operation) {
+                case "unaryMinus":
+                    skip("-");
+                    op = padLeft(EMPTY, J.Unary.Type.Negative);
+                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    break;
+                case "unaryPlus":
+                    skip("+");
+                    op = padLeft(EMPTY, J.Unary.Type.Positive);
+                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Unsupported unary operator type.");
+            }
+
+            return new J.Unary(randomId(), prefix, Markers.EMPTY, op, expr, typeMapping.type(functionCall));
+        } else {
+            J left = visitElement(functionCall.getDispatchReceiver(), ctx);
+
+            J.Binary.Type type;
+            switch (operation) {
+                case "times":
+                    type = J.Binary.Type.Multiplication;
+                    opPrefix = sourceBefore("*");
+                    break;
+                case "minus":
+                    type = J.Binary.Type.Subtraction;
+                    opPrefix = sourceBefore("-");
+                    break;
+                case "plus":
+                    type = J.Binary.Type.Addition;
+                    opPrefix = sourceBefore("+");
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Unsupported binary operator type.");
+            }
+            J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+
+            return new J.Binary(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    (Expression) left,
+                    padLeft(opPrefix, type),
+                    (Expression) right,
+                    typeMapping.type(functionCall));
         }
-
-        J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
-
-        return new J.Binary(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                (Expression) left,
-                padLeft(opPrefix, type),
-                (Expression) right,
-                typeMapping.type(functionCall));
     }
 
     @Override
