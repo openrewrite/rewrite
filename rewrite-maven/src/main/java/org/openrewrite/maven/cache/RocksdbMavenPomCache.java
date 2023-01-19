@@ -92,9 +92,6 @@ public class RocksdbMavenPomCache implements MavenPomCache {
 
         //Init the rockdb native jni library
         RocksDB.loadLibrary();
-
-        //Register a shutdown hook to close things down on exit.
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> cacheMap.values().forEach(RocksCache::close)));
     }
 
     static synchronized RocksCache getCache(String pomCacheDir) {
@@ -319,19 +316,20 @@ public class RocksdbMavenPomCache implements MavenPomCache {
         }
 
         private void close() {
-            //Called by a shutdown hook, this will flush any in-memory memtables to disk and free up resources held
-            //by the underlying C++ code. The worse case scenario is that this is not called because the system exits
-            //abnormally, in which case, the data in-memory is simply not saved to the cache.
+            // This will flush any in-memory memtables to disk and free up resources held
+            // by the underlying C++ code. The worse case scenario is that this is not called because the system exits
+            // abnormally, in which case, the data in-memory is simply not saved to the cache.
             if (Files.exists(Paths.get(cacheFolder))) {
                 //Attempting to close the database if the file has been deleted underneath it prevents the process
                 //from exiting.
-                try {
-                    database.flush(new FlushOptions());
+                try(FlushOptions flushOptions = new FlushOptions()) {
+                    database.flush(flushOptions);
                 } catch (RocksDBException e) {
                     //Error while flushing the database (before close), this means that any interim changes in memory
                     //will not be persisted. This is non-fatal.
+                } finally {
+                    database.close();
                 }
-                database.close();
             }
             writeOptions.close();
             options.close();
