@@ -348,6 +348,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             boolean explicitReturn = false;
             Space returnPrefix = EMPTY;
             if (i == firStatements.size() - 1) {
+                // Skip the implicit return from a unary increment or decrement operation.
+                if (!statements.isEmpty() && statements.get(statements.size() - 1).getElement() instanceof J.Unary) {
+                    continue;
+                }
+
                 saveCursor = cursor;
                 returnPrefix = whitespace();
                 if (source.startsWith("return", cursor)) {
@@ -844,14 +849,25 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
 
         Space opPrefix;
-        String operation = functionCall.getCalleeReference().getName().asString();
+        String name = functionCall.getCalleeReference().getName().asString();
 
-        boolean unaryOperation = "unaryMinus".equals(operation) || "unaryPlus".equals(operation);
+        boolean unaryOperation = isUnaryOperator(name);
+
         if (unaryOperation) {
             JLeftPadded<J.Unary.Type> op;
             Expression expr;
 
-            switch (operation) {
+            switch (name) {
+                case "dec":
+                    skip("--");
+                    op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
+                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    break;
+                case "inc":
+                    skip("++");
+                    op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
+                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    break;
                 case "unaryMinus":
                     skip("-");
                     op = padLeft(EMPTY, J.Unary.Type.Negative);
@@ -871,7 +887,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             J left = visitElement(functionCall.getDispatchReceiver(), ctx);
 
             J.Binary.Type type;
-            switch (operation) {
+            switch (name) {
                 case "times":
                     type = J.Binary.Type.Multiplication;
                     opPrefix = sourceBefore("*");
@@ -1598,29 +1614,39 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitVariableAssignment(FirVariableAssignment variableAssignment, ExecutionContext ctx) {
-        Space prefix = whitespace();
-        Expression variable;
-        if (variableAssignment.getExplicitReceiver() != null) {
-            Expression target = (Expression) visitElement(variableAssignment.getExplicitReceiver(), ctx);
-            JLeftPadded<J.Identifier> name = padLeft(sourceBefore("."), (J.Identifier) visitElement(variableAssignment.getLValue(), ctx));
-            variable = new J.FieldAccess(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    target,
-                    name,
-                    typeMapping.type(variableAssignment, currentFile.getSymbol()));
-        } else {
-            variable = convert(variableAssignment.getLValue(), ctx);
-        }
+        boolean unaryAssignment = variableAssignment.getRValue() instanceof FirFunctionCall &&
+                ((FirFunctionCall) variableAssignment.getRValue()).getOrigin() == FirFunctionCallOrigin.Operator &&
+                ((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference() instanceof FirResolvedNamedReference &&
+                isUnaryOperator((((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference()).getName().asString());
 
-        return new J.Assignment(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                variable,
-                padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
-                typeMapping.type(variableAssignment));
+        if (unaryAssignment) {
+            return visitElement(variableAssignment.getRValue(), ctx);
+        } else {
+            Space prefix = whitespace();
+
+            Expression variable;
+            if (variableAssignment.getExplicitReceiver() != null) {
+                Expression target = (Expression) visitElement(variableAssignment.getExplicitReceiver(), ctx);
+                JLeftPadded<J.Identifier> name = padLeft(sourceBefore("."), (J.Identifier) visitElement(variableAssignment.getLValue(), ctx));
+                variable = new J.FieldAccess(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        target,
+                        name,
+                        typeMapping.type(variableAssignment, currentFile.getSymbol()));
+            } else {
+                variable = convert(variableAssignment.getLValue(), ctx);
+            }
+
+            return new J.Assignment(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    variable,
+                    padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
+                    typeMapping.type(variableAssignment));
+        }
     }
 
     @Override
@@ -1905,6 +1931,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return modifiers;
+    }
+
+    private boolean isUnaryOperator(String name) {
+        return "dec".equals(name) ||
+                "inc".equals(name) ||
+                "unaryMinus".equals(name) ||
+                "unaryPlus".equals(name);
     }
 
     private J.Identifier convertToIdentifier(String name) {

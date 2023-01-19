@@ -27,10 +27,10 @@ public class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val i = -1
-                val l = -2L
-                val f = -3.0f
-                val d = -4.0
+                val i = - 1
+                val l = - 2L
+                val f = - 3.0f
+                val d = - 4.0
             """
           )
         );
@@ -41,10 +41,34 @@ public class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val i = +1
-                val l = +2L
-                val f = +3.0f
-                val d = +4.0
+                val i = + 1
+                val l = + 2L
+                val f = + 3.0f
+                val d = + 4.0
+            """
+          )
+        );
+    }
+
+    @Test
+    void preDecrement() {
+        rewriteRun(
+          kotlin(
+            """
+                val a = 42
+                val b = -- a
+            """
+          )
+        );
+    }
+
+    @Test
+    void preIncrement() {
+        rewriteRun(
+          kotlin(
+            """
+                val a = 42
+                val b = ++ a
             """
           )
         );
