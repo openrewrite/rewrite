@@ -29,7 +29,7 @@ class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void filedWithInitializerMadeFinal() {
+    void fieldWithInitializerMadeFinal() {
         rewriteRun(
           java(
             """
@@ -53,7 +53,7 @@ class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void filedWithInitializerViaMethodMadeFinal() {
+    void fieldWithInitializerViaMethodMadeFinal() {
         rewriteRun(
           java(
             """
@@ -79,7 +79,7 @@ class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void filedAssignedInConstructorMadeFinal() {
+    void fieldAssignedInConstructorMadeFinal() {
         rewriteRun(
           java(
             """
@@ -229,7 +229,7 @@ class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void fieldOfAFiledReassignedByAMethodUsingThis() {
+    void fieldOfAFieldReassignedByAMethodUsingThis() {
         rewriteRun(
           java(
             """
