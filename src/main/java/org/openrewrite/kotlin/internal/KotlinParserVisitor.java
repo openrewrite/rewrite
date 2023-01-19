@@ -1750,7 +1750,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip("if");
         } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
                 whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
-            throw new UnsupportedOperationException("Unsupport condition type.");
+            throw new UnsupportedOperationException("Unsupported condition type.");
         }
 
         boolean singleExpression = whenBranch.getResult() instanceof FirSingleExpressionBlock;

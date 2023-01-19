@@ -18,7 +18,6 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
