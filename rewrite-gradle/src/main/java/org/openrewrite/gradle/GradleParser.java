@@ -32,8 +32,8 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 public class GradleParser implements Parser<G.CompilationUnit> {
-    private GroovyParser buildParser;
-    private GroovyParser settingsParser;
+    private final GroovyParser buildParser;
+    private final GroovyParser settingsParser;
 
     public GradleParser(GroovyParser.Builder groovyParser) {
         GroovyParser.Builder base = groovyParser;

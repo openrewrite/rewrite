@@ -36,6 +36,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -287,9 +288,8 @@ public interface RewriteTest extends SourceSpecs {
                 }
 
                 //noinspection unchecked
-                ((Consumer<SourceFile>) nextSpec.beforeRecipe).accept(sourceFile);
-
-                specBySourceFile.put(sourceFile, nextSpec);
+                SourceFile mapped = ((UnaryOperator<SourceFile>) nextSpec.beforeRecipe).apply(sourceFile);
+                specBySourceFile.put(mapped, nextSpec);
             }
         }
 

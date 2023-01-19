@@ -205,11 +205,11 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         return prefix.resolve("file.groovy");
     }
 
-    public static Builder builder() {
+    public static GroovyParser.Builder builder() {
         return new Builder();
     }
 
-    public static Builder builder(Builder base) {
+    public static GroovyParser.Builder builder(Builder base) {
         return new Builder(base);
     }
 
@@ -262,11 +262,11 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
-        public Builder compilerCustomizers(Consumer<CompilerConfiguration>... compilerCustomizers) {
+        public GroovyParser.Builder compilerCustomizers(Consumer<CompilerConfiguration>... compilerCustomizers) {
             return compilerCustomizers(Arrays.asList(compilerCustomizers));
         }
 
-        public Builder compilerCustomizers(Iterable<Consumer<CompilerConfiguration>> compilerCustomizers) {
+        public GroovyParser.Builder compilerCustomizers(Iterable<Consumer<CompilerConfiguration>> compilerCustomizers) {
             for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
                 this.compilerCustomizers.add(compilerCustomizer);
             }

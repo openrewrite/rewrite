@@ -17,11 +17,11 @@ package org.openrewrite.maven;
 
 import lombok.Getter;
 import lombok.experimental.NonFinal;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collections;
 import java.util.Map;
@@ -93,7 +93,7 @@ public class MavenDownloadingException extends Exception {
         return message;
     }
 
-    public <X extends Xml> X warn(X x) {
-        return Markup.warn(x, this);
+    public <T extends Tree> T warn(T t) {
+        return Markup.warn(t, this);
     }
 }
