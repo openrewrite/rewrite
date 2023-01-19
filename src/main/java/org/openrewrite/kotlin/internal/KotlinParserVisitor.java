@@ -345,10 +345,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
         for (int i = 0; i < firStatements.size(); i++) {
             FirElement firElement = firStatements.get(i);
+            // Skip receiver of the unary post increment or decrement.
+            if (firElement instanceof FirProperty && "<unary>".equals(((FirProperty) firElement).getName().asString())) {
+                continue;
+            }
+
             boolean explicitReturn = false;
             Space returnPrefix = EMPTY;
             if (i == firStatements.size() - 1) {
-                // Skip the implicit return from a unary increment or decrement operation.
+                // Skip the implicit return from a unary pre increment or decrement operation.
                 if (!statements.isEmpty() && statements.get(statements.size() - 1).getElement() instanceof J.Unary) {
                     continue;
                 }
@@ -859,14 +864,38 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             switch (name) {
                 case "dec":
-                    skip("--");
-                    op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
-                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    if (source.startsWith("--", cursor)) {
+                        skip("--");
+                        op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
+                        expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    } else {
+                        // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
+                        // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
+                        // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
+                        // So, we extract the name from the source based on the post operator.
+                        int saveCursor = cursor;
+                        String opName = sourceBefore("--").getWhitespace().trim();
+                        cursor = saveCursor;
+                        expr = convertToIdentifier(opName);
+                        op = padLeft(sourceBefore("--"), J.Unary.Type.PostDecrement);
+                    }
                     break;
                 case "inc":
-                    skip("++");
-                    op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
-                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    if (source.startsWith("++", cursor)) {
+                        skip("++");
+                        op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
+                        expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                    } else {
+                        // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
+                        // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
+                        // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
+                        // So, we extract the name from the source based on the post operator.
+                        int saveCursor = cursor;
+                        String opName = sourceBefore("++").getWhitespace().trim();
+                        cursor = saveCursor;
+                        expr = convertToIdentifier(opName);
+                        op = padLeft(sourceBefore("++"), J.Unary.Type.PostIncrement);
+                    }
                     break;
                 case "unaryMinus":
                     skip("-");

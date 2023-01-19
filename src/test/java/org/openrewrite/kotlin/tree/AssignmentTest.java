@@ -55,7 +55,7 @@ public class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val a = 42
+                var a = 42
                 val b = -- a
             """
           )
@@ -67,8 +67,32 @@ public class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val a = 42
+                var a = 42
                 val b = ++ a
+            """
+          )
+        );
+    }
+
+    @Test
+    void postDecrement() {
+        rewriteRun(
+          kotlin(
+            """
+                var a = 42
+                val b = a --
+            """
+          )
+        );
+    }
+
+    @Test
+    void postIncrement() {
+        rewriteRun(
+          kotlin(
+            """
+                var a = 42
+                val b = a ++
             """
           )
         );
