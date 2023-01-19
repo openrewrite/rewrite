@@ -54,19 +54,4 @@ public class AssignmentTest implements RewriteTest {
           )
         );
     }
-
-    @Disabled("Requires support for StringConcatenationCall.")
-    @Test
-    void parameterizedString() {
-        rewriteRun(
-          kotlin(
-            """
-                val latest = "value"
-                fun someFun() {
-                    val ref = "${latest}"
-                }
-            """
-          )
-        );
-    }
 }

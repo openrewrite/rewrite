@@ -1379,7 +1379,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 values.add(visitElement(e, ctx));
             }
         }
-
+        cursor += delimiter.length();
         return new K.KString(
                 randomId(),
                 prefix,

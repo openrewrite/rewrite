@@ -107,6 +107,8 @@ public class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "${a} ${b}!"
+              
+              val after = 0
           """)
         );
     }
@@ -118,6 +120,8 @@ public class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "$a $b!"
+              
+              val after = 0
           """)
         );
     }
@@ -131,6 +135,8 @@ public class VariableDeclarationTest implements RewriteTest {
               }
               val a = Test()
               val b = "${a.value}"
+              
+              val after = 0
           """)
         );
     }
