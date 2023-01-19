@@ -15,23 +15,21 @@
  */
 package org.openrewrite.java.cleanup;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
+import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import java.util.Map;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
@@ -150,29 +148,39 @@ public class FinalizePrivateFields extends Recipe {
             Expression expression,
             Map<JavaType.Variable, Integer> assignedCountMap
         ) {
-            if (expression instanceof J.Identifier) {
-                J.Identifier i = (J.Identifier) expression;
-                JavaType.Variable v = i.getFieldType();
+            JavaType.Variable privateField = null;
 
-                if (assignedCountMap.containsKey(v)) {
-                    // filtered so the variable is a private field here
-                    int assignedCount = assignedCountMap.get(v);
-
-                    // increment count rules are following
-                    // (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
-                    // (2) any assignment in other place count for 2.
-                    // (3) any assignment in a loop in anywhere count for 2.
-                    int increment;
-                    if (isInLoop(cursor)) {
-                        increment = 2;
-                    } else if (isInitializedByClass(cursor)) {
-                        increment = 1;
-                    } else {
-                        increment = 2;
-                    }
-
-                    assignedCountMap.put(v, assignedCount + increment);
+            if (expression instanceof J.FieldAccess) {
+                // to support case of field accessed via 'this' like 'this.member'.
+                J.Identifier lastId = FindLastIdentifier.getLastIdentifier(expression);
+                if (lastId != null && assignedCountMap.containsKey(lastId.getFieldType())) {
+                    privateField = lastId.getFieldType();
                 }
+            } else if (expression instanceof J.Identifier) {
+                J.Identifier i = (J.Identifier) expression;
+                if (assignedCountMap.containsKey(i.getFieldType())) {
+                    privateField = i.getFieldType();
+                }
+            }
+
+            if (privateField != null) {
+                // filtered so the variable is a private field here
+                int assignedCount = assignedCountMap.get(privateField);
+
+                // increment count rules are following
+                // (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
+                // (2) any assignment in other place count for 2.
+                // (3) any assignment in a loop in anywhere count for 2.
+                int increment;
+                if (isInLoop(cursor)) {
+                    increment = 2;
+                } else if (isInitializedByClass(cursor)) {
+                    increment = 1;
+                } else {
+                    increment = 2;
+                }
+
+                assignedCountMap.put(privateField, assignedCount + increment);
             }
         }
 
@@ -235,6 +243,26 @@ public class FinalizePrivateFields extends Recipe {
             return dropUntilMeetCondition(cursor,
                 CollectPrivateFieldsAssignmentCounts::dropCursorEndCondition,
                 parent -> parent instanceof J.WhileLoop);
+        }
+    }
+
+    @Value
+    private static class FindLastIdentifier extends JavaIsoVisitor<List<J.Identifier>> {
+        /**
+         * Find the last identifier in a J.FieldAccess. The purpose is to check whether it's a private field.
+         * @param j the subtree to search, supposed to be a J.FieldAccess
+         * @return the last Identifier if found, otherwise null.
+         */
+        @Nullable
+        static J.Identifier getLastIdentifier(J j) {
+            List<J.Identifier> ids = new FindLastIdentifier().reduce(j, new ArrayList<>());
+            return !ids.isEmpty() ? ids.get(ids.size() - 1) : null;
+        }
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, List<J.Identifier> ids) {
+            ids.add(identifier);
+            return super.visitIdentifier(identifier, ids);
         }
     }
 }

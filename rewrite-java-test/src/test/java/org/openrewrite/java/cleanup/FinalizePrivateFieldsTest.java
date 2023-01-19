@@ -15,20 +15,21 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class FinalizePrivateFieldsTest implements RewriteTest {
+class FinalizePrivateFieldsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FinalizePrivateFields());
     }
 
     @Test
-    void initializerMadeFinal() {
+    void fieldWithInitializerMadeFinal() {
         rewriteRun(
           java(
             """
@@ -52,7 +53,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void initByMethodMadeFinal() {
+    void fieldWithInitializerViaMethodMadeFinal() {
         rewriteRun(
           java(
             """
@@ -78,7 +79,7 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void InitByConstructorMadeFinal() {
+    void fieldAssignedInConstructorMadeFinal() {
         rewriteRun(
           java(
             """
@@ -184,7 +185,84 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void fieldReassignedByConstructor() {
+    void fieldReassignedByAMethodUsingThis() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name = "ABC";
+                  private int a = 0;
+
+                  void func() {
+                      this.name = "XYZ";
+                      this.a += 1;
+                  }
+
+                  String getName() {
+                      return name;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldReassignedByAMethodUsingClassAndThis() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name = "ABC";
+
+                  void func() {
+                      A.this.name = "XYZ";
+                  }
+
+                  String getName() {
+                      return name;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldOfAFieldReassignedByAMethodUsingThis() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private B b = new B();
+
+                  void func() {
+                      this.b.num = 1;
+                  }
+              }
+              """,
+            """
+              class A {
+                  private final B b = new B();
+
+                  void func() {
+                      this.b.num = 1;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class B {
+                  public int num = 0;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldReassignedInConstructor() {
         rewriteRun(
           java(
             """
@@ -201,7 +279,119 @@ public class FinalizePrivateFieldsTest implements RewriteTest {
     }
 
     @Test
-    void constructorInitTwiceOrMore() {
+    void fieldAssignedInConstructorViaThis() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name;
+
+                  A() {
+                    this.name = "XYZ";
+                  }
+              }
+              """,
+            """
+              class A {
+                  private final String name;
+
+                  A() {
+                    this.name = "XYZ";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled ("Doesn't support multiple constructors, to be enhanced")
+    @Test
+    void fieldAssignedInAllAlternateConstructors() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name;
+
+                  A() {
+                    name = "XYZ";
+                  }
+                  A(String n) {
+                    name = n;
+                  }
+              }
+              """,
+            """
+              class A {
+                  private final String name;
+
+                  A() {
+                    name = "XYZ";
+                  }
+                  A(String n) {
+                    name = n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldAssignedIndirectlyInAllAlternateConstructors() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name;
+
+                  A() {
+                    this("ABC");
+                  }
+                  A(String name) {
+                    this.name = name;
+                  }
+              }
+              """,
+            """
+              class A {
+                  private final String name;
+
+                  A() {
+                    this("ABC");
+                  }
+                  A(String name) {
+                    this.name = name;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldReassignedInAlternateConstructors() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name;
+
+                  A() {
+                    this("ABC");
+                    name = "XYZ";
+                  }
+                  A(String name) {
+                    this.name = name;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldReassignedInConstructorMultipleTimes() {
         rewriteRun(
           java(
             """
