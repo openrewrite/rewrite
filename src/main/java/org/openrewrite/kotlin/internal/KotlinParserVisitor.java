@@ -857,7 +857,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         String name = functionCall.getCalleeReference().getName().asString();
 
         boolean unaryOperation = isUnaryOperator(name);
-
         if (unaryOperation) {
             JLeftPadded<J.Unary.Type> op;
             Expression expr;
@@ -896,6 +895,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         expr = convertToIdentifier(opName);
                         op = padLeft(sourceBefore("++"), J.Unary.Type.PostIncrement);
                     }
+                    break;
+                case "not":
+                    skip("!");
+                    op = padLeft(EMPTY, J.Unary.Type.Not);
+                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
                     break;
                 case "unaryMinus":
                     skip("-");
@@ -1965,6 +1969,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private boolean isUnaryOperator(String name) {
         return "dec".equals(name) ||
                 "inc".equals(name) ||
+                "not".equals(name) ||
                 "unaryMinus".equals(name) ||
                 "unaryPlus".equals(name);
     }

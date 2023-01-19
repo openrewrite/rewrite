@@ -99,6 +99,18 @@ public class AssignmentTest implements RewriteTest {
     }
 
     @Test
+    void not() {
+        rewriteRun(
+          kotlin(
+            """
+                val a = true
+                val b = ! a
+            """
+          )
+        );
+    }
+
+    @Test
     void fieldAccess() {
         rewriteRun(
           kotlin(
