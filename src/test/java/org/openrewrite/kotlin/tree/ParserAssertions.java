@@ -20,8 +20,14 @@ public class ParserAssertions {
         return kotlin;
     }
 
+    public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before, null);
+        spec.andThen(isFullyParsed()).accept(kotlin);
+        return kotlin;
+    }
+
     public static Consumer<SourceSpec<K.CompilationUnit>> isFullyParsed() {
-        return spec -> spec.path("build.gradle").afterRecipe(cu -> new JavaVisitor<Integer>() {
+        return spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
             @Override
             public Space visitSpace(Space space, Space.Location loc, Integer integer) {
                 assertThat(space.getWhitespace().trim()).isEmpty();

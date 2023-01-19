@@ -140,7 +140,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 pkg,
                 imports,
                 statements,
-                Space.EMPTY
+                format(source.substring(cursor))
         );
     }
 

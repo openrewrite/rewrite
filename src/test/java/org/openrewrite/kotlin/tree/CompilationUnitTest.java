@@ -17,15 +17,51 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 public class CompilationUnitTest implements RewriteTest {
 
     @Test
+    void emptyFile() {
+        rewriteRun(kotlin(""));
+    }
+
+    @Test
     void packageDecl() {
         rewriteRun(
           kotlin("package kotlin")
+        );
+    }
+
+    @Test
+    void imports() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.List
+              import java.io.*
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void packageAndComments() {
+        rewriteRun(
+          kotlin(
+            """
+              /* Comment */
+              package a
+              import java.util.List
+                            
+              class A
+              // comment
+              """,
+              SourceSpec::noTrim
+          )
         );
     }
 }
