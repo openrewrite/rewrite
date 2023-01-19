@@ -18,8 +18,7 @@ package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -30,6 +29,8 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Value
 @With
+@Builder
+@AllArgsConstructor(access = AccessLevel.PUBLIC)
 public class ResolvedDependency {
     /**
      * This will be {@code null} when this is a project dependency.

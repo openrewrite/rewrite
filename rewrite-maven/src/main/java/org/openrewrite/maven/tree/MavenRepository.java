@@ -100,7 +100,7 @@ public class MavenRepository {
 
     @Data
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Accessors(chain = true)
+    @Accessors(fluent = true, chain = true)
     public static class Builder {
         String id;
         String uri;
@@ -119,20 +119,20 @@ public class MavenRepository {
             return new MavenRepository(id, uri, releases, snapshots, knownToExist, username, password, deriveMetadataIfMissing);
         }
 
-        public Builder setReleases(boolean releases) {
+        public Builder releases(boolean releases) {
             this.releases = Boolean.toString(releases);
             return this;
         }
-        public Builder setReleases(String releases) {
+        public Builder releases(String releases) {
             this.releases = releases;
             return this;
         }
-        public Builder setSnapshots(boolean snapshots) {
+        public Builder snapshots(boolean snapshots) {
             this.snapshots = Boolean.toString(snapshots);
             return this;
         }
 
-        public Builder setSnapshots(String snapshots) {
+        public Builder snapshots(String snapshots) {
             this.snapshots = snapshots;
             return this;
         }

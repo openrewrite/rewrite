@@ -41,8 +41,8 @@ public class MavenMetadataFailures extends DataTable<MavenMetadataFailures.Row> 
         String artifactId;
         String version;
         String mavenRepositoryUri;
-        boolean snapshots;
-        boolean releases;
+        String snapshots;
+        String releases;
         String failure;
     }
 
@@ -61,8 +61,8 @@ public class MavenMetadataFailures extends DataTable<MavenMetadataFailures.Row> 
                         failedOn.getArtifactId(),
                         failedOn.getVersion(),
                         repositoryResponse.getKey().getUri(),
-                        repositoryResponse.getKey().isSnapshots(),
-                        repositoryResponse.getKey().isReleases(),
+                        repositoryResponse.getKey().getSnapshots(),
+                        repositoryResponse.getKey().getReleases(),
                         repositoryResponse.getValue()
                 ));
             }

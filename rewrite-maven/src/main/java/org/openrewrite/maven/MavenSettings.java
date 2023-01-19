@@ -172,7 +172,7 @@ public class MavenSettings {
             return MAVEN_LOCAL_DEFAULT;
         }
         if (mavenLocal == null) {
-            mavenLocal = MavenRepository.builder().setId("local").setUri(asUriString(localRepository)).setKnownToExist(true).build();
+            mavenLocal = MavenRepository.builder().id("local").uri(asUriString(localRepository)).knownToExist(true).build();
         }
         return mavenLocal;
     }

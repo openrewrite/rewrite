@@ -15,13 +15,14 @@
  */
 package org.openrewrite.maven.tree;
 
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
 
 @Value
+@Builder
+@AllArgsConstructor(access = AccessLevel.PUBLIC)
 public class Dependency {
     GroupArtifactVersion gav;
 
