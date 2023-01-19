@@ -4,8 +4,6 @@ plugins {
     id("org.openrewrite.build.language-library")
 }
 
-val rocksDbVersion = "7.4.3" // https://github.com/facebook/rocksdb/issues/10448
-
 dependencies {
     api(project(":rewrite-xml"))
     api("org.jetbrains:annotations:latest.release")
@@ -31,7 +29,7 @@ dependencies {
 
     compileOnly("guru.nidi:graphviz-java:latest.release")
 
-    compileOnly("org.rocksdb:rocksdbjni:$rocksDbVersion")
+    compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly(project(":rewrite-yaml"))
     compileOnly(project(":rewrite-properties"))
 
@@ -47,7 +45,7 @@ dependencies {
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
-    testRuntimeOnly("org.rocksdb:rocksdbjni:$rocksDbVersion")
+    testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {
