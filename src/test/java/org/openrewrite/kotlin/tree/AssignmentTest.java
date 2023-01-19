@@ -38,7 +38,6 @@ public class AssignmentTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires detection of field access.")
     @Test
     void fieldAccess() {
         rewriteRun(

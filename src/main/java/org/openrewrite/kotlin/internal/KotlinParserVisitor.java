@@ -1575,11 +1575,26 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitVariableAssignment(FirVariableAssignment variableAssignment, ExecutionContext ctx) {
         Space prefix = whitespace();
+        Expression variable;
+        if (variableAssignment.getExplicitReceiver() != null) {
+            Expression target = (Expression) visitElement(variableAssignment.getExplicitReceiver(), ctx);
+            JLeftPadded<J.Identifier> name = padLeft(sourceBefore("."), (J.Identifier) visitElement(variableAssignment.getLValue(), ctx));
+            variable = new J.FieldAccess(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    target,
+                    name,
+                    typeMapping.type(variableAssignment, currentFile.getSymbol()));
+        } else {
+            variable = convert(variableAssignment.getLValue(), ctx);
+        }
+
         return new J.Assignment(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                convert(variableAssignment.getLValue(), ctx),
+                variable,
                 padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
                 typeMapping.type(variableAssignment));
     }
