@@ -18,8 +18,7 @@ package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -30,6 +29,8 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @Value
 @With
+@Builder
+@AllArgsConstructor(access = AccessLevel.PUBLIC)
 public class ResolvedDependency {
     /**
      * This will be {@code null} when this is a project dependency.
@@ -48,6 +49,15 @@ public class ResolvedDependency {
     List<ResolvedDependency> dependencies;
 
     List<License> licenses;
+
+    @Nullable
+    String type;
+
+    @Nullable
+    String classifier;
+
+    @Nullable
+    Boolean optional;
 
     int depth;
 
@@ -76,22 +86,14 @@ public class ResolvedDependency {
     }
 
     public String getType() {
-        return requested.getType() == null ? "jar" : requested.getType();
-    }
-
-    @Nullable
-    public String getClassifier() {
-        return requested.getClassifier();
-    }
-
-    public boolean isOptional() {
-        return requested.isOptional();
+        return type == null ? "jar" : type;
     }
 
     public boolean isDirect() {
         return depth == 0;
     }
 
+    @SuppressWarnings("unused")
     public boolean isTransitive() {
         return depth != 0;
     }

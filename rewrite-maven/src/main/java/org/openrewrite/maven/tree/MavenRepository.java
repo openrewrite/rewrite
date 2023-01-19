@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
+import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
@@ -33,9 +34,10 @@ import java.net.URI;
 @Data
 @RequiredArgsConstructor
 public class MavenRepository {
-    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), true, true, true, null, null, false);
-    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), true, true, true, null, null, false);
-    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", true, false, true, null, null, true);
+
+    public static final MavenRepository MAVEN_LOCAL_USER_NEUTRAL = new MavenRepository("local", new File("~/.m2/repository").toString(), "true", "true", true, null, null, false);
+    public static final MavenRepository MAVEN_LOCAL_DEFAULT = new MavenRepository("local", new File(System.getProperty("user.home") + "/.m2/repository").toURI().toString(), "true", "true", true, null, null, false);
+    public static final MavenRepository MAVEN_CENTRAL = new MavenRepository("central", "https://repo.maven.apache.org/maven2", "true", "false", true, null, null, true);
 
     @EqualsAndHashCode.Include
     @With
@@ -51,11 +53,13 @@ public class MavenRepository {
 
     @EqualsAndHashCode.Include
     @With
-    boolean releases;
+    @Nullable
+    String releases;
 
     @EqualsAndHashCode.Include
     @With
-    boolean snapshots;
+    @Nullable
+    String snapshots;
 
     @NonFinal
     boolean knownToExist;
@@ -76,7 +80,10 @@ public class MavenRepository {
     Boolean deriveMetadataIfMissing;
 
     @JsonIgnore
-    public MavenRepository(@Nullable String id, String uri, boolean releases, boolean snapshots, boolean knownToExist, @Nullable String username, @Nullable String password, @Nullable Boolean deriveMetadataIfMissing) {
+    public MavenRepository(
+            @Nullable String id, String uri, @Nullable String releases, @Nullable String snapshots, boolean knownToExist,
+            @Nullable String username, @Nullable String password, @Nullable Boolean deriveMetadataIfMissing
+    ) {
         this.id = id;
         this.uri = uri;
         this.releases = releases;
@@ -87,13 +94,47 @@ public class MavenRepository {
         this.deriveMetadataIfMissing = deriveMetadataIfMissing;
     }
 
-    public boolean acceptsVersion(String version) {
-        if (version.endsWith("-SNAPSHOT")) {
-            return snapshots;
-        } else if ("https://repo.spring.io/milestone".equalsIgnoreCase(uri)) {
-            // special case this repository since it will be so commonly used
-            return version.matches(".*(M|RC)\\d+$");
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    @Data
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Accessors(fluent = true, chain = true)
+    public static class Builder {
+        String id;
+        String uri;
+
+        String releases;
+        String snapshots;
+        boolean knownToExist;
+        String username;
+        String password;
+        Boolean deriveMetadataIfMissing;
+
+        private Builder() {
         }
-        return releases;
+
+        public MavenRepository build() {
+            return new MavenRepository(id, uri, releases, snapshots, knownToExist, username, password, deriveMetadataIfMissing);
+        }
+
+        public Builder releases(boolean releases) {
+            this.releases = Boolean.toString(releases);
+            return this;
+        }
+        public Builder releases(String releases) {
+            this.releases = releases;
+            return this;
+        }
+        public Builder snapshots(boolean snapshots) {
+            this.snapshots = Boolean.toString(snapshots);
+            return this;
+        }
+
+        public Builder snapshots(String snapshots) {
+            this.snapshots = snapshots;
+            return this;
+        }
     }
 }

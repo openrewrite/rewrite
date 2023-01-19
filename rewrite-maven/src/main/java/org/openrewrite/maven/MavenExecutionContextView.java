@@ -223,8 +223,8 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
                         return new MavenRepository(
                                 repo.getId(),
                                 repo.getUrl(),
-                                repo.getReleases() == null || repo.getReleases().isEnabled(),
-                                repo.getSnapshots() != null && repo.getSnapshots().isEnabled(),
+                                repo.getReleases() == null ? null : repo.getReleases().getEnabled(),
+                                repo.getSnapshots() == null ? null : repo.getSnapshots().getEnabled(),
                                 null,
                                 null
                         );

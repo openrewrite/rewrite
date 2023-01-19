@@ -48,7 +48,7 @@ public class Pom {
      */
     public static int getModelVersion() {
         //NOTE: This value should be incremented if there are any model changes to Pom (or one of its referenced types)
-        return 1;
+        return 2;
     }
 
     @Nullable

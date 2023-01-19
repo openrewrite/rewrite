@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -46,7 +45,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
           spec -> spec
             .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
+              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
@@ -87,7 +86,7 @@ public class MavenDependencyFailuresTest implements RewriteTest {
           spec -> spec
             .recipe(new UpgradeParentVersion("*", "*", "latest.patch", null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
-              .setRepositories(List.of(new MavenRepository("jenkins", "https://repo.jenkins-ci.org/public", true, false, true, null, null, null))))
+              .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").knownToExist(true).build())))
             .recipeExecutionContext(new InMemoryExecutionContext())
             .cycles(1)
             .expectedCyclesThatMakeChanges(1),
@@ -142,7 +141,8 @@ public class MavenDependencyFailuresTest implements RewriteTest {
             """
         );
 
-        MavenRepository mavenLocal = new MavenRepository("local", localRepository.toUri().toString(), true, false, true, null, null, null);
+        MavenRepository mavenLocal = MavenRepository.builder().id("local").uri(localRepository.toUri().toString())
+          .snapshots(false).knownToExist(true).build();
 
         rewriteRun(
           spec -> spec

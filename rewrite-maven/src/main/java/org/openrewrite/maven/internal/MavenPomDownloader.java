@@ -205,13 +205,8 @@ public class MavenPomDownloader {
         Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         for (MavenRepository repo : normalizedRepos) {
-            String version = gav.getVersion();
-            if (version != null) {
-                if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
-                    continue;
-                } else if (!version.endsWith("-SNAPSHOT") && !repo.isReleases()) {
-                    continue;
-                }
+            if (gav.getVersion() != null && !repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
+                continue;
             }
             Optional<MavenMetadata> result = mavenCache.getMavenMetadata(URI.create(repo.getUri()), gav);
             if (result == null) {
@@ -481,10 +476,7 @@ public class MavenPomDownloader {
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
         for (MavenRepository repo : normalizedRepos) {
-            String version = gav.getVersion();
-            if (version.endsWith("-SNAPSHOT") && !repo.isSnapshots()) {
-                continue;
-            } else if (!version.endsWith("-SNAPSHOT") && !repo.isReleases()) {
+            if (!repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
                 continue;
             }
 
@@ -606,7 +598,7 @@ public class MavenPomDownloader {
 
         for (MavenRepository repo : repositories) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || normalizedRepo.acceptsVersion(acceptsVersion))) {
+            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
                 normalizedRepositories.add(normalizedRepo);
             }
         }
@@ -614,7 +606,7 @@ public class MavenPomDownloader {
         // repositories from maven settings
         for (MavenRepository repo : ctx.getRepositories(mavenSettings, activeProfiles)) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
-            if (normalizedRepo != null && (acceptsVersion == null || normalizedRepo.acceptsVersion(acceptsVersion))) {
+            if (normalizedRepo != null && (acceptsVersion == null || repositoryAcceptsVersion(normalizedRepo, acceptsVersion, containingPom))) {
                 normalizedRepositories.add(normalizedRepo);
             }
         }
@@ -688,8 +680,8 @@ public class MavenPomDownloader {
                                 normalized = new MavenRepository(
                                         repository.getId(),
                                         originalUrl,
-                                        repository.isReleases(),
-                                        repository.isSnapshots(),
+                                        repository.getReleases(),
+                                        repository.getSnapshots(),
                                         repository.getUsername(),
                                         repository.getPassword());
                             } catch (HttpSenderResponseException e) {
@@ -698,8 +690,8 @@ public class MavenPomDownloader {
                                     normalized = new MavenRepository(
                                             repository.getId(),
                                             originalUrl,
-                                            repository.isReleases(),
-                                            repository.isSnapshots(),
+                                            repository.getReleases(),
+                                            repository.getSnapshots(),
                                             repository.getUsername(),
                                             repository.getPassword());
                                 } else if (!e.isClientSideException()) {
@@ -791,4 +783,19 @@ public class MavenPomDownloader {
                     "HTTP " + responseCode;
         }
     }
+
+    public boolean repositoryAcceptsVersion(MavenRepository repo, String version, @Nullable ResolvedPom containingPom) {
+
+        if (version.endsWith("-SNAPSHOT")) {
+            String snapshotsRaw = containingPom == null ? repo.getSnapshots() : containingPom.getValue(repo.getSnapshots());
+            return snapshotsRaw == null || Boolean.parseBoolean(snapshotsRaw.trim());
+        } else if ("https://repo.spring.io/milestone".equalsIgnoreCase(repo.getUri())) {
+            // special case this repository since it will be so commonly used
+            return version.matches(".*(M|RC)\\d+$");
+        }
+
+        String releasesRaw = containingPom == null ? repo.getReleases() : containingPom.getValue(repo.getReleases());
+        return releasesRaw == null || Boolean.parseBoolean(releasesRaw.trim());
+    }
+
 }

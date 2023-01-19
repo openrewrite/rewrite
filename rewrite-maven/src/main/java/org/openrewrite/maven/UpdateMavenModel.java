@@ -74,7 +74,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                         dependency.getChildValue("type").orElse(null),
                         dependency.getChildValue("scope").orElse("compile"),
                         mapExclusions(dependency),
-                        dependency.getChildValue("optional").map(Boolean::parseBoolean).orElse(false)
+                        dependency.getChildValue("optional").orElse(null)
                 ));
             }
             requested = requested.withDependencies(requestedDependencies);
@@ -116,8 +116,8 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
             requested = requested.withRepositories(repos.get().getChildren("repository").stream().map(t -> new MavenRepository(
                     t.getChildValue("id").orElse(null),
                     t.getChildValue("url").get(),
-                    Boolean.TRUE.equals(t.getChild("releases").flatMap(s -> s.getChildValue("enabled").map(Boolean::valueOf)).orElse(null)),
-                    Boolean.TRUE.equals(t.getChild("snapshots").flatMap(s -> s.getChildValue("enabled").map(Boolean::valueOf)).orElse(null)),
+                    t.getChild("releases").flatMap(s -> s.getChildValue("enabled")).orElse(null),
+                    t.getChild("snapshots").flatMap(s -> s.getChildValue("enabled")).orElse(null),
                     null,
                     null
             )).collect(Collectors.toList()));

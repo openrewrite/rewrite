@@ -424,8 +424,8 @@ public class ResolvedPom {
                     MavenRepository incoming = new MavenRepository(
                             getValue(incomingRepository.getId()),
                             getValue(incomingRepository.getUri()),
-                            incomingRepository.isReleases(),
-                            incomingRepository.isSnapshots(),
+                            incomingRepository.getReleases(),
+                            incomingRepository.getSnapshots(),
                             incomingRepository.isKnownToExist(),
                             incomingRepository.getUsername(),
                             incomingRepository.getPassword(),
@@ -590,6 +590,9 @@ public class ResolvedPom {
                     ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), dd.getDependency(), emptyList(),
                             resolvedPom.getRequested().getLicenses(),
+                            resolvedPom.getValue(dd.getDependency().getType()),
+                            resolvedPom.getValue(dd.getDependency().getClassifier()),
+                            Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
                             depth);
 
                     MavenExecutionContextView.view(ctx)
@@ -612,7 +615,8 @@ public class ResolvedPom {
                         if (d2.getGroupId() == null) {
                             d2 = d2.withGav(d2.getGav().withGroupId(resolvedPom.getGroupId()));
                         }
-                        if (d2.isOptional()) {
+                        String optional = resolvedPom.getValue(d2.getOptional());
+                        if (optional != null && Boolean.parseBoolean(optional.trim())) {
                             continue;
                         }
                         if (d.getExclusions() != null) {

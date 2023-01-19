@@ -58,26 +58,41 @@ public class DependencyInsightTest implements RewriteTest {
               """,
             spec -> {
                 // This is really awkward, need a DSL or some other tooling support
-                Dependency requestedOrgWhatever = new Dependency(
-                  new GroupArtifactVersion("org.whatever", "test", "1.0"),
-                  null, "jar", "implementation", emptyList(), false);
-                ResolvedDependency resolvedOrgWhatever = new ResolvedDependency(null,
-                  new ResolvedGroupArtifactVersion(null, "org.whatever", "test", "1.0", null),
-                  requestedOrgWhatever, emptyList(), emptyList(), 0);
+                Dependency requestedOrgWhatever = Dependency.builder()
+                  .gav(new GroupArtifactVersion("org.whatever", "test", "1.0"))
+                  .type("jar")
+                  .scope("implementation")
+                  .build();
+                ResolvedDependency resolvedOrgWhatever = ResolvedDependency.builder()
+                  .gav(new ResolvedGroupArtifactVersion(null, "org.whatever", "test", "1.0", null))
+                  .requested(requestedOrgWhatever)
+                  .dependencies(emptyList())
+                  .licenses(emptyList())
+                  .build();
 
+                Dependency requestedBingBaz = Dependency.builder()
+                  .gav(new GroupArtifactVersion("com.example", "bing-baz", "latest.release"))
+                  .type("jar")
+                  .scope("implementation")
+                  .build();
+                ResolvedDependency resolvedBingBaz = ResolvedDependency.builder()
+                  .gav(new ResolvedGroupArtifactVersion(null, "com.example", "bing-baz", "1.0", null))
+                  .requested(requestedBingBaz)
+                  .dependencies(emptyList())
+                  .depth(1)
+                  .build();
 
-                Dependency requestedBingBaz = new Dependency(
-                  new GroupArtifactVersion("com.example", "bing-baz", "latest.release"),
-                  null, "jar", "implementation", emptyList(), false);
-                ResolvedDependency resolvedBingBaz = new ResolvedDependency(null,
-                  new ResolvedGroupArtifactVersion(null, "com.example", "bing-baz", "1.0", null),
-                  requestedBingBaz, emptyList(), emptyList(), 1);
-                Dependency requestedComExample = new Dependency(
-                  new GroupArtifactVersion("com.example", "foo-bar", "latest.release"),
-                  null, "jar", "implementation", emptyList(), false);
-                ResolvedDependency resolvedComExample = new ResolvedDependency(null,
-                  new ResolvedGroupArtifactVersion(null, "com.example", "foo-bar", "1.0", null),
-                  requestedComExample, List.of(resolvedBingBaz), emptyList(), 0);
+                Dependency requestedComExample = Dependency.builder()
+                  .gav(new GroupArtifactVersion("com.example", "foo-bar", "latest.release"))
+                  .type("jar")
+                  .scope("implementation")
+                  .build();
+                ResolvedDependency resolvedComExample = ResolvedDependency.builder()
+                  .gav(new ResolvedGroupArtifactVersion(null, "com.example", "foo-bar", "1.0", null))
+                  .requested(requestedComExample)
+                  .dependencies(List.of(resolvedBingBaz))
+                  .depth(0)
+                  .build();
 
                 spec.markers(new GradleProject(
                   randomId(),
