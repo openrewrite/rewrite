@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -37,15 +36,16 @@ public class BinaryTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires function call and Convert PSI.")
     @Test
-    void minusEquals() {
+    void compoundAssignment() {
         rewriteRun(
           kotlin(
             """
                 fun method() {
                   var n = 0
                   n -= 5
+                  n += 5
+                  n *= 5
                 }
             """
           )

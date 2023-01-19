@@ -1672,13 +1672,52 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 variable = convert(variableAssignment.getLValue(), ctx);
             }
 
-            return new J.Assignment(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    variable,
-                    padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
-                    typeMapping.type(variableAssignment));
+            int saveCursor = cursor;
+            whitespace();
+            boolean isCompoundAssignment = source.startsWith("-=", cursor) ||
+                    source.startsWith("+=", cursor) ||
+                    source.startsWith("*=", cursor);
+            cursor = saveCursor;
+
+            if (isCompoundAssignment) {
+                Space opPrefix = whitespace();
+                J.AssignmentOperation.Type op;
+                if (source.startsWith("-=", cursor)) {
+                    skip("-=");
+                    op = J.AssignmentOperation.Type.Subtraction;
+                } else if (source.startsWith("+=", cursor)) {
+                    skip("+=");
+                    op = J.AssignmentOperation.Type.Addition;
+                } else if (source.startsWith("*=", cursor)) {
+                    skip("*=");
+                    op = J.AssignmentOperation.Type.Multiplication;
+                } else {
+                    throw new IllegalArgumentException("Unexpected compound assignment.");
+                }
+
+                if (!(variableAssignment.getRValue() instanceof FirFunctionCall) ||
+                        (((FirFunctionCall) variableAssignment.getRValue())).getArgumentList().getArguments().size() != 1) {
+                    throw new IllegalArgumentException("Unexpected compound assignment.");
+                }
+
+                FirElement rhs = (((FirFunctionCall) variableAssignment.getRValue())).getArgumentList().getArguments().get(0);
+                return new J.AssignmentOperation(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        variable,
+                        padLeft(opPrefix, op),
+                        (Expression) visitElement(rhs, ctx),
+                        typeMapping.type(variableAssignment));
+            } else {
+                return new J.Assignment(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY,
+                        variable,
+                        padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
+                        typeMapping.type(variableAssignment));
+            }
         }
     }
 
