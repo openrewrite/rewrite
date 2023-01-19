@@ -181,6 +181,19 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void singleLineCommentBeforeModifier() {
+        rewriteRun(
+          kotlin(
+            """
+              @Deprecated("")
+              // Some comment
+              open class A
+              """
+          )
+        );
+    }
+
     @Disabled
     @Test
     void multipleBounds() {

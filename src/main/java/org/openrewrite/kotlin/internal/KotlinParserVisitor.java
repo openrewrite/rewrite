@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -411,6 +412,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 JRightPadded.build(false),
                 statements,
                 isEmptyBody ? Space.EMPTY : sourceBefore("}"));
+    }
+
+    @Override
+    public J visitBreakExpression(@NotNull FirBreakExpression breakExpression, ExecutionContext data) {
+        Space prefix = sourceBefore("break");
+
+        J.Identifier label = breakExpression.getTarget().getLabelName() == null ? null : convertToIdentifier(breakExpression.getTarget().getLabelName());
+        return new J.Break(randomId(), prefix, Markers.EMPTY, label);
     }
 
     @Override
@@ -1739,10 +1748,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             J j = visitElement(result, ctx);
             return j.withPrefix(prefix);
         } else {
-            Space controlParenPrefix = whitespace();
-            skip("(");
-            J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<>(randomId(), controlParenPrefix, Markers.EMPTY,
-                        convert(whenBranch.getCondition(), t -> sourceBefore(")"), ctx));
+            J.ControlParentheses<Expression> controlParentheses = convertToControlParentheses(whenBranch.getCondition());
 
             FirElement result = singleExpression ? ((FirSingleExpressionBlock) whenBranch.getResult()).getStatement() : whenBranch.getResult();
             return new J.If(
@@ -1802,6 +1808,20 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitWhileLoop(@NotNull FirWhileLoop whileLoop, ExecutionContext data) {
+        Space prefix = sourceBefore("while");
+
+        J.ControlParentheses<Expression> controlParentheses = convertToControlParentheses(whileLoop.getCondition());
+        J j = visitElement(whileLoop.getBlock(), ctx);
+        return new J.WhileLoop(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                controlParentheses,
+                JRightPadded.build((Statement) j));
+    }
+
+    @Override
     public J visitElement(FirElement firElement, ExecutionContext ctx) {
         if (firElement instanceof FirErrorNamedReference) {
             return visitErrorNamedReference((FirErrorNamedReference) firElement, ctx);
@@ -1817,7 +1837,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitAnonymousObjectExpression((FirAnonymousObjectExpression) firElement, ctx);
         } else if (firElement instanceof FirBlock) {
             return visitBlock((FirBlock) firElement, ctx);
-        }  else if (firElement instanceof FirClass) {
+        } else if (firElement instanceof FirBreakExpression) {
+            return visitBreakExpression((FirBreakExpression) firElement, ctx);
+        } else if (firElement instanceof FirClass) {
             return visitClass((FirClass) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<?>) firElement, ctx);
@@ -1869,6 +1891,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitWhenBranch((FirWhenBranch) firElement, ctx);
         } else if (firElement instanceof FirWhenExpression) {
             return visitWhenExpression((FirWhenExpression) firElement, ctx);
+        } else if (firElement instanceof FirWhileLoop) {
+            return visitWhileLoop((FirWhileLoop) firElement, ctx);
         }
 
         throw new IllegalStateException("Implement me.");
@@ -2011,6 +2035,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 "not".equals(name) ||
                 "unaryMinus".equals(name) ||
                 "unaryPlus".equals(name);
+    }
+
+    private J.ControlParentheses<Expression> convertToControlParentheses(FirElement firElement) {
+        Space controlParenPrefix = whitespace();
+        skip("(");
+        return new J.ControlParentheses<>(randomId(), controlParenPrefix, Markers.EMPTY,
+                convert(firElement, t -> sourceBefore(")"), ctx));
     }
 
     private J.Identifier convertToIdentifier(String name) {
