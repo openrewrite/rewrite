@@ -672,6 +672,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitContinueExpression(@NotNull FirContinueExpression continueExpression, ExecutionContext data) {
+        Space prefix = sourceBefore("continue");
+        J.Identifier label = continueExpression.getTarget().getLabelName() == null ? null : convertToIdentifier(continueExpression.getTarget().getLabelName());
+        return new J.Continue(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                label);
+    }
+
+    @Override
     public J visitEnumEntry(FirEnumEntry enumEntry, ExecutionContext ctx) {
         Space prefix = whitespace();
 
@@ -1843,6 +1854,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitClass((FirClass) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<?>) firElement, ctx);
+        } else if (firElement instanceof FirContinueExpression) {
+            return visitContinueExpression((FirContinueExpression) firElement, ctx);
         } else if (firElement instanceof FirEnumEntry) {
             return visitEnumEntry((FirEnumEntry) firElement, ctx);
         } else if (firElement instanceof FirEqualityOperatorCall) {
