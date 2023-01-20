@@ -22,7 +22,6 @@ import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.io.Serializable;
 import java.util.List;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -32,8 +31,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @With
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
-public class ResolvedDependency implements Serializable {
-
+public class ResolvedDependency {
     /**
      * This will be {@code null} when this is a project dependency.
      */

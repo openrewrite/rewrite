@@ -19,11 +19,9 @@ package org.openrewrite.maven.tree;
 import lombok.Value;
 import lombok.With;
 
-import java.io.Serializable;
-
 @Value
 @With
-public class GroupArtifact implements Serializable {
+public class GroupArtifact {
     String groupId;
     String artifactId;
 }
