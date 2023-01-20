@@ -2065,4 +2065,149 @@ class MavenParserTest implements RewriteTest {
                 """, spec -> spec.path("sub/pom.xml"))
         );
     }
+
+    @Test
+    void optionalDependencies() {
+        rewriteRun(
+          mavenProject("a",
+            pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                </project>
+                """)),
+          mavenProject("b",
+            pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>b</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.sample</groupId>
+                      <artifactId>a</artifactId>
+                      <version>1.0.0</version>
+                      <optional>true</optional>
+                    </dependency>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.12</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """)),
+          mavenProject("c",
+            pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>c</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.sample</groupId>
+                      <artifactId>b</artifactId>
+                      <version>1.0.0</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(afterDoc -> assertThat(afterDoc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+                .getDependencies().get(Scope.Compile))
+                .noneMatch(dep -> dep.getGav().getArtifactId().equals("a"))
+                .anyMatch(dep -> dep.getGav().getArtifactId().equals("b"))
+                .anyMatch(dep -> dep.getGav().getArtifactId().equals("junit")))
+            ))
+        );
+    }
+
+    @Test
+    void exclusions() {
+        rewriteRun(
+          mavenProject("a",
+            pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>junit</groupId>
+                      <artifactId>junit</artifactId>
+                      <version>4.12</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """)),
+          mavenProject("b",
+            pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>b</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.sample</groupId>
+                      <artifactId>a</artifactId>
+                      <version>1.0.0</version>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(afterDoc -> assertThat(afterDoc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow()
+                .findDependencies("org.sample", "a", Scope.Compile))
+                .singleElement()
+                .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions())
+                  .singleElement()
+                  .matches(ga -> ga.getArtifactId().equals("junit")))
+              ))),
+          mavenProject("c",
+            pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>c</artifactId>
+                  <version>1.0.0</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.sample</groupId>
+                      <artifactId>b</artifactId>
+                      <version>1.0.0</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """,
+              spec -> spec.afterRecipe(afterDoc -> assertThat(afterDoc.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow())
+                .satisfies(mavenResolutionResult -> assertThat(mavenResolutionResult
+                  .findDependencies("org.sample", "a", Scope.Compile))
+                  .singleElement()
+                  .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions())
+                    .singleElement()
+                    .matches(ga -> ga.getArtifactId().equals("junit"))))
+                .satisfies(mavenResolutionResult -> assertThat(mavenResolutionResult
+                  .findDependencies("org.sample", "b", Scope.Compile))
+                  .singleElement()
+                  .satisfies(aDep -> assertThat(aDep.getEffectiveExclusions()).isEmpty()))
+              )
+            ))
+        );
+    }
 }

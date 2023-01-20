@@ -28,7 +28,8 @@ class RemoveExclusionTest implements RewriteTest {
           "com.google.guava",
           "guava",
           "commons-lang",
-          "commons-lang"
+          "commons-lang",
+          null
         ));
     }
 
@@ -66,6 +67,198 @@ class RemoveExclusionTest implements RewriteTest {
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
                     <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUnusedExclusionsOnlyIneffective() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "com.google.guava",
+            "guava",
+            "commons-lang",
+            "commons-lang",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>commons-lang</groupId>
+                        <artifactId>commons-lang</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAnyExclusionsOnlyIneffective() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>commons-lang</groupId>
+                        <artifactId>commons-lang</artifactId>
+                      </exclusion>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUsedExclusions() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "com.google.guava",
+            "guava",
+            "com.google.code.findbugs",
+            "jsr305",
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeUsedExclusionsOnlyIneffective() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "com.google.guava",
+            "guava",
+            "com.google.code.findbugs",
+            "jsr305",
+            true
+          )),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
                   </dependency>
                 </dependencies>
               </project>
@@ -207,6 +400,181 @@ class RemoveExclusionTest implements RewriteTest {
                       <groupId>com.google.guava</groupId>
                       <artifactId>guava</artifactId>
                       <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAnyExclusionsFromDependencyManagementOnlyIneffectiveUsedDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml("""
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>commons-lang</groupId>
+                          <artifactId>commons-lang</artifactId>
+                        </exclusion>
+                        <exclusion>
+                          <groupId>com.google.code.findbugs</groupId>
+                          <artifactId>jsr305</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>com.google.code.findbugs</groupId>
+                          <artifactId>jsr305</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAnyExclusionsFromDependencyManagementOnlyIneffectiveDoesNothingIfUnsure() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml("""
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>commons-lang</groupId>
+                          <artifactId>commons-lang</artifactId>
+                        </exclusion>
+                        <exclusion>
+                          <groupId>com.google.code.findbugs</groupId>
+                          <artifactId>jsr305</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    // https://issues.apache.org/jira/browse/MNG-5600
+    void dependencyManagementImportExclusionsAreAlwaysIneffective() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveExclusion(
+            "*",
+            "*",
+            "*",
+            "*",
+            true
+          )),
+          pomXml("""
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>commons-lang</groupId>
+                          <artifactId>commons-lang</artifactId>
+                        </exclusion>
+                        <exclusion>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit</groupId>
+                      <artifactId>junit-bom</artifactId>
+                      <version>5.9.0</version>
+                      <type>pom</type>
+                      <scope>import</scope>
                     </dependency>
                   </dependencies>
                 </dependencyManagement>

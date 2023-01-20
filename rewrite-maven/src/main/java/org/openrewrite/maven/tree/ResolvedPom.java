@@ -593,7 +593,8 @@ public class ResolvedPom {
                             resolvedPom.getValue(dd.getDependency().getType()),
                             resolvedPom.getValue(dd.getDependency().getClassifier()),
                             Boolean.valueOf(resolvedPom.getValue(dd.getDependency().getOptional())),
-                            depth);
+                            depth,
+                            emptyList());
 
                     MavenExecutionContextView.view(ctx)
                             .getResolutionListener()
@@ -623,6 +624,10 @@ public class ResolvedPom {
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
                                     matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                    if (resolved.getEffectiveExclusions().isEmpty()) {
+                                        resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
+                                    }
+                                    resolved.getEffectiveExclusions().add(exclusion);
                                     continue nextDependency;
                                 }
                             }
