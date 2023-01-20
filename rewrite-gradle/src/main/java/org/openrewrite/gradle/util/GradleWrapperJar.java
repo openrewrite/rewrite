@@ -27,12 +27,14 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.remote.RemoteArchive;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -59,6 +61,8 @@ public class GradleWrapperJar implements Remote {
     String version;
     Checksum checksum;
 
+    Path path;
+
     @lombok.experimental.Tolerate
     public GradleWrapperJar(URI uri, String version, Checksum checksum) {
         this.uri = uri;
@@ -71,6 +75,12 @@ public class GradleWrapperJar implements Remote {
         this.fileAttributes = WRAPPER_JAR_FILE_ATTRIBUTES;
         this.markers = Markers.EMPTY;
         this.id = Tree.randomId();
+        this.path = Paths.get("gradle-" + version + "/**/" + "gradle-wrapper-*.jar!gradle-wrapper.jar");
+    }
+
+    public RemoteArchive asRemoteArchive() {
+        return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes,
+                description, path);
     }
 
     @Override
@@ -78,7 +88,7 @@ public class GradleWrapperJar implements Remote {
         //noinspection resource
         HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
         InputStream body = response.getBody();
-        return readIntoArchive(body, "gradle-" + version + "/**/" + "gradle-wrapper-*.jar!gradle-wrapper.jar");
+        return readIntoArchive(body, path.toString());
     }
 
 

@@ -21,11 +21,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Value;
-import org.openrewrite.Checksum;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.HttpSenderExecutionContextView;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
@@ -144,7 +140,7 @@ public class GradleWrapper {
     static final FileAttributes WRAPPER_JAR_FILE_ATTRIBUTES = new FileAttributes(null, null, null, true, true, false, 0);
 
     public Remote asRemote() {
-        return new GradleWrapperJar(URI.create(getDistributionUrl()), version, distributionInfos.getWrapperJarChecksum());
+        return new GradleWrapperJar(URI.create(getDistributionUrl()), version, distributionInfos.getWrapperJarChecksum()).asRemoteArchive();
     }
 
     public enum DistributionType {
