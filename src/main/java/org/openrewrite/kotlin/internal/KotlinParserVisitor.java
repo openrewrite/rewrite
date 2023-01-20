@@ -280,26 +280,44 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         TypeTree clazz = (TypeTree) visitElement(anonymousObject.getSuperTypeRefs().get(0), ctx);
         JContainer<Expression> args;
-        if (positionOfNext("(", '{') > -1) {
-            args = JContainer.build(sourceBefore("("),
+
+        int saveCursor = cursor;
+        Space before = whitespace();
+        if (source.startsWith("(", cursor)) {
+            skip("(");
+            args = JContainer.build(before,
                     singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
         } else {
+            cursor = saveCursor;
             args = JContainer.<Expression>empty()
                     .withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
         }
 
-        int saveCursor = cursor;
+        saveCursor = cursor;
         J.Block body = null;
         Space bodyPrefix = whitespace();
 
         if (source.startsWith("{", cursor)) {
             skip("{");
+            List<FirElement> declarations = new ArrayList<>(anonymousObject.getDeclarations().size());
+            for (FirDeclaration declaration : anonymousObject.getDeclarations()) {
+                if (declaration.getSource().getKind() instanceof KtFakeSourceElementKind) {
+                    continue;
+                }
+                declarations.add(declaration);
+            }
+
+            List<JRightPadded<Statement>> statements = new ArrayList<>(declarations.size());
+            for (FirElement element : declarations) {
+                statements.add(JRightPadded.build((Statement) visitElement(element, ctx)));
+            }
+
             body = new J.Block(
                     randomId(),
                     bodyPrefix,
                     Markers.EMPTY,
                     new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    emptyList(),
+                    statements,
                     sourceBefore("}"));
         } else {
             cursor = saveCursor;
@@ -545,11 +563,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         boolean inlineConstructor = source.startsWith("(", cursor) && firPrimaryConstructor != null;
         if (inlineConstructor) {
             skip("(");
-            primaryConstructor = JContainer.build(
-                    before,
-                    convertAll(firPrimaryConstructor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx),
-                    Markers.EMPTY
-            );
+            primaryConstructor = JContainer.build(before,
+                    firPrimaryConstructor.getValueParameters().isEmpty() ?
+                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                            convertAll(firPrimaryConstructor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
         } else {
             cursor = saveCursor;
         }
