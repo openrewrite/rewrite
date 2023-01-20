@@ -1676,7 +1676,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             catches.add((J.Try.Catch) visitElement(aCatch, ctx));
         }
 
-        JLeftPadded<J.Block> finallyy = null;
+        JLeftPadded<J.Block> finallyy = tryExpression.getFinallyBlock() == null ? null :
+                padLeft(sourceBefore("finally"), (J.Block) visitElement(tryExpression.getFinallyBlock(), ctx));
+
         return new J.Try(randomId(),
                 prefix,
                 Markers.EMPTY,
