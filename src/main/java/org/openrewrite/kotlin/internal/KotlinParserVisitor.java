@@ -1100,7 +1100,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     firImport.getImportedFqName().asString() + ".*" :
                     firImport.getImportedFqName().asString();
             qualid = TypeTree.build(packageName).withPrefix(space);
-            skip(firImport.getImportedFqName().asString());
+            skip(qualid.toString());
         }
         return new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid);
     }
