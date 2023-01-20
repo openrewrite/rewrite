@@ -20,40 +20,31 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class EnumTest implements RewriteTest {
+public class WhileLoopTest implements RewriteTest {
 
+    @SuppressWarnings("ControlFlowWithEmptyBody")
     @Test
-    void enumEmptyBody() {
-        rewriteRun(
-          kotlin("enum class A")
-        );
-    }
-
-    @Test
-    void enumDefinition() {
+    void whileLoop() {
         rewriteRun(
           kotlin(
             """
-                enum class A {
-                    B, C,
-                    D
-                }
-            """
+                  fun test() {
+                      while(true) {}
+                  }
+              """
           )
         );
     }
 
     @Test
-    void innerEnum() {
+    void statementTerminatorForSingleLineWhileLoops() {
         rewriteRun(
           kotlin(
             """
-                class A {
-                    enum class B {
-                        C
-                    }
-                }
-            """
+                  fun test() {
+                      while(true) test()
+                  }
+              """
           )
         );
     }

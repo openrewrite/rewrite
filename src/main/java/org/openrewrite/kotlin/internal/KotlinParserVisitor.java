@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -29,10 +28,7 @@ import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
 import org.jetbrains.kotlin.fir.expressions.*;
-import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition;
-import org.jetbrains.kotlin.fir.expressions.impl.FirNoReceiverExpression;
-import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock;
-import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression;
+import org.jetbrains.kotlin.fir.expressions.impl.*;
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
 import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
@@ -347,7 +343,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         for (int i = 0; i < firStatements.size(); i++) {
             FirElement firElement = firStatements.get(i);
             // Skip receiver of the unary post increment or decrement.
-            if (firElement instanceof FirProperty && "<unary>".equals(((FirProperty) firElement).getName().asString())) {
+            if (firElement instanceof FirProperty && ("<unary>".equals(((FirProperty) firElement).getName().asString()) ||
+                    "<iterator>".equals(((FirProperty) firElement).getName().asString()))) {
                 continue;
             }
 
@@ -415,7 +412,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitBreakExpression(@NotNull FirBreakExpression breakExpression, ExecutionContext data) {
+    public J visitBreakExpression(FirBreakExpression breakExpression, ExecutionContext ctx) {
         Space prefix = sourceBefore("break");
 
         J.Identifier label = breakExpression.getTarget().getLabelName() == null ? null : convertToIdentifier(breakExpression.getTarget().getLabelName());
@@ -672,7 +669,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitContinueExpression(@NotNull FirContinueExpression continueExpression, ExecutionContext data) {
+    public J visitContinueExpression(FirContinueExpression continueExpression, ExecutionContext ctx) {
         Space prefix = sourceBefore("continue");
         J.Identifier label = continueExpression.getTarget().getLabelName() == null ? null : convertToIdentifier(continueExpression.getTarget().getLabelName());
         return new J.Continue(
@@ -1547,7 +1544,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             name.append(part.getName().asString());
             if (i < qualifier.size() - 1) {
                 if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
-                    throw new UnsupportedOperationException("Unsupported type parameters in user part " + part.getName().toString());
+                    throw new UnsupportedOperationException("Unsupported type parameters in user part " + part.getName());
                 }
                 name.append(".");
             }
@@ -1819,17 +1816,34 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitWhileLoop(@NotNull FirWhileLoop whileLoop, ExecutionContext data) {
-        Space prefix = sourceBefore("while");
+    public J visitWhileLoop(FirWhileLoop whileLoop, ExecutionContext ctx) {
+        Space prefix = whitespace();
 
-        J.ControlParentheses<Expression> controlParentheses = convertToControlParentheses(whileLoop.getCondition());
-        J j = visitElement(whileLoop.getBlock(), ctx);
-        return new J.WhileLoop(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                controlParentheses,
-                JRightPadded.build((Statement) j));
+        if (source.startsWith("while", cursor)) {
+            skip("while");
+            J.ControlParentheses<Expression> controlParentheses = convertToControlParentheses(whileLoop.getCondition());
+            Statement body = (Statement) visitElement(whileLoop.getBlock(), ctx);
+            return new J.WhileLoop(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    controlParentheses,
+                    JRightPadded.build(body));
+        } else if (source.startsWith("for", cursor)) {
+            // The structure of the for only exists in the PSI.
+            skip("for");
+
+//            Statement body = (Statement) visitElement(whileLoop.getBlock(), ctx);
+//            return new J.ForEachLoop(
+//                    randomId(),
+//                    prefix,
+//                    Markers.EMPTY,
+//                    null,
+//                    JRightPadded.build(body));
+            throw new UnsupportedOperationException("For loop is not supported");
+        } else {
+            throw new UnsupportedOperationException("Unsupported loop starts with " + source.substring(cursor, cursor + 10));
+        }
     }
 
     @Override

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -115,12 +116,26 @@ public class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
-    void methodInvocation() {
+    void listOf() {
         rewriteRun(
           kotlin(
             """
                 fun method(arg: Any) {
                     val l = listOf(1, 2, 3)
+                }
+            """
+          )
+        );
+    }
+
+    @Disabled("Requires support of infix function `to`")
+    @Test
+    void mapOf() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method(arg: Any) {
+                    val map = mapOf(1 to "one", 2 to "two", 3 to "three")
                 }
             """
           )

@@ -15,43 +15,44 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class EnumTest implements RewriteTest {
+public class ForLoopTest implements RewriteTest {
 
+    @Disabled("FIR does not contain a for loop and the PSI is not accessible")
     @Test
-    void enumEmptyBody() {
-        rewriteRun(
-          kotlin("enum class A")
-        );
-    }
-
-    @Test
-    void enumDefinition() {
+    void inList() {
         rewriteRun(
           kotlin(
             """
-                enum class A {
-                    B, C,
-                    D
+                fun method() {
+                    val l = listOf(1, 2, 3)
+                    for (i in l) {
+                        println(i)
+                    }
                 }
             """
           )
         );
     }
 
+    @Disabled("FIR does not contain a for loop and the PSI is not accessible")
     @Test
-    void innerEnum() {
+    void inMap() {
         rewriteRun(
           kotlin(
             """
-                class A {
-                    enum class B {
-                        C
-                    }
+                fun method() {
+                      val map = mapOf(1 to "one", 2 to "two", 3 to "three")
+                      for ((key, value) in map) {
+                          print(key)
+                          print(", ")
+                          println(value)
+                      }
                 }
             """
           )
