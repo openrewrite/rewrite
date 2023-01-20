@@ -1691,11 +1691,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
 
         List<J> modifiers = emptyList();
-        boolean isVal = valueParameter.isVal();
-        List<J.Annotation> annotations = mapModifiers(isVal ? ModifierScope.VAL : ModifierScope.VAR, valueParameter.getAnnotations());
-
         Markers markers = Markers.EMPTY;
-        markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
+
+        List<J.Annotation> annotations;
+        if (source.startsWith("val ", cursor) || source.startsWith("var ", cursor)) {
+            boolean isVal = valueParameter.isVal();
+            annotations = mapModifiers(isVal ? ModifierScope.VAL : ModifierScope.VAR, valueParameter.getAnnotations());
+            markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
+        } else {
+            annotations = mapAnnotations(valueParameter.getAnnotations());
+        }
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
         Space namePrefix = EMPTY;
