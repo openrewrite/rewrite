@@ -50,4 +50,102 @@ public class BinaryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void bitwiseAnd() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0
+                  val b = a and 1
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void bitwiseOr() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0
+                  val b = a or 1
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void bitwiseXOr() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0
+                  val b = a xor 1
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void inversion() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0
+                  val b = a.inv()
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void shiftLeft() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0
+                  val b = a shl 1
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void shiftRight() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0
+                  val b = a shr 1
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void unsignedShiftRight() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0
+                  val b = a ushr 1
+                }
+            """
+          )
+        );
+    }
 }
