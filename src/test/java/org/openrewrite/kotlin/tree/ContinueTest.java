@@ -29,8 +29,8 @@ public class ContinueTest implements RewriteTest {
           kotlin(
             """
               class Test {
-                  fun test() {
-                      while(true) continue
+                  fun test ( ) {
+                      while ( true ) continue
                   }
               }
               """
@@ -45,8 +45,8 @@ public class ContinueTest implements RewriteTest {
           kotlin(
             """
               class Test {
-                  fun test() {
-                      labeled@ while(true) continue@labeled
+                  fun test ( ) {
+                      labeled@ while ( true ) continue@labeled
                   }
               }
               """

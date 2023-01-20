@@ -27,13 +27,13 @@ public class MethodInvocationTest implements RewriteTest {
     void implicitFunctionCall() {
         rewriteRun(
           kotlin("""
-                fun plugins(input: () -> String) {
-                    println( input( ) )
+                fun plugins ( input : ( ) -> String ) {
+                    println ( input ( ) )
                 }
             """
           ),
           kotlin("""
-                fun main() {
+                fun main ( ) {
                     plugins {
                         "test"
                     }
@@ -60,11 +60,11 @@ public class MethodInvocationTest implements RewriteTest {
           ),
           kotlin("""
                 class SpecScope  {
-                    val delegate : Spec = Spec()
+                    val delegate : Spec = Spec ( )
                     fun id ( id : String ) : Spec = delegate . id ( id )
                 }
                 public infix fun Spec . version ( version : String ) : Spec = version ( version )
-                public inline val SpecScope . `java-library` : Spec get ( ) = id("org.gradle.java-library")
+                public inline val SpecScope . `java-library` : Spec get ( ) = id ( "org.gradle.java-library" )
             """
           ),
           kotlin("""
@@ -82,17 +82,17 @@ public class MethodInvocationTest implements RewriteTest {
                     plugins {
                         `java-library`
                     
-                        id("nebula.release") version "16.0.0"
+                        id ( "nebula.release") version "16.0.0"
                     
-                        id("nebula.maven-manifest") version "18.4.0"
-                        id("nebula.maven-nebula-publish") version "18.4.0"
-                        id("nebula.maven-resolved-dependencies") version "18.4.0"
+                        id ( "nebula.maven-manifest" ) version "18.4.0"
+                        id ( "nebula.maven-nebula-publish" ) version "18.4.0"
+                        id ( "nebula.maven-resolved-dependencies" ) version "18.4.0"
                     
-                        id("nebula.contacts") version "6.0.0"
-                        id("nebula.info") version "11.3.3"
+                        id ( "nebula.contacts" ) version "6.0.0"
+                        id ( "nebula.info" ) version "11.3.3"
                     
-                        id("nebula.javadoc-jar") version "18.4.0"
-                        id("nebula.source-jar") version "18.4.0"
+                        id ( "nebula.javadoc-jar" ) version "18.4.0"
+                        id ( "nebula.source-jar" ) version "18.4.0"
                     }
                 }
             """
@@ -103,10 +103,10 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void methodWithLambda() {
         rewriteRun(
-          kotlin("fun method(arg: Any) {}"),
+          kotlin("fun method ( arg : Any ) { }"),
           kotlin(
             """
-              fun callMethodWithLambda() {
+              fun callMethodWithLambda ( ) {
                   method {
                   }
               }
@@ -120,8 +120,8 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method(arg: Any) {
-                    val l = listOf(1, 2, 3)
+                fun method ( arg : Any ) {
+                    val l = listOf ( 1 , 2 , 3 )
                 }
             """
           )
@@ -134,8 +134,8 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method(arg: Any) {
-                    val map = mapOf(1 to "one", 2 to "two", 3 to "three")
+                fun method ( arg : Any ) {
+                    val map = mapOf( 1 to "one" , 2 to "two" , 3 to "three")
                 }
             """
           )

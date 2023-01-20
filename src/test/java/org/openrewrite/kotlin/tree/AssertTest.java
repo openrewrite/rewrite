@@ -27,8 +27,8 @@ public class AssertTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                    assert(1 == 1)
+                fun method ( ) {
+                    assert( 1 == 1 )
                 }
             """
           )

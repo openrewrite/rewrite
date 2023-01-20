@@ -27,7 +27,7 @@ public class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
+                fun method ( ) {
                   val n = 0
                   val b = n == 0
                 }
@@ -41,7 +41,7 @@ public class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
+                fun method ( ) {
                     val b : Boolean = 1 == 1 // c1
                                 && 2 == 2 // c2
                                 && 3 == 3

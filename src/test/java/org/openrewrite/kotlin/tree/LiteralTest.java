@@ -20,105 +20,66 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class AssignmentTest implements RewriteTest {
+public class LiteralTest implements RewriteTest {
 
     @Test
-    void assignment() {
+    void intentionallyBadUnicodeCharacter() {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    var s : String
-                    s = "42"
-                }
+                val s1 = "\\\\u{U1}"
+                val s2 = "\\\\u1234"
+                val s3 = "\\\\u{00AUF}"
             """
           )
         );
     }
 
     @Test
-    void unaryMinus() {
+    void literalField() {
         rewriteRun(
           kotlin(
             """
-                val i = - 1
-                val l = - 2L
-                val f = - 3.0f
-                val d = - 4.0
+                val n : Int = 0
             """
           )
         );
     }
 
     @Test
-    void unaryPlus() {
+    void literalCharacter() {
         rewriteRun(
           kotlin(
             """
-                val i = + 1
-                val l = + 2L
-                val f = + 3.0f
-                val d = + 4.0
+                val c : Character = 'c'
             """
           )
         );
     }
 
     @Test
-    void preDecrement() {
+    void literalNumerics() {
         rewriteRun(
           kotlin(
             """
-                var a = 42
-                val b = -- a
+                val d : Double = 1.0
+                val f : Float = 1.0F
+                val l1 : Long = 1
+                val l2 : Long = 1L
             """
           )
         );
     }
 
     @Test
-    void preIncrement() {
+    void literalBinary() {
         rewriteRun(
           kotlin(
             """
-                var a = 42
-                val b = ++ a
-            """
-          )
-        );
-    }
-
-    @Test
-    void postDecrement() {
-        rewriteRun(
-          kotlin(
-            """
-                var a = 42
-                val b = a --
-            """
-          )
-        );
-    }
-
-    @Test
-    void postIncrement() {
-        rewriteRun(
-          kotlin(
-            """
-                var a = 42
-                val b = a ++
-            """
-          )
-        );
-    }
-
-    @Test
-    void not() {
-        rewriteRun(
-          kotlin(
-            """
-                val a = true
-                val b = ! a
+                val l : Long = 0b10L
+                val b : Byte = 0b10
+                val s : Short = 0b10
+                val i : Int = 0b10
             """
           )
         );

@@ -29,8 +29,8 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
                 package some.package.name
-                class A {}
-                class B {}
+                class A { }
+                class B { }
             """
           )
         );
@@ -135,14 +135,14 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                public @Deprecated("message 0") abstract @Suppress("") class Test
+                public @Deprecated ( "message 0" ) abstract @Suppress("") class Test
                 
-                @Deprecated("message 1")
-                @Suppress("")
+                @Deprecated ( "message 1" )
+                @Suppress ( "" )
                 class A
                 
-                @Suppress("unused", "unchecked")
-                @Deprecated("message 2")
+                @Suppress ( "unused" , "unchecked" )
+                @Deprecated ( "message 2" )
                 class B
             """
           )
@@ -162,7 +162,7 @@ class ClassDeclarationTest implements RewriteTest {
     void typeArguments() {
         rewriteRun(
           kotlin(
-            "open class B<T> {}"
+            "open class B < T > { }"
           )
         );
     }
@@ -175,7 +175,7 @@ class ClassDeclarationTest implements RewriteTest {
                   interface A
                   interface B
                   
-                  class KotlinTypeGoat<T: A, S: B>
+                  class KotlinTypeGoat < T : A , S : B>
               """
           )
         );
@@ -186,7 +186,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              @Deprecated("")
+              @Deprecated ( "" )
               // Some comment
               open class A
               """

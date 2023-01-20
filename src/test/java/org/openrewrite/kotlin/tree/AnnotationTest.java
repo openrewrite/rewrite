@@ -27,7 +27,7 @@ public class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                @SuppressWarnings("ConstantConditions", "unchecked")
+                @SuppressWarnings ( "ConstantConditions" , "unchecked" )
                 class A
             """
           )

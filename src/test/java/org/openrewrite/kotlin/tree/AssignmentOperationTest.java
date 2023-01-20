@@ -27,7 +27,7 @@ public class AssignmentOperationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
+                fun method ( ) {
                   var n = 0
                   n -= 5
                 }
@@ -41,7 +41,7 @@ public class AssignmentOperationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
+                fun method ( ) {
                   var n = 0
                   n += 5
                 }
@@ -55,7 +55,7 @@ public class AssignmentOperationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
+                fun method ( ) {
                   var n = 0
                   n *= 5
                 }
@@ -69,7 +69,7 @@ public class AssignmentOperationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
+                fun method ( ) {
                   var n = 0
                   n /= 5
                 }

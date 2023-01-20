@@ -27,8 +27,8 @@ public class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                    val square = { number: Int -> number * number }
+                fun method ( ) {
+                    val square = { number : Int -> number * number }
                 }
             """
           )
@@ -40,8 +40,8 @@ public class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun plugins(input: () -> String) {
-                  println( input( ) )
+                fun plugins ( input : ( ) -> String ) {
+                  println ( input( ) )
                 }
             """
           )

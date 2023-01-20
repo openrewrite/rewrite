@@ -28,8 +28,8 @@ public class BreakTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                    while(true) break
+                fun method ( ) {
+                    while ( true ) break
                 }
             """
           )
@@ -42,8 +42,8 @@ public class BreakTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                    labeled@ while(true) {
+                fun method ( ) {
+                    labeled@ while ( true ) {
                         break@labeled
                     }
                 }

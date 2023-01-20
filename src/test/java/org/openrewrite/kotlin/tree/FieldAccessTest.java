@@ -28,9 +28,9 @@ public class FieldAccessTest implements RewriteTest {
           kotlin(
             """
                 class Test {
-                    var id: String = ""
-                    fun setId(id: String) {
-                        this.id = id
+                    var id : String = ""
+                    fun setId ( id : String ) {
+                        this . id = id
                     }
                 }
             """

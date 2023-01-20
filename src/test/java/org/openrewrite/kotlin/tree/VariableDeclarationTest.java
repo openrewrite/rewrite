@@ -40,7 +40,7 @@ public class VariableDeclarationTest implements RewriteTest {
     @Test
     void singleVariableDeclarationWithTypeConstraint() {
         rewriteRun(
-          kotlin("val a: Int = 1")
+          kotlin("val a : Int = 1")
         );
     }
 
@@ -56,7 +56,7 @@ public class VariableDeclarationTest implements RewriteTest {
     @Test
     void diamondOperator() {
         rewriteRun(
-          kotlin("val a: Array<Int> = Array<Int>(1){1}")
+          kotlin("val a : Array < Int > = Array < Int > ( 1 ) { 1 }")
         );
     }
 
@@ -87,7 +87,7 @@ public class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin("class Spec"),
           kotlin("""
-              val isEmpty: Boolean
+              val isEmpty : Boolean
                   get ( ) : Boolean = 1 == 1
           """)
         );
@@ -133,7 +133,7 @@ public class VariableDeclarationTest implements RewriteTest {
               class Test {
                   val value = 10
               }
-              val a = Test()
+              val a = Test ( )
               val b = "${a.value}"
               
               val after = 0
@@ -152,7 +152,7 @@ public class VariableDeclarationTest implements RewriteTest {
                   }
               }
 
-              val a = Test()
+              val a = Test ( )
               val b = "${a.testValue.innerValue}"
           """)
         );

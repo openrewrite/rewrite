@@ -29,10 +29,10 @@ public class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                    val l = listOf(1, 2, 3)
-                    for (i in l) {
-                        println(i)
+                fun method ( ) {
+                    val l = listOf ( 1 , 2 , 3 )
+                    for ( i in l ) {
+                        println ( i )
                     }
                 }
             """
@@ -47,11 +47,11 @@ public class ForLoopTest implements RewriteTest {
           kotlin(
             """
                 fun method() {
-                      val map = mapOf(1 to "one", 2 to "two", 3 to "three")
-                      for ((key, value) in map) {
-                          print(key)
-                          print(", ")
-                          println(value)
+                      val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+                      for ( ( key , value ) in map ) {
+                          print ( key )
+                          print ( ", " )
+                          println ( value )
                       }
                 }
             """
