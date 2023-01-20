@@ -67,20 +67,12 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String resolveSignature(Object type, @Nullable FirBasedSymbol<?> ownerSymbol) {
         if (type instanceof ConeTypeProjection) {
             return coneTypeProjectionSignature((ConeTypeProjection) type);
-        } else if (type instanceof FirBinaryLogicExpression) {
-            return signature(((FirBinaryLogicExpression) type).getTypeRef(), ownerSymbol);
-        } else if (type instanceof FirConstExpression) {
-            return signature(((FirConstExpression<?>) type).getTypeRef(), ownerSymbol);
-        } else if (type instanceof FirEqualityOperatorCall) {
-            return signature(((FirEqualityOperatorCall) type).getTypeRef(), ownerSymbol);
+        } else if (type instanceof FirExpression) {
+            return signature(((FirExpression) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirFunctionTypeRef) {
             return signature(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerSymbol);
         } else if (type instanceof FirJavaTypeRef) {
             return type.toString();
-        } else if (type instanceof FirNamedArgumentExpression) {
-            return signature(((FirNamedArgumentExpression) type).getTypeRef(), ownerSymbol);
-        } else if (type instanceof FirLambdaArgumentExpression) {
-            return signature(((FirLambdaArgumentExpression) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
@@ -105,18 +97,12 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 }
             }
             return coneKotlinType.getTypeArguments().length > 0 ? parameterizedTypeRef(coneKotlinType) : typeRefClassSignature(coneKotlinType);
-        } else if (type instanceof FirResolvedQualifier) {
-            return signature(((FirResolvedQualifier) type).getSymbol(), ownerSymbol);
-        } else if (type instanceof FirStringConcatenationCall) {
-            return signature(((FirStringConcatenationCall) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirTypeParameter) {
             return genericSignature(type);
         } else if (type instanceof FirValueParameterSymbol) {
             return signature(((FirValueParameterSymbol) type).getResolvedReturnType(), ownerSymbol);
         } else if (type instanceof FirVariableAssignment) {
             return signature(((FirVariableAssignment) type).getCalleeReference(), ownerSymbol);
-        } else if (type instanceof FirQualifiedAccessExpression) {
-            return signature(((FirQualifiedAccessExpression) type).getTypeRef(), ownerSymbol);
         }
 
         throw new UnsupportedOperationException("Unexpected type " + type.getClass().getName());

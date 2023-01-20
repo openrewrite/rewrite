@@ -96,19 +96,13 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private JavaType resolveType(Object type, String signature, @Nullable FirBasedSymbol<?> ownerFallBack) {
         if (type instanceof ConeTypeProjection) {
             return generic((ConeTypeProjection) type, signature, ownerFallBack);
-        }  else if (type instanceof FirConstExpression) {
-            return type(((FirConstExpression<?>) type).getTypeRef(), ownerFallBack);
-        } else if (type instanceof FirEqualityOperatorCall) {
-            return type(((FirEqualityOperatorCall) type).getTypeRef(), ownerFallBack);
-        }  else if (type instanceof FirFunctionTypeRef) {
+        } else if (type instanceof FirExpression) {
+            return type(((FirExpression) type).getTypeRef(), ownerFallBack);
+        } else if (type instanceof FirFunctionTypeRef) {
             return type(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerFallBack);
-        }  else if (type instanceof FirJavaTypeRef) {
+        } else if (type instanceof FirJavaTypeRef) {
             // TODO: There isn't time to convert the JavaTypeReference to a JavaType.
             return null;
-        } else if (type instanceof FirNamedArgumentExpression) {
-            return type(((FirNamedArgumentExpression) type).getTypeRef(), ownerFallBack);
-        } else if (type instanceof FirLambdaArgumentExpression) {
-            return type(((FirLambdaArgumentExpression) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
@@ -133,14 +127,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 }
             }
             return classType(type, signature, ownerFallBack);
-        }  else if (type instanceof FirStringConcatenationCall) {
-            return type(((FirStringConcatenationCall) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirTypeParameter) {
             return generic((FirTypeParameter) type, signature, ownerFallBack);
         } else if (type instanceof FirVariableAssignment) {
             return type(((FirVariableAssignment) type).getCalleeReference(), ownerFallBack);
-        } else if (type instanceof FirQualifiedAccessExpression) {
-            return type(((FirQualifiedAccessExpression) type).getTypeRef(), ownerFallBack);
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());

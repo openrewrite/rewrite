@@ -642,6 +642,30 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitComparisonExpression(FirComparisonExpression comparisonExpression, ExecutionContext ctx) {
+        Space prefix = whitespace();
+
+        FirFunctionCall functionCall = comparisonExpression.getCompareToCall();
+        Expression left = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
+
+        Space opPrefix = whitespace();
+        J.Binary.Type op = mapOperation(comparisonExpression.getOperation());
+
+        if (functionCall.getArgumentList().getArguments().size() != 1) {
+            throw new UnsupportedOperationException("Unsupported FirComparisonExpression argument size");
+        }
+
+        Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+        return new J.Binary(randomId(),
+                prefix,
+                Markers.EMPTY,
+                left,
+                padLeft(opPrefix, op),
+                right,
+                typeMapping.type(comparisonExpression));
+    }
+
+    @Override
     public <T> J visitConstExpression(FirConstExpression<T> constExpression, ExecutionContext ctx) {
         String valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
         Space prefix = sourceBefore(valueSource);
@@ -686,17 +710,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 typeMapping.type(equalityOperatorCall));
     }
 
-    private J.Binary.Type mapOperation(FirOperation op) {
-        switch (op) {
-            case EQ:
-                return J.Binary.Type.Equal;
-            case NOT_EQ:
-                return J.Binary.Type.NotEqual;
-            default:
-                throw new UnsupportedOperationException("Unsupported FirOperation " + op.name());
-        }
-    }
-
     @Override
     public J visitContinueExpression(FirContinueExpression continueExpression, ExecutionContext ctx) {
         Space prefix = sourceBefore("continue");
@@ -706,6 +719,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 prefix,
                 Markers.EMPTY,
                 label);
+    }
+
+    @Override
+    public J visitDoWhileLoop(FirDoWhileLoop doWhileLoop, ExecutionContext ctx) {
+        Space prefix = whitespace();
+
+        skip("do");
+        return new J.DoWhileLoop(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                JRightPadded.build((Statement) visitElement(doWhileLoop.getBlock(), ctx)),
+                padLeft(sourceBefore("while"), convertToControlParentheses(doWhileLoop.getCondition())));
     }
 
     @Override
@@ -1905,10 +1931,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitBreakExpression((FirBreakExpression) firElement, ctx);
         } else if (firElement instanceof FirClass) {
             return visitClass((FirClass) firElement, ctx);
+        } else if (firElement instanceof FirComparisonExpression) {
+            return visitComparisonExpression((FirComparisonExpression) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<?>) firElement, ctx);
         } else if (firElement instanceof FirContinueExpression) {
             return visitContinueExpression((FirContinueExpression) firElement, ctx);
+        } else if (firElement instanceof FirDoWhileLoop) {
+            return visitDoWhileLoop((FirDoWhileLoop) firElement, ctx);
         } else if (firElement instanceof FirEnumEntry) {
             return visitEnumEntry((FirEnumEntry) firElement, ctx);
         } else if (firElement instanceof FirEqualityOperatorCall) {
@@ -2093,6 +2123,41 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return modifiers;
+    }
+
+
+    private J.Binary.Type mapOperation(FirOperation firOp) {
+        J.Binary.Type op = null;
+        switch (firOp) {
+            case EQ:
+                skip("=");
+                op = J.Binary.Type.Equal;
+                break;
+            case NOT_EQ:
+                skip("!=");
+                op = J.Binary.Type.NotEqual;
+                break;
+            case GT:
+                skip(">");
+                op = J.Binary.Type.GreaterThan;
+                break;
+            case GT_EQ:
+                skip(">=");
+                op = J.Binary.Type.GreaterThanOrEqual;
+                break;
+            case LT:
+                skip("<");
+                op = J.Binary.Type.LessThan;
+                break;
+            case LT_EQ:
+                skip("<=");
+                op = J.Binary.Type.LessThan;
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported FirOperation " + op.name());
+        }
+
+        return op;
     }
 
     private boolean isUnaryOperator(String name) {
