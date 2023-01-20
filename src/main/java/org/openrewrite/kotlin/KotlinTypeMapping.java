@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.descriptors.Visibility;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.*;
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaField;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
@@ -191,6 +192,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             }
 
             List<FirProperty> properties = new ArrayList<>(firClass.getDeclarations().size());
+            List<FirJavaField> javaFields = new ArrayList<>(firClass.getDeclarations().size());
             List<FirFunction> functions = new ArrayList<>(firClass.getDeclarations().size());
             List<FirEnumEntry> enumEntries = new ArrayList<>(firClass.getDeclarations().size());
 
@@ -199,6 +201,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                     if (declaration.getSource() == null || !(declaration.getSource().getKind() instanceof KtFakeSourceElementKind)) {
                         properties.add((FirProperty) declaration);
                     }
+                } else if (declaration instanceof FirJavaField) {
+                    javaFields.add((FirJavaField) declaration);
                 } else if (declaration instanceof FirSimpleFunction) {
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirConstructor) {
@@ -230,6 +234,15 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 }
             }
 
+            if (!javaFields.isEmpty()) {
+                if (fields == null) {
+                    fields = new ArrayList<>(javaFields.size());
+                }
+
+                for (FirJavaField field : javaFields) {
+                    fields.add(variableType(field.getSymbol(), clazz, ownerFallBack));
+                }
+            }
             List<JavaType.Method> methods = null;
             if(!functions.isEmpty()) {
                 methods = new ArrayList<>(functions.size());
@@ -466,8 +479,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         List<JavaType.FullyQualified> annotations = listAnnotations(symbol.getAnnotations());
 
         JavaType resolvedOwner = owner;
-        // Resolve owner ... there isn't a clear way to access this yet.
-        variable.unsafeSet(resolvedOwner, type(symbol.getResolvedReturnTypeRef()), annotations);
+        // TODO: Resolve owner ... there isn't a clear way to access this yet.
+        FirTypeRef typeRef = symbol.getFir() instanceof FirJavaField ? symbol.getFir().getReturnTypeRef() :
+                symbol.getResolvedReturnTypeRef();
+                variable.unsafeSet(resolvedOwner, type(typeRef), annotations);
 
         return variable;
     }

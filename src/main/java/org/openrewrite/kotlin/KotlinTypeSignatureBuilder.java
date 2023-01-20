@@ -3,6 +3,7 @@ package org.openrewrite.kotlin;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.*;
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaField;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter;
 import org.jetbrains.kotlin.fir.references.FirNamedReference;
@@ -268,8 +269,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             typeSignature = convertKotlinFqToJavaFq(typeParameterType.toString());
             s.append(typeSignature);
             s.append("}");
+        } else if (type instanceof ConeFlexibleType) {
+            s.append(signature(((ConeFlexibleType) type).getLowerBound()));
         } else {
-            throw new IllegalStateException("Implement me.");
+            throw new UnsupportedOperationException("Unsupported ConeTypeProjection.");
         }
 
         return s.toString();
@@ -306,7 +309,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             owner = classSignature(ownerSymbol.getFir());
         }
 
-        return owner + "{name=" + symbol.getName().asString() + ",type=" + signature(symbol.getResolvedReturnTypeRef()) + '}';
+        String typeSig = symbol.getFir() instanceof FirJavaField ? signature(symbol.getFir().getReturnTypeRef()) :
+                signature(symbol.getResolvedReturnTypeRef());
+        return owner + "{name=" + symbol.getName().asString() + ",type=" + typeSig + '}';
     }
 
     public String methodSignature(FirFunctionCall functionCall, @Nullable FirBasedSymbol<?> ownerSymbol) {
