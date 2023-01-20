@@ -103,7 +103,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return type(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerFallBack);
         } else if (type instanceof FirJavaTypeRef) {
             // TODO: There isn't time to convert the JavaTypeReference to a JavaType.
-            return null;
+            return JavaType.Class.Unknown.getInstance();
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
