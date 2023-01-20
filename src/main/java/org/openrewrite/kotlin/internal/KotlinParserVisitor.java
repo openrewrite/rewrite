@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.expressions.impl.*;
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
 import org.jetbrains.kotlin.fir.references.FirNamedReference;
+import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
@@ -327,9 +328,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitCallableReferenceAccess(FirCallableReferenceAccess callableReferenceAccess, ExecutionContext ctx) {
         Space prefix = whitespace();
 
+        FirResolvedCallableReference reference = (FirResolvedCallableReference) callableReferenceAccess.getCalleeReference();
         JavaType.Method methodReferenceType = null;
-
+        if (reference.getResolvedSymbol() instanceof FirNamedFunctionSymbol) {
+            methodReferenceType = typeMapping.methodDeclarationType(((FirNamedFunctionSymbol) reference.getResolvedSymbol()).getFir(),
+                    TypeUtils.asFullyQualified(typeMapping.type(callableReferenceAccess.getExplicitReceiver())), currentFile.getSymbol());
+        }
         JavaType.Variable fieldReferenceType = null;
+        if (reference.getResolvedSymbol() instanceof FirPropertySymbol) {
+            fieldReferenceType = typeMapping.variableType((FirVariableSymbol<? extends FirVariable>) reference.getResolvedSymbol(),
+                    TypeUtils.asFullyQualified(typeMapping.type(callableReferenceAccess.getExplicitReceiver())), currentFile.getSymbol());
+        }
 
         return new J.MemberReference(
                 randomId(),
@@ -338,7 +347,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 padRight((Expression) visitElement(callableReferenceAccess.getExplicitReceiver(), ctx), sourceBefore("::")),
                 callableReferenceAccess.getTypeArguments().isEmpty() ? null : mapTypeArguments(callableReferenceAccess.getTypeArguments()),
                 padLeft(whitespace(), (J.Identifier) visitElement(callableReferenceAccess.getCalleeReference(), ctx)),
-                typeMapping.type(callableReferenceAccess),
+                typeMapping.type(callableReferenceAccess.getCalleeReference()),
                 methodReferenceType,
                 fieldReferenceType
         );

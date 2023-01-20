@@ -23,7 +23,7 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class MethodReferenceTest implements RewriteTest {
 
     @Test
-    void reference() {
+    void fieldReference() {
         rewriteRun(
           kotlin(
             """
@@ -32,6 +32,16 @@ public class MethodReferenceTest implements RewriteTest {
                     val l = listOf ( Test ( 42 ) )
                     l . map { Test :: answer }
                 }
+            """)
+        );
+    }
+
+    @Test
+    void methodReference() {
+        rewriteRun(
+          kotlin(
+            """
+                val str = 42::toString
             """)
         );
     }
