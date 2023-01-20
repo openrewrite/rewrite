@@ -18,12 +18,13 @@ package org.openrewrite.maven.tree;
 import lombok.*;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.Serializable;
 import java.util.List;
 
 @Value
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
-public class Dependency {
+public class Dependency implements Serializable {
     GroupArtifactVersion gav;
 
     @With
