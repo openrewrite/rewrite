@@ -995,7 +995,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             switch (name) {
                 case "div":
                     type = J.Binary.Type.Division;
-                    opPrefix = sourceBefore("*");
+                    opPrefix = sourceBefore("/");
                     break;
                 case "minus":
                     type = J.Binary.Type.Subtraction;
@@ -1007,7 +1007,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     break;
                 case "times":
                     type = J.Binary.Type.Multiplication;
-                    opPrefix = sourceBefore("/");
+                    opPrefix = sourceBefore("*");
                     break;
                 default:
                     throw new UnsupportedOperationException("Unsupported binary operator type.");
