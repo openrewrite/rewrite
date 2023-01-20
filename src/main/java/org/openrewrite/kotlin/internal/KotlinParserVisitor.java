@@ -319,6 +319,35 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitBinaryLogicExpression(FirBinaryLogicExpression binaryLogicExpression, ExecutionContext ctx) {
+        Space prefix = whitespace();
+        Expression left = (Expression) visitElement(binaryLogicExpression.getLeftOperand(), ctx);
+
+        Space opPrefix = whitespace();
+        J.Binary.Type op;
+        if (LogicOperationKind.AND == binaryLogicExpression.getKind()) {
+            skip("&&");
+            op = J.Binary.Type.And;
+        } else if (LogicOperationKind.OR == binaryLogicExpression.getKind()) {
+            skip("||");
+            op = J.Binary.Type.Or;
+        } else {
+            throw new UnsupportedOperationException("Unsupported binary expression type " + binaryLogicExpression.getKind().name());
+        }
+
+        Expression right = (Expression) visitElement(binaryLogicExpression.getRightOperand(), ctx);
+
+        return new J.Binary(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                left,
+                padLeft(opPrefix, op),
+                right,
+                typeMapping.type(binaryLogicExpression));
+    }
+
+    @Override
     public J visitBlock(FirBlock block, ExecutionContext ctx) {
         int saveCursor = cursor;
         Space prefix = whitespace();
@@ -938,8 +967,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             J.Binary.Type type;
             switch (name) {
-                case "times":
-                    type = J.Binary.Type.Multiplication;
+                case "div":
+                    type = J.Binary.Type.Division;
                     opPrefix = sourceBefore("*");
                     break;
                 case "minus":
@@ -949,6 +978,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 case "plus":
                     type = J.Binary.Type.Addition;
                     opPrefix = sourceBefore("+");
+                    break;
+                case "times":
+                    type = J.Binary.Type.Multiplication;
+                    opPrefix = sourceBefore("/");
                     break;
                 default:
                     throw new UnsupportedOperationException("Unsupported binary operator type.");
@@ -1693,7 +1726,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             whitespace();
             boolean isCompoundAssignment = source.startsWith("-=", cursor) ||
                     source.startsWith("+=", cursor) ||
-                    source.startsWith("*=", cursor);
+                    source.startsWith("*=", cursor) ||
+                    source.startsWith("/=", cursor);
             cursor = saveCursor;
 
             if (isCompoundAssignment) {
@@ -1708,6 +1742,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 } else if (source.startsWith("*=", cursor)) {
                     skip("*=");
                     op = J.AssignmentOperation.Type.Multiplication;
+                } else if (source.startsWith("/=", cursor)) {
+                    skip("/=");
+                    op = J.AssignmentOperation.Type.Division;
                 } else {
                     throw new IllegalArgumentException("Unexpected compound assignment.");
                 }
@@ -1860,6 +1897,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitAnonymousObject((FirAnonymousObject) firElement, ctx);
         }  else if (firElement instanceof FirAnonymousObjectExpression) {
             return visitAnonymousObjectExpression((FirAnonymousObjectExpression) firElement, ctx);
+        } else if (firElement instanceof FirBinaryLogicExpression) {
+            return visitBinaryLogicExpression((FirBinaryLogicExpression) firElement, ctx);
         } else if (firElement instanceof FirBlock) {
             return visitBlock((FirBlock) firElement, ctx);
         } else if (firElement instanceof FirBreakExpression) {

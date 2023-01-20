@@ -67,6 +67,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String resolveSignature(Object type, @Nullable FirBasedSymbol<?> ownerSymbol) {
         if (type instanceof ConeTypeProjection) {
             return coneTypeProjectionSignature((ConeTypeProjection) type);
+        } else if (type instanceof FirBinaryLogicExpression) {
+            return signature(((FirBinaryLogicExpression) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirConstExpression) {
             return signature(((FirConstExpression<?>) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirEqualityOperatorCall) {

@@ -23,15 +23,55 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class AssignmentOperationTest implements RewriteTest {
 
     @Test
-    void compoundAssignment() {
+    void minusEqual() {
         rewriteRun(
           kotlin(
             """
                 fun method() {
                   var n = 0
                   n -= 5
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void plusEqual() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method() {
+                  var n = 0
                   n += 5
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void timesEqual() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method() {
+                  var n = 0
                   n *= 5
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void divideEqual() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method() {
+                  var n = 0
+                  n /= 5
                 }
             """
           )

@@ -20,31 +20,18 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class BinaryTest implements RewriteTest {
+public class FieldAccessTest implements RewriteTest {
 
     @Test
-    void equals() {
+    void fieldAccess() {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                  val n = 0
-                  val b = n == 0
-                }
-            """
-          )
-        );
-    }
-
-    @Test
-    void endOfLineBreaks() {
-        rewriteRun(
-          kotlin(
-            """
-                fun method() {
-                    val b : Boolean = 1 == 1 // c1
-                                && 2 == 2 // c2
-                                && 3 == 3
+                class Test {
+                    var id: String = ""
+                    fun setId(id: String) {
+                        this.id = id
+                    }
                 }
             """
           )

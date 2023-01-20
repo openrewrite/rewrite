@@ -23,6 +23,20 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class AssignmentTest implements RewriteTest {
 
     @Test
+    void assignment() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method() {
+                    var s : String
+                    s = "42"
+                }
+            """
+          )
+        );
+    }
+
+    @Test
     void unaryMinus() {
         rewriteRun(
           kotlin(
@@ -105,22 +119,6 @@ public class AssignmentTest implements RewriteTest {
             """
                 val a = true
                 val b = ! a
-            """
-          )
-        );
-    }
-
-    @Test
-    void fieldAccess() {
-        rewriteRun(
-          kotlin(
-            """
-                class Test {
-                    var id: String = ""
-                    fun setId(id: String) {
-                        this.id = id
-                    }
-                }
             """
           )
         );
