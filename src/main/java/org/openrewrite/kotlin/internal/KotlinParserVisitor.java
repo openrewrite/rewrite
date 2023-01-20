@@ -502,6 +502,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitCatch(FirCatch firCatch, ExecutionContext ctx) {
+        Space prefix = whitespace();
+        skip("catch");
+
+        Space paramPrefix = sourceBefore("(");
+        J.VariableDeclarations paramDecl = (J.VariableDeclarations) visitElement(firCatch.getParameter(), ctx);
+
+        J.ControlParentheses<J.VariableDeclarations> param = new J.ControlParentheses<>(
+                randomId(),
+                paramPrefix,
+                Markers.EMPTY,
+                padRight(paramDecl, sourceBefore(")")));
+
+        return new J.Try.Catch(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                param,
+                (J.Block) visitElement(firCatch.getBlock(), ctx));
+    }
+
+    @Override
     public J visitClass(FirClass klass, ExecutionContext ctx) {
         FirRegularClass firRegularClass = (FirRegularClass) klass;
         Space prefix = whitespace();
@@ -1643,6 +1665,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitTryExpression(FirTryExpression tryExpression, ExecutionContext ctx) {
+        Space prefix = whitespace();
+        skip("try");
+
+        JContainer<J.Try.Resource> resources = null;
+        J.Block block = (J.Block) visitElement(tryExpression.getTryBlock(), ctx);
+        List<J.Try.Catch> catches = new ArrayList<>(tryExpression.getCatches().size());
+        for (FirCatch aCatch : tryExpression.getCatches()) {
+            catches.add((J.Try.Catch) visitElement(aCatch, ctx));
+        }
+
+        JLeftPadded<J.Block> finallyy = null;
+        return new J.Try(randomId(),
+                prefix,
+                Markers.EMPTY,
+                resources,
+                block,
+                catches,
+                finallyy);
+    }
+
+    @Override
     public J visitTypeProjectionWithVariance(FirTypeProjectionWithVariance typeProjectionWithVariance, ExecutionContext ctx) {
         return visitResolvedTypeRef((FirResolvedTypeRef) typeProjectionWithVariance.getTypeRef(), ctx);
     }
@@ -1985,14 +2029,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitAnonymousObject((FirAnonymousObject) firElement, ctx);
         }  else if (firElement instanceof FirAnonymousObjectExpression) {
             return visitAnonymousObjectExpression((FirAnonymousObjectExpression) firElement, ctx);
-        } else if (firElement instanceof FirCallableReferenceAccess) {
-            return visitCallableReferenceAccess((FirCallableReferenceAccess) firElement, ctx);
         } else if (firElement instanceof FirBinaryLogicExpression) {
             return visitBinaryLogicExpression((FirBinaryLogicExpression) firElement, ctx);
         } else if (firElement instanceof FirBlock) {
             return visitBlock((FirBlock) firElement, ctx);
         } else if (firElement instanceof FirBreakExpression) {
             return visitBreakExpression((FirBreakExpression) firElement, ctx);
+        } else if (firElement instanceof FirCallableReferenceAccess) {
+            return visitCallableReferenceAccess((FirCallableReferenceAccess) firElement, ctx);
+        } else if (firElement instanceof FirCatch) {
+            return visitCatch((FirCatch) firElement, ctx);
         } else if (firElement instanceof FirClass) {
             return visitClass((FirClass) firElement, ctx);
         } else if (firElement instanceof FirComparisonExpression) {
@@ -2039,6 +2085,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitThisReceiverExpression((FirThisReceiverExpression) firElement, ctx);
         } else if (firElement instanceof FirTypeParameter) {
             return visitTypeParameter((FirTypeParameter) firElement, ctx);
+        } else if (firElement instanceof FirTryExpression) {
+            return visitTryExpression((FirTryExpression) firElement, ctx);
         } else if (firElement instanceof FirTypeProjectionWithVariance) {
             return visitTypeProjectionWithVariance((FirTypeProjectionWithVariance) firElement, ctx);
         } else if (firElement instanceof FirUserTypeRef) {
