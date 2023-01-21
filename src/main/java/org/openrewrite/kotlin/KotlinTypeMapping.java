@@ -451,11 +451,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return method;
     }
 
-//    @Nullable
-//    public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol) {
-//        return variableType(symbol, null, null);
-//    }
-
     @Nullable
     public JavaType.Variable variableType(@Nullable FirVariableSymbol<? extends FirVariable> symbol, @Nullable JavaType.FullyQualified owner, @Nullable FirBasedSymbol<?> ownerFallBack) {
         if (symbol == null) {

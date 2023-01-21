@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -872,6 +871,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
             }
 
+            Markers markers = Markers.EMPTY;
             JRightPadded<Expression> select = null;
             FirElement dispatchReceiver = functionCall.getDispatchReceiver();
             FirElement extensionReceiver = functionCall.getExtensionReceiver();
@@ -879,10 +879,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     (!(dispatchReceiver instanceof FirNoReceiverExpression || dispatchReceiver instanceof FirThisReceiverExpression)) ||
                     !(extensionReceiver instanceof FirNoReceiverExpression || extensionReceiver instanceof FirThisReceiverExpression)) {
                 FirElement visit;
-                if (dispatchReceiver instanceof FirFunctionCall || dispatchReceiver instanceof FirPropertyAccessExpression) {
+                if (dispatchReceiver instanceof FirFunctionCall ||
+                        dispatchReceiver instanceof FirPropertyAccessExpression) {
                     visit = dispatchReceiver;
-                } else if (extensionReceiver instanceof FirFunctionCall || extensionReceiver instanceof FirPropertyAccessExpression) {
+                } else if (extensionReceiver instanceof FirFunctionCall ||
+                        extensionReceiver instanceof FirPropertyAccessExpression) {
                     visit = extensionReceiver;
+                } else if (dispatchReceiver instanceof FirCheckedSafeCallSubject) {
+                    visit = ((FirCheckedSafeCallSubject) dispatchReceiver).getOriginalReceiverRef().getValue();
+                } else if (extensionReceiver instanceof FirCheckedSafeCallSubject) {
+                    visit = ((FirCheckedSafeCallSubject) extensionReceiver).getOriginalReceiverRef().getValue();
                 } else {
                     throw new UnsupportedOperationException("Unsupported FunctionCall selection type.");
                 }
@@ -891,12 +897,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Space after = whitespace();
                 if (source.startsWith(".", cursor)) {
                     skip(".");
+                } else if (source.startsWith("?.", cursor)) {
+                    skip("?.");
+                    markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
                 }
 
                 select = JRightPadded.build(selectExpr)
                         .withAfter(after);
             }
-            Markers markers = Markers.EMPTY;
+
             if (isInfix) {
                 markers = markers.addIfAbsent(new ReceiverType(randomId()));
             }
@@ -1325,11 +1334,20 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (propertyAccessExpression.getExplicitReceiver() != null) {
             Space prefix = whitespace();
             Expression target = (Expression) visitElement(propertyAccessExpression.getExplicitReceiver(), ctx);
-            JLeftPadded<J.Identifier> name = padLeft(sourceBefore("."), (J.Identifier) visitElement(propertyAccessExpression.getCalleeReference(), ctx));
+            Space before = whitespace();
+            Markers markers = Markers.EMPTY;
+            if (source.startsWith(".", cursor)) {
+                skip(".");
+            } else if (source.startsWith("?.", cursor)) {
+                skip("?.");
+                markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+            }
+
+            JLeftPadded<J.Identifier> name = padLeft(before, (J.Identifier) visitElement(propertyAccessExpression.getCalleeReference(), ctx));
             return new J.FieldAccess(
                     randomId(),
                     prefix,
-                    Markers.EMPTY,
+                    markers,
                     target,
                     name,
                     type
@@ -1451,6 +1469,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitResolvedQualifier(FirResolvedQualifier resolvedQualifier, ExecutionContext ctx) {
         return convertToIdentifier(resolvedQualifier.getRelativeClassFqName().asString(), resolvedQualifier);
+    }
+
+    @Override
+    public J visitSafeCallExpression(FirSafeCallExpression safeCallExpression, ExecutionContext ctx) {
+        return visitElement(safeCallExpression.getSelector(), ctx);
+    }
+
+    @Override
+    public J visitCheckedSafeCallSubject(FirCheckedSafeCallSubject checkedSafeCallSubject, ExecutionContext ctx) {
+        return visitElement(checkedSafeCallSubject.getOriginalReceiverRef().getValue(), ctx);
     }
 
     @Override
@@ -2133,6 +2161,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitResolvedQualifier((FirResolvedQualifier) firElement, ctx);
         } else if (firElement instanceof FirReturnExpression) {
             return visitReturnExpression((FirReturnExpression) firElement, ctx);
+        } else if (firElement instanceof FirSafeCallExpression) {
+            return visitSafeCallExpression((FirSafeCallExpression) firElement, ctx);
+        } else if (firElement instanceof FirCheckedSafeCallSubject) {
+            return visitCheckedSafeCallSubject((FirCheckedSafeCallSubject) firElement, ctx);
         } else if (firElement instanceof FirSimpleFunction) {
             return visitSimpleFunction((FirSimpleFunction) firElement, ctx);
         } else if (firElement instanceof FirStarProjection) {

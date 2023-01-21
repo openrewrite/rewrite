@@ -205,6 +205,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess, PrintOutputCapture<P> p) {
+            beforeSyntax(fieldAccess, Space.Location.FIELD_ACCESS_PREFIX, p);
+            visit(fieldAccess.getTarget(), p);
+            String prefix = fieldAccess.getMarkers().findFirst(IsNullable.class).isPresent() ? "?." : ".";
+            visitLeftPadded(prefix, fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
+            afterSyntax(fieldAccess, p);
+            return fieldAccess;
+        }
+
+        @Override
         public J visitInstanceOf(J.InstanceOf instanceOf, PrintOutputCapture<P> p) {
             beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
             String suffix = instanceOf.getMarkers().findFirst(NotIs.class).isPresent() ? "!is" : "is";
@@ -309,6 +319,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
             if (method.getSelect() != null && !method.getMarkers().findFirst(ReceiverType.class).isPresent()) {
+                if (method.getMarkers().findFirst(IsNullable.class).isPresent()) {
+                    p.out.append("?");
+                }
                 p.out.append(".");
             }
 

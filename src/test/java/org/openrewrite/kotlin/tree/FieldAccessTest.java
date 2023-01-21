@@ -37,4 +37,45 @@ public class FieldAccessTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nullSafeMethodAccess() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    fun method ( ) {
+                    }
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun method ( test : Test ? ) {
+                    val a = test ?. method ( )
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void nullSafePropertyAccess() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    val property = 42
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun method ( test : Test ? ) {
+                    val a = test ?. property
+                }
+            """
+          )
+        );
+    }
 }
