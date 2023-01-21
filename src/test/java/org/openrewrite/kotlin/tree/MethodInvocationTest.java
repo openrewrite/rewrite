@@ -116,6 +116,50 @@ public class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void nullSafeDereference() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    fun method ( ) {
+                    }
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun method ( test : Test ? ) {
+                    val a = test ?. method ( )
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void elvisOperator() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    fun method () : String ? {
+                        return ""
+                    }
+                }
+            """
+          ),
+          kotlin(
+            """
+                val t = Test ( )
+                fun method ( ) {
+                    val a = t . method ( ) ?: null
+                }
+            """
+          )
+        );
+    }
+
+    @Test
     void listOf() {
         rewriteRun(
           kotlin(

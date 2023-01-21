@@ -215,6 +215,19 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitIdentifier(J.Identifier ident, PrintOutputCapture<P> p) {
+            beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
+            p.append(ident.getSimpleName());
+            IsNullable isNullable = ident.getMarkers().findFirst(IsNullable.class).orElse(null);
+            if (isNullable != null) {
+                KotlinPrinter.this.visitSpace(isNullable.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
+                p.out.append("?");
+            }
+            afterSyntax(ident, p);
+            return ident;
+        }
+
+        @Override
         public J visitInstanceOf(J.InstanceOf instanceOf, PrintOutputCapture<P> p) {
             beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
             String suffix = instanceOf.getMarkers().findFirst(NotIs.class).isPresent() ? "!is" : "is";
@@ -401,6 +414,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitTernary(J.Ternary ternary, PrintOutputCapture<P> p) {
+            beforeSyntax(ternary, Space.Location.TERNARY_PREFIX, p);
+            visitLeftPadded("", ternary.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p);
+            visitLeftPadded("?:", ternary.getPadding().getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, p);
+            afterSyntax(ternary, p);
+            return ternary;
+        }
+
+        @Override
         public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
             beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
             visit(typeCast.getExpression(), p);
@@ -463,11 +485,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(":");
                 }
                 visit(multiVariable.getTypeExpression(), p);
-                IsNullable isNullable = multiVariable.getTypeExpression().getMarkers().findFirst(IsNullable.class).orElse(null);
-                if (isNullable != null) {
-                    KotlinPrinter.this.visitSpace(isNullable.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p);
-                    p.append("?");
-                }
             }
 
             boolean implicitEquals = variable.getInitializer() instanceof K.StatementExpression &&

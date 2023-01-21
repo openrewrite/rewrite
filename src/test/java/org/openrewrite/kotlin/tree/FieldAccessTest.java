@@ -39,28 +39,7 @@ public class FieldAccessTest implements RewriteTest {
     }
 
     @Test
-    void nullSafeMethodAccess() {
-        rewriteRun(
-          kotlin(
-            """
-                class Test {
-                    fun method ( ) {
-                    }
-                }
-            """
-          ),
-          kotlin(
-            """
-                fun method ( test : Test ? ) {
-                    val a = test ?. method ( )
-                }
-            """
-          )
-        );
-    }
-
-    @Test
-    void nullSafePropertyAccess() {
+    void nullSafeDereference() {
         rewriteRun(
           kotlin(
             """
@@ -73,6 +52,26 @@ public class FieldAccessTest implements RewriteTest {
             """
                 fun method ( test : Test ? ) {
                     val a = test ?. property
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void elvisOperator() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    val value : Int ? = 42
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun method ( test : Test ) {
+                    val a = test . value ?: null
                 }
             """
           )

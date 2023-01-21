@@ -243,7 +243,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 We might want to extract the generation of `platformSources` later on.
              */
             for (Input source : sources) {
-                VirtualFile vFile = new LightVirtualFile(randomId().toString(), KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
+                VirtualFile vFile = new LightVirtualFile("input", KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
                 platformSources.add(new KtVirtualFileSourceFile(vFile));
             }
 
