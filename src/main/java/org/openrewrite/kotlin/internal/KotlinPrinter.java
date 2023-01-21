@@ -388,6 +388,23 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
+            beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
+            visit(typeCast.getExpression(), p);
+
+            J.ControlParentheses<TypeTree> controlParens = typeCast.getClazz();
+            beforeSyntax(controlParens, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+
+            String as = typeCast.getMarkers().findFirst(IsNullable.class).isPresent() ? "as?" : "as";
+            p.append(as);
+
+            visit(controlParens.getTree(), p);
+
+            afterSyntax(typeCast, p);
+            return typeCast;
+        }
+
+        @Override
         public J visitTypeParameter(J.TypeParameter typeParam, PrintOutputCapture<P> p) {
             beforeSyntax(typeParam, Space.Location.TYPE_PARAMETERS_PREFIX, p);
             visit(typeParam.getAnnotations(), p);

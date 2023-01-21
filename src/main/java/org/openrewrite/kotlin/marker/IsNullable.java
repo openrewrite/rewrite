@@ -22,6 +22,9 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
+/**
+ * The nullable delimiter `?` may contain a prefix with whitespace.
+ */
 @Value
 @With
 public class IsNullable implements Marker {

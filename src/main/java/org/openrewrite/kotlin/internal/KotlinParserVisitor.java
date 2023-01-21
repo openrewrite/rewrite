@@ -1630,7 +1630,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitTypeOperatorCall(FirTypeOperatorCall typeOperatorCall, ExecutionContext ctx) {
         Space prefix = whitespace();
-        Expression element = (Expression) visitElement(typeOperatorCall.getArgumentList().getArguments().get(0), ctx);
+        FirElement target = typeOperatorCall.getArgumentList().getArguments().get(0) instanceof FirSmartCastExpression ?
+                ((FirSmartCastExpression) typeOperatorCall.getArgumentList().getArguments().get(0)).getOriginalExpression() :
+                typeOperatorCall.getArgumentList().getArguments().get(0);
+        Expression element = (Expression) visitElement(target, ctx);
 
         Space after;
         Markers markers = Markers.EMPTY;
@@ -1642,21 +1645,42 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 after = sourceBefore("!is");
                 markers = markers.addIfAbsent(new NotIs(randomId()));
                 break;
+            case AS:
+                after = sourceBefore("as");
+                break;
+            case SAFE_AS:
+                after = sourceBefore("as?");
+                markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+                break;
             default:
                 throw new UnsupportedOperationException("Unsupported type operator " + typeOperatorCall.getOperation().name());
         }
-        JRightPadded<Expression> expr = JRightPadded.build(element).withAfter(after);
 
-        J clazz = visitElement(typeOperatorCall.getConversionTypeRef(), ctx);
-        J pattern = null;
-        return new J.InstanceOf(
-                randomId(),
-                prefix,
-                markers,
-                expr,
-                clazz,
-                pattern,
-                typeMapping.type(typeOperatorCall));
+        if (typeOperatorCall.getOperation() == FirOperation.AS || typeOperatorCall.getOperation() == FirOperation.SAFE_AS) {
+            return new J.TypeCast(
+                    randomId(),
+                    prefix,
+                    markers,
+                    new J.ControlParentheses<>(
+                            randomId(),
+                            after,
+                            Markers.EMPTY,
+                            JRightPadded.build((TypeTree) visitElement(typeOperatorCall.getConversionTypeRef(), ctx))),
+                    element);
+        } else {
+            JRightPadded<Expression> expr = JRightPadded.build(element).withAfter(after);
+
+            J clazz = visitElement(typeOperatorCall.getConversionTypeRef(), ctx);
+            J pattern = null;
+            return new J.InstanceOf(
+                    randomId(),
+                    prefix,
+                    markers,
+                    expr,
+                    clazz,
+                    pattern,
+                    typeMapping.type(typeOperatorCall));
+        }
     }
 
     @Override

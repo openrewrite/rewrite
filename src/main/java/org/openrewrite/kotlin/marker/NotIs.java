@@ -21,6 +21,9 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
+/**
+ * Distinguish !is in J.InstanceOf.
+ */
 @Value
 @With
 public class NotIs implements Marker {

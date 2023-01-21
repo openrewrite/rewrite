@@ -29,6 +29,7 @@ class CastTest implements RewriteTest {
             """
                 fun method ( a : Any ) {
                     val b = a as String
+                    val c : String ? = a as? String
                 }
             """
           )
