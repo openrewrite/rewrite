@@ -205,6 +205,17 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitInstanceOf(J.InstanceOf instanceOf, PrintOutputCapture<P> p) {
+            beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
+            String suffix = instanceOf.getMarkers().findFirst(NotIs.class).isPresent() ? "!is" : "is";
+            visitRightPadded(instanceOf.getPadding().getExpr(), JRightPadded.Location.INSTANCEOF, suffix, p);
+            visit(instanceOf.getClazz(), p);
+            visit(instanceOf.getPattern(), p);
+            afterSyntax(instanceOf, p);
+            return instanceOf;
+        }
+
+        @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
             boolean omitBraces = lambda.getMarkers().findFirst(OmitBraces.class).isPresent();

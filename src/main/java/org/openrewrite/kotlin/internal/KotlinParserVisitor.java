@@ -1628,6 +1628,38 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitTypeOperatorCall(FirTypeOperatorCall typeOperatorCall, ExecutionContext ctx) {
+        Space prefix = whitespace();
+        Expression element = (Expression) visitElement(typeOperatorCall.getArgumentList().getArguments().get(0), ctx);
+
+        Space after;
+        Markers markers = Markers.EMPTY;
+        switch (typeOperatorCall.getOperation()) {
+            case IS:
+                after = sourceBefore("is");
+                break;
+            case NOT_IS:
+                after = sourceBefore("!is");
+                markers = markers.addIfAbsent(new NotIs(randomId()));
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported type operator " + typeOperatorCall.getOperation().name());
+        }
+        JRightPadded<Expression> expr = JRightPadded.build(element).withAfter(after);
+
+        J clazz = visitElement(typeOperatorCall.getConversionTypeRef(), ctx);
+        J pattern = null;
+        return new J.InstanceOf(
+                randomId(),
+                prefix,
+                markers,
+                expr,
+                clazz,
+                pattern,
+                typeMapping.type(typeOperatorCall));
+    }
+
+    @Override
     public J visitTypeParameter(FirTypeParameter typeParameter, ExecutionContext ctx) {
         if (!typeParameter.getAnnotations().isEmpty()) {
             throw new IllegalStateException("Implement me.");
@@ -2085,6 +2117,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitStringConcatenationCall((FirStringConcatenationCall) firElement, ctx);
         } else if (firElement instanceof FirThisReceiverExpression) {
             return visitThisReceiverExpression((FirThisReceiverExpression) firElement, ctx);
+        } else if (firElement instanceof FirTypeOperatorCall) {
+            return visitTypeOperatorCall((FirTypeOperatorCall) firElement, ctx);
         } else if (firElement instanceof FirTypeParameter) {
             return visitTypeParameter((FirTypeParameter) firElement, ctx);
         } else if (firElement instanceof FirTryExpression) {
