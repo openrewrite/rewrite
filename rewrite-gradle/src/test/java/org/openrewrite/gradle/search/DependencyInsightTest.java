@@ -54,7 +54,7 @@ public class DependencyInsightTest implements RewriteTest {
               }
               
               dependencies {
-                  /*~~(com.example:bing-baz:1.0)~~>*/implementation 'com.google.guava:guava:31.1-jre'
+                  /*~~(com.google.guava:failureaccess:1.0.1)~~>*/implementation 'com.google.guava:guava:31.1-jre'
               }
               """
           )

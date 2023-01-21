@@ -62,12 +62,12 @@ public class ChangeDependencyGroupId extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Gradle dependency group id";
+        return "Change Gradle dependency group";
     }
 
     @Override
     public String getDescription() {
-        return "Change the group id of a specified Gradle dependency.";
+        return "Change the group of a specified Gradle dependency.";
     }
 
     @Override

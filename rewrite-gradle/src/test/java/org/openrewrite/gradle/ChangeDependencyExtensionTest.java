@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 class ChangeDependencyExtensionTest implements RewriteTest {
+
     @Test
     void worksWithEmptyStringConfig() {
         rewriteRun(
@@ -177,7 +178,7 @@ class ChangeDependencyExtensionTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @CsvSource(value = {"org.eclipse.jetty:jetty-servlet", "*:*"}, delimiterString = ":")
     void worksWithClassifier(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyExtension(group, artifact, "war", null)),

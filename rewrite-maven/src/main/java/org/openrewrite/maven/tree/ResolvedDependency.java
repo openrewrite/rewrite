@@ -112,7 +112,6 @@ public class ResolvedDependency implements Serializable {
         }
         outer:
         for (ResolvedDependency dependency : dependencies) {
-
             ResolvedDependency found = dependency.findDependency(groupId, artifactId);
             if (found != null) {
                 if (getRequested().getExclusions() != null) {

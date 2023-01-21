@@ -41,7 +41,7 @@ public class ChangeJavaCompatibility extends Recipe {
     @Option(displayName = "New version",
             description = "The Java version to update source compatibility to. All allowed variations of Gradle's `org.gradle.api.JavaVersion` are allowed. " +
                           "This means that we accept versions in the form of doubles (ex. 1.8, 1.11), whole numbers (ex. 8, 11), strings (ex. \"1.8\", \"8\", '1.11', '11'), " +
-                          "and `org.gradle.api.JavaVersion` enum values (ex. VERSION_1_8, VERSION_11, JavaVersion.VERSION_1_8, JavaVersion.VERSION_11).",
+                          "and `org.gradle.api.JavaVersion` enum values (ex. `VERSION_1_8`, `VERSION_11`, `JavaVersion.VERSION_1_8`, `JavaVersion.VERSION_11`).",
             example = "11")
     String newVersion;
 

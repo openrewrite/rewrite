@@ -150,6 +150,14 @@ class ChangeDependencyVersionTest implements RewriteTest {
                   mavenCentral()
               }
               
+              configurations.all {
+                  resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+                      if (details.requested.version == null) {
+                          details.useVersion 'latest.release'
+                      }
+                  }
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core'
                   api "org.openrewrite:rewrite-core"
@@ -207,7 +215,7 @@ class ChangeDependencyVersionTest implements RewriteTest {
     @CsvSource(value = {"org.eclipse.jetty:jetty-servlet", "*:*"}, delimiterString = ":")
     void worksWithExt(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "9.+", null, null)),
+          spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "9.4.50.v20221201", null, null)),
           buildGradle(
             """
               plugins {

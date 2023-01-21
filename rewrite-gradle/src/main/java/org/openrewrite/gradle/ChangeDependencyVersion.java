@@ -33,6 +33,8 @@ import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyVersion extends Recipe {
@@ -73,7 +75,7 @@ public class ChangeDependencyVersion extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Finds dependencies declared in `build.gradle` files.";
+        return "Change a version of a specified dependency. The new version must be an exact version number.";
     }
 
     @Override
@@ -89,7 +91,7 @@ public class ChangeDependencyVersion extends Recipe {
     @Override
     public GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
-            final DependencyMatcher depMatcher = DependencyMatcher.build(groupId + ":" + artifactId).getValue();
+            final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override
