@@ -28,11 +28,27 @@ class FindDependencyHandlerTest implements RewriteTest {
           spec -> spec.recipe(fromRuntimeClasspath("org.openrewrite.gradle.search.FindDependencyHandler")),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'com.google.guava:guava:23.0'
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               /*~~>*/dependencies {
                   api 'com.google.guava:guava:23.0'
               }

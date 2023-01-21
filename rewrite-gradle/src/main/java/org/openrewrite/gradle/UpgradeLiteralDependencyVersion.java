@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -29,7 +30,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.semver.LatestPatch;
@@ -113,25 +113,27 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
                             if (StringUtils.matchesGlob(parts[0], groupId) &&
                                 StringUtils.matchesGlob(parts[1], artifactId)) {
 
-                                GradleProject gradleProject = method.getMarkers().findFirst(GradleProject.class)
+                                GradleProject gradleProject = getCursor().firstEnclosingOrThrow(G.CompilationUnit.class)
+                                        .getMarkers()
+                                        .findFirst(GradleProject.class)
                                         .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
-                                Dependency requested = gradleProject.findDependency(method.getSimpleName(), groupId, artifactId);
 
-                                if (requested != null) {
-                                    String version = requested.getVersion();
-                                    if (version != null && !version.startsWith("$")) {
-                                        try {
-                                            String newVersion = findNewerVersion(groupId, artifactId, version, gradleProject, ctx);
-                                            return method.withArguments(ListUtils.mapFirst(method.getArguments(), arg -> {
-                                                J.Literal literal = (J.Literal) arg;
-                                                String newGav = groupId + ":" + artifactId + ":" + newVersion;
-                                                return literal
-                                                        .withValue(newGav)
-                                                        .withValueSource(requireNonNull(literal.getValueSource()).replace(gav, newGav));
-                                            }));
-                                        } catch (MavenDownloadingException e) {
-                                            return e.warn(method);
+                                String version = parts[2];
+                                if (version != null && !version.startsWith("$")) {
+                                    try {
+                                        String newVersion = findNewerVersion(groupId, artifactId, version, gradleProject, ctx);
+                                        if (newVersion == null || version.equals(newVersion)) {
+                                            return method;
                                         }
+                                        return method.withArguments(ListUtils.mapFirst(method.getArguments(), arg -> {
+                                            J.Literal literal = (J.Literal) arg;
+                                            String newGav = groupId + ":" + artifactId + ":" + newVersion;
+                                            return literal
+                                                    .withValue(newGav)
+                                                    .withValueSource(requireNonNull(literal.getValueSource()).replace(gav, newGav));
+                                        }));
+                                    } catch (MavenDownloadingException e) {
+                                        return e.warn(method);
                                     }
                                 }
                             }

@@ -39,9 +39,9 @@ class ActivateStyleTest implements RewriteTest {
             """
               plugins {
                   id("java")
-                  id("org.openrewrite.rewrite")
+                  id("org.openrewrite.rewrite") version "5.34.0"
               }
-
+              
               rewrite {
                   activeRecipe("org.openrewrite.java.format.AutoFormat")
               }
@@ -49,9 +49,9 @@ class ActivateStyleTest implements RewriteTest {
             """
               plugins {
                   id("java")
-                  id("org.openrewrite.rewrite")
+                  id("org.openrewrite.rewrite") version "5.34.0"
               }
-
+              
               rewrite {
                   activeRecipe("org.openrewrite.java.format.AutoFormat")
                   activeStyle("org.openrewrite.java.IntelliJ")
@@ -69,9 +69,9 @@ class ActivateStyleTest implements RewriteTest {
             """
               plugins {
                   id("java")
-                  id("org.openrewrite.rewrite")
+                  id("org.openrewrite.rewrite") version "5.34.0"
               }
-
+              
               rewrite {
                   activeRecipe("org.openrewrite.java.format.AutoFormat")
                   activeStyle("otherStyle")
@@ -80,9 +80,9 @@ class ActivateStyleTest implements RewriteTest {
             """
               plugins {
                   id("java")
-                  id("org.openrewrite.rewrite")
+                  id("org.openrewrite.rewrite") version "5.34.0"
               }
-
+              
               rewrite {
                   activeRecipe("org.openrewrite.java.format.AutoFormat")
                   activeStyle("otherStyle", "org.openrewrite.java.IntelliJ")
@@ -99,9 +99,9 @@ class ActivateStyleTest implements RewriteTest {
             """
               plugins {
                   id("java")
-                  id("org.openrewrite.rewrite")
+                  id("org.openrewrite.rewrite") version "5.34.0"
               }
-
+              
               rewrite {
                   activeRecipe("org.openrewrite.java.format.AutoFormat")
                   activeStyle("com.your.Style")
@@ -110,9 +110,9 @@ class ActivateStyleTest implements RewriteTest {
             """
               plugins {
                   id("java")
-                  id("org.openrewrite.rewrite")
+                  id("org.openrewrite.rewrite") version "5.34.0"
               }
-
+              
               rewrite {
                   activeRecipe("org.openrewrite.java.format.AutoFormat")
                   activeStyle("org.openrewrite.java.IntelliJ")

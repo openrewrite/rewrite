@@ -87,16 +87,16 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                              
+              
               sourceCompatibility = 7
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                              
+              
               sourceCompatibility = %s
               """.formatted(coerce(newVersion))
           )
@@ -110,16 +110,16 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               targetCompatibility = '7'
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               targetCompatibility = %s
               """.formatted(coerce(newVersion))
           )
@@ -133,16 +133,16 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               setSourceCompatibility "7"
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               setSourceCompatibility %s
               """.formatted(coerce(newVersion))
           )
@@ -156,16 +156,16 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               setTargetCompatibility 1.7
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               setTargetCompatibility %s
               """.formatted(coerce(newVersion))
           )
@@ -179,18 +179,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java {
                   sourceCompatibility = "1.7"
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java {
                   sourceCompatibility = %s
               }
@@ -206,18 +206,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java {
                   targetCompatibility = '1.7'
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java {
                   targetCompatibility = %s
               }
@@ -233,18 +233,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                              
+              
               compileJava {
                   sourceCompatibility = JavaVersion.VERSION_1_7
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               compileJava {
                   sourceCompatibility = %s
               }
@@ -260,18 +260,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               compileJava {
                   targetCompatibility = "1.7"
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               compileJava {
                   targetCompatibility = %s
               }
@@ -287,18 +287,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.named("compileJava") {
                   sourceCompatibility = "1.7"
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.named("compileJava") {
                   sourceCompatibility = %s
               }
@@ -314,18 +314,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.named("compileJava") {
                   targetCompatibility = "1.7"
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.named("compileJava") {
                   targetCompatibility = %s
               }
@@ -341,18 +341,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.withType(JavaCompile).configureEach {
                   sourceCompatibility = "1.7"
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.withType(JavaCompile).configureEach {
                   sourceCompatibility = %s
               }
@@ -368,18 +368,18 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.withType(JavaCompile).configureEach {
                   targetCompatibility = "1.7"
               }
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               tasks.withType(JavaCompile).configureEach {
                   targetCompatibility = %s
               }
@@ -395,16 +395,16 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java.sourceCompatibility = "1.7"
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java.sourceCompatibility = %s
               """.formatted(coerce(newVersion))
           )
@@ -418,16 +418,16 @@ abstract class BaseTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java.targetCompatibility = "1.7"
               """,
             """
               plugins {
-                  java
+                  id 'java'
               }
-                            
+              
               java.targetCompatibility = %s
               """.formatted(coerce(newVersion))
           )
@@ -435,7 +435,6 @@ abstract class BaseTest implements RewriteTest {
     }
 
     private String coerce(String version) {
-        return version.startsWith("VERSION_") ?
-          "JavaVersion." + version : version;
+        return version.startsWith("VERSION_") ? "JavaVersion." + version : version;
     }
 }

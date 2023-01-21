@@ -28,11 +28,27 @@ class FindDependencyTest implements RewriteTest {
           spec -> spec.recipe(new FindDependency("org.openrewrite", "rewrite-core", "api")),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
               }
@@ -47,11 +63,27 @@ class FindDependencyTest implements RewriteTest {
           spec -> spec.recipe(new FindDependency("org.*", "*", "")),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   /*~~>*/api 'org.openrewrite:rewrite-core:latest.release'
               }
