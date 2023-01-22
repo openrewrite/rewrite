@@ -663,4 +663,24 @@ class FinalizePrivateFieldsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fieldAssignedInLambdaInsideConstructor() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class A {
+                  private int x;
+                  private int y;
+                  A() {
+                      List.of(1,2,3).forEach(n -> x = n);
+                      Runnable r = () -> y = 2;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

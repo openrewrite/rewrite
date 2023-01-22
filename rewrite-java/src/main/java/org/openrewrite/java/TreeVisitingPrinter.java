@@ -129,13 +129,15 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     private static String printTreeElement(Tree tree) {
         // skip some specific types printed in the output to make the output looks clean
         if (tree instanceof J.CompilationUnit
-                || tree instanceof J.ClassDeclaration
-                || tree instanceof J.Block
-                || tree instanceof J.Empty
-                || tree instanceof J.Literal
-                || tree instanceof J.Try
-                || tree instanceof J.Try.Catch
-                || tree instanceof J.WhileLoop
+            || tree instanceof J.ClassDeclaration
+            || tree instanceof J.Block
+            || tree instanceof J.Empty
+            || tree instanceof J.Literal
+            || tree instanceof J.Try
+            || tree instanceof J.Try.Catch
+            || tree instanceof J.WhileLoop
+            || tree instanceof J.Lambda
+            || tree instanceof J.Lambda.Parameters
         ) {
             return "";
         }
