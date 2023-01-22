@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -109,7 +110,7 @@ public class FinalizePrivateFields extends Recipe {
          * Collects private fields assignment counts, count rules are:
          * (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
          * (2) any assignment in other place count for 2.
-         * (3) any assignment in a loop in anywhere count for 2.
+         * (3) any assignment in a loop or lambda in anywhere count for 2.
          * By giving 3 rules above, if a private field has an assigned count equal to 1, it should be finalized.
          *
          * @param j The subtree to search, supposed to be at Class declaration level.
@@ -168,9 +169,9 @@ public class FinalizePrivateFields extends Recipe {
                 // increment count rules are following
                 // (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
                 // (2) any assignment in other place count for 2.
-                // (3) any assignment in a loop in anywhere count for 2.
+                // (3) any assignment in a loop or lambda in anywhere count for 2.
                 int increment;
-                if (isInLoop(cursor)) {
+                if (isInLoop(cursor) || isInLambda(cursor)) {
                     increment = 2;
                 } else if (isInitializedByClass(cursor)) {
                     increment = 1;
@@ -241,6 +242,12 @@ public class FinalizePrivateFields extends Recipe {
             return dropUntilMeetCondition(cursor,
                 CollectPrivateFieldsAssignmentCounts::dropCursorEndCondition,
                 parent -> parent instanceof J.WhileLoop);
+        }
+
+        private static boolean isInLambda(Cursor cursor) {
+            return dropUntilMeetCondition(cursor,
+                CollectPrivateFieldsAssignmentCounts::dropCursorEndCondition,
+                parent -> parent instanceof J.Lambda);
         }
     }
 
