@@ -62,12 +62,12 @@ public class ChangeDependencyArtifactId extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Gradle dependency artifactId";
+        return "Change Gradle dependency artifact";
     }
 
     @Override
     public String getDescription() {
-        return "Change the artifactId of a specified Gradle dependency.";
+        return "Change the artifact of a specified Gradle dependency.";
     }
 
     @Override

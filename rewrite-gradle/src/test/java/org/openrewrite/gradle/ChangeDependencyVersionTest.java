@@ -30,23 +30,29 @@ class ChangeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyVersion("org.springframework.boot", "*", "2.5.5", null, "")),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  rewrite 'org.openrewrite:rewrite-gradle:latest.integration'
-                  implementation 'org.springframework.cloud:spring-cloud-starter-sleuth:3.0.3'
-                  implementation 'org.springframework.integration:spring-integration-ftp:5.5.1'
                   implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
-                  implementation 'commons-lang:commons-lang:2.6'
-                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  rewrite 'org.openrewrite:rewrite-gradle:latest.integration'
-                  implementation 'org.springframework.cloud:spring-cloud-starter-sleuth:3.0.3'
-                  implementation 'org.springframework.integration:spring-integration-ftp:5.5.1'
                   implementation 'org.springframework.boot:spring-boot-starter:2.5.5'
-                  implementation 'commons-lang:commons-lang:2.6'
-                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
               }
               """
           )
@@ -60,12 +66,28 @@ class ChangeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "latest.integration", null, null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
                   api "org.openrewrite:rewrite-core:latest.release"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.integration'
                   api "org.openrewrite:rewrite-core:latest.integration"
@@ -82,12 +104,28 @@ class ChangeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "latest.integration", null, null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.integration'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.integration"
@@ -104,6 +142,22 @@ class ChangeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "latest.integration", null, null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              configurations.all {
+                  resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+                      if (details.requested.version == null) {
+                          details.useVersion 'latest.release'
+                      }
+                  }
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core'
                   api "org.openrewrite:rewrite-core"
@@ -122,19 +176,35 @@ class ChangeDependencyVersionTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "latest.integration", null, null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:classifier'
                   api "org.openrewrite:rewrite-core:latest.release:classifier"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classifier'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classifier"
+                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'tests'
+                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "tests"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.integration:classifier'
                   api "org.openrewrite:rewrite-core:latest.integration:classifier"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.integration', classifier: 'classifier'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.integration", classifier: "classifier"
+                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.integration', classifier: 'tests'
+                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.integration", classifier: "tests"
               }
               """
           )
@@ -142,41 +212,57 @@ class ChangeDependencyVersionTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @CsvSource(value = {"org.eclipse.jetty:jetty-servlet", "*:*"}, delimiterString = ":")
     void worksWithExt(String group, String artifact) {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "latest.integration", null, null)),
+          spec -> spec.recipe(new ChangeDependencyVersion(group, artifact, "9.4.50.v20221201", null, null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api 'org.openrewrite:rewrite-core@ext'
-                  api "org.openrewrite:rewrite-core@ext"
-                  api 'org.openrewrite:rewrite-core:latest.release@ext'
-                  api "org.openrewrite:rewrite-core:latest.release@ext"
-                  api 'org.openrewrite:rewrite-core:latest.release:classifier@ext'
-                  api "org.openrewrite:rewrite-core:latest.release:classifier@ext"
-                  api group: 'org.openrewrite', name: 'rewrite-core', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", extension: "ext"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", extension: "ext"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classifier', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classifier", extension: "ext"
+                  api 'org.eclipse.jetty:jetty-servlet@jar'
+                  api "org.eclipse.jetty:jetty-servlet@jar"
+                  api 'org.eclipse.jetty:jetty-servlet:9.4.9.v20180320@jar'
+                  api "org.eclipse.jetty:jetty-servlet:9.4.9.v20180320@jar"
+                  api 'org.eclipse.jetty:jetty-servlet:9.4.9.v20180320:classifier@jar'
+                  api "org.eclipse.jetty:jetty-servlet:9.4.9.v20180320:classifier@jar"
+                  api group: 'org.eclipse.jetty', name: 'jetty-servlet', ext: 'jar'
+                  api group: "org.eclipse.jetty", name: "jetty-servlet", ext: "jar"
+                  api group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.9.v20180320', ext: 'jar'
+                  api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.9.v20180320", ext: "jar"
+                  api group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.9.v20180320', classifier: 'tests', ext: 'jar'
+                  api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.9.v20180320", classifier: "tests", ext: "jar"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api 'org.openrewrite:rewrite-core@ext'
-                  api "org.openrewrite:rewrite-core@ext"
-                  api 'org.openrewrite:rewrite-core:latest.integration@ext'
-                  api "org.openrewrite:rewrite-core:latest.integration@ext"
-                  api 'org.openrewrite:rewrite-core:latest.integration:classifier@ext'
-                  api "org.openrewrite:rewrite-core:latest.integration:classifier@ext"
-                  api group: 'org.openrewrite', name: 'rewrite-core', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", extension: "ext"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.integration', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.integration", extension: "ext"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.integration', classifier: 'classifier', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.integration", classifier: "classifier", extension: "ext"
+                  api 'org.eclipse.jetty:jetty-servlet@jar'
+                  api "org.eclipse.jetty:jetty-servlet@jar"
+                  api 'org.eclipse.jetty:jetty-servlet:9.4.50.v20221201@jar'
+                  api "org.eclipse.jetty:jetty-servlet:9.4.50.v20221201@jar"
+                  api 'org.eclipse.jetty:jetty-servlet:9.4.50.v20221201:classifier@jar'
+                  api "org.eclipse.jetty:jetty-servlet:9.4.50.v20221201:classifier@jar"
+                  api group: 'org.eclipse.jetty', name: 'jetty-servlet', ext: 'jar'
+                  api group: "org.eclipse.jetty", name: "jetty-servlet", ext: "jar"
+                  api group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.50.v20221201', ext: 'jar'
+                  api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.50.v20221201", ext: "jar"
+                  api group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.50.v20221201', classifier: 'tests', ext: 'jar'
+                  api group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.50.v20221201", classifier: "tests", ext: "jar"
               }
               """
           )

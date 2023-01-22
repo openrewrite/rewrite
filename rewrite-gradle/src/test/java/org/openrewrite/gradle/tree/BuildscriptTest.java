@@ -29,6 +29,9 @@ class BuildscriptTest implements RewriteTest {
             """
               buildscript {
                   repositories {
+                      maven {
+                          url "https://plugins.gradle.org/m2/"
+                      }
                       mavenCentral()
                   }
                   dependencies {

@@ -31,12 +31,15 @@ public class GradleParserTest implements RewriteTest {
           settingsGradle(
             """
               plugins {
-                  id 'com.gradle.enterprise' version '3.11.3'
+                  id 'java-library'
               }
-
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               gradleEnterprise {
                   server = 'https://enterprise-samples.gradle.com'
-
                   buildScan {
                       publishAlways()
                   }
@@ -52,18 +55,26 @@ public class GradleParserTest implements RewriteTest {
           buildGradle(
             """
               import org.gradle.api.Project
-
+              
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements()).hasSize(2);
+                assertThat(cu.getStatements()).hasSize(4);
                 assertThat(cu.getStatements().get(0)).isInstanceOf(J.Import.class);
                 J.Import i = (J.Import) cu.getStatements().get(0);
                 assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
-                assertThat(cu.getStatements().get(1)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(1);
+                assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
+                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
             })
@@ -76,6 +87,14 @@ public class GradleParserTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
@@ -85,13 +104,13 @@ public class GradleParserTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements()).hasSize(2);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(0);
+                assertThat(cu.getStatements()).hasSize(4);
+                assertThat(cu.getStatements().get(2)).isInstanceOf(J.MethodInvocation.class);
+                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(2);
                 assertThat(m.getMethodType()).isNotNull();
                 assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
-                assertThat(cu.getStatements().get(1)).isInstanceOf(J.MethodDeclaration.class);
-                J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(1);
+                assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
+                J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(3);
                 assertThat(d.getSimpleName()).isEqualTo("greet");
             })
           )
@@ -107,7 +126,15 @@ public class GradleParserTest implements RewriteTest {
                * LICENSE
                */
               import org.gradle.api.Project
-
+              
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   testImplementation "junit:junit:4.13"
               }
@@ -121,6 +148,14 @@ public class GradleParserTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               // Some comment
               dependencies {
                   testImplementation "junit:junit:4.13"
@@ -135,12 +170,16 @@ public class GradleParserTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
-              plugins {
-                id("java-library")
-              }
-
               import org.gradle.api.Project
-
+              
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   testImplementation "junit:junit:4.13"
               }

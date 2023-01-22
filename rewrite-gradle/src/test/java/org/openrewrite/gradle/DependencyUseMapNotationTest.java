@@ -33,12 +33,28 @@ class DependencyUseMapNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api('org.openrewrite:rewrite-core:latest.release')
                   implementation "group:artifact:version"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   implementation group: 'group', name: 'artifact', version: 'version'
@@ -53,6 +69,14 @@ class DependencyUseMapNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               def version = "latest.release"
               dependencies {
                   api("org.openrewrite:rewrite-core:$version")
@@ -60,6 +84,14 @@ class DependencyUseMapNotationTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
@@ -75,6 +107,14 @@ class DependencyUseMapNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release") {
                       exclude group: "group", module: "artifact"
@@ -85,6 +125,14 @@ class DependencyUseMapNotationTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release') {
                       exclude group: "group", module: "artifact"
@@ -103,6 +151,14 @@ class DependencyUseMapNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api("org.openrewrite:rewrite-core:$version") {
                       exclude group: "group", module: "artifact"
@@ -113,6 +169,14 @@ class DependencyUseMapNotationTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version) {
                       exclude group: "group", module: "artifact"

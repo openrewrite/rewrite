@@ -33,12 +33,20 @@ class DependencyUseStringNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release')
                   implementation group: 'group', name: 'artifact', version: 'version'
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release")
                   implementation "group:artifact:version"
@@ -53,11 +61,19 @@ class DependencyUseStringNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api([group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'])
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release")
               }
@@ -71,6 +87,10 @@ class DependencyUseStringNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               def version = "latest.release"
               dependencies {
                   api(group: 'org.openrewrite', name: 'rewrite-core', version: version)
@@ -78,6 +98,10 @@ class DependencyUseStringNotationTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               def version = "latest.release"
               dependencies {
                   api("org.openrewrite:rewrite-core:$version")
@@ -93,12 +117,20 @@ class DependencyUseStringNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api(group: "org.openrewrite", name: "rewrite-core")
                   implementation group: "group", name: "artifact"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api("org.openrewrite:rewrite-core")
                   implementation "group:artifact"
@@ -113,6 +145,10 @@ class DependencyUseStringNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api(group: "org.openrewrite", name: "rewrite-core", version: "latest.release") {
                       exclude group: "group", module: "artifact"
@@ -120,6 +156,10 @@ class DependencyUseStringNotationTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               dependencies {
                   api("org.openrewrite:rewrite-core:latest.release") {
                       exclude group: "group", module: "artifact"
@@ -135,6 +175,10 @@ class DependencyUseStringNotationTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               def version = "latest.release"
               dependencies {
                   api(group: "org.openrewrite", name: "rewrite-core", version: version) {
@@ -143,6 +187,10 @@ class DependencyUseStringNotationTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               def version = "latest.release"
               dependencies {
                   api("org.openrewrite:rewrite-core:$version") {

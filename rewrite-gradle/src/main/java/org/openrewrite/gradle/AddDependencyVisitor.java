@@ -36,6 +36,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
     private static final MethodMatcher DEPENDENCIES_DSL_MATCHER = new MethodMatcher("RewriteGradleProject dependencies(..)");
@@ -60,9 +62,6 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
     @Nullable
     private final Pattern familyRegex;
 
-    @Nullable
-    private VersionComparator versionComparator;
-
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
         G.CompilationUnit groovy = super.visitCompilationUnit(cu, ctx);
@@ -75,13 +74,16 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
         Validated versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {
-            versionComparator = versionValidation.getValue();
+            @Nullable VersionComparator versionComparator = versionValidation.getValue();
         }
 
         if (dependenciesBlockMissing) {
             Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}").get(0).getStatements().get(0);
             dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
-            groovy = groovy.withStatements(ListUtils.concat(groovy.getStatements(), dependenciesInvocation));
+            groovy = groovy.withStatements(ListUtils.concat(groovy.getStatements(),
+                    groovy.getStatements().isEmpty() ?
+                            dependenciesInvocation :
+                            dependenciesInvocation.withPrefix(Space.format("\n\n"))));
         }
 
         doAfterVisit(new InsertDependencyInOrder(configuration));
@@ -111,15 +113,15 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             DependencyStyle style = autodetectDependencyStyle(body.getStatements());
             if (style == DependencyStyle.String) {
                 codeTemplate = "dependencies {\n" +
-                        configuration + " \"" + groupId + ":" + artifactId + ":" + version + (classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
-                        "\n}";
+                               configuration + " \"" + groupId + ":" + artifactId + ":" + version + (classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
+                               "\n}";
             } else {
                 codeTemplate = "dependencies {\n" +
-                        configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\", version: \"" + version + "\"" + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
-                        "\n}";
+                               configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\", version: \"" + version + "\"" + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                               "\n}";
             }
-            J.MethodInvocation addDependencyInvocation = (J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation) GRADLE_PARSER.parse(codeTemplate)
-                    .get(0).getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression();
+            J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation) GRADLE_PARSER.parse(codeTemplate)
+                    .get(0).getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression());
             addDependencyInvocation = autoFormat(addDependencyInvocation, ctx, new Cursor(getCursor(), body));
             InsertDependencyComparator dependencyComparator = new InsertDependencyComparator(body.getStatements(), addDependencyInvocation);
 
@@ -129,7 +131,9 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 Statement currentStatement = body.getStatements().get(i);
                 if (dependencyComparator.compare(currentStatement, addDependencyInvocation) > 0) {
                     if (dependencyComparator.getBeforeDependency() != null) {
-                        J.MethodInvocation beforeDependency = (J.MethodInvocation) (dependencyComparator.getBeforeDependency() instanceof J.Return ? ((J.Return) dependencyComparator.getBeforeDependency()).getExpression() : dependencyComparator.getBeforeDependency());
+                        J.MethodInvocation beforeDependency = (J.MethodInvocation) (dependencyComparator.getBeforeDependency() instanceof J.Return ?
+                                requireNonNull(((J.Return) dependencyComparator.getBeforeDependency()).getExpression()) :
+                                dependencyComparator.getBeforeDependency());
                         if (i == 0) {
                             if (!addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
                                 statements.set(i, currentStatement.withPrefix(Space.format("\n\n" + currentStatement.getPrefix().getIndent())));
@@ -162,10 +166,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     break;
                 }
             }
-            if (i == body.getStatements().size()) {
+            if (body.getStatements().size() == i) {
                 if (!body.getStatements().isEmpty()) {
                     J.Return lastStatement = (J.Return) statements.remove(i - 1);
-                    statements.add(lastStatement.getExpression().withPrefix(lastStatement.getPrefix()));
+                    statements.add(requireNonNull(lastStatement.getExpression()).withPrefix(lastStatement.getPrefix()));
                     if (lastStatement.getExpression() instanceof J.MethodInvocation && !((J.MethodInvocation) lastStatement.getExpression()).getSimpleName().equals(addDependencyInvocation.getSimpleName())) {
                         addDependencyInvocation = addDependencyInvocation.withPrefix(Space.format("\n\n" + addDependencyInvocation.getPrefix().getIndent()));
                     }

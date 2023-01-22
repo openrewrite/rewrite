@@ -15,12 +15,29 @@
  */
 package org.openrewrite.gradle.search;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Paths;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindGradleProject extends Recipe {
+
+    @Option(displayName = "Search criteria",
+            description = "Whether to identify gradle projects by source file name or the presence of a marker",
+            valid = {"File", "Marker"},
+            example = "Marker")
+    @Nullable
+    SearchCriteria searchCriteria;
+
     @Override
     public String getDisplayName() {
         return "Find Gradle projects";
@@ -33,10 +50,22 @@ public class FindGradleProject extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        if (searchCriteria == SearchCriteria.Marker) {
+            return new JavaVisitor<ExecutionContext>() {
+                @Override
+                public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                    if (cu.getMarkers().findFirst(GradleProject.class).isPresent()) {
+                        return SearchResult.found(cu);
+                    }
+                    return cu;
+                }
+            };
+        }
+
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
-                if(tree instanceof SourceFile) {
+                if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     if (sourceFile.getSourcePath().endsWith(Paths.get("build.gradle")) ||
                         sourceFile.getSourcePath().endsWith(Paths.get("build.gradle.kts"))) {
@@ -46,5 +75,10 @@ public class FindGradleProject extends Recipe {
                 return tree;
             }
         };
+    }
+
+    public enum SearchCriteria {
+        File,
+        Marker
     }
 }

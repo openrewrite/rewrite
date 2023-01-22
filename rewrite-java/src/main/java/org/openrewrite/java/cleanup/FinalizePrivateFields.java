@@ -15,16 +15,9 @@
  */
 package org.openrewrite.java.cleanup;
 
-import java.util.*;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-
+import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -34,6 +27,9 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class FinalizePrivateFields extends Recipe {
     @Override
@@ -249,6 +245,7 @@ public class FinalizePrivateFields extends Recipe {
     }
 
     @Value
+    @EqualsAndHashCode(callSuper = false)
     private static class FindLastIdentifier extends JavaIsoVisitor<List<J.Identifier>> {
         /**
          * Find the last identifier in a J.FieldAccess. The purpose is to check whether it's a private field.

@@ -7,7 +7,7 @@ plugins {
 
 repositories {
     maven {
-        url = uri("https://repo.gradle.org/gradle/libs-releases-local/")
+        url = uri("https://repo.gradle.org/gradle/libs-releases/")
     }
     maven {
         url = uri("https://plugins.gradle.org/m2/")
@@ -20,6 +20,7 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
     implementation("org.codehaus.groovy:groovy:latest.release")
+    implementation("org.openrewrite.gradle.tooling:model:latest.release")
 
     compileOnly("org.gradle:gradle-base-services:latest.release")
     compileOnly("org.gradle:gradle-core-api:latest.release")
@@ -34,6 +35,10 @@ dependencies {
     compileOnly("org.gradle:gradle-testing-jvm:latest.release")
 
     compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
+
+    compileOnly("org.gradle:gradle-tooling-api:latest.release")
+
+    testImplementation("org.gradle:gradle-tooling-api:latest.release")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already

@@ -16,6 +16,8 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,12 +29,14 @@ public class FindGradleProjectTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindGradleProject());
+        spec.recipe(new FindGradleProject(null));
     }
 
-    @Test
-    void isGradleGroovyProject() {
+    @ParameterizedTest
+    @EnumSource(FindGradleProject.SearchCriteria.class)
+    void isGradleGroovyProject(FindGradleProject.SearchCriteria criteria) {
         rewriteRun(
+          spec -> spec.recipe(new FindGradleProject(criteria)),
           buildGradle(
             """
               plugins {

@@ -37,6 +37,8 @@ import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyClassifier extends Recipe {
@@ -85,7 +87,7 @@ public class ChangeDependencyClassifier extends Recipe {
     @Override
     public GroovyVisitor<ExecutionContext> getVisitor() {
         return new GroovyVisitor<ExecutionContext>() {
-            final DependencyMatcher depMatcher = DependencyMatcher.build(groupId + ":" + artifactId).getValue();
+            final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
             @Override

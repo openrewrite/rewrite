@@ -4115,7 +4115,7 @@ public interface J extends Tree {
         }
 
         /**
-         * This is an alias for {@link #getConstructorType()}.
+         * This is an alias for {@link J.NewClass#getConstructorType()}.
          *
          * @return The constructor type.
          */
@@ -4125,7 +4125,7 @@ public interface J extends Tree {
         }
 
         /**
-         * This is an alias for {@link #withConstructorType(JavaType.Method)}.
+         * This is an alias for {@link J.NewClass#withConstructorType(JavaType.Method)}.
          *
          * @param methodType The constructor type.
          * @return An instance with the new constructor type.

@@ -30,7 +30,7 @@ class UpgradePluginVersionTest implements RewriteTest {
           buildGradle(
             """
               plugins {
-                  id 'com.jfrog.bintray' version '1.7.0'
+                  id 'com.jfrog.bintray' version '1.7.1'
                   id 'com.github.johnrengelman.shadow' version '6.1.0'
               }
               """,
@@ -66,16 +66,16 @@ class UpgradePluginVersionTest implements RewriteTest {
     @Test
     void exactVersionDoesNotHaveToBeResolvable() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradePluginVersion("com.madeup.doesnotexist", "2.0", null)),
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "999.0", null)),
           buildGradle(
             """
               plugins {
-                  id 'com.madeup.doesnotexist' version '1.0'
+                  id 'org.openrewrite.rewrite' version '5.34.0'
               }
               """,
             """
               plugins {
-                  id 'com.madeup.doesnotexist' version '2.0'
+                  id 'org.openrewrite.rewrite' version '999.0'
               }
               """
           )

@@ -42,7 +42,7 @@ class AddDependencyTest implements RewriteTest {
                 boolean getMap() {
                     return IntMath.isPrime(5);
                 }
-   
+         
             }
       """;
 
@@ -77,8 +77,24 @@ class AddDependencyTest implements RewriteTest {
               java(usingGuavaIntMath)
             ),
             buildGradle(
-              "",
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
                 }
@@ -139,11 +155,27 @@ class AddDependencyTest implements RewriteTest {
             ),
             buildGradle(
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "commons-lang:commons-lang:1.0"
                 }
                 """,
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
                     implementation "commons-lang:commons-lang:1.0"
@@ -164,11 +196,27 @@ class AddDependencyTest implements RewriteTest {
             ),
             buildGradle(
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "commons-lang:commons-lang:1.0"
                 }
                 """,
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "commons-lang:commons-lang:1.0"
                     
@@ -190,12 +238,28 @@ class AddDependencyTest implements RewriteTest {
             ),
             buildGradle(
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "com.example:example:1.0"
                     testImplementation "junit:junit:4.12"
                 }
                 """,
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "com.example:example:1.0"
                     implementation "com.google.guava:guava:29.0-jre"
@@ -215,7 +279,7 @@ class AddDependencyTest implements RewriteTest {
             srcMainJava(
               java("""
                 import lombok.Value;
-                
+                                
                 @Value
                 class A {
                     String b;
@@ -225,6 +289,14 @@ class AddDependencyTest implements RewriteTest {
             ),
             buildGradle(
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "commons-lang:commons-lang:1.0"
 
@@ -232,6 +304,14 @@ class AddDependencyTest implements RewriteTest {
                 }
                 """,
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     annotationProcessor "org.projectlombok:lombok:1.0"
                     
@@ -255,6 +335,14 @@ class AddDependencyTest implements RewriteTest {
             ),
             buildGradle(
               """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
 
@@ -263,6 +351,14 @@ class AddDependencyTest implements RewriteTest {
                 }
                 """,
               """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
 
@@ -286,11 +382,27 @@ class AddDependencyTest implements RewriteTest {
             ),
             buildGradle(
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
                 }
                 """,
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation group: "commons-lang", name: "commons-lang", version: "1.0"
 
@@ -312,6 +424,14 @@ class AddDependencyTest implements RewriteTest {
             ),
             buildGradle(
               """
+                plugins {
+                    id 'java-library'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
                 dependencies {
                     implementation "com.google.guava:guava:28.0-jre"
                 }
@@ -358,9 +478,9 @@ class AddDependencyTest implements RewriteTest {
             ),
             settingsGradle(
               """
-              include "project1"
-              include "project2"
-              """
+                include "project1"
+                include "project2"
+                """
             )
           ),
           mavenProject("project1",

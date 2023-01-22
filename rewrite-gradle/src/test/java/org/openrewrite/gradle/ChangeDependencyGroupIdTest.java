@@ -30,23 +30,29 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupId("org.springframework.boot", "spring-boot-starter", "org.newboot", "")),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  rewrite 'org.openrewrite:rewrite-gradle:latest.integration'
-                  implementation 'org.springframework.cloud:spring-cloud-starter-sleuth:3.0.3'
-                  implementation 'org.springframework.integration:spring-integration-ftp:5.5.1'
                   implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
-                  implementation 'commons-lang:commons-lang:2.6'
-                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  rewrite 'org.openrewrite:rewrite-gradle:latest.integration'
-                  implementation 'org.springframework.cloud:spring-cloud-starter-sleuth:3.0.3'
-                  implementation 'org.springframework.integration:spring-integration-ftp:5.5.1'
                   implementation 'org.newboot:spring-boot-starter:2.5.4'
-                  implementation 'commons-lang:commons-lang:2.6'
-                  testImplementation 'org.springframework.boot:spring-boot-starter-test'
               }
               """
           )
@@ -60,12 +66,28 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
                   api "org.openrewrite:rewrite-core:latest.release"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.dewrite:rewrite-core:latest.release'
                   api "org.dewrite:rewrite-core:latest.release"
@@ -82,12 +104,28 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api group: 'org.dewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.dewrite", name: "rewrite-core", version: "latest.release"
@@ -104,6 +142,14 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                   mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core'
                   api "org.openrewrite:rewrite-core"
@@ -112,6 +158,14 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                   mavenCentral()
+              }
+              
               dependencies {
                   api 'org.dewrite:rewrite-core'
                   api "org.dewrite:rewrite-core"
@@ -130,6 +184,14 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                   mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:classifier'
                   api "org.openrewrite:rewrite-core:latest.release:classifier"
@@ -138,6 +200,14 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                   mavenCentral()
+              }
+              
               dependencies {
                   api 'org.dewrite:rewrite-core:latest.release:classifier'
                   api "org.dewrite:rewrite-core:latest.release:classifier"
@@ -156,6 +226,14 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyGroupId(group, artifact, "org.dewrite", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                   mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core@ext'
                   api "org.openrewrite:rewrite-core@ext"
@@ -172,6 +250,14 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                   mavenCentral()
+              }
+              
               dependencies {
                   api 'org.dewrite:rewrite-core@ext'
                   api "org.dewrite:rewrite-core@ext"
