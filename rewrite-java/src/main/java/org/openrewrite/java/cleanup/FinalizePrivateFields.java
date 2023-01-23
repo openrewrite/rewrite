@@ -49,8 +49,12 @@ public class FinalizePrivateFields extends Recipe {
             private Set<JavaType.Variable> privateFieldsToBeFinalized = new HashSet<>();
 
             @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
-                ExecutionContext ctx) {
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                if (!classDecl.getLeadingAnnotations().isEmpty()) {
+                    // skip if a class has any annotation, since the annotation could generate some code to assign
+                    // fields like Lombok @Setter.
+                    return classDecl;
+                }
 
                 List<J.VariableDeclarations.NamedVariable> privateFields = collectPrivateFields(classDecl);
                 Map<JavaType.Variable, Integer> privateFieldAssignCountMap = privateFields.stream()
@@ -89,6 +93,11 @@ public class FinalizePrivateFields extends Recipe {
         };
     }
 
+    private static boolean anyAnnotationApplied(J.VariableDeclarations mv) {
+        return !mv.getLeadingAnnotations().isEmpty()
+            || mv.getTypeExpression() instanceof J.AnnotatedType;
+    }
+
     /**
      * Collect private and non-final fields from a class
      */
@@ -99,6 +108,7 @@ public class FinalizePrivateFields extends Recipe {
             .filter(statement -> statement instanceof J.VariableDeclarations)
             .map(J.VariableDeclarations.class::cast)
             .filter(mv -> mv.hasModifier(J.Modifier.Type.Private) && !mv.hasModifier(J.Modifier.Type.Final))
+            .filter(mv -> !anyAnnotationApplied(mv))
             .map(J.VariableDeclarations::getVariables)
             .flatMap(Collection::stream)
             .collect(Collectors.toList());

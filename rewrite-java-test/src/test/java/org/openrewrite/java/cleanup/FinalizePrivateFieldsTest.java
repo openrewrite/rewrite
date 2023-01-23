@@ -336,6 +336,7 @@ class FinalizePrivateFieldsTest implements RewriteTest {
                   A() {
                     name = "XYZ";
                   }
+
                   A(String n) {
                     name = n;
                   }
@@ -348,8 +349,44 @@ class FinalizePrivateFieldsTest implements RewriteTest {
                   A() {
                     name = "XYZ";
                   }
+
                   A(String n) {
                     name = n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("Doesn't support if-else conditions analysis, to be enhanced.")
+    @Test
+    void fieldAssignedInIfElseStatementsInConstructor() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private String name;
+
+                  A(boolean condition) {
+                      if (condition) {
+                          name = "ABC";
+                      } else {
+                          name = "XYZ";
+                      }
+                  }
+              }
+              """,
+            """
+              class A {
+                  private final String name;
+
+                  A(boolean condition) {
+                      if (condition) {
+                          name = "ABC";
+                      } else {
+                          name = "XYZ";
+                      }
                   }
               }
               """
@@ -677,6 +714,50 @@ class FinalizePrivateFieldsTest implements RewriteTest {
                   A() {
                       List.of(1,2,3).forEach(n -> x = n);
                       Runnable r = () -> y = 2;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anyFieldAnnotationAppliedIgnored() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Setter;
+
+              public class A {
+                  @Setter
+                  private int num = 1;
+                  private @Setter String name = "ABC";
+
+                  static void test() {
+                      A a = new A();
+                      a.setNum(2);
+                      a.setName("XYZ");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anyAnnotationAppliedClassIgnored() {
+        rewriteRun(
+          java(
+            """
+              import lombok.Data;
+                          
+              @Data
+              public class B {
+                  private int num = 0;
+                          
+                  void func() {
+                      B b = new B();
+                      b.setNum(1);
                   }
               }
               """
