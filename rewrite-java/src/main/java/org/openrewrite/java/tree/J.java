@@ -2788,6 +2788,12 @@ public interface J extends Tree {
             return new CoordinateBuilder.Expression(this);
         }
 
+        @Override
+        @Transient
+        public List<J> getSideEffects() {
+            return expression.getElement().getSideEffects();
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -5096,6 +5102,12 @@ public interface J extends Tree {
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
+        }
+
+        @Override
+        @Transient
+        public List<J> getSideEffects() {
+            return expression.getSideEffects();
         }
     }
 
