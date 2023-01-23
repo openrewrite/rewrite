@@ -373,6 +373,92 @@ public interface K extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class Binary implements K, Expression, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.Binary.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Expression left;
+
+        JLeftPadded<K.Binary.Type> operator;
+
+        public K.Binary.Type getOperator() {
+            return operator.getElement();
+        }
+
+        public K.Binary withOperator(K.Binary.Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @With
+        Expression right;
+
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitBinary(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public enum Type {
+            Contains,
+            RangeTo
+        }
+
+        public K.Binary.Padding getPadding() {
+            K.Binary.Padding p;
+            if (this.padding == null) {
+                p = new K.Binary.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new K.Binary.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final K.Binary t;
+
+            public JLeftPadded<K.Binary.Type> getOperator() {
+                return t.operator;
+            }
+
+            public K.Binary withOperator(JLeftPadded<K.Binary.Type> operator) {
+                return t.operator == operator ? t : new K.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     @With
     final class KString implements K, Statement, Expression {

@@ -63,6 +63,23 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         throw new UnsupportedOperationException("Kotlin has a different structure for its compilation unit. See K.CompilationUnit.");
     }
 
+    public J visitBinary(K.Binary binary, P p) {
+        K.Binary b = binary;
+        b = b.withPrefix(visitSpace(b.getPrefix(), KSpace.Location.BINARY_PREFIX, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(b, p);
+        if (!(temp instanceof K.Binary)) {
+            return temp;
+        } else {
+            b = (K.Binary) temp;
+        }
+        b = b.withLeft(visitAndCast(b.getLeft(), p));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), KLeftPadded.Location.BINARY_OPERATOR, p));
+        b = b.withRight(visitAndCast(b.getRight(), p));
+        b = b.withType(visitType(b.getType(), p));
+        return b;
+    }
+
     public J visitFunctionType(K.FunctionType functionType, P p) {
         K.FunctionType f = functionType;
         f = f.withReceiver(visitRightPadded(f.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p));

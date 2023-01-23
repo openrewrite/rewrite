@@ -75,4 +75,18 @@ public class IfTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void inRange() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( n : Int ) {
+                    if ( n in 1..4 ) {
+                    }
+                }
+            """
+          )
+        );
+    }
 }

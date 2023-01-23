@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -845,10 +844,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitFunctionCall(FirFunctionCall functionCall, ExecutionContext ctx) {
         FirFunctionCallOrigin origin = functionCall.getOrigin();
         if (origin == FirFunctionCallOrigin.Operator && !(functionCall instanceof FirImplicitInvokeCall)) {
-            return mapOperatorFunctionCall(functionCall);
-        } else {
-            return mapFunctionalCall(functionCall, origin == FirFunctionCallOrigin.Infix);
+            String operatorName = functionCall.getCalleeReference().getName().asString();
+            if (isUnaryOperation(operatorName)) {
+                return mapUnaryOperation(functionCall);
+            } else if ("contains".equals(operatorName) || "rangeTo".equals(operatorName)) {
+                return mapKotlinBinaryOperation(functionCall);
+            }
+
+            return mapBinaryOperation(functionCall);
         }
+
+        return mapFunctionalCall(functionCall, origin == FirFunctionCallOrigin.Infix);
     }
 
     private J mapFunctionalCall(FirFunctionCall functionCall, boolean isInfix) {
@@ -1023,107 +1029,158 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return JContainer.build(prefix, parameters, Markers.EMPTY);
     }
 
-    private J mapOperatorFunctionCall(FirFunctionCall functionCall) {
+    private J mapUnaryOperation(FirFunctionCall functionCall) {
+        Space prefix = whitespace();
+        String name = functionCall.getCalleeReference().getName().asString();
+
+        JLeftPadded<J.Unary.Type> op;
+        Expression expr;
+
+        switch (name) {
+            case "dec":
+                if (source.startsWith("--", cursor)) {
+                    skip("--");
+                    op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
+                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                } else {
+                    // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
+                    // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
+                    // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
+                    // So, we extract the name from the source based on the post operator.
+                    int saveCursor = cursor;
+                    String opName = sourceBefore("--").getWhitespace().trim();
+                    cursor = saveCursor;
+
+                    expr = convertToIdentifier(opName);
+                    op = padLeft(sourceBefore("--"), J.Unary.Type.PostDecrement);
+                }
+                break;
+            case "inc":
+                if (source.startsWith("++", cursor)) {
+                    skip("++");
+                    op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
+                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                } else {
+                    // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
+                    // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
+                    // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
+                    // So, we extract the name from the source based on the post operator.
+                    int saveCursor = cursor;
+                    String opName = sourceBefore("++").getWhitespace().trim();
+                    cursor = saveCursor;
+
+                    expr = convertToIdentifier(opName);
+                    op = padLeft(sourceBefore("++"), J.Unary.Type.PostIncrement);
+                }
+                break;
+            case "not":
+                skip("!");
+                op = padLeft(EMPTY, J.Unary.Type.Not);
+                expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                break;
+            case "unaryMinus":
+                skip("-");
+                op = padLeft(EMPTY, J.Unary.Type.Negative);
+                expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                break;
+            case "unaryPlus":
+                skip("+");
+                op = padLeft(EMPTY, J.Unary.Type.Positive);
+                expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported unary operator type.");
+        }
+
+        return new J.Unary(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                op,
+                expr,
+                typeMapping.type(functionCall));
+    }
+
+    private J mapKotlinBinaryOperation(FirFunctionCall functionCall) {
         Space prefix = whitespace();
 
         Space opPrefix;
+        K.Binary.Type kotlinBinaryType;
+
         String name = functionCall.getCalleeReference().getName().asString();
-
-        boolean unaryOperation = isUnaryOperator(name);
-        if (unaryOperation) {
-            JLeftPadded<J.Unary.Type> op;
-            Expression expr;
-
-            switch (name) {
-                case "dec":
-                    if (source.startsWith("--", cursor)) {
-                        skip("--");
-                        op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
-                        expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
-                    } else {
-                        // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
-                        // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
-                        // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
-                        // So, we extract the name from the source based on the post operator.
-                        int saveCursor = cursor;
-                        String opName = sourceBefore("--").getWhitespace().trim();
-                        cursor = saveCursor;
-                        expr = convertToIdentifier(opName);
-                        op = padLeft(sourceBefore("--"), J.Unary.Type.PostDecrement);
-                    }
-                    break;
-                case "inc":
-                    if (source.startsWith("++", cursor)) {
-                        skip("++");
-                        op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
-                        expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
-                    } else {
-                        // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
-                        // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
-                        // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
-                        // So, we extract the name from the source based on the post operator.
-                        int saveCursor = cursor;
-                        String opName = sourceBefore("++").getWhitespace().trim();
-                        cursor = saveCursor;
-                        expr = convertToIdentifier(opName);
-                        op = padLeft(sourceBefore("++"), J.Unary.Type.PostIncrement);
-                    }
-                    break;
-                case "not":
-                    skip("!");
-                    op = padLeft(EMPTY, J.Unary.Type.Not);
-                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
-                    break;
-                case "unaryMinus":
-                    skip("-");
-                    op = padLeft(EMPTY, J.Unary.Type.Negative);
-                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
-                    break;
-                case "unaryPlus":
-                    skip("+");
-                    op = padLeft(EMPTY, J.Unary.Type.Positive);
-                    expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
-                    break;
-                default:
-                    throw new UnsupportedOperationException("Unsupported unary operator type.");
+        if ("contains".equals(name)) {
+            if (functionCall.getArgumentList().getArguments().size() > 1) {
+                throw new UnsupportedOperationException("Unsupported number of arguments in contains operator.");
             }
 
-            return new J.Unary(randomId(), prefix, Markers.EMPTY, op, expr, typeMapping.type(functionCall));
-        } else {
-            J left = visitElement(functionCall.getDispatchReceiver(), ctx);
-
-            J.Binary.Type type;
-            switch (name) {
-                case "div":
-                    type = J.Binary.Type.Division;
-                    opPrefix = sourceBefore("/");
-                    break;
-                case "minus":
-                    type = J.Binary.Type.Subtraction;
-                    opPrefix = sourceBefore("-");
-                    break;
-                case "plus":
-                    type = J.Binary.Type.Addition;
-                    opPrefix = sourceBefore("+");
-                    break;
-                case "times":
-                    type = J.Binary.Type.Multiplication;
-                    opPrefix = sourceBefore("*");
-                    break;
-                default:
-                    throw new UnsupportedOperationException("Unsupported binary operator type.");
-            }
-            J right = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
-
-            return new J.Binary(
+            Expression left = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+            // The `in` keyword is a function call to `contains` applied to a primitive range. I.E., `IntRange`, `LongRange`.
+            opPrefix = sourceBefore("in");
+            kotlinBinaryType = K.Binary.Type.Contains;
+            Expression right = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
+            return new K.Binary(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
-                    (Expression) left,
-                    padLeft(opPrefix, type),
-                    (Expression) right,
+                    left,
+                    padLeft(opPrefix, kotlinBinaryType),
+                    right,
+                    typeMapping.type(functionCall));
+        } else {
+            Expression left = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+            kotlinBinaryType = K.Binary.Type.RangeTo;
+            opPrefix = sourceBefore("..");
+            Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+            return new K.Binary(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    left,
+                    padLeft(opPrefix, kotlinBinaryType),
+                    right,
                     typeMapping.type(functionCall));
         }
+    }
+
+    private J mapBinaryOperation(FirFunctionCall functionCall) {
+        Space prefix = whitespace();
+
+        Expression left = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+
+        Space opPrefix;
+        J.Binary.Type javaBinaryType;
+
+        String name = functionCall.getCalleeReference().getName().asString();
+        switch (name) {
+            case "div":
+                javaBinaryType = J.Binary.Type.Division;
+                opPrefix = sourceBefore("/");
+                break;
+            case "minus":
+                javaBinaryType = J.Binary.Type.Subtraction;
+                opPrefix = sourceBefore("-");
+                break;
+            case "plus":
+                javaBinaryType = J.Binary.Type.Addition;
+                opPrefix = sourceBefore("+");
+                break;
+            case "times":
+                javaBinaryType = J.Binary.Type.Multiplication;
+                opPrefix = sourceBefore("*");
+                break;
+            default:
+                throw new UnsupportedOperationException("Unsupported binary operator type.");
+        }
+        Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+
+        return new J.Binary(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                left,
+                padLeft(opPrefix, javaBinaryType),
+                right,
+                typeMapping.type(functionCall));
     }
 
     @Override
@@ -1954,7 +2011,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         boolean unaryAssignment = variableAssignment.getRValue() instanceof FirFunctionCall &&
                 ((FirFunctionCall) variableAssignment.getRValue()).getOrigin() == FirFunctionCallOrigin.Operator &&
                 ((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference() instanceof FirResolvedNamedReference &&
-                isUnaryOperator((((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference()).getName().asString());
+                isUnaryOperation((((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference()).getName().asString());
 
         if (unaryAssignment) {
             return visitElement(variableAssignment.getRValue(), ctx);
@@ -2401,7 +2458,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return op;
     }
 
-    private boolean isUnaryOperator(String name) {
+    private boolean isUnaryOperation(String name) {
         return "dec".equals(name) ||
                 "inc".equals(name) ||
                 "not".equals(name) ||

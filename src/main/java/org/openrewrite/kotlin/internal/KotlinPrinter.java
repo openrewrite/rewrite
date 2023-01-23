@@ -73,6 +73,26 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitBinary(K.Binary binary, PrintOutputCapture<P> p) {
+        String keyword = "";
+        switch (binary.getOperator()) {
+            case Contains:
+                keyword = "in";
+                break;
+            case RangeTo:
+                keyword = "..";
+                break;
+        }
+        beforeSyntax(binary, KSpace.Location.BINARY_PREFIX, p);
+        visit(binary.getLeft(), p);
+        visitSpace(binary.getPadding().getOperator().getBefore(), KSpace.Location.BINARY_OPERATOR, p);
+        p.append(keyword);
+        visit(binary.getRight(), p);
+        afterSyntax(binary, p);
+        return binary;
+    }
+
+    @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p);

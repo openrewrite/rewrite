@@ -17,7 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 public class KLeftPadded {
     public enum Location {
-        TODO(KSpace.Location.TODO);
+        BINARY_OPERATOR(KSpace.Location.BINARY_OPERATOR);
 
         private final KSpace.Location beforeLocation;
 
