@@ -21,39 +21,42 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-@Disabled("FIR does not contain a for loop and the PSI is not accessible")
-public class ForLoopTest implements RewriteTest {
+@Disabled("Requires K model object for when.")
+public class WhenTest implements RewriteTest {
 
     @Test
-    void inList() {
+    void when() {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    val l = listOf ( 1 , 2 , 3 )
-                    for ( i in l ) {
-                        println ( i )
-                    }
-                }
-            """
+                  fun method(i: Int) : String {
+                      when (i) {
+                          1 -> return "1"
+                          2 -> return "2"
+                          else -> {
+                              return "42"
+                          }
+                      }
+                  }
+              """
           )
         );
     }
 
     @Test
-    void inMap() {
+    void multiCase() {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                      val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
-                      for ( ( key , value ) in map ) {
-                          print ( key )
-                          print ( ", " )
-                          println ( value )
+                  fun method(i: Int) : String {
+                      when (i) {
+                          1, 2 -> return "1 or 2"
+                          else -> {
+                              return "42"
+                          }
                       }
-                }
-            """
+                  }
+              """
           )
         );
     }
@@ -63,12 +66,14 @@ public class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    for ( i in 1..42 ) {
-                        println ( i )
-                    }
-                }
-            """
+                  fun method(i: Int) : String {
+                      when (i) {
+                          in 1..10 -> return "in range 1"
+                          !in 10..20 -> return "not in range 2"
+                          else -> "42"
+                      }
+                  }
+              """
           )
         );
     }
