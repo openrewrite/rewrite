@@ -1241,6 +1241,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 arrow,
                 body,
                 closureType);
+
         return new K.FunctionType(
                 randomId(),
                 lambda,
@@ -1309,13 +1310,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitProperty(FirProperty property, ExecutionContext ctx) {
         Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
 
         List<J> modifiers = emptyList();
-        boolean isVal = property.isVal();
-        List<J.Annotation> annotations = mapModifiers(isVal ? ModifierScope.VAL : ModifierScope.VAR, property.getAnnotations());
-
-        Markers markers = Markers.EMPTY;
-        markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
+        List<J.Annotation> annotations;
+        if (source.startsWith("val ", cursor) || source.startsWith("var ", cursor)) {
+            boolean isVal = property.isVal();
+            annotations = mapModifiers(isVal ? ModifierScope.VAL : ModifierScope.VAR, property.getAnnotations());
+            markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
+        } else {
+            annotations = mapAnnotations(property.getAnnotations());
+        }
 
         JRightPadded<J.VariableDeclarations.NamedVariable> receiver = null;
         if (property.getReceiverTypeRef() != null) {
@@ -1929,10 +1934,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitValueParameter(FirValueParameter valueParameter, ExecutionContext ctx) {
         Space prefix = whitespace();
-
-        List<J> modifiers = emptyList();
         Markers markers = Markers.EMPTY;
 
+        List<J> modifiers = emptyList();
         List<J.Annotation> annotations;
         if (source.startsWith("val ", cursor) || source.startsWith("var ", cursor)) {
             boolean isVal = valueParameter.isVal();
