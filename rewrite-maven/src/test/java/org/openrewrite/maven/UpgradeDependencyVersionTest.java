@@ -798,7 +798,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       <dependency>
                           <groupId>com.fasterxml.jackson.core</groupId>
                           <artifactId>jackson-core</artifactId>
-                          <version>2.13.4</version>
+                          <version>2.13.5</version>
                       </dependency>
                   </dependencies>
               </project>
