@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -58,6 +57,7 @@ public class FinalizePrivateFields extends Recipe {
 
                 List<J.VariableDeclarations.NamedVariable> privateFields = collectPrivateFields(classDecl);
                 Map<JavaType.Variable, Integer> privateFieldAssignCountMap = privateFields.stream()
+                    .filter(v -> v.getVariableType() != null)
                     .collect(Collectors.toMap(J.VariableDeclarations.NamedVariable::getVariableType,
                         v -> v.getInitializer() != null ? 1 : 0));
 
