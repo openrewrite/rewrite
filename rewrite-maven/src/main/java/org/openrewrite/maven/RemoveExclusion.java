@@ -15,40 +15,69 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 import java.util.Optional;
 
+import static org.openrewrite.internal.StringUtils.matchesGlob;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveExclusion extends Recipe {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
             example = "guava")
     String artifactId;
 
-    @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+    @Option(displayName = "Exclusion Group",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
             example = "com.google.guava")
     String exclusionGroupId;
 
-    @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+    @Option(displayName = "Exclusion Artifact",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
             example = "guava")
     String exclusionArtifactId;
+
+    @Option(displayName = "Only ineffective",
+            description = "Default false. If enabled, matching exclusions will only be removed if they are ineffective (if the excluded dependency was not actually a transitive dependency of the target dependency).",
+            required = false,
+            example = "true")
+    @Nullable
+    Boolean onlyIneffective;
+
+    @JsonCreator
+    public RemoveExclusion(String groupId, String artifactId, String exclusionGroupId, String exclusionArtifactId,
+            @Nullable Boolean onlyIneffective) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.exclusionGroupId = exclusionGroupId;
+        this.exclusionArtifactId = exclusionArtifactId;
+        this.onlyIneffective = onlyIneffective;
+    }
+
+    @Deprecated
+    public RemoveExclusion(String groupId, String artifactId, String exclusionGroupId, String exclusionArtifactId) {
+        this(groupId, artifactId, exclusionGroupId, exclusionArtifactId, null);
+    }
 
     @Override
     public String getDisplayName() {
@@ -57,7 +86,7 @@ public class RemoveExclusion extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove a single exclusion from on a particular dependency.";
+        return "Remove any matching exclusion from any matching dependency.";
     }
 
     @Override
@@ -76,8 +105,9 @@ public class RemoveExclusion extends Recipe {
                                     e = e.withContent(ListUtils.map(e.getContent(), child2 -> {
                                         if (child2 instanceof Xml.Tag && "exclusion".equals(((Xml.Tag) child2).getName())) {
                                             Xml.Tag exclusion = (Xml.Tag) child2;
-                                            if (exclusion.getChildValue("groupId").map(g -> g.equals(exclusionGroupId)).orElse(false) &&
-                                                exclusion.getChildValue("artifactId").map(g -> g.equals(exclusionArtifactId)).orElse(false)) {
+                                            if (exclusion.getChildValue("groupId").map(g -> matchesGlob(g, exclusionGroupId)).orElse(false) &&
+                                                exclusion.getChildValue("artifactId").map(g -> matchesGlob(g, exclusionArtifactId)).orElse(false) &&
+                                                    !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && onlyIneffective())) {
                                                 return null;
                                             }
                                         }
@@ -98,6 +128,31 @@ public class RemoveExclusion extends Recipe {
                 }
                 return super.visitTag(tag, executionContext);
             }
+
+            private GroupArtifact groupArtifact(Xml.Tag tag) {
+                return new GroupArtifact(
+                        tag.getChildValue("groupId").orElseThrow(IllegalArgumentException::new),
+                        tag.getChildValue("artifactId").orElseThrow(IllegalArgumentException::new)
+                );
+            }
+
+            private boolean isEffectiveExclusion(Xml.Tag tag, GroupArtifact exclusion) {
+                final ResolvedDependency dependency = findDependency(tag);
+                if (dependency != null) {
+                    return dependency.getEffectiveExclusions().contains(exclusion);
+                }
+                final ResolvedManagedDependency managedDependency = findManagedDependency(tag);
+                // With current code, if a dependency is only in dependencyManagement (and not an active dependency in some scope),
+                // then we never resolve its transitive dependencies and therefore cannot check if exclusions are effective.
+                // So, default to assuming those exclusions are effective, to avoid incorrect removals.
+                // Meanwhile, exclusions on bom imports aren't actually implemented in Maven (src https://issues.apache.org/jira/browse/MNG-5600),
+                // so those are always ineffective
+                return managedDependency != null && managedDependency.getRequested() != null;
+            }
         };
+    }
+
+    private boolean onlyIneffective() {
+        return Boolean.TRUE.equals(onlyIneffective);
     }
 }

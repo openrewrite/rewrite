@@ -63,12 +63,19 @@ public class ResolvedDependency implements Serializable {
 
     int depth;
 
+    @NonFinal
+    List<GroupArtifact> effectiveExclusions;
+
     /**
      * Only used by dependency resolution to avoid unnecessary empty list allocations for leaf dependencies.
      * @param dependencies A dependency list
      */
     void unsafeSetDependencies(List<ResolvedDependency> dependencies) {
         this.dependencies = dependencies;
+    }
+
+    void unsafeSetEffectiveExclusions(List<GroupArtifact> effectiveExclusions) {
+        this.effectiveExclusions = effectiveExclusions;
     }
 
     public ResolvedGroupArtifactVersion getGav() {
