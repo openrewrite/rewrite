@@ -749,15 +749,12 @@ class FinalizePrivateFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              import lombok.Setter;
-
-              @Setter
+              import lombok.Data;
+                          
+              @Data
               public class B {
-                      @Setter
-                      public int b;
-
                   private int num = 0;
-
+                          
                   void func() {
                       B b = new B();
                       b.setNum(1);
