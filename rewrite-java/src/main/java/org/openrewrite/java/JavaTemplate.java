@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
@@ -29,6 +30,8 @@ import org.openrewrite.template.SourceTemplate;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -174,5 +177,110 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return new JavaTemplate(parentScope, javaParser, code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
+    }
+
+    public static PatternBuilder compile(String name, F0 f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F1<?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F2<?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F3<?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F4<?, ?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F5<?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F6<?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F7<?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F8<?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F9<?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    public static PatternBuilder compile(String name, F10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name);
+    }
+
+    @Value
+    @SuppressWarnings("unused")
+    public static class PatternBuilder {
+        String name;
+
+        public JavaTemplate build(JavaVisitor<?> owner) {
+            try {
+                Class<?> templateClass = Class.forName(owner.getClass().getName() + "_" + name);
+                Method getTemplate = templateClass.getDeclaredMethod("getTemplate", JavaVisitor.class);
+                return (JavaTemplate) getTemplate.invoke(null, owner);
+            } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException |
+                     IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    public interface F0 {
+        void accept() throws Exception;
+    }
+
+    public interface F1<P1> {
+        void accept(P1 p) throws Exception;
+    }
+
+    public interface F2<P1, P2> {
+        void accept(P1 p, P2 p2) throws Exception;
+    }
+
+    public interface F3<P1, P2, P3> {
+        void accept(P1 p, P2 p2, P3 p3) throws Exception;
+    }
+
+    public interface F4<P1, P2, P3, P4> {
+        void accept(P1 p, P2 p2, P3 p3, P4 p4) throws Exception;
+    }
+
+    public interface F5<P1, P2, P3, P4, P5> {
+        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5) throws Exception;
+    }
+
+    public interface F6<P1, P2, P3, P4, P5, P6> {
+        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6) throws Exception;
+    }
+
+    public interface F7<P1, P2, P3, P4, P5, P6, P7> {
+        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7) throws Exception;
+    }
+
+    public interface F8<P1, P2, P3, P4, P5, P6, P7, P8> {
+        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8) throws Exception;
+    }
+
+    public interface F9<P1, P2, P3, P4, P5, P6, P7, P8, P9> {
+        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9) throws Exception;
+    }
+
+    public interface F10<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10> {
+        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9, P10 p10) throws Exception;
     }
 }
