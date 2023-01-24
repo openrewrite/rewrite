@@ -205,13 +205,18 @@ public class Result {
                 new PrintOutputCapture<>(0) :
                 new PrintOutputCapture<>(0, markerPrinter);
 
+        FileMode beforeMode = before != null  && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+        FileMode afterMode = after != null  && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 beforePath,
                 afterPath,
                 relativeTo,
                 before == null ? "" : before.printAll(out),
                 after == null ? "" : after.printAll(out.clone()),
-                recipes.stream().map(Stack::peek).collect(Collectors.toSet())
+                recipes.stream().map(Stack::peek).collect(Collectors.toSet()),
+                beforeMode,
+                afterMode
         )) {
             this.relativeTo = relativeTo;
             return diffEntry.getDiff(ignoreAllWhitespace);
@@ -233,6 +238,11 @@ public class Result {
 
         InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
                           String newSource, Set<Recipe> recipesThatMadeChanges) {
+            this(originalFilePath, filePath, relativeTo, oldSource, newSource, recipesThatMadeChanges, FileMode.REGULAR_FILE, FileMode.REGULAR_FILE);
+        }
+
+        InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
+                          String newSource, Set<Recipe> recipesThatMadeChanges, FileMode oldMode, FileMode newMode) {
 
             this.recipesThatMadeChanges = recipesThatMadeChanges;
 
@@ -245,7 +255,7 @@ public class Result {
 
                     if (originalFilePath != null) {
                         this.oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
-                        this.oldMode = FileMode.REGULAR_FILE;
+                        this.oldMode = oldMode;
                         this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
                     } else {
                         this.oldId = A_ZERO;
@@ -255,7 +265,7 @@ public class Result {
 
                     if (filePath != null) {
                         this.newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
-                        this.newMode = FileMode.REGULAR_FILE;
+                        this.newMode = newMode;
                         this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
                     } else {
                         this.newId = A_ZERO;
