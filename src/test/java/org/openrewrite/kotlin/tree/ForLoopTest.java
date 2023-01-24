@@ -21,7 +21,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-@Disabled("FIR does not contain a for loop and the PSI is not accessible")
 public class ForLoopTest implements RewriteTest {
 
     @Test
@@ -40,6 +39,7 @@ public class ForLoopTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void inMap() {
         rewriteRun(
