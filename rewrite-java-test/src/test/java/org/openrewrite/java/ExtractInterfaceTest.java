@@ -27,7 +27,7 @@ import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 
-class DataTableInterfaceTest implements RewriteTest {
+class ExtractInterfaceTest implements RewriteTest {
 
     private static class ExtractTestInterface extends Recipe {
         @Override
