@@ -59,6 +59,26 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
         );
     }
 
+    @Issue("a common case of https://github.com/openrewrite/rewrite/issues/2674")
+    @Test
+    void noCollectionInitializedInDoubleBraceIgnored() {
+        rewriteRun(
+          java(
+            """
+              import java.util.HashMap;
+              import java.util.Map;
+              class A {
+                  void example() {
+                      Map<String, String> map = new HashMap<>(){{notCollectionRelated();}};
+                  }
+                  void notCollectionRelated() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void doubleBranchInitializationForArgIgnored() {
         rewriteRun(

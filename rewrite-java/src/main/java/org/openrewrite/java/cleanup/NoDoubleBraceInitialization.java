@@ -22,7 +22,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -220,7 +219,7 @@ public class NoDoubleBraceInitialization extends Recipe {
 
     private static class FindMethodInvocationInDoubleBrace extends JavaIsoVisitor<AtomicBoolean>{
         /**
-         * Find whether any method invocation happened in the double brace.
+         * Find whether any collection content initialization method(e.g add() or put()) is invoked in the double brace.
          * @param j The subtree to search, supposed to be the 2nd brace (J.Block)
          * @return true if any method invocation found in the double brace, otherwise false.
          */
@@ -231,8 +230,19 @@ public class NoDoubleBraceInitialization extends Recipe {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
-            atomicBoolean.set(true);
-            return method;
+            if (atomicBoolean.get()) {
+                return method;
+            }
+
+            // In double brace initialization of a new class, methods to initialize collection content like `add()` or
+            // `put()` are all belonged to the anonymous class and have type `JavaType.Parameterized`.
+            if (method.getMethodType() != null
+                && method.getMethodType().getDeclaringType() instanceof JavaType.Parameterized) {
+                atomicBoolean.set(true);
+                return method;
+            }
+
+            return super.visitMethodInvocation(method, atomicBoolean);
         }
     }
 }
