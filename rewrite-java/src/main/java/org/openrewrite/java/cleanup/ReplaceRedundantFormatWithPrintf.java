@@ -15,12 +15,16 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -28,6 +32,17 @@ import org.openrewrite.java.tree.JavaType;
 import java.util.List;
 
 public class ReplaceRedundantFormatWithPrintf extends Recipe {
+
+    private static final MethodMatcher STRING_FORMAT_MATCHER_LOCALE =
+            new MethodMatcher("java.lang.String format(java.util.Locale, java.lang.String, java.lang.Object[])");
+    private static final MethodMatcher STRING_FORMAT_MATCHER_NO_LOCALE =
+            new MethodMatcher("java.lang.String format(java.lang.String, java.lang.Object[])");
+
+    private static final MethodMatcher PRINTSTREAM_PRINT_MATCHER =
+            new MethodMatcher("java.io.PrintStream print(java.lang.String)", true);
+    private static final MethodMatcher PRINTSTREAM_PRINTLN_MATCHER =
+            new MethodMatcher("java.io.PrintStream println(java.lang.String)", true);
+
 
     @Override
     public String getDisplayName() {
@@ -40,41 +55,56 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
     }
 
     @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return Applicability.and(
+                Applicability.or(
+                        new UsesMethod<>(STRING_FORMAT_MATCHER_LOCALE),
+                        new UsesMethod<>(STRING_FORMAT_MATCHER_NO_LOCALE)
+                ),
+                Applicability.or(
+                        new UsesMethod<>(PRINTSTREAM_PRINT_MATCHER),
+                        new UsesMethod<>(PRINTSTREAM_PRINTLN_MATCHER)
+                )
+        );
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 method = super.visitMethodInvocation(method, ctx);
 
-                if (!isPrintStreamPrintOrPrintln(method.getMethodType())) {
+                final boolean needsNewline;
+                if (PRINTSTREAM_PRINTLN_MATCHER.matches(method)) {
+                    needsNewline = true;
+                } else if (PRINTSTREAM_PRINT_MATCHER.matches(method)) {
+                    needsNewline = false;
+                } else {
                     return method;
                 }
 
-                if (method.getArguments().size() != 1) {
-                    return method;
-                }
-
-                Expression arg = method.getArguments().get(0);
+                final Expression arg = method.getArguments().get(0);
                 if (!(arg instanceof J.MethodInvocation)) {
                     return method;
                 }
 
-                J.MethodInvocation innerMethodInvocation = (J.MethodInvocation) arg;
+                final J.MethodInvocation innerMethodInvocation = (J.MethodInvocation) arg;
 
-                if (!isStringFormat(innerMethodInvocation.getMethodType())) {
+                final boolean hasLocaleArg;
+                if (STRING_FORMAT_MATCHER_NO_LOCALE.matches(innerMethodInvocation)) {
+                    hasLocaleArg = false;
+                } else if (STRING_FORMAT_MATCHER_LOCALE.matches(innerMethodInvocation)) {
+                    hasLocaleArg = true;
+                } else {
                     return method;
                 }
 
-                List<Expression> newArguments = innerMethodInvocation.getArguments();
+                final List<Expression> originalFormatArgs = innerMethodInvocation.getArguments();
 
-                boolean needsNewline = method.getMethodType().getName().equals("println");
+                List<Expression> printfArgs;
                 if (needsNewline) {
-                    Integer formatStringIndex = getFormatStringIndex(innerMethodInvocation.getMethodType());
-                    if (formatStringIndex == null) {
-                        return method;
-                    }
-
-                    Expression formatStringExpression = newArguments.get(formatStringIndex);
+                    Expression formatStringExpression = originalFormatArgs.get(hasLocaleArg ? 1 : 0);
                     if (!(formatStringExpression instanceof J.Literal)) {
                         return method;
                     }
@@ -86,53 +116,44 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
                     }
 
                     formatStringLiteral = appendToStringLiteral(formatStringLiteral, "%n");
-                    newArguments = ListUtils.concatAll(
-                            ListUtils.concat(newArguments.subList(0, formatStringIndex), formatStringLiteral),
-                            newArguments.subList(formatStringIndex + 1, newArguments.size())
-                    );
+                    if (formatStringLiteral == null) {
+                        return method;
+                    }
+
+                    List<Expression> formatStringArgs = originalFormatArgs.subList(hasLocaleArg ? 2 : 1, originalFormatArgs.size());
+                    printfArgs = ListUtils.concat(formatStringLiteral, formatStringArgs);
+
+                    if (hasLocaleArg) {
+                        printfArgs = ListUtils.concat(originalFormatArgs.get(0), printfArgs);
+                    }
+                } else {
+                    printfArgs = originalFormatArgs;
                 }
 
-                return method.withName(method.getName().withSimpleName("printf")).withArguments(newArguments);
+                // need to build the JavaTemplate code dynamically due to varargs
+                final StringBuilder code = new StringBuilder();
+                code.append("printf(");
+                for (int i = 0; i < originalFormatArgs.size(); i++) {
+                    JavaType argType = originalFormatArgs.get(i).getType();
+                    if (i != 0) {
+                        code.append(", ");
+                    }
+                    code.append("#{any(" + argType + ")}");
+                }
+                code.append(")");
+
+                final JavaTemplate template = JavaTemplate.builder(this::getCursor, code.toString()).build();
+                return maybeAutoFormat(
+                        method,
+                        method.withTemplate(
+                                template,
+                                method.getCoordinates().replaceMethod(),
+                                printfArgs.toArray()
+                        ),
+                        ctx
+                );
             }
         };
-    }
-
-    private static boolean isPrintStreamPrintOrPrintln(JavaType.Method method) {
-        if (!method.getDeclaringType().getFullyQualifiedName().equals("java.io.PrintStream")) {
-            return false;
-        }
-        if (!method.getName().equals("print") && !method.getName().equals("println")) {
-            return false;
-        }
-        return true;
-    }
-
-    private static boolean isStringFormat(JavaType.Method method) {
-        if (!method.getDeclaringType().getFullyQualifiedName().equals("java.lang.String")) {
-            return false;
-        }
-        if (!method.getName().equals("format")) {
-            return false;
-        }
-        return true;
-    }
-
-    private static Integer getFormatStringIndex(JavaType.Method method) {
-        // Signatures are:
-        //  	format(Locale l, String format, Object... args)
-        // 	    format(String format, Object... args)
-        // So it is either the 0th or 1st argument.
-        List<JavaType> parameterTypes = method.getParameterTypes();
-        for (int i = 0; i <= 1; i++) {
-            JavaType type = parameterTypes.get(i);
-            if (type instanceof JavaType.FullyQualified) {
-                String fullyQualified = (((JavaType.FullyQualified) type).getFullyQualifiedName());
-                if (fullyQualified.equals("java.lang.String")) {
-                    return i;
-                }
-            }
-        }
-        return null;
     }
 
     @Nullable
@@ -141,14 +162,14 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
             return null;
         }
 
-        Object value = literal.getValue();
+        final Object value = literal.getValue();
         if (!(value instanceof String)) {
             return null;
         }
-        String stringValue = (String) value;
-        String newStringValue = stringValue + textToAppend;
+        final String stringValue = (String) value;
+        final String newStringValue = stringValue + textToAppend;
 
-        String valueSource = literal.getValueSource();
+        final String valueSource = literal.getValueSource();
         if (valueSource.startsWith("\"\"\"") && valueSource.endsWith("\"\"\"")) {
             // text block
             return literal

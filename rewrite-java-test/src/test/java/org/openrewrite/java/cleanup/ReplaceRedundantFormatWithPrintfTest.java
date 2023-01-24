@@ -29,14 +29,38 @@ public class ReplaceRedundantFormatWithPrintfTest implements RewriteTest {
     }
 
     @Test
-    void doesNotModifyNonLiteralFormatString() {
+    void doesNotModifyNonLiteralFormatStringForPrintln() {
         rewriteRun(
           java(
             """
-              class Test<T> {
-                  int test(String arg) {
-                    String formatString = "hello %s%n";
-                    System.out.print(String.format(formatString, arg));
+              class Test {
+                  void test(String arg) {
+                      String formatString = "hello %s%n";
+                      System.out.println(String.format(formatString, arg));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void transformsNonLiteralFormatStringForPrint() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String arg) {
+                      String formatString = "hello %s%n";
+                      System.out.print(String.format(formatString, arg));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String arg) {
+                      String formatString = "hello %s%n";
+                      System.out.printf(formatString, arg);
                   }
               }
               """
@@ -51,18 +75,18 @@ public class ReplaceRedundantFormatWithPrintfTest implements RewriteTest {
             """
               import java.util.Locale;
               
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.println(String.format(Locale.ENGLISH, "hello %s", arg));
+              class Test {
+                  void test(String arg) {
+                      System.out.println(String.format(Locale.ENGLISH, "hello %s", arg));
                   }
               }
               """,
             """
               import java.util.Locale;
 
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.printf(Locale.ENGLISH, "hello %s%n", arg);
+              class Test {
+                  void test(String arg) {
+                      System.out.printf(Locale.ENGLISH, "hello %s%n", arg);
                   }
               }
               """
@@ -71,24 +95,24 @@ public class ReplaceRedundantFormatWithPrintfTest implements RewriteTest {
     }
 
     @Test
-    void transformsWhenTargetIsAnyPrintStream() {
+    void transformsWhenTargetIsArbitraryPrintStreamSubclass() {
         rewriteRun(
           java(
-            """
-              class PrintStreamSubclass extends java.io.PrintStream {}
-              
-              class Test<T> {
-                  int test(PrintStreamSubclass stream, String arg) {
-                    stream.println(String.format("hello %s", arg));
+            """              
+              class Test {
+                  static class PrintStreamSubclass extends java.io.PrintStream {}
+             
+                  void test(PrintStreamSubclass stream, String arg) {
+                      stream.println(String.format("hello %s", arg));
                   }
               }
               """,
             """
-              class PrintStreamSubclass extends java.io.PrintStream {}
-
-              class Test<T> {
-                  int test(String arg) {
-                    stream.printf("hello %s%n", arg);
+              class Test {
+                  static class PrintStreamSubclass extends java.io.PrintStream {}
+                  
+                  void test(PrintStreamSubclass stream, String arg) {
+                      stream.printf("hello %s%n", arg);
                   }
               }
               """
@@ -101,16 +125,16 @@ public class ReplaceRedundantFormatWithPrintfTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.print(String.format("hello %s", arg));
+              class Test {
+                  void test(String arg) {
+                      System.out.print(String.format("hello %s", arg));
                   }
               }
               """,
             """
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.printf("hello %s", arg);
+              class Test {
+                  void test(String arg) {
+                      System.out.printf("hello %s", arg);
                   }
               }
               """
@@ -123,18 +147,18 @@ public class ReplaceRedundantFormatWithPrintfTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.print(String.format(\"\"\"
-                    hello %s\"\"\", arg));
+              class Test {
+                  void test(String arg) {
+                      System.out.print(String.format(\"\"\"
+                      hello %s\"\"\", arg));
                   }
               }
               """,
             """
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.printf(\"\"\"
-                    hello %s\"\"\", arg);
+              class Test {
+                  void test(String arg) {
+                      System.out.printf(\"\"\"
+                      hello %s\"\"\", arg);
                   }
               }
               """
@@ -147,16 +171,16 @@ public class ReplaceRedundantFormatWithPrintfTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.println(String.format("hello %s", arg));
+              class Test {
+                  void test(String arg) {
+                      System.out.println(String.format("hello %s", arg));
                   }
               }
               """,
             """
-              class Test<T> {
-                  int test(String arg) {
-                    System.out.printf("hello %s%n", arg);
+              class Test {
+                  void test(String arg) {
+                      System.out.printf("hello %s%n", arg);
                   }
               }
               """
@@ -169,18 +193,97 @@ public class ReplaceRedundantFormatWithPrintfTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              class Test {
+                  void test(String arg) {
+                      System.out.println(String.format(\"\"\"
+                      hello %s\"\"\", arg));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String arg) {
+                      System.out.printf(\"\"\"
+                      hello %s%n\"\"\", arg);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    /**
+     * Tests that the code generation used for JavaTemplate behaves correctly given a parameterized type.
+     */
+    void doesNotFailWhenArgHasParameterizedType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test() {
+                      java.util.List<Integer> ints = new java.util.ArrayList<>();
+                      System.out.print(String.format("hello %s", ints));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      java.util.List<Integer> ints = new java.util.ArrayList<>();
+                      System.out.printf("hello %s", ints);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    /**
+     * Tests that the code generation used for JavaTemplate behaves correctly given a primitive type.
+     */
+    void doesNotFailWhenArgHasPrimitiveType() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test() {
+                      int value = 42;
+                      System.out.print(String.format("hello %i", value));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      int value = 42;
+                      System.out.printf("hello %i", value);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    /**
+     * Tests that the code generation used for JavaTemplate behaves correctly given a template parameter.
+     */
+    void doesNotFailWhenArgHasTemplateParameter() {
+        rewriteRun(
+          java(
+            """
               class Test<T> {
-                  int test(String arg) {
-                    System.out.println(String.format(\"\"\"
-                    hello %s\"\"\", arg));
+                  void test(T arg) {
+                      System.out.print(String.format("hello %s", arg));
                   }
               }
               """,
             """
               class Test<T> {
-                  int test(String arg) {
-                    System.out.printf(\"\"\"
-                    hello %s%n\"\"\", arg);
+                  void test(T arg) {
+                      System.out.printf("hello %s", arg);
                   }
               }
               """
