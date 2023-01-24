@@ -82,6 +82,7 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.*;
+import static org.jetbrains.kotlin.cli.common.config.ContentRootsKt.addKotlinSourceRoot;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.compiler.CoreEnvironmentUtilsKt.applyModuleProperties;
@@ -181,8 +182,15 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureJdkClasspathRoots(compilerConfiguration);
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
-        // Add kotlin sources.
-//        addKotlinSourceRoot(compilerConfiguration, "add path", true);
+        if (classpath != null && !classpath.isEmpty()) {
+            for (Path path : classpath) {
+                if (path.toFile().toString().endsWith(".jar") || path.toFile().toString().endsWith(".java")) {
+                    addJvmClasspathRoot(compilerConfiguration, path.toFile());
+                } else if (path.toFile().toString().endsWith(".kt")) {
+                    addKotlinSourceRoot(compilerConfiguration, path.toString());
+                }
+            }
+        }
 
         Disposable disposable = Disposer.newDisposable();
 
