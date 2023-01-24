@@ -27,6 +27,10 @@ class TestTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               test {
                  useJUnit()
                  useTestNG()

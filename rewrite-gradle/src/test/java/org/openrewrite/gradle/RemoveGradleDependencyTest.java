@@ -33,12 +33,28 @@ class RemoveGradleDependencyTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
                   testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
               }
@@ -52,6 +68,14 @@ class RemoveGradleDependencyTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   implementation("org.springframework.boot:spring-boot-starter-web:2.7.0") {
                       exclude group: "junit"
@@ -60,6 +84,14 @@ class RemoveGradleDependencyTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
               }
@@ -73,12 +105,28 @@ class RemoveGradleDependencyTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   implementation group: "org.springframework.boot", name: "spring-boot-starter-web", version: "2.7.0"
                   testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
               }
@@ -92,6 +140,14 @@ class RemoveGradleDependencyTest implements RewriteTest {
         rewriteRun(
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   implementation(group: "org.springframework.boot", name: "spring-boot-starter-web", version: "2.7.0") {
                       exclude group: "junit"
@@ -100,6 +156,14 @@ class RemoveGradleDependencyTest implements RewriteTest {
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
               }

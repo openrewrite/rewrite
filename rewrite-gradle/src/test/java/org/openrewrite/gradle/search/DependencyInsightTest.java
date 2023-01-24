@@ -16,97 +16,48 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
-import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.GroupArtifactVersion;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
-import java.util.Map;
-
-import static java.util.Collections.emptyList;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 public class DependencyInsightTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new DependencyInsight("com.example", "bing-*", null));
+        spec.recipe(new DependencyInsight("com.google.guava", "failureaccess", null));
     }
 
     @Test
     void findTransitiveDependency() {
         rewriteRun(
           buildGradle("""
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  implementation 'org.whatever:test:1.0'
-                  implementation 'com.example:foo-bar:latest.release'
-                  implementation group: 'com.example', name: 'foo-bar', version: '1.0'
+                  implementation 'com.google.guava:guava:31.1-jre'
               }
               """,
             """
-              dependencies {
-                  implementation 'org.whatever:test:1.0'
-                  /*~~(com.example:bing-baz:1.0)~~>*/implementation 'com.example:foo-bar:latest.release'
-                  /*~~(com.example:bing-baz:1.0)~~>*/implementation group: 'com.example', name: 'foo-bar', version: '1.0'
+              plugins {
+                  id 'java-library'
               }
-              """,
-            spec -> {
-                // This is really awkward, need a DSL or some other tooling support
-                Dependency requestedOrgWhatever = Dependency.builder()
-                  .gav(new GroupArtifactVersion("org.whatever", "test", "1.0"))
-                  .type("jar")
-                  .scope("implementation")
-                  .build();
-                ResolvedDependency resolvedOrgWhatever = ResolvedDependency.builder()
-                  .gav(new ResolvedGroupArtifactVersion(null, "org.whatever", "test", "1.0", null))
-                  .requested(requestedOrgWhatever)
-                  .dependencies(emptyList())
-                  .licenses(emptyList())
-                  .build();
-
-                Dependency requestedBingBaz = Dependency.builder()
-                  .gav(new GroupArtifactVersion("com.example", "bing-baz", "latest.release"))
-                  .type("jar")
-                  .scope("implementation")
-                  .build();
-                ResolvedDependency resolvedBingBaz = ResolvedDependency.builder()
-                  .gav(new ResolvedGroupArtifactVersion(null, "com.example", "bing-baz", "1.0", null))
-                  .requested(requestedBingBaz)
-                  .dependencies(emptyList())
-                  .depth(1)
-                  .build();
-
-                Dependency requestedComExample = Dependency.builder()
-                  .gav(new GroupArtifactVersion("com.example", "foo-bar", "latest.release"))
-                  .type("jar")
-                  .scope("implementation")
-                  .build();
-                ResolvedDependency resolvedComExample = ResolvedDependency.builder()
-                  .gav(new ResolvedGroupArtifactVersion(null, "com.example", "foo-bar", "1.0", null))
-                  .requested(requestedComExample)
-                  .dependencies(List.of(resolvedBingBaz))
-                  .depth(0)
-                  .build();
-
-                spec.markers(new GradleProject(
-                  randomId(),
-                  "project",
-                  ":",
-                  emptyList(),
-                  emptyList(),
-                  Map.of("implementation", new GradleDependencyConfiguration(
-                    "implementation", "implementation configuration", true, true, emptyList(),
-                    List.of(requestedOrgWhatever, requestedComExample),
-                    List.of(resolvedOrgWhatever, resolvedComExample)
-                  ))
-                ));
-            })
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.google.guava:failureaccess:1.0.1)~~>*/implementation 'com.google.guava:guava:31.1-jre'
+              }
+              """
+          )
         );
     }
 }

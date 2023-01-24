@@ -29,11 +29,27 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyClassifier("org.openrewrite", "*", "classified", "")),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api 'org.openrewrite:rewrite-gradle:latest.release:classifier'
+                  api 'org.openrewrite:rewrite-gradle:latest.release:javadoc'
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-gradle:latest.release:classified'
               }
@@ -49,12 +65,28 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api 'org.openrewrite:rewrite-core:latest.release:classifier'
-                  api "org.openrewrite:rewrite-core:latest.release:classifier"
+                  api 'org.openrewrite:rewrite-core:latest.release:javadoc'
+                  api "org.openrewrite:rewrite-core:latest.release:javadoc"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:classified'
                   api "org.openrewrite:rewrite-core:latest.release:classified"
@@ -71,12 +103,28 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classifier'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classifier"
+                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'javadoc'
+                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified"
@@ -93,12 +141,28 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier'
-                  api group: "org.openrewrite", name: "rewrite-core", classifier: "classifier"
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
+                  api group: "org.openrewrite", name: "rewrite-core", classifier: "javadoc"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
                   api group: "org.openrewrite", name: "rewrite-core", classifier: "classified"
@@ -115,14 +179,30 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api 'org.openrewrite:rewrite-core:latest.release:classifier'
-                  api "org.openrewrite:rewrite-core:latest.release:classifier"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classifier'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classifier"
+                  api 'org.openrewrite:rewrite-core:latest.release:javadoc'
+                  api "org.openrewrite:rewrite-core:latest.release:javadoc"
+                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'javadoc'
+                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:classified'
                   api "org.openrewrite:rewrite-core:latest.release:classified"
@@ -141,27 +221,43 @@ class ChangeDependencyClassifierTest implements RewriteTest {
           spec -> spec.recipe(new ChangeDependencyClassifier(group, artifact, "classified", null)),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api 'org.openrewrite:rewrite-core:latest.release:classifier@ext'
-                  api "org.openrewrite:rewrite-core:latest.release:classifier@ext"
-                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classifier'
-                  api group: "org.openrewrite", name: "rewrite-core", classifier: "classifier"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classifier'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classifier"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classifier', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classifier", extension: "ext"
+                  api 'org.openrewrite:rewrite-core:latest.release:javadoc@jar'
+                  api "org.openrewrite:rewrite-core:latest.release:javadoc@jar"
+                  api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'javadoc'
+                  api group: "org.openrewrite", name: "rewrite-core", classifier: "javadoc"
+                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'javadoc'
+                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc"
+                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'javadoc', ext: 'jar'
+                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "javadoc", ext: "jar"
               }
               """,
             """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+              
               dependencies {
-                  api 'org.openrewrite:rewrite-core:latest.release:classified@ext'
-                  api "org.openrewrite:rewrite-core:latest.release:classified@ext"
+                  api 'org.openrewrite:rewrite-core:latest.release:classified@jar'
+                  api "org.openrewrite:rewrite-core:latest.release:classified@jar"
                   api group: 'org.openrewrite', name: 'rewrite-core', classifier: 'classified'
                   api group: "org.openrewrite", name: "rewrite-core", classifier: "classified"
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified"
-                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified', extension: 'ext'
-                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified", extension: "ext"
+                  api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classified', ext: 'jar'
+                  api group: "org.openrewrite", name: "rewrite-core", version: "latest.release", classifier: "classified", ext: "jar"
               }
               """
           )

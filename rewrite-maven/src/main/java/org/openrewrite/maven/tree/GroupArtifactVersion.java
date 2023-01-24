@@ -20,9 +20,11 @@ import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.Serializable;
+
 @Value
 @With
-public class GroupArtifactVersion {
+public class GroupArtifactVersion implements Serializable {
     @Nullable
     String groupId;
 

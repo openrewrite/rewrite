@@ -18,8 +18,10 @@ package org.openrewrite.maven.tree;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.Serializable;
+
 @Value
-public class License {
+public class License implements Serializable {
     String name;
     Type type;
 

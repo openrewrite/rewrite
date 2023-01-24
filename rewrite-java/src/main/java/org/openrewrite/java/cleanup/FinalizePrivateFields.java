@@ -15,27 +15,22 @@
  */
 package org.openrewrite.java.cleanup;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import java.util.Map;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public class FinalizePrivateFields extends Recipe {
     @Override
@@ -49,16 +44,26 @@ public class FinalizePrivateFields extends Recipe {
     }
 
     @Override
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
+    }
+
+    @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             private Set<JavaType.Variable> privateFieldsToBeFinalized = new HashSet<>();
 
             @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
-                ExecutionContext ctx) {
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                if (!classDecl.getLeadingAnnotations().isEmpty()) {
+                    // skip if a class has any annotation, since the annotation could generate some code to assign
+                    // fields like Lombok @Setter.
+                    return classDecl;
+                }
 
                 List<J.VariableDeclarations.NamedVariable> privateFields = collectPrivateFields(classDecl);
                 Map<JavaType.Variable, Integer> privateFieldAssignCountMap = privateFields.stream()
+                    .filter(v -> v.getVariableType() != null)
                     .collect(Collectors.toMap(J.VariableDeclarations.NamedVariable::getVariableType,
                         v -> v.getInitializer() != null ? 1 : 0));
 
@@ -94,6 +99,11 @@ public class FinalizePrivateFields extends Recipe {
         };
     }
 
+    private static boolean anyAnnotationApplied(J.VariableDeclarations mv) {
+        return !mv.getLeadingAnnotations().isEmpty()
+            || mv.getTypeExpression() instanceof J.AnnotatedType;
+    }
+
     /**
      * Collect private and non-final fields from a class
      */
@@ -104,6 +114,7 @@ public class FinalizePrivateFields extends Recipe {
             .filter(statement -> statement instanceof J.VariableDeclarations)
             .map(J.VariableDeclarations.class::cast)
             .filter(mv -> mv.hasModifier(J.Modifier.Type.Private) && !mv.hasModifier(J.Modifier.Type.Final))
+            .filter(mv -> !anyAnnotationApplied(mv))
             .map(J.VariableDeclarations::getVariables)
             .flatMap(Collection::stream)
             .collect(Collectors.toList());
@@ -115,7 +126,7 @@ public class FinalizePrivateFields extends Recipe {
          * Collects private fields assignment counts, count rules are:
          * (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
          * (2) any assignment in other place count for 2.
-         * (3) any assignment in a loop in anywhere count for 2.
+         * (3) any assignment in a loop or lambda in anywhere count for 2.
          * By giving 3 rules above, if a private field has an assigned count equal to 1, it should be finalized.
          *
          * @param j The subtree to search, supposed to be at Class declaration level.
@@ -142,7 +153,9 @@ public class FinalizePrivateFields extends Recipe {
         @Override
         public J.Unary visitUnary(J.Unary unary, Map<JavaType.Variable, Integer> assignedCountMap) {
             J.Unary u = super.visitUnary(unary, assignedCountMap);
-            updateAssignmentCount(getCursor(), u.getExpression(),assignedCountMap);
+            if (u.getOperator().isModifying()) {
+                updateAssignmentCount(getCursor(), u.getExpression(), assignedCountMap);
+            }
             return u;
         }
 
@@ -150,29 +163,39 @@ public class FinalizePrivateFields extends Recipe {
             Expression expression,
             Map<JavaType.Variable, Integer> assignedCountMap
         ) {
-            if (expression instanceof J.Identifier) {
-                J.Identifier i = (J.Identifier) expression;
-                JavaType.Variable v = i.getFieldType();
+            JavaType.Variable privateField = null;
 
-                if (assignedCountMap.containsKey(v)) {
-                    // filtered so the variable is a private field here
-                    int assignedCount = assignedCountMap.get(v);
-
-                    // increment count rules are following
-                    // (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
-                    // (2) any assignment in other place count for 2.
-                    // (3) any assignment in a loop in anywhere count for 2.
-                    int increment;
-                    if (isInLoop(cursor)) {
-                        increment = 2;
-                    } else if (isInitializedByClass(cursor)) {
-                        increment = 1;
-                    } else {
-                        increment = 2;
-                    }
-
-                    assignedCountMap.put(v, assignedCount + increment);
+            if (expression instanceof J.FieldAccess) {
+                // to support case of field accessed via 'this' like 'this.member'.
+                J.Identifier lastId = FindLastIdentifier.getLastIdentifier(expression);
+                if (lastId != null && assignedCountMap.containsKey(lastId.getFieldType())) {
+                    privateField = lastId.getFieldType();
                 }
+            } else if (expression instanceof J.Identifier) {
+                J.Identifier i = (J.Identifier) expression;
+                if (assignedCountMap.containsKey(i.getFieldType())) {
+                    privateField = i.getFieldType();
+                }
+            }
+
+            if (privateField != null) {
+                // filtered so the variable is a private field here
+                int assignedCount = assignedCountMap.get(privateField);
+
+                // increment count rules are following
+                // (1) any assignment in class constructor, instance variable initializer or initializer block count for 1.
+                // (2) any assignment in other place count for 2.
+                // (3) any assignment in a loop or lambda in anywhere count for 2.
+                int increment;
+                if (isInLoop(cursor) || isInLambda(cursor)) {
+                    increment = 2;
+                } else if (isInitializedByClass(cursor)) {
+                    increment = 1;
+                } else {
+                    increment = 2;
+                }
+
+                assignedCountMap.put(privateField, assignedCount + increment);
             }
         }
 
@@ -235,6 +258,33 @@ public class FinalizePrivateFields extends Recipe {
             return dropUntilMeetCondition(cursor,
                 CollectPrivateFieldsAssignmentCounts::dropCursorEndCondition,
                 parent -> parent instanceof J.WhileLoop);
+        }
+
+        private static boolean isInLambda(Cursor cursor) {
+            return dropUntilMeetCondition(cursor,
+                CollectPrivateFieldsAssignmentCounts::dropCursorEndCondition,
+                parent -> parent instanceof J.Lambda);
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    private static class FindLastIdentifier extends JavaIsoVisitor<List<J.Identifier>> {
+        /**
+         * Find the last identifier in a J.FieldAccess. The purpose is to check whether it's a private field.
+         * @param j the subtree to search, supposed to be a J.FieldAccess
+         * @return the last Identifier if found, otherwise null.
+         */
+        @Nullable
+        static J.Identifier getLastIdentifier(J j) {
+            List<J.Identifier> ids = new FindLastIdentifier().reduce(j, new ArrayList<>());
+            return !ids.isEmpty() ? ids.get(ids.size() - 1) : null;
+        }
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, List<J.Identifier> ids) {
+            ids.add(identifier);
+            return super.visitIdentifier(identifier, ids);
         }
     }
 }

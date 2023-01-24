@@ -22,6 +22,7 @@ import lombok.*;
 import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.Serializable;
 import java.util.List;
 
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -31,7 +32,8 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @With
 @Builder
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
-public class ResolvedDependency {
+public class ResolvedDependency implements Serializable {
+
     /**
      * This will be {@code null} when this is a project dependency.
      */
@@ -61,12 +63,19 @@ public class ResolvedDependency {
 
     int depth;
 
+    @NonFinal
+    List<GroupArtifact> effectiveExclusions;
+
     /**
      * Only used by dependency resolution to avoid unnecessary empty list allocations for leaf dependencies.
      * @param dependencies A dependency list
      */
     void unsafeSetDependencies(List<ResolvedDependency> dependencies) {
         this.dependencies = dependencies;
+    }
+
+    void unsafeSetEffectiveExclusions(List<GroupArtifact> effectiveExclusions) {
+        this.effectiveExclusions = effectiveExclusions;
     }
 
     public ResolvedGroupArtifactVersion getGav() {
@@ -110,7 +119,6 @@ public class ResolvedDependency {
         }
         outer:
         for (ResolvedDependency dependency : dependencies) {
-
             ResolvedDependency found = dependency.findDependency(groupId, artifactId);
             if (found != null) {
                 if (getRequested().getExclusions() != null) {

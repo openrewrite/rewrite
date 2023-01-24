@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,44 +13,50 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.search;
+package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.test.RewriteTest.fromRuntimeClasspath;
 
-class FindDependencyHandlerTest implements RewriteTest {
+class UpgradeLiteralDependencyVersionTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new UpgradeLiteralDependencyVersion("com.google.guava",
+          "guava", "30.x", "-jre"));
+    }
+
     @Test
-    void findDependenciesBlock() {
+    void guava() {
         rewriteRun(
-          spec -> spec.recipe(fromRuntimeClasspath("org.openrewrite.gradle.search.FindDependencyHandler")),
           buildGradle(
             """
               plugins {
-                  id 'java-library'
+                id 'java-library'
               }
               
               repositories {
-                  mavenCentral()
+                mavenCentral()
               }
               
               dependencies {
-                  api 'com.google.guava:guava:23.0'
+                implementation 'com.google.guava:guava:29.0-jre'
               }
               """,
             """
               plugins {
-                  id 'java-library'
+                id 'java-library'
               }
               
               repositories {
-                  mavenCentral()
+                mavenCentral()
               }
               
-              /*~~>*/dependencies {
-                  api 'com.google.guava:guava:23.0'
+              dependencies {
+                implementation 'com.google.guava:guava:30.1.1-jre'
               }
               """
           )

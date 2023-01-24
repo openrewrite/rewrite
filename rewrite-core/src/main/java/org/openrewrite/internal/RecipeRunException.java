@@ -39,6 +39,7 @@ public class RecipeRunException extends RuntimeException {
     @Nullable
     private static String message(@Nullable String visitedLocation, Throwable cause) {
         return visitedLocation == null ? null
-                : String.format("Exception while visiting project file '%s', caused by: %s", visitedLocation, cause);
+                : String.format("Exception while visiting project file '%s', caused by: %s, at %s",
+                visitedLocation, cause, cause.getStackTrace()[0]);
     }
 }

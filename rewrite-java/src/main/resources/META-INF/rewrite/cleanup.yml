@@ -23,6 +23,8 @@ recipeList:
   - org.openrewrite.java.cleanup.EmptyBlock
   - org.openrewrite.java.format.EmptyNewlineAtEndOfFile
   - org.openrewrite.java.cleanup.ForLoopControlVariablePostfixOperators
+  - org.openrewrite.java.cleanup.FinalizeLocalVariables
+  - org.openrewrite.java.cleanup.FinalizePrivateFields
   - org.openrewrite.java.cleanup.MethodParamPad
   - org.openrewrite.java.cleanup.NoWhitespaceAfter
   - org.openrewrite.java.cleanup.NoWhitespaceBefore

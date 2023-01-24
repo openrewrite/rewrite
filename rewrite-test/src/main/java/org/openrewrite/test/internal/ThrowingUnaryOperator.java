@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.gradle.marker;
+package org.openrewrite.test.internal;
 
-import lombok.Value;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.Throwing;
 
-@Value
-public class GradlePluginDescriptor {
-    /**
-     * The fully qualified name of the class which implements the plugin.
-     */
-    String fullyQualifiedClassName;
+import java.util.function.UnaryOperator;
 
-    /**
-     * The ID by which a plugin can be applied in the plugins{} block. Not all Gradle plugins have an ID, including
-     * script plugins, or plugins which are implementation details of other plugins.
-     */
-    @Nullable
-    String id;
+@FunctionalInterface
+public interface ThrowingUnaryOperator<T> extends UnaryOperator<T> {
+
+    @Override
+    default T apply(T t) {
+        try {
+            return apply0(t);
+        } catch (Throwable ex) {
+            Throwing.sneakyThrow(ex);
+            return null;
+        }
+    }
+
+    T apply0(T t) throws Throwable;
 }

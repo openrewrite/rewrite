@@ -25,6 +25,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.test.internal.ThrowingUnaryOperator;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -93,9 +94,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return sourcePath == null ? null : dir.resolve(sourcePath);
     }
 
-    protected ThrowingConsumer<T> beforeRecipe = t -> {
-
-    };
+    protected ThrowingUnaryOperator<T> beforeRecipe = t -> t;
 
     protected ThrowingConsumer<T> afterRecipe = t -> {
     };
@@ -140,9 +139,16 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         return this;
     }
 
-    public SourceSpec<T> beforeRecipe(ThrowingConsumer<T> beforeRecipe) {
+    public SourceSpec<T> mapBeforeRecipe(ThrowingUnaryOperator<T> beforeRecipe) {
         this.beforeRecipe = beforeRecipe;
         return this;
+    }
+
+    public SourceSpec<T> beforeRecipe(ThrowingConsumer<T> beforeRecipe) {
+        return mapBeforeRecipe(t -> {
+            beforeRecipe.accept(t);
+            return t;
+        });
     }
 
     public SourceSpec<T> afterRecipe(ThrowingConsumer<T> afterRecipe) {

@@ -47,6 +47,10 @@ class TaskTest implements RewriteTest {
           spec -> spec.typeValidationOptions(TypeValidation.none()),
           buildGradle(
             """
+              plugins {
+                  id 'java-library'
+              }
+              
               test {
                   // Ex: -PexcludeTests=com/google/cloud/healthcare/etl/runner/hl7v2tofhir/integ/*
                   if (project.hasProperty('excludeTests')) {

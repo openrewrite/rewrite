@@ -62,7 +62,7 @@ public class AddProperty extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new FindGradleProject().getVisitor();
+        return new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor();
     }
 
     @Override

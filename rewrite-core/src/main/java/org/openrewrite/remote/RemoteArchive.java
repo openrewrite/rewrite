@@ -18,9 +18,8 @@ package org.openrewrite.remote;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.apache.tools.ant.taskdefs.Exec;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.*;
+import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
@@ -30,7 +29,9 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -39,7 +40,7 @@ import java.util.zip.ZipInputStream;
  * If you want to download and retain the entire archive, use {@link RemoteFile}.
  * Useful when a Recipe wishes to create a SourceFile based on something specific from within a remote archive, but not
  * the entire archive.
- *
+ * <p>
  * Downloading and extracting the correct file from within the archive are not handled during Recipe execution.
  * Post-processing of Recipe results by a build plugin or other caller of OpenRewrite is responsible for this.
  */
@@ -65,34 +66,34 @@ public class RemoteArchive implements Remote {
     @Language("markdown")
     String description;
 
-    Path path;
+    /**
+     * A set of regular expressions that match consecutively nested paths within an archive, starting
+     * with the path of the topmost archive itself. For example:
+     * <p/>
+     * <pre>
+     *     gradle-[^\/]+\/(?:.*\/)+gradle-wrapper-(?!shared).*\.jar
+     *     gradle-wrapper\.jar
+     * </pre>
+     */
+    List<String> paths;
 
     @Override
     public InputStream getInputStream(HttpSender httpSender) {
         //noinspection resource
         HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
         InputStream body = response.getBody();
-        return readIntoArchive(body, path.toString());
+        return readIntoArchive(body, paths, 0);
     }
 
-    private InputStream readIntoArchive(InputStream body, String path) {
-        String pathBeforeBang;
-        String pathAfterBang = null;
-        int bangIndex = path.indexOf('!');
-        if(bangIndex == -1) {
-            pathBeforeBang = path;
-        } else {
-            pathBeforeBang = path.substring(0, bangIndex);
-            pathAfterBang = path.substring(bangIndex + 1);
-        }
-
+    private InputStream readIntoArchive(InputStream body, List<String> paths, int index) {
         ZipInputStream zis = new ZipInputStream(body);
+        Pattern pattern = Pattern.compile(paths.get(index));
 
         try {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
-                if (PathUtils.equalIgnoringSeparators(entry.getName(), pathBeforeBang)) {
-                    if(pathAfterBang == null) {
+                if (pattern.matcher(entry.getName()).matches()) {
+                    if (paths.size() == index + 1) {
                         return new InputStream() {
                             @Override
                             public int read() throws IOException {
@@ -106,14 +107,14 @@ public class RemoteArchive implements Remote {
                             }
                         };
                     } else {
-                        return readIntoArchive(zis, pathAfterBang);
+                        return readIntoArchive(zis, paths, index + 1);
                     }
                 }
             }
 
         } catch (IOException e) {
-            throw new IllegalArgumentException("Unable to load path " + path + " in zip file " + uri, e);
+            throw new IllegalArgumentException("Unable to load path " + paths + " in zip file " + uri, e);
         }
-        throw new IllegalArgumentException("Unable to find path " + path + " in zip file " + uri);
+        throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
     }
 }
