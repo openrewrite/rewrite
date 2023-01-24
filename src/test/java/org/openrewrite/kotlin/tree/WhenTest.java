@@ -60,7 +60,6 @@ public class WhenTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void inRange() {
         rewriteRun(

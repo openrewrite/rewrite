@@ -1114,7 +1114,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 throw new UnsupportedOperationException("Unsupported number of arguments in contains operator.");
             }
 
-            Expression left = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+            Expression left;
+            // Prevent SOE of methods with an implicit LHS that refers to the subject of a when expression.
+            if (functionCall.getArgumentList().getArguments().get(0) instanceof FirWhenSubjectExpression) {
+                left = new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+            } else {
+                left = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+            }
+
             // The `in` keyword is a function call to `contains` applied to a primitive range. I.E., `IntRange`, `LongRange`.
             opPrefix = sourceBefore("in");
             kotlinBinaryType = K.Binary.Type.Contains;
@@ -2154,7 +2161,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 } else if (whenBranch.getCondition() instanceof FirBinaryLogicExpression) {
                     mapBinaryExpressions((FirBinaryLogicExpression) whenBranch.getCondition(), expressions);
                 } else if (whenBranch.getCondition() instanceof FirFunctionCall) {
-                    throw new UnsupportedOperationException("Unsupported rangeTo or contains function.");
+                    expressions.add(padRight((Expression) visitElement(whenBranch.getCondition(), ctx), sourceBefore("->")));
                 } else {
                     List<FirExpression> arguments = new ArrayList<>(((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size());
                     for (FirExpression argument : ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()) {
@@ -2166,8 +2173,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     for (int i = 0; i < arguments.size(); i++) {
                         FirExpression argument = arguments.get(i);
                         Expression expr = (Expression) visitElement(argument, ctx);
-                        expressions.add(JRightPadded.build(expr)
-                                .withAfter(i == arguments.size() - 1 ? sourceBefore("->") : sourceBefore(",")));
+                        expressions.add(padRight(expr, i == arguments.size() - 1 ? sourceBefore("->") : sourceBefore(",")));
                     }
                 }
 
