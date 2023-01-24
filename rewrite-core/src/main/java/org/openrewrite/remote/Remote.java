@@ -28,6 +28,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.UUID;
 
 /**
@@ -172,7 +173,14 @@ public interface Remote extends SourceFile {
         }
 
         public RemoteArchive build(Path path) {
-            return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description, path);
+            return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description,
+                    Arrays.asList(path.toString().replace("/", "\\/").replace(".", "\\.")
+                            .split("!")));
+        }
+
+        public RemoteArchive build(String... paths) {
+            return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description,
+                    Arrays.asList(paths));
         }
     }
 }

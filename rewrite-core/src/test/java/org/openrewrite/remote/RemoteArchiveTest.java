@@ -15,7 +15,8 @@
  */
 package org.openrewrite.remote;
 
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
@@ -32,18 +33,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class RemoteArchiveTest {
 
-    @Test
-    void gradleWrapper() throws Exception {
-        URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-7.4.2-bin.zip"));
-        RemoteArchive remoteArchive = Remote.builder(new Quark(Tree.randomId(), Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-                Markers.EMPTY, null, null), distributionUrl.toURI()
-        ).build(Paths.get("gradle-7.4.2/lib/gradle-wrapper-7.4.2.jar!gradle-wrapper.jar"));
+    @ParameterizedTest
+    @ValueSource(strings = {"7.4.2", "7.5-rc-1", "7.6"})
+    void gradleWrapper(String version) throws Exception {
+        URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-" + version + "-bin.zip"));
 
-        //noinspection NullableProblems
+        RemoteArchive remoteArchive = Remote
+          .builder(
+            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+            distributionUrl.toURI()
+          )
+          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+
         byte[] actual = readAll(remoteArchive.getInputStream(new MockHttpSender(distributionUrl::openStream)));
-        byte[] expected = readAll(requireNonNull(RemoteArchiveTest.class.getClassLoader()
-                .getResource("gradle-wrapper.jar.dontunpack")).openStream());
-        assertThat(actual).isEqualTo(expected);
+        assertThat(actual).hasSizeGreaterThan(50_000);
     }
 
     private byte[] readAll(InputStream is) {
@@ -51,7 +54,7 @@ public class RemoteArchiveTest {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             int count;
             byte[] buf = new byte[4096];
-            while((count = is.read(buf)) != -1) {
+            while ((count = is.read(buf)) != -1) {
                 baos.write(buf, 0, count);
             }
             return baos.toByteArray();

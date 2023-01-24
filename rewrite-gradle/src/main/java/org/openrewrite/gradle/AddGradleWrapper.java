@@ -37,6 +37,7 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
@@ -138,14 +139,14 @@ public class AddGradleWrapper extends Recipe {
         if (needsGradleShellScript) {
             PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false,
                     wrapperScriptAttributes, null,
-                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew"), StandardCharsets.UTF_8));
+                    StringUtils.readFully(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew")), StandardCharsets.UTF_8));
             gradleWrapperFiles.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
             PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY, null, false,
                     wrapperScriptAttributes, null,
-                    StringUtils.readFully(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat"), StandardCharsets.UTF_8));
+                    StringUtils.readFully(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")), StandardCharsets.UTF_8));
             gradleWrapperFiles.add(gradlewBat);
         }
 

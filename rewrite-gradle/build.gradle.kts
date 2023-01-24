@@ -15,8 +15,10 @@ repositories {
 }
 
 dependencies {
+    api(project(":rewrite-core"))
     api(project(":rewrite-groovy"))
     api(project(":rewrite-maven"))
+    api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
     implementation("org.codehaus.groovy:groovy:latest.release")
