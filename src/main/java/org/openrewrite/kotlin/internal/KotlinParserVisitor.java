@@ -115,9 +115,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
         }
 
-        List<JRightPadded<J.Import>> imports = file.getImports().stream()
-                .map(it -> maybeSemicolon((J.Import) visitImport(it, ctx)))
-                .collect(Collectors.toList());
+        List<JRightPadded<J.Import>> imports = new ArrayList<>(file.getImports().size());
+        for (FirImport anImport : file.getImports()) {
+            imports.add(maybeSemicolon((J.Import) visitImport(anImport, ctx)));
+        }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(file.getDeclarations().size());
         for (FirDeclaration declaration : file.getDeclarations()) {
@@ -1568,10 +1569,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(ModifierScope.FUNCTION, simpleFunction.getAnnotations());
 
-        boolean isInfix = annotations.stream()
-                .filter(it -> it.getAnnotationType() instanceof J.Identifier)
-                .map(it -> (J.Identifier) it.getAnnotationType())
-                .anyMatch(it -> "infix".equals(it.getSimpleName()));
+        boolean isInfix = false;
+        for (J.Annotation annotation : annotations) {
+            if (annotation.getAnnotationType() instanceof J.Identifier &&
+                    "infix".equals(((J.Identifier) annotation.getAnnotationType()).getSimpleName())) {
+                isInfix = true;
+                break;
+            }
+        }
 
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (isInfix && simpleFunction.getReceiverTypeRef() != null) {
@@ -1826,7 +1831,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         Expression name = convertToIdentifier(typeParameter.getName().asString(), typeParameter);
 
-        List<FirTypeRef> nonImplicitParams = typeParameter.getBounds().stream().filter(it -> !(it instanceof FirImplicitNullableAnyTypeRef)).collect(Collectors.toList());
+        List<FirTypeRef> nonImplicitParams = new ArrayList<>(typeParameter.getBounds().size());
+        for (FirTypeRef bound : typeParameter.getBounds()) {
+            if (!(bound instanceof FirImplicitNullableAnyTypeRef)) {
+                nonImplicitParams.add(bound);
+            }
+        }
+
         JContainer<TypeTree> bounds = null;
         if (nonImplicitParams.size() == 1) {
             bounds = JContainer.build(sourceBefore(":"),
@@ -2120,7 +2131,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         Space prefix = whitespace();
         if (source.startsWith("when", cursor)) {
-            // Create the entire when expression here to simplify visiting `WhenBranche`s, since `if` and `when` share the same data structure.
+            // Create the entire when expression here to simplify visiting `WhenBranch`, since `if` and `when` share the same data structure.
             skip("when");
 
             J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<>(
@@ -2139,15 +2150,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 List<JRightPadded<Expression>> expressions = new ArrayList<>(exprSize);
 
                 if (whenBranch.getCondition() instanceof FirElseIfTrueCondition) {
-                    expressions.add(JRightPadded.build((Expression) convertToIdentifier("else"))
-                            .withAfter(sourceBefore("->")));
+                    expressions.add(padRight(convertToIdentifier("else"), sourceBefore("->")));
                 } else if (whenBranch.getCondition() instanceof FirBinaryLogicExpression) {
                     mapBinaryExpressions((FirBinaryLogicExpression) whenBranch.getCondition(), expressions);
+                } else if (whenBranch.getCondition() instanceof FirFunctionCall) {
+                    throw new UnsupportedOperationException("Unsupported rangeTo or contains function.");
                 } else {
-                    List<FirExpression> arguments = ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()
-                            .stream()
-                            .filter(it -> !(it instanceof FirWhenSubjectExpression))
-                            .collect(Collectors.toList());
+                    List<FirExpression> arguments = new ArrayList<>(((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size());
+                    for (FirExpression argument : ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()) {
+                        if (!(argument instanceof FirWhenSubjectExpression)) {
+                            arguments.add(argument);
+                        }
+                    }
+
                     for (int i = 0; i < arguments.size(); i++) {
                         FirExpression argument = arguments.get(i);
                         Expression expr = (Expression) visitElement(argument, ctx);
@@ -2185,7 +2200,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     body);
         }
 
-        // TODO: Clean up.
+        // Otherwise, create an if branch.
         cursor = saveCursor;
 
         FirWhenBranch whenBranch = whenExpression.getBranches().get(0);

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
