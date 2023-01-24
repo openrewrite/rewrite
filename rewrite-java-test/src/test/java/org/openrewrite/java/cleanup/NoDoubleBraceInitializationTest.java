@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,8 +29,38 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
         spec.recipe(new NoDoubleBraceInitialization());
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2674")
     @Test
-    void doubleBranchInitializationForArg() {
+    void noMethodInvocationInDoubleBraceIgnored() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              class A {
+                  void example() {
+                      OTList otList = new OTList() {{ new OTElement();}};
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class OTElement  {
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.ArrayList;
+              class OTList extends ArrayList {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleBranchInitializationForArgIgnored() {
         rewriteRun(
           java(
             """
@@ -48,13 +79,13 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
     }
 
     @Test
-    void doubleBranchInitializationForNewClassArg() {
+    void doubleBranchInitializationForNewClassArgIgnored() {
         rewriteRun(
           java(
             """
               package abc;
               import java.util.List;
-                          
+
               public class Thing {
                   private final List<String> stuff;
                   public Thing(List<String> stuff) {
@@ -68,7 +99,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
               package abc;
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class A {
                   Thing t = new Thing(new ArrayList<String>(){{add("abc"); add("def");}});
               }
@@ -78,7 +109,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
     }
 
     @Test
-    void doubleBraceInitWithinConstructorArg() {
+    void doubleBraceInitWithinConstructorArgIgnored() {
         rewriteRun(
           java(
             """
