@@ -15,15 +15,13 @@
  */
 package org.openrewrite.kotlin;
 
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.tree.K;
-import org.openrewrite.kotlin.tree.KLeftPadded;
-import org.openrewrite.kotlin.tree.KRightPadded;
-import org.openrewrite.kotlin.tree.KSpace;
+import org.openrewrite.kotlin.tree.*;
 
 /**
  * Visit K types.
@@ -109,6 +107,36 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return v;
     }
 
+    public J visitWhen(K.When when, P p) {
+        K.When w = when;
+        w = w.withPrefix(visitSpace(w.getPrefix(), KSpace.Location.WHEN_PREFIX, p));
+        w = w.withMarkers(visitMarkers(w.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(w, p);
+        if (!(temp instanceof K.When)) {
+            return temp;
+        } else {
+            w = (K.When) temp;
+        }
+        w = w.withSelector(visitAndCast(w.getSelector(), p));
+        w = w.withBranches(visitAndCast(w.getBranches(), p));
+        return w;
+    }
+
+    public J visitWhenBranch(K.WhenBranch whenBranch, P p) {
+        K.WhenBranch w = whenBranch;
+        w = w.withPrefix(visitSpace(w.getPrefix(), KSpace.Location.WHEN_BRANCH_PREFIX, p));
+        w = w.withMarkers(visitMarkers(w.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(w, p);
+        if (!(temp instanceof K.WhenBranch)) {
+            return temp;
+        } else {
+            w = (K.WhenBranch) temp;
+        }
+        w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, p));
+        w = w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
+        return w;
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }
@@ -119,5 +147,9 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public Space visitSpace(Space space, KSpace.Location loc, P p) {
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, KContainer.Location loc, P p) {
+        return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
     }
 }

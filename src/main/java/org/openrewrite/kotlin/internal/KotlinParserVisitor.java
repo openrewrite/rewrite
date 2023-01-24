@@ -2089,9 +2089,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitWhenBranch(FirWhenBranch whenBranch, ExecutionContext ctx) {
         Space prefix = whitespace();
-        if (source.substring(cursor).startsWith("when")) {
-            throw new UnsupportedOperationException("When conditions are currently unsupported.");
-        } else if (source.substring(cursor).startsWith("if")) {
+        if (source.substring(cursor).startsWith("if")) {
             skip("if");
         } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
                 whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
@@ -2119,6 +2117,77 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitWhenExpression(FirWhenExpression whenExpression, ExecutionContext ctx) {
+        int saveCursor = cursor;
+        Space prefix = whitespace();
+        if (source.startsWith("when", cursor)) {
+            // Create the entire when expression here to simplify visiting `WhenBranche`s, since `if` and `when` share the same data structure.
+            skip("when");
+
+            J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<>(
+                    randomId(),
+                    sourceBefore("("),
+                    Markers.EMPTY,
+                    padRight((Expression) visitElement(whenExpression.getSubject(), ctx), sourceBefore(")"))
+            );
+
+            Space bodyPrefix = sourceBefore("{");
+            List<JRightPadded<Statement>> statements = new ArrayList<>(whenExpression.getBranches().size());
+
+            for (FirWhenBranch whenBranch : whenExpression.getBranches()) {
+                int exprSize = whenBranch.getCondition() instanceof FirEqualityOperatorCall ?
+                        ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size() - 1 : 1;
+                List<JRightPadded<Expression>> expressions = new ArrayList<>(exprSize);
+
+                if (whenBranch.getCondition() instanceof FirElseIfTrueCondition) {
+                    expressions.add(JRightPadded.build((Expression) convertToIdentifier("else"))
+                            .withAfter(sourceBefore("->")));
+                } else if (whenBranch.getCondition() instanceof FirBinaryLogicExpression) {
+                    throw new UnsupportedOperationException("Implement multi-case.");
+                } else {
+                    List<FirExpression> arguments = ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()
+                            .stream()
+                            .filter(it -> !(it instanceof FirWhenSubjectExpression))
+                            .collect(Collectors.toList());
+                    for (int i = 0; i < arguments.size(); i++) {
+                        FirExpression argument = arguments.get(i);
+                        Expression expr = (Expression) visitElement(argument, ctx);
+                        expressions.add(JRightPadded.build(expr)
+                                .withAfter(i == arguments.size() - 1 ? sourceBefore("->") : sourceBefore(",")));
+                    }
+                }
+
+                JContainer<Expression> expressionContainer = JContainer.build(EMPTY, expressions, Markers.EMPTY);
+
+                J body = visitElement(whenBranch.getResult(), ctx);
+                K.WhenBranch branch = new K.WhenBranch(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        expressionContainer,
+                        padRight(body, EMPTY));
+
+                statements.add(padRight(branch, EMPTY));
+            }
+            Space bodySuffix = sourceBefore("}");
+            J.Block body = new J.Block(
+                    randomId(),
+                    bodyPrefix,
+                    Markers.EMPTY,
+                    new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                    statements,
+                    bodySuffix);
+
+            return new K.When(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    controlParentheses,
+                    body);
+        }
+
+        // TODO: Clean up.
+        cursor = saveCursor;
+
         FirWhenBranch whenBranch = whenExpression.getBranches().get(0);
         J firstElement = visitElement(whenBranch, ctx);
         if (!(firstElement instanceof J.If)) {
@@ -2285,6 +2354,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitWhenBranch((FirWhenBranch) firElement, ctx);
         } else if (firElement instanceof FirWhenExpression) {
             return visitWhenExpression((FirWhenExpression) firElement, ctx);
+        } else if (firElement instanceof FirWhenSubjectExpression) {
+            return visitWhenSubjectExpression((FirWhenSubjectExpression) firElement, ctx);
         } else if (firElement instanceof FirWhileLoop) {
             return visitWhileLoop((FirWhileLoop) firElement, ctx);
         }

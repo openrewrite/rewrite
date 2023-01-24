@@ -19,7 +19,8 @@ public class KRightPadded {
     public enum Location {
         FUNCTION_TYPE_RECEIVER(KSpace.Location.TOP_LEVEL_STATEMENT),
         INFIX_FUNCTION_DECLARATION_RECEIVER(KSpace.Location.TOP_LEVEL_STATEMENT),
-        TOP_LEVEL_STATEMENT_SUFFIX(KSpace.Location.TOP_LEVEL_STATEMENT);
+        TOP_LEVEL_STATEMENT_SUFFIX(KSpace.Location.TOP_LEVEL_STATEMENT),
+        WHEN_BRANCH_EXPRESSION(KSpace.Location.WHEN_BRANCH_EXPRESSION);
 
         private final KSpace.Location afterLocation;
 

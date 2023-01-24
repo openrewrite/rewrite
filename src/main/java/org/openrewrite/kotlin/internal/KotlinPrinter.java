@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KContainer;
 import org.openrewrite.kotlin.tree.KRightPadded;
 import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
@@ -130,6 +131,25 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(value, p);
         return value;
+    }
+
+    @Override
+    public J visitWhen(K.When when, PrintOutputCapture<P> p) {
+        beforeSyntax(when, KSpace.Location.WHEN_PREFIX, p);
+        p.append("when");
+        visit(when.getSelector(), p);
+        visit(when.getBranches(), p);
+
+        afterSyntax(when, p);
+        return when;
+    }
+
+    @Override
+    public J visitWhenBranch(K.WhenBranch whenBranch, PrintOutputCapture<P> p) {
+        beforeSyntax(whenBranch, KSpace.Location.WHEN_BRANCH_PREFIX, p);
+        visitContainer("", whenBranch.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, "", "->", p);
+        visit(whenBranch.getBody(), p);
+        return whenBranch;
     }
 
     private class KotlinJavaPrinter extends JavaPrinter<P> {
@@ -557,6 +577,28 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
         return delegate.visitSpace(space, loc, p);
+    }
+
+    protected void visitContainer(String before, @Nullable JContainer<? extends J> container, KContainer.Location location,
+                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+        if (container == null) {
+            return;
+        }
+        visitSpace(container.getBefore(), location.getBeforeLocation(), p);
+        p.out.append(before);
+        visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+        p.out.append(after == null ? "" : after);
+    }
+
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, KRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
+        for (int i = 0; i < nodes.size(); i++) {
+            JRightPadded<? extends J> node = nodes.get(i);
+            visit(node.getElement(), p);
+            visitSpace(node.getAfter(), location.getAfterLocation(), p);
+            if (i < nodes.size() - 1) {
+                p.out.append(suffixBetween);
+            }
+        }
     }
 
     @Override

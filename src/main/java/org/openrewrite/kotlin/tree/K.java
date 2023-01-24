@@ -15,11 +15,15 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -36,6 +40,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 
 public interface K extends J {
     @SuppressWarnings("unchecked")
@@ -641,6 +648,135 @@ public interface K extends J {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class When implements K, Statement {
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        ControlParentheses<Expression> selector;
+
+        @With
+        Block branches;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitWhen(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class WhenBranch implements K, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<WhenBranch.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+
+        JContainer<Expression> expressions;
+
+        public List<Expression> getExpressions() {
+            return expressions.getElements();
+        }
+
+        public WhenBranch withExpressions(List<Expression> expressions) {
+            return getPadding().withExpressions(requireNonNull(JContainer.withElementsNullable(this.expressions, expressions)));
+        }
+
+        JRightPadded<J> body;
+
+        public J getBody() {
+            return body.getElement();
+        }
+
+        public WhenBranch withBody(J body) {
+            return getPadding().withBody(JRightPadded.withElement(this.body, body));
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitWhenBranch(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public WhenBranch.Padding getPadding() {
+            WhenBranch.Padding p;
+            if (this.padding == null) {
+                p = new WhenBranch.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new WhenBranch.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final WhenBranch t;
+
+            @Nullable
+            public JRightPadded<J> getBody() {
+                return t.body;
+            }
+
+            public WhenBranch withBody(@Nullable JRightPadded<J> body) {
+                return t.body == body ? t : new WhenBranch(t.id, t.prefix, t.markers, t.expressions, body);
+            }
+
+            public JContainer<Expression> getExpressions() {
+                return t.expressions;
+            }
+
+            public WhenBranch withExpressions(JContainer<Expression> expressions) {
+                return t.expressions == expressions ? t : new WhenBranch(t.id, t.prefix, t.markers, expressions, t.body);
+            }
         }
     }
 }

@@ -21,7 +21,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-@Disabled("Requires K model object for when.")
 public class WhenTest implements RewriteTest {
 
     @Test
@@ -43,6 +42,7 @@ public class WhenTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void multiCase() {
         rewriteRun(
@@ -61,6 +61,7 @@ public class WhenTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void inRange() {
         rewriteRun(

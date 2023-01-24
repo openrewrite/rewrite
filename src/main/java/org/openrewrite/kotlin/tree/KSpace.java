@@ -25,6 +25,9 @@ public class KSpace {
         IS_NULLABLE_PREFIX,
         KSTRING,
         TOP_LEVEL_STATEMENT,
-        TYPE_REFERENCE_PREFIX
+        TYPE_REFERENCE_PREFIX,
+        WHEN_PREFIX,
+        WHEN_BRANCH_EXPRESSION,
+        WHEN_BRANCH_PREFIX
     }
 }
