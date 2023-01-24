@@ -59,7 +59,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
         );
     }
 
-    @Issue("a common case of https://github.com/openrewrite/rewrite/issues/2674")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2674")
     @Test
     void noCollectionInitializedInDoubleBraceIgnored() {
         rewriteRun(
