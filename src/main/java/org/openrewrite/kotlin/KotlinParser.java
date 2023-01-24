@@ -182,15 +182,15 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureJdkClasspathRoots(compilerConfiguration);
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
-        if (classpath != null && !classpath.isEmpty()) {
-            for (Path path : classpath) {
-                if (path.toFile().toString().endsWith(".jar") || path.toFile().toString().endsWith(".java")) {
-                    addJvmClasspathRoot(compilerConfiguration, path.toFile());
-                } else if (path.toFile().toString().endsWith(".kt")) {
-                    addKotlinSourceRoot(compilerConfiguration, path.toString());
-                }
-            }
-        }
+//        if (classpath != null && !classpath.isEmpty()) {
+//            for (Path path : classpath) {
+//                if (path.toFile().toString().endsWith(".jar") || path.toFile().toString().endsWith(".java")) {
+//                    addJvmClasspathRoot(compilerConfiguration, path.toFile());
+//                } else if (path.toFile().toString().endsWith(".kt")) {
+//                    addKotlinSourceRoot(compilerConfiguration, path.toString());
+//                }
+//            }
+//        }
 
         Disposable disposable = Disposer.newDisposable();
 
