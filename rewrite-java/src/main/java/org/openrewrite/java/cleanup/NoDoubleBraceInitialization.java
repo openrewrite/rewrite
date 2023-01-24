@@ -104,9 +104,10 @@ public class NoDoubleBraceInitialization extends Recipe {
                 J.Block secondBlock = (J.Block) nc.getBody().getStatements().get(0);
                 List<Statement> initStatements = secondBlock.getStatements();
 
-                // If not any method invocation (like add(), push(), etc) happened in the double brace, the intention of
-                // code in double brace is uncertain or maybe a custom code bug (issue: https://github.com/openrewrite/rewrite/issues/2674),
-                // we do rewriting for double braces that have method invocation only.
+                // If not any method invocation (like add(), push(), etc) happened in the double brace to initialize
+                // the content of the collection, it means the intention of the code in the double brace is uncertain
+                // or maybe a custom code bug (like issue: https://github.com/openrewrite/rewrite/issues/2674),
+                // we don't want to rewrite code for this case to avoid introducing other warnings.
                 boolean hasMethodInvocationInDoubleBrace = FindMethodInvocationInDoubleBrace.find(secondBlock).get();
 
                 if (hasMethodInvocationInDoubleBrace && var != null && parentBlockCursor.getParent() != null) {
