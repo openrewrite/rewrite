@@ -16,6 +16,9 @@
 package org.openrewrite.java;
 
 import io.github.classgraph.ClassGraph;
+import io.github.classgraph.Resource;
+import io.github.classgraph.ResourceList;
+import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -28,8 +31,11 @@ import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -37,7 +43,9 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.stream.Collectors.*;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
 
@@ -77,14 +85,14 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         List<Path> artifacts = new ArrayList<>(artifactNames.length);
         List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
         for (String artifactName : artifactNames) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-.*?\\.jar$");
-            // In a multiproject IDE classpath, some classpath entries aren't jars
+            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+            // In a multi-project IDE classpath, some classpath entries aren't jars
             Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
             boolean lacking = true;
             for (URI cpEntry : runtimeClasspath) {
                 String cpEntryString = cpEntry.toString();
                 if (jarPattern.matcher(cpEntryString).find()
-                        || (explodedPattern.matcher(cpEntryString).find()
+                    || (explodedPattern.matcher(cpEntryString).find()
                         && Paths.get(cpEntry).toFile().isDirectory())) {
                     artifacts.add(Paths.get(cpEntry));
                     lacking = false;
@@ -98,7 +106,59 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         if (!missingArtifactNames.isEmpty()) {
             throw new IllegalArgumentException("Unable to find runtime dependencies beginning with: " +
-                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
+                                               missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
+        }
+
+        return artifacts;
+    }
+
+    static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNames) {
+        List<Path> artifacts = new ArrayList<>(artifactNames.length);
+        List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
+        File resourceTarget = JavaParserExecutionContextView.view(ctx)
+                .getParserClasspathDownloadTarget();
+
+        nextArtifact:
+        for (String artifactName : artifactNames) {
+            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+            File[] extracted = resourceTarget.listFiles();
+            if (extracted != null) {
+                for (File file : extracted) {
+                    if (jarPattern.matcher(file.getName()).find()) {
+                        artifacts.add(file.toPath());
+                        continue nextArtifact;
+                    }
+                }
+            }
+            missingArtifactNames.add(artifactName);
+        }
+
+        for (String artifactName : new ArrayList<>(missingArtifactNames)) {
+            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+            try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath").scan()) {
+                ResourceList resources = result.getResourcesWithExtension(".jar");
+                for (Resource resource : resources) {
+                    if (jarPattern.matcher(resource.getPath()).find()) {
+                        try {
+                            Path artifact = resourceTarget.toPath().resolve(Paths.get(resource.getPath()).getFileName());
+                            Files.copy(
+                                    requireNonNull(JavaParser.class.getResourceAsStream("/" + resource.getPath())),
+                                    artifact
+                            );
+                            missingArtifactNames.remove(artifactName);
+                            artifacts.add(artifact);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!missingArtifactNames.isEmpty()) {
+            throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
+                                               missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
         }
 
         return artifacts;
@@ -147,7 +207,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return javaParser;
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create a Java parser instance. " +
-                    "`rewrite-java-8`, `rewrite-java-11`, or `rewrite-java-17` must be on the classpath.", e);
+                                            "`rewrite-java-8`, `rewrite-java-11`, or `rewrite-java-17` must be on the classpath.", e);
         }
     }
 
@@ -255,6 +315,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return (B) this;
         }
 
+        public B classpathFromResources(ExecutionContext ctx, String... classpath) {
+            this.classpath = dependenciesFromResources(ctx, classpath);
+            return (B) this;
+        }
+
         public B classpath(byte[]... classpath) {
             this.classBytesClasspath = Arrays.asList(classpath);
             return (B) this;
@@ -296,7 +361,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
         String className = Optional.ofNullable(simpleName.apply(sourceCode))
-                .orElse(Long.toString(System.nanoTime())) + ".java";
+                                   .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
     }

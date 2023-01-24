@@ -16,8 +16,12 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -63,7 +67,7 @@ class JavaParserTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              @SuppressWarnings("serial") // fred
+              @SuppressWarnings("ALL") // fred
               @Deprecated
               public class PersistenceManagerImpl {
               }
@@ -72,5 +76,12 @@ class JavaParserTest implements RewriteTest {
               assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
           )
         );
+    }
+
+    @Test
+    void dependenciesFromResources(@TempDir Path temp) {
+        JavaParserExecutionContextView ctx = JavaParserExecutionContextView.view(new InMemoryExecutionContext());
+        ctx.setParserClasspathDownloadTarget(temp.toFile());
+        assertThat(JavaParser.dependenciesFromResources(ctx, "guava-31.0-jre")).isNotEmpty();
     }
 }
