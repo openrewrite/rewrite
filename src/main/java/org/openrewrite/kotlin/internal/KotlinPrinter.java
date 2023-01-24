@@ -255,6 +255,21 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitForEachLoop(J.ForEachLoop forEachLoop, PrintOutputCapture<P> p) {
+            beforeSyntax(forEachLoop, Space.Location.FOR_EACH_LOOP_PREFIX, p);
+            p.append("for");
+            J.ForEachLoop.Control ctrl = forEachLoop.getControl();
+            visitSpace(ctrl.getPrefix(), Space.Location.FOR_EACH_CONTROL_PREFIX, p);
+            p.append('(');
+            visitRightPadded(ctrl.getPadding().getVariable(), JRightPadded.Location.FOREACH_VARIABLE, "in", p);
+            visitRightPadded(ctrl.getPadding().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, "", p);
+            p.append(')');
+            visitStatement(forEachLoop.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p);
+            afterSyntax(forEachLoop, p);
+            return forEachLoop;
+        }
+
+        @Override
         public J visitIdentifier(J.Identifier ident, PrintOutputCapture<P> p) {
             beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
             p.append(ident.getSimpleName());
@@ -498,13 +513,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitModifier(m, p);
             }
 
-            PropertyClassifier propertyClassifier = multiVariable.getMarkers().findFirst(PropertyClassifier.class).orElse(null);
-            if (propertyClassifier != null) {
-                boolean isVal = propertyClassifier.getClassifierType() == PropertyClassifier.ClassifierType.VAL;
-                p.append(propertyClassifier.getPrefix().getWhitespace());
-                p.append(isVal ? "val" : "var");
-            }
-
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(ReceiverType.class).isPresent();
             int variablePos = 0;
             if (containsTypeReceiver) {
@@ -514,9 +522,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 variablePos = 1;
             }
 
-            J.VariableDeclarations.NamedVariable variable = multiVariable.getVariables().get(variablePos);
-            beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
-            visit(variable.getName(), p);
+            JRightPadded<J.VariableDeclarations.NamedVariable> variable = multiVariable.getPadding().getVariables().get(variablePos);
+            beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
+            visit(variable.getElement().getName(), p);
 
             if (multiVariable.getTypeExpression() != null) {
                 TypeReferencePrefix typeReferencePrefix = multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
@@ -527,10 +535,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visit(multiVariable.getTypeExpression(), p);
             }
 
-            boolean implicitEquals = variable.getInitializer() instanceof K.StatementExpression &&
-                    ((K.StatementExpression) variable.getInitializer()).getStatement() instanceof J.MethodDeclaration;
-            visitLeftPadded(implicitEquals ? "" : "=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+            boolean implicitEquals = variable.getElement().getInitializer() instanceof K.StatementExpression &&
+                    ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration;
+            visitLeftPadded(implicitEquals ? "" : "=", variable.getElement().getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
 
+            visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
             visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);
             afterSyntax(multiVariable, p);
             return multiVariable;

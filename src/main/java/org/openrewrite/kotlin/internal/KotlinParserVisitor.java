@@ -58,21 +58,17 @@ import org.openrewrite.marker.Markers;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.lang.Math.max;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
-import static org.openrewrite.kotlin.marker.PropertyClassifier.ClassifierType.VAL;
-import static org.openrewrite.kotlin.marker.PropertyClassifier.ClassifierType.VAR;
 
 @SuppressWarnings("DataFlowIssue")
 public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> {
@@ -402,6 +398,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitBlock(FirBlock block, ExecutionContext ctx) {
+        return visitBlock(block, emptySet(), ctx);
+    }
+
+    private J visitBlock(FirBlock block, Set<FirElement> skipStatements, ExecutionContext ctx) {
         int saveCursor = cursor;
         Space prefix = whitespace();
         OmitBraces omitBraces = null;
@@ -416,7 +416,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<FirStatement> firStatements = new ArrayList<>(block.getStatements().size());
         for (FirStatement s : block.getStatements()) {
-            if (s.getSource() == null || !(s.getSource().getKind() instanceof KtFakeSourceElementKind.ImplicitConstructor)) {
+            if (!skipStatements.contains(s) &&
+                    (s.getSource() == null || !(s.getSource().getKind() instanceof KtFakeSourceElementKind.ImplicitConstructor))) {
                 firStatements.add(s);
             }
         }
@@ -427,7 +428,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             // Skip receiver of the unary post increment or decrement.
             if (firElement instanceof FirProperty && ("<unary>".equals(((FirProperty) firElement).getName().asString()))) {
                 continue;
-            } else if (firElement instanceof FirBlock && ((FirBlock) firElement).getStatements().size() == 2) {
+            }
+
+            J expr = null;
+            if (firElement instanceof FirBlock && ((FirBlock) firElement).getStatements().size() == 2) {
                 // For loops are wrapped in a block and split into two FirElements.
                 // The FirProperty at position 0 is the control of the for loop.
                 // The FirWhileLoop at position 1 is the for loop, which is transformed to use an iterator.
@@ -436,47 +440,51 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (check.getStatements().get(0) instanceof FirProperty &&
                         "<iterator>".equals(((FirProperty) check.getStatements().get(0)).getName().asString()) &&
                         check.getStatements().get(1) instanceof FirWhileLoop) {
-                    System.out.println();
+                    expr = mapForLoop(check);
                 }
             }
+            // Note: Labeled items like FirWhileLoop need to be detected here to create a J.Label, since labels exist on
+            // The labeled FirElement.
 
-            boolean explicitReturn = false;
-            Space returnPrefix = EMPTY;
-            if (i == firStatements.size() - 1) {
-                // Skip the implicit return from a unary pre increment or decrement operation.
-                if (!statements.isEmpty() && statements.get(statements.size() - 1).getElement() instanceof J.Unary) {
-                    continue;
+            if (expr == null) {
+                boolean explicitReturn = false;
+                Space returnPrefix = EMPTY;
+                if (i == firStatements.size() - 1) {
+                    // Skip the implicit return from a unary pre increment or decrement operation.
+                    if (!statements.isEmpty() && statements.get(statements.size() - 1).getElement() instanceof J.Unary) {
+                        continue;
+                    }
+
+                    saveCursor = cursor;
+                    returnPrefix = whitespace();
+                    if (source.startsWith("return", cursor)) {
+                        cursor += "return".length();
+                        explicitReturn = true;
+                    } else {
+                        cursor(saveCursor);
+                    }
                 }
 
-                saveCursor = cursor;
-                returnPrefix = whitespace();
-                if (source.startsWith("return", cursor)) {
-                    cursor += "return".length();
-                    explicitReturn = true;
-                } else {
-                    cursor(saveCursor);
-                }
-            }
-
-            J expr = visitElement(firElement, ctx);
-            if (i == firStatements.size() - 1 && (expr instanceof Expression)) {
-                if (!explicitReturn) {
-                    returnPrefix = expr.getPrefix();
-                    expr = expr.withPrefix(EMPTY);
-                }
-                expr = new J.Return(randomId(), returnPrefix, expr.getMarkers(), (Expression) expr);
-                if (!explicitReturn) {
+                expr = visitElement(firElement, ctx);
+                if (i == firStatements.size() - 1 && (expr instanceof Expression)) {
+                    if (!explicitReturn) {
+                        returnPrefix = expr.getPrefix();
+                        expr = expr.withPrefix(EMPTY);
+                    }
+                    expr = new J.Return(randomId(), returnPrefix, expr.getMarkers(), (Expression) expr);
+                    if (!explicitReturn) {
+                        expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+                    }
+                } else if (i == firStatements.size() - 1 && expr instanceof J.Return && ((J.Return) expr).getExpression() == null) {
                     expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
                 }
-            } else if (i == firStatements.size() - 1 && expr instanceof J.Return && ((J.Return) expr).getExpression() == null) {
-                expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
-            }
 
-            if (!(expr instanceof Statement)) {
-                if (expr instanceof Expression) {
-                    expr = new K.ExpressionStatement(randomId(), (Expression) expr);
-                } else {
-                    throw new UnsupportedOperationException("Unexpected statement type.");
+                if (!(expr instanceof Statement)) {
+                    if (expr instanceof Expression) {
+                        expr = new K.ExpressionStatement(randomId(), (Expression) expr);
+                    } else {
+                        throw new UnsupportedOperationException("Unexpected statement type.");
+                    }
                 }
             }
 
@@ -546,14 +554,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
 
         ClassKind classKind = klass.getClassKind();
-        ModifierScope modifierScope = null;
+        String stopWord;
         if (ClassKind.INTERFACE == classKind) {
-            modifierScope = ModifierScope.INTERFACE;
+            stopWord = "interface";
         } else {
-            modifierScope = ModifierScope.CLASS;
+            stopWord = "class";
         }
 
-        List<J.Annotation> leadingAnnotation = mapModifiers(modifierScope, firRegularClass.getAnnotations());
+        List<J.Annotation> leadingAnnotation = mapModifiers(firRegularClass.getAnnotations(), stopWord);
         List<J.Annotation> kindAnnotations = emptyList();
 
         J.ClassDeclaration.Kind kind;
@@ -1326,13 +1334,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitProperty(FirProperty property, ExecutionContext ctx) {
         Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
 
         List<J> modifiers = emptyList();
-        boolean isVal = property.isVal();
-        List<J.Annotation> annotations = mapModifiers(isVal ? ModifierScope.VAL : ModifierScope.VAR, property.getAnnotations());
-
-        Markers markers = Markers.EMPTY;
-        markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
+        List<J.Annotation> annotations = mapModifiers(property.getAnnotations(), property.getName().asString());
 
         JRightPadded<J.VariableDeclarations.NamedVariable> receiver = null;
         if (property.getReceiverTypeRef() != null) {
@@ -1381,13 +1386,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
 
         J expr = null;
-        Space exprPrefix = EMPTY;
-        if (property.getInitializer() != null) {
-            exprPrefix = sourceBefore("=");
+        int saveCursor = cursor;
+        Space exprPrefix = whitespace();
+        if (property.getInitializer() != null && source.startsWith("=", cursor)) {
+            cursor += "=".length();
             expr = visitExpression(property.getInitializer(), ctx);
             if (expr instanceof Statement && !(expr instanceof Expression)) {
                 expr = new K.StatementExpression(randomId(), (Statement) expr);
             }
+        } else {
+            exprPrefix = EMPTY;
+            cursor(saveCursor);
         }
 
         if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
@@ -1470,14 +1479,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             convertAll(propertyAccessor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
 
             String methodName = "get";
-            skip(methodName);
-            J.Identifier name = new J.Identifier(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    methodName,
-                    typeMapping.type(propertyAccessor),
-                    null);
+            J.Identifier name = createIdentifier(methodName, propertyAccessor);
 
             JContainer<Statement> params;
             Space paramFmt = sourceBefore("(");
@@ -1583,7 +1585,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
         List<J> modifiers = emptyList();
-        List<J.Annotation> annotations = mapModifiers(ModifierScope.FUNCTION, simpleFunction.getAnnotations());
+        List<J.Annotation> annotations = mapModifiers(simpleFunction.getAnnotations(), "fun");
 
         boolean isInfix = false;
         for (J.Annotation annotation : annotations) {
@@ -1960,14 +1962,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         Markers markers = Markers.EMPTY;
 
-        List<J.Annotation> annotations;
-        if (source.startsWith("val ", cursor) || source.startsWith("var ", cursor)) {
-            boolean isVal = valueParameter.isVal();
-            annotations = mapModifiers(isVal ? ModifierScope.VAL : ModifierScope.VAR, valueParameter.getAnnotations());
-            markers = markers.addIfAbsent(new PropertyClassifier(randomId(), isVal ? sourceBefore("val") : sourceBefore("var"), isVal ? VAL : VAR));
-        } else {
-            annotations = mapAnnotations(valueParameter.getAnnotations());
-        }
+        List<J.Annotation> annotations = mapModifiers(valueParameter.getAnnotations(), valueParameter.getName().asString());
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
         Space namePrefix = EMPTY;
@@ -2507,7 +2502,47 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
     }
 
-    private List<J.Annotation> mapModifiers(ModifierScope modifierScope, List<FirAnnotation> firAnnotations) {
+    private J.ForEachLoop mapForLoop(FirBlock firBlock) {
+        Space prefix = whitespace();
+        skip("for");
+        Space controlPrefix = sourceBefore("(");
+
+        FirWhileLoop forLoop = (FirWhileLoop) firBlock.getStatements().get(1);
+        FirProperty receiver = (FirProperty) forLoop.getBlock().getStatements().get(0);
+        J.VariableDeclarations variable = (J.VariableDeclarations) visitElement(receiver, ctx);
+        Space afterVariable = sourceBefore("in");
+
+        FirProperty loopCondition = (FirProperty) firBlock.getStatements().get(0);
+        Expression expression = (Expression) visitElement(((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver(), ctx);
+        Space afterExpression = sourceBefore(")");
+        J.ForEachLoop.Control control = new J.ForEachLoop.Control(
+                randomId(),
+                controlPrefix,
+                Markers.EMPTY,
+                padRight(variable, afterVariable),
+                padRight(expression, afterExpression));
+
+        JRightPadded<Statement> body = null;
+        if (forLoop.getBlock().getStatements().size() > 1) {
+            Set<FirElement> skip = Collections.newSetFromMap(new IdentityHashMap<>());
+            skip.add(forLoop.getBlock().getStatements().get(0));
+            Statement block = (Statement) visitBlock(forLoop.getBlock(), skip, ctx);
+            body = padRight(block, EMPTY);
+        }
+
+        return new J.ForEachLoop(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                control,
+                body);
+    }
+
+    private List<J.Annotation> mapModifiers(List<FirAnnotation> firAnnotations, String stopWord) {
+        if ("<no name provided>".equals(stopWord)) {
+            return mapAnnotations(firAnnotations);
+        }
+
         List<FirAnnotation> findMatch = new ArrayList<>(firAnnotations.size());
         findMatch.addAll(firAnnotations);
 
@@ -2517,8 +2552,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             int saveCursor = cursor;
             Space prefix = whitespace();
 
-            if (source.startsWith(modifierScope.getKeyword() + " ", cursor)) {
-                if (ModifierScope.FUNCTION == modifierScope) {
+            if (cursor == source.length() -1 ||
+                    // Matched stop word.
+                    (source.startsWith(stopWord, cursor) && (source.length() - 1 == cursor + stopWord.length() ||
+                            (Character.isWhitespace(source.charAt(cursor + stopWord.length())) ||
+                                    isDelimiter(source.charAt(cursor + stopWord.length())))))) {
+                if ("fun".equals(stopWord)) {
                     K.Modifier modifier = mapModifier(prefix, emptyList());
                     J.Annotation annotation = convertToAnnotation(modifier);
                     modifiers.add(annotation);
@@ -2530,8 +2569,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 cursor(saveCursor);
                 J.Annotation annotation = mapAnnotation(findMatch);
                 modifiers.add(annotation);
+            } else if ((source.startsWith("val", cursor) || source.startsWith("var", cursor)) &&
+                    (Character.isWhitespace(source.charAt(cursor + 3)) ||
+                            isDelimiter(source.charAt(cursor + 3)))) {
+                String word = source.startsWith("val", cursor) ? "val" : "var";
+
+                J.Identifier name = createIdentifier(word);
+                modifiers.add(new J.Annotation(
+                        randomId(),
+                        prefix,
+                        Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
+                        name,
+                        JContainer.empty()));
             } else {
                 K.Modifier modifier = mapModifier(prefix, emptyList());
+                if (modifier == null) {
+                    cursor(saveCursor);
+                    return modifiers;
+                }
                 J.Annotation annotation = convertToAnnotation(modifier);
                 modifiers.add(annotation);
             }
@@ -2542,6 +2597,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return modifiers;
     }
 
+    private boolean isDelimiter(char c) {
+        return c == '(' || c == ')' || c == '{' || c == '}' || c == '<' || c == '>' || c == ':' || c == '.';
+    }
+
+    @Nullable
     private K.Modifier mapModifier(Space prefix, List<J.Annotation> annotations) {
         K.Modifier.Type type;
         // Ordered based on kotlin requirements.
@@ -2600,7 +2660,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else if (source.startsWith("data", cursor)) {
             type = K.Modifier.Type.Data;
         } else {
-            throw new IllegalArgumentException("Source starts with " + source.substring(cursor, cursor + 30) + " at cursor pos " + cursor);
+            return null;
         }
 
         skip(type.name().toLowerCase());
@@ -2651,7 +2711,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Nullable
     private FirBasedSymbol<?> getCurrentFile() {
-        return currentFile == null ? null : getCurrentFile();
+        return currentFile == null ? null : currentFile.getSymbol();
     }
 
     private final Function<FirElement, Space> commaDelim = ignored -> sourceBefore(",");
