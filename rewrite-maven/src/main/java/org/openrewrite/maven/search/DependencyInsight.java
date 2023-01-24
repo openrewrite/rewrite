@@ -18,12 +18,16 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
+import org.openrewrite.maven.table.DependencyInUse;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
@@ -36,6 +40,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class DependencyInsight extends Recipe {
+    transient DependencyInUse dependencyInUse = new DependencyInUse(this);
 
     @Option(displayName = "Group pattern",
             description = "Group glob pattern used to match dependencies.",
@@ -76,7 +81,7 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and scope. " +
-                "Results include dependencies that either directly match or transitively include a matching dependency.";
+               "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
@@ -85,8 +90,8 @@ public class DependencyInsight extends Recipe {
 
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
-                Xml.Tag t = super.visitTag(tag, context);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
 
                 if (isDependencyTag()) {
                     ResolvedDependency dependency = findDependency(t, aScope);
@@ -98,6 +103,22 @@ public class DependencyInsight extends Recipe {
                             } else {
                                 t = SearchResult.found(t, match.getGav().toString());
                             }
+
+                            Optional<JavaProject> javaProject = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                                    .findFirst(JavaProject.class);
+                            Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                                    .findFirst(JavaSourceSet.class);
+
+                            dependencyInUse.insertRow(ctx, new DependencyInUse.Row(
+                                    javaProject.map(JavaProject::getProjectName).orElse(""),
+                                    javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
+                                    match.getGroupId(),
+                                    match.getArtifactId(),
+                                    match.getVersion(),
+                                    match.getDatedSnapshotVersion(),
+                                    match.getRequested().getScope(),
+                                    match.getDepth()
+                            ));
                         }
                     }
                 }

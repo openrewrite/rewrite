@@ -27,11 +27,15 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.marker.JavaProject;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.table.DependencyInUse;
 import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 import java.util.Map;
@@ -44,6 +48,7 @@ import static java.util.stream.Collectors.toMap;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class DependencyInsight extends Recipe {
+    transient DependencyInUse dependencyInUse = new DependencyInUse(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -109,8 +114,8 @@ public class DependencyInsight extends Recipe {
             }
 
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (!DEPENDENCY_CONFIGURATION_MATCHER.matches(m) || !configToMatchingDependencies.containsKey(m.getSimpleName()) ||
                     m.getArguments().isEmpty()) {
                     return m;
@@ -169,6 +174,22 @@ public class DependencyInsight extends Recipe {
 
                     ResolvedDependency match = maybeMatch.get().findDependency(groupIdPattern, artifactIdPattern);
                     if (match != null) {
+                        Optional<JavaProject> javaProject = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                                .findFirst(JavaProject.class);
+                        Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                                .findFirst(JavaSourceSet.class);
+
+                        dependencyInUse.insertRow(ctx, new DependencyInUse.Row(
+                                javaProject.map(JavaProject::getProjectName).orElse(""),
+                                javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
+                                match.getGroupId(),
+                                match.getArtifactId(),
+                                match.getVersion(),
+                                match.getDatedSnapshotVersion(),
+                                match.getRequested().getScope(),
+                                match.getDepth()
+                        ));
+
                         return SearchResult.found(m, match.getGroupId() + ":" + match.getArtifactId() + ":" + match.getVersion());
                     }
                 }
