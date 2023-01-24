@@ -85,7 +85,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         List<Path> artifacts = new ArrayList<>(artifactNames.length);
         List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
         for (String artifactName : artifactNames) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+            Pattern jarPattern = Pattern.compile(artifactName + "-.*?\\.jar$");
             // In a multi-project IDE classpath, some classpath entries aren't jars
             Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
             boolean lacking = true;
@@ -112,15 +112,15 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         return artifacts;
     }
 
-    static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNames) {
-        List<Path> artifacts = new ArrayList<>(artifactNames.length);
-        List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
+    static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
+        List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
+        List<String> missingArtifactNames = new ArrayList<>(artifactNamesWithVersions.length);
         File resourceTarget = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget();
 
         nextArtifact:
-        for (String artifactName : artifactNames) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+        for (String artifactName : artifactNamesWithVersions) {
+            Pattern jarPattern = Pattern.compile(artifactName + "\\.jar$");
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
