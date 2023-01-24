@@ -2142,7 +2142,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     expressions.add(JRightPadded.build((Expression) convertToIdentifier("else"))
                             .withAfter(sourceBefore("->")));
                 } else if (whenBranch.getCondition() instanceof FirBinaryLogicExpression) {
-                    throw new UnsupportedOperationException("Implement multi-case.");
+                    mapBinaryExpressions((FirBinaryLogicExpression) whenBranch.getCondition(), expressions);
                 } else {
                     List<FirExpression> arguments = ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()
                             .stream()
@@ -2229,6 +2229,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return ifStatement;
+    }
+
+    private void mapBinaryExpressions(FirBinaryLogicExpression logicExpression, List<JRightPadded<Expression>> expressions) {
+        if (logicExpression.getLeftOperand() instanceof FirBinaryLogicExpression) {
+            mapBinaryExpressions((FirBinaryLogicExpression) logicExpression.getLeftOperand(), expressions);
+        } else if (logicExpression.getLeftOperand() instanceof FirEqualityOperatorCall) {
+            FirEqualityOperatorCall lhs = (FirEqualityOperatorCall) logicExpression.getLeftOperand();
+            Expression left = (Expression) visitElement(lhs.getArgumentList().getArguments().get(1), ctx);
+            expressions.add(padRight(left, sourceBefore(",")));
+        } else {
+            throw new UnsupportedOperationException("Unsupported logical operator from when expression.");
+        }
+
+        FirEqualityOperatorCall rhs = (FirEqualityOperatorCall) logicExpression.getRightOperand();
+        Expression right = (Expression) visitElement(rhs.getArgumentList().getArguments().get(1), ctx);
+        Space after = whitespace();
+        if (source.startsWith(",", cursor)) {
+            cursor++;
+        } else {
+            cursor += "->".length();
+        }
+        expressions.add(padRight(right, after));
     }
 
     @Override
