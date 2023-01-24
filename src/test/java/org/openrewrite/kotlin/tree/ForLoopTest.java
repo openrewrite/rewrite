@@ -39,7 +39,6 @@ public class ForLoopTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void inMap() {
         rewriteRun(

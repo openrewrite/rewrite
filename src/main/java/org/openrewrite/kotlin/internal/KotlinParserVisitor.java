@@ -2598,7 +2598,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private boolean isDelimiter(char c) {
-        return c == '(' || c == ')' || c == '{' || c == '}' || c == '<' || c == '>' || c == ':' || c == '.';
+        return c == '(' || c == ')' || c == '{' || c == '}' || c == '<' || c == '>' || c == ':' || c == '.' || c == ',';
     }
 
     @Nullable

@@ -168,4 +168,13 @@ public class VariableDeclarationTest implements RewriteTest {
           """)
         );
     }
+
+    @Test
+    void mapOf() {
+        rewriteRun(
+          kotlin("""
+              val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+          """)
+        );
+    }
 }
