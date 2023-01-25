@@ -31,7 +31,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2674")
     @Test
-    void noMethodInvocationInDoubleBraceIgnored() {
+    void possibleMistakenlyMissedAddingToCollection() {
         rewriteRun(
           java(
             """
@@ -41,11 +41,19 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
                       OTList otList = new OTList() {{ new OTElement();}};
                   }
               }
+              """,
+            """
+              import java.util.List;
+              class A {
+                  void example() {
+                      OTList otList = new OTList() {{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new OTElement();}};
+                  }
+              }
               """
           ),
           java(
             """
-              class OTElement  {
+              class OTElement {
               }
               """
           ),
@@ -53,6 +61,35 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
             """
               import java.util.ArrayList;
               class OTList extends ArrayList {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2674")
+    @Test
+    void possibleMistakenlyMissedAddingToCollectionWithDifferentMethodName() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.*;
+
+              class A {
+                  private final Map<String, String> map = new HashMap<>() {{ new AbstractMap.SimpleEntry<>("key", "value"); }};
+                  private final List<String> list = new ArrayList<>() {{ new String("foo"); new String("bar"); }};
+                  private final Set<String> set = new HashSet<>(){{ new String("foo"); new String("bar"); }};
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.*;
+
+              class A {
+                  private final Map<String, String> map = new HashMap<>() {{ /*~~(Did you mean to invoke put() method to the collection?)~~>*/new AbstractMap.SimpleEntry<>("key", "value"); }};
+                  private final List<String> list = new ArrayList<>() {{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo"); new String("bar"); }};
+                  private final Set<String> set = new HashSet<>(){{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo"); new String("bar"); }};
               }
               """
           )

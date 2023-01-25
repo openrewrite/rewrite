@@ -15,16 +15,14 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
 import java.util.*;
@@ -102,6 +100,15 @@ public class NoDoubleBraceInitialization extends Recipe {
                 //noinspection ConstantConditions
                 J.Block secondBlock = (J.Block) nc.getBody().getStatements().get(0);
                 List<Statement> initStatements = secondBlock.getStatements();
+
+                boolean maybeMistakenlyMissedAddingElement = !initStatements.isEmpty()
+                    && initStatements.stream().allMatch(statement -> statement instanceof J.NewClass);
+
+                if (maybeMistakenlyMissedAddingElement) {
+                    JavaType newClassType = nc.getType();
+                    String addToCollectionMethod = TypeUtils.isAssignableTo(MAP_TYPE, newClassType) ? "put()" : "add()";
+                    return AddWarningMessage.addWarningComment(nc, addToCollectionMethod);
+                }
 
                 // If not any method invocation (like add(), push(), etc) happened in the double brace to initialize
                 // the content of the collection, it means the intention of the code in the double brace is uncertain
@@ -217,7 +224,27 @@ public class NoDoubleBraceInitialization extends Recipe {
         }
     }
 
-    private static class FindMethodInvocationInDoubleBrace extends JavaIsoVisitor<AtomicBoolean>{
+    private static class AddWarningMessage extends JavaIsoVisitor<String> {
+        private int count = 0;
+
+        static J.NewClass addWarningComment(J.NewClass nc, String methodName) {
+            return (J.NewClass) new AddWarningMessage().visit(nc, methodName);
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, String methodName) {
+            count++;
+            // skip the root which starts from 1, and only comment for the 1st raw constructor which has count as 2.
+            if (count == 2) {
+                String comment = "Did you mean to invoke " + methodName + " method to the collection?";
+                return SearchResult.found(newClass, comment);
+            }
+
+            return super.visitNewClass(newClass, methodName);
+        }
+    }
+
+    private static class FindMethodInvocationInDoubleBrace extends JavaIsoVisitor<AtomicBoolean> {
         /**
          * Find whether any collection content initialization method(e.g add() or put()) is invoked in the double brace.
          * @param j The subtree to search, supposed to be the 2nd brace (J.Block)
