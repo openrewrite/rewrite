@@ -81,7 +81,7 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(GradleWrapper.validate(ctx, version, distribution, gradleWrapper));
+        return super.validate(ctx).and(GradleWrapper.validate(ctx, version == null ? "latest.release" : version, distribution, gradleWrapper));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
@@ -91,12 +91,6 @@ public class AddGradleWrapper extends Recipe {
     public AddGradleWrapper(String version, String distribution) {
         this.version = version;
         this.distribution = distribution;
-    }
-
-    @LoathingOfOthers("JavaDoc")
-    @JsonCreator
-    public AddGradleWrapper() {
-       this(RELEASE,null);
     }
 
     @Override

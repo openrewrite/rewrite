@@ -118,9 +118,10 @@ class AddGradleWrapperTest implements RewriteTest {
                     type: specs.openrewrite.org/v1beta/recipe
                     name: org.openrewrite.test.AddGradleWrapper
                     displayName: Adds a Gradle wrapper
-                    description: Adds the latest RELEASE of the gradle wrapper
+                    description: Add latest release of the gradle wrapper
                     recipeList:
-                      - org.openrewrite.gradle.AddGradleWrapper
+                      - org.openrewrite.gradle.AddGradleWrapper:
+                          version: null
                     """.getBytes()
                 ),
                 "org.openrewrite.test.AddGradleWrapper"
