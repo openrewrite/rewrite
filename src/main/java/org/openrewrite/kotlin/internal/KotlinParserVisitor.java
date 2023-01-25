@@ -2513,7 +2513,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         FirProperty receiver = (FirProperty) forLoop.getBlock().getStatements().get(0);
         int paramCount = 1;
         if ("<destruct>".equals(receiver.getName().asString())) {
-            paramCount = ((FirResolvedTypeRef) receiver.getReturnTypeRef()).getType().getTypeArguments().length;
+            paramCount = source.substring(cursor, cursor + source.substring(cursor).indexOf(")") + 1).split(",").length;
         }
 
         J.VariableDeclarations variable;
