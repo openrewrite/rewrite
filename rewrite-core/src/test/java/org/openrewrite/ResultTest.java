@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import org.eclipse.jgit.lib.FileMode;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.StringUtils;
 
@@ -205,6 +207,33 @@ class ResultTest {
               """
                 diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
                 deleted file mode 100644
+                index efeb105..0000000
+                --- a/com/netflix/MyJavaClass.java
+                +++ /dev/null
+                @@ -1,3 +0,0 @@ logger.Fix1
+                -public void test() {
+                -   logger.info("Hello Fred");
+                -}
+                """
+            );
+        }
+    }
+    @Disabled("Does not work with CI due to jgit shadowJar")
+    @Test
+    void executableFile() {
+        try (var result = new Result.InMemoryDiffEntry(
+          filePath, null, null,
+          """
+            public void test() {
+               logger.info("Hello Fred");
+            }
+            """,
+          "",
+          Set.of(toRecipe().withName("logger.Fix1")), FileMode.EXECUTABLE_FILE, FileMode.EXECUTABLE_FILE)) {
+            assertThat(result.getDiff()).isEqualTo(
+              """
+                diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
+                deleted file mode 100755
                 index efeb105..0000000
                 --- a/com/netflix/MyJavaClass.java
                 +++ /dev/null
