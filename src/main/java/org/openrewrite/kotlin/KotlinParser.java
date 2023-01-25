@@ -187,7 +187,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureJdkClasspathRoots(compilerConfiguration);
 
         Disposable disposable = Disposer.newDisposable();
-
         try {
             KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                     disposable,
@@ -287,7 +286,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             sessionToCus.put(output.getSession(), cus);
             return sessionToCus;
         } finally {
-            disposable.dispose();
+            Disposer.dispose(disposable);
         }
     }
 
