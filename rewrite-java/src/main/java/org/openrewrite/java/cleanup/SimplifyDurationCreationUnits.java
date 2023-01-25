@@ -66,11 +66,7 @@ public class SimplifyDurationCreationUnits extends Recipe {
 
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        TreeVisitor<?, ExecutionContext>[] tests = new TreeVisitor[DurationUnits.values().length];
-        for (int i = 0; i < tests.length; i++) {
-            tests[i] = new UsesMethod(DurationUnits.values()[i].methodMatcher);
-        }
-        return Applicability.or(tests);
+        return new UsesMethod(new MethodMatcher("java.time.Duration of*(long)"));
     }
 
     @Override
