@@ -102,19 +102,19 @@ public class NoDoubleBraceInitialization extends Recipe {
                 List<Statement> initStatements = secondBlock.getStatements();
 
                 boolean maybeMistakenlyMissedAddingElement = !initStatements.isEmpty()
-                    && initStatements.stream().allMatch(statement -> statement instanceof J.NewClass);
+                        && initStatements.stream().allMatch(statement -> statement instanceof J.NewClass);
 
                 if (maybeMistakenlyMissedAddingElement) {
                     JavaType newClassType = nc.getType();
                     String addToCollectionMethod = TypeUtils.isAssignableTo(MAP_TYPE, newClassType) ? "put()" : "add()";
-                    return AddWarningMessage.addWarningComment(nc, addToCollectionMethod);
+                    return nc.withBody(AddWarningMessage.addWarningComment(nc.getBody(), addToCollectionMethod));
                 }
 
                 // If not any method invocation (like add(), push(), etc) happened in the double brace to initialize
                 // the content of the collection, it means the intention of the code in the double brace is uncertain
                 // or maybe a custom code bug (like issue: https://github.com/openrewrite/rewrite/issues/2674),
                 // we don't want to rewrite code for this case to avoid introducing other warnings.
-                boolean hasMethodInvocationInDoubleBrace = FindMethodInvocationInDoubleBrace.find(secondBlock).get();
+                boolean hasMethodInvocationInDoubleBrace = FindMethodInvocationInDoubleBrace.find(secondBlock);
 
                 if (hasMethodInvocationInDoubleBrace && var != null && parentBlockCursor.getParent() != null) {
                     if (parentBlockCursor.getParent().getValue() instanceof J.ClassDeclaration) {
@@ -154,16 +154,18 @@ public class NoDoubleBraceInitialization extends Recipe {
         }
 
         private static class AddSelectVisitor extends JavaIsoVisitor<ExecutionContext> {
-            private  final J.Identifier identifier;
+            private final J.Identifier identifier;
+
             public AddSelectVisitor(J.Identifier identifier) {
                 this.identifier = identifier;
             }
+
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
                 if (mi.getMethodType() != null && TypeUtils.isAssignableTo(identifier.getFieldType(), mi.getMethodType().getDeclaringType())) {
                     if (mi.getSelect() == null
-                        || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier)mi.getSelect()).getSimpleName()))) {
+                            || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier) mi.getSelect()).getSimpleName()))) {
                         return mi.withSelect(identifier);
                     }
                 }
@@ -225,46 +227,43 @@ public class NoDoubleBraceInitialization extends Recipe {
     }
 
     private static class AddWarningMessage extends JavaIsoVisitor<String> {
-        private int count = 0;
 
-        static J.NewClass addWarningComment(J.NewClass nc, String methodName) {
-            return (J.NewClass) new AddWarningMessage().visit(nc, methodName);
+        static <T extends J> T addWarningComment(T nc, String methodName) {
+            //noinspection unchecked
+            return (T) new AddWarningMessage().visitNonNull(nc, methodName);
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, String s) {
+            return method;
         }
 
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, String methodName) {
-            count++;
-            // skip the root which starts from 1, and only comment for the 1st raw constructor which has count as 2.
-            if (count == 2) {
-                String comment = "Did you mean to invoke " + methodName + " method to the collection?";
-                return SearchResult.found(newClass, comment);
-            }
-
-            return super.visitNewClass(newClass, methodName);
+            String comment = "Did you mean to invoke " + methodName + " method to the collection?";
+            return SearchResult.found(newClass, comment);
         }
     }
 
     private static class FindMethodInvocationInDoubleBrace extends JavaIsoVisitor<AtomicBoolean> {
         /**
          * Find whether any collection content initialization method(e.g add() or put()) is invoked in the double brace.
+         *
          * @param j The subtree to search, supposed to be the 2nd brace (J.Block)
          * @return true if any method invocation found in the double brace, otherwise false.
          */
-        static AtomicBoolean find(J j) {
+        static boolean find(J j) {
             return new FindMethodInvocationInDoubleBrace()
-                .reduce(j, new AtomicBoolean());
+                    .reduce(j, new AtomicBoolean()).get();
         }
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
-            if (atomicBoolean.get()) {
+            if (atomicBoolean.get() || method.getMethodType() == null) {
                 return method;
             }
-
-            // In double brace initialization of a new class, methods to initialize collection content like `add()` or
-            // `put()` are all belonged to the anonymous class and have type `JavaType.Parameterized`.
-            if (method.getMethodType() != null
-                && method.getMethodType().getDeclaringType() instanceof JavaType.Parameterized) {
+            JavaType.FullyQualified declaring = method.getMethodType().getDeclaringType();
+            if (TypeUtils.isAssignableTo(MAP_TYPE, declaring) || TypeUtils.isAssignableTo(LIST_TYPE, declaring) || TypeUtils.isAssignableTo(SET_TYPE, declaring)) {
                 atomicBoolean.set(true);
                 return method;
             }

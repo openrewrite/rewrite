@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings({"Convert2Diamond", "ResultOfMethodCallIgnored"})
+@SuppressWarnings({"Convert2Diamond", "ResultOfMethodCallIgnored", "StringOperationCanBeSimplified", "rawtypes"})
 class NoDoubleBraceInitializationTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
@@ -73,24 +73,40 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              import java.util.List;
-              import java.util.*;
-
-              class A {
-                  private final Map<String, String> map = new HashMap<>() {{ new AbstractMap.SimpleEntry<>("key", "value"); }};
-                  private final List<String> list = new ArrayList<>() {{ new String("foo"); new String("bar"); }};
-                  private final Set<String> set = new HashSet<>(){{ new String("foo"); new String("bar"); }};
-              }
+                import java.util.List;
+                import java.util.*;
+                
+                class A {
+                    private final Map<String, String> map = new HashMap<String, String>() {{
+                        new AbstractMap.SimpleEntry<>("key", "value");
+                    }};
+                    private final List<String> list = new ArrayList<String>() {{
+                        new String("foo");
+                        new String("bar");
+                    }};
+                    private final Set<String> set = new HashSet<String>() {{
+                        new String("foo");
+                        new String("bar");
+                    }};
+                }
               """,
             """
-              import java.util.List;
-              import java.util.*;
-
-              class A {
-                  private final Map<String, String> map = new HashMap<>() {{ /*~~(Did you mean to invoke put() method to the collection?)~~>*/new AbstractMap.SimpleEntry<>("key", "value"); }};
-                  private final List<String> list = new ArrayList<>() {{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo"); new String("bar"); }};
-                  private final Set<String> set = new HashSet<>(){{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo"); new String("bar"); }};
-              }
+                import java.util.List;
+                import java.util.*;
+                
+                class A {
+                    private final Map<String, String> map = new HashMap<String, String>() {{
+                        /*~~(Did you mean to invoke put() method to the collection?)~~>*/new AbstractMap.SimpleEntry<>("key", "value");
+                    }};
+                    private final List<String> list = new ArrayList<String>() {{
+                        /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo");
+                        /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("bar");
+                    }};
+                    private final Set<String> set = new HashSet<String>() {{
+                        /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo");
+                        /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("bar");
+                    }};
+                }
               """
           )
         );
@@ -104,7 +120,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
             """
               import java.util.HashMap;
               import java.util.Map;
-              class A {
+              class A<T> {
                   void example() {
                       Map<String, String> map = new HashMap<>(){{notCollectionRelated();}};
                   }
