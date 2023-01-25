@@ -92,8 +92,8 @@ dependencies {
 tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
-    minHeapSize = "512m"
-    maxHeapSize = "4096m"
+//    minHeapSize = "512m"
+//    maxHeapSize = "1024m"
 }
 
 tasks.withType<JavaCompile>().configureEach {

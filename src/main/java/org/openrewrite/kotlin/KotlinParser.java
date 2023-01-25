@@ -82,7 +82,6 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.*;
-import static org.jetbrains.kotlin.cli.common.config.ContentRootsKt.addKotlinSourceRoot;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.K2JVMCompilerKt.configureModuleChunk;
 import static org.jetbrains.kotlin.cli.jvm.compiler.CoreEnvironmentUtilsKt.applyModuleProperties;
@@ -187,6 +186,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureJdkClasspathRoots(compilerConfiguration);
 
         Disposable disposable = Disposer.newDisposable();
+        Map<FirSession, List<CompiledKotlinSource>> sessionToCus = new HashMap<>();
         try {
             KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                     disposable,
@@ -242,8 +242,10 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 `LightVirtualFile` are created to support tests and in the future, Kotlin template.
                 We might want to extract the generation of `platformSources` later on.
              */
+            int i = 0;
             for (Input source : sources) {
-                VirtualFile vFile = new LightVirtualFile("input", KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
+                String fileName = "openRewriteFile.kt".equals(source.getPath().toString()) ? "openRewriteFile.kt" + i : source.getPath().toString();
+                VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
                 platformSources.add(new KtVirtualFileSourceFile(vFile));
             }
 
@@ -276,18 +278,18 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             assert firFiles.size() == inputs.size();
 
             List<CompiledKotlinSource> cus = new ArrayList<>();
-            for (int i = 0; i < inputs.size(); i++) {
-                Input input = inputs.get(i);
-                FirFile firFile = firFiles.get(i);
+            for (int j = 0; j < inputs.size(); j++) {
+                Input input = inputs.get(j);
+                FirFile firFile = firFiles.get(j);
                 cus.add(new CompiledKotlinSource(input, firFile));
             }
 
-            Map<FirSession, List<CompiledKotlinSource>> sessionToCus = new HashMap<>();
             sessionToCus.put(output.getSession(), cus);
-            return sessionToCus;
         } finally {
             Disposer.dispose(disposable);
         }
+
+        return sessionToCus;
     }
 
     private CompilerConfiguration compilerConfiguration() {
@@ -323,7 +325,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-        return prefix.resolve("file.kt");
+        return prefix.resolve("openRewriteFile.kt");
     }
 
     public static Builder builder() {

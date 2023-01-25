@@ -1,5 +1,6 @@
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.fir.ClassMembersKt;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.*;
@@ -14,6 +15,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef;
+import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource;
 import org.jetbrains.kotlin.name.ClassId;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
@@ -44,6 +46,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String signature(@Nullable Object type, @Nullable FirBasedSymbol<?> ownerSymbol) {
         if (type == null) {
             return "{undefined}";
+        }
+
+        if (type instanceof String) {
+            return (String) type;
         }
 
         if (type instanceof FirClass) {
@@ -319,17 +325,34 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     public String methodSignature(FirFunctionCall functionCall, @Nullable FirBasedSymbol<?> ownerSymbol) {
         String owner = "{undefined}";
         if (functionCall.getExplicitReceiver() != null) {
-            // Update to class sig once ref resolution is implemented.
             owner = signature(functionCall.getExplicitReceiver().getTypeRef());
-        } else if (ownerSymbol != null) {
-            if (ownerSymbol instanceof FirFileSymbol) {
-                owner = ((FirFileSymbol) ownerSymbol).getFir().getName();
-            } else if (ownerSymbol instanceof FirNamedFunctionSymbol) {
-                owner = signature(((FirNamedFunctionSymbol) ownerSymbol).getFir());
-            } else if (ownerSymbol instanceof FirRegularClassSymbol) {
-                owner = signature(((FirRegularClassSymbol) ownerSymbol).getFir());
+        } else if (functionCall.getCalleeReference() instanceof FirResolvedNamedReference) {
+            if (((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol() instanceof FirNamedFunctionSymbol) {
+                FirNamedFunctionSymbol resolvedSymbol = (FirNamedFunctionSymbol) ((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol();
+                if (ClassMembersKt.containingClass(resolvedSymbol) != null) {
+                    //noinspection DataFlowIssue
+                    owner = signature(LookupTagUtilsKt.toFirRegularClassSymbol(ClassMembersKt.containingClass(resolvedSymbol), firSession), ownerSymbol);
+                } else if (resolvedSymbol.getOrigin() == FirDeclarationOrigin.Library.INSTANCE) {
+                    if (resolvedSymbol.getFir().getContainerSource() instanceof JvmPackagePartSource) {
+                        JvmPackagePartSource source = (JvmPackagePartSource) resolvedSymbol.getFir().getContainerSource();
+                        if (source.getFacadeClassName() != null) {
+                            owner = convertKotlinFqToJavaFq(source.getFacadeClassName().toString());
+                        } else {
+                            owner = convertKotlinFqToJavaFq(source.getClassName().toString());
+                        }
+                    }
+                } else if (resolvedSymbol.getOrigin() == FirDeclarationOrigin.Source.INSTANCE && ownerSymbol != null) {
+                    if (ownerSymbol instanceof FirFileSymbol) {
+                        owner = ((FirFileSymbol) ownerSymbol).getFir().getName();
+                    } else if (ownerSymbol instanceof FirNamedFunctionSymbol) {
+                        owner = signature(((FirNamedFunctionSymbol) ownerSymbol).getFir());
+                    } else if (ownerSymbol instanceof FirRegularClassSymbol) {
+                        owner = signature(((FirRegularClassSymbol) ownerSymbol).getFir());
+                    }
+                }
             }
         }
+
         String s = owner;
 
         FirNamedReference namedReference = functionCall.getCalleeReference();

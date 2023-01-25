@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.Modality;
 import org.jetbrains.kotlin.descriptors.Visibility;
+import org.jetbrains.kotlin.fir.ClassMembersKt;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.expressions.*;
@@ -33,6 +34,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef;
+import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource;
 import org.jetbrains.kotlin.name.ClassId;
 import org.jetbrains.kotlin.name.StandardClassIds;
 import org.openrewrite.Incubating;
@@ -48,6 +50,7 @@ import java.util.List;
 
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertClassIdToFqn;
+import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertKotlinFqToJavaFq;
 
 @Incubating(since = "0")
 public class KotlinTypeMapping implements JavaTypeMapping<Object> {
@@ -81,7 +84,11 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return existing;
         }
 
-        if (type instanceof FirClass) {
+        if (type instanceof String) {
+            JavaType javaType = JavaType.ShallowClass.build((String) type);
+            typeCache.put(signature, javaType);
+            return javaType;
+        } else if (type instanceof FirClass) {
             return classType(type, signature, ownerFallBack);
         } else if (type instanceof FirFunction) {
             return methodDeclarationType((FirFunction) type, null, ownerFallBack);
@@ -378,7 +385,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return existing;
         }
 
-        // Time constrained.
         FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol();
         FirConstructor constructor = null;
         FirSimpleFunction simpleFunction = null;
@@ -414,36 +420,48 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         );
         typeCache.put(signature, method);
 
-        JavaType returnType = null;
         List<JavaType> parameterTypes = null;
         List<JavaType.FullyQualified> exceptionTypes = null;
 
-//        if (selectType instanceof Type.MethodType) {
-//            Type.MethodType methodType = (Type.MethodType) selectType;
+        if (constructor != null && !constructor.getValueParameters().isEmpty()) {
+            parameterTypes = new ArrayList<>(constructor.getValueParameters().size());
+            for (FirValueParameter argtype : constructor.getValueParameters()) {
+                if (argtype != null) {
+                    JavaType javaType = type(argtype);
+                    parameterTypes.add(javaType);
+                }
+            }
+        }
 
-            if (constructor != null && !constructor.getValueParameters().isEmpty()) {
-                parameterTypes = new ArrayList<>(constructor.getValueParameters().size());
-                for (FirValueParameter argtype : constructor.getValueParameters()) {
-                    if (argtype != null) {
-                        JavaType javaType = type(argtype);
-                        parameterTypes.add(javaType);
+        JavaType.FullyQualified resolvedDeclaringType = null;
+        if (functionCall.getCalleeReference() instanceof FirResolvedNamedReference) {
+            if (((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol() instanceof FirNamedFunctionSymbol) {
+                FirNamedFunctionSymbol resolvedSymbol = (FirNamedFunctionSymbol) ((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol();
+                if (ClassMembersKt.containingClass(resolvedSymbol) != null) {
+                    //noinspection DataFlowIssue
+                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(LookupTagUtilsKt.toFirRegularClassSymbol(ClassMembersKt.containingClass(resolvedSymbol), firSession).getFir(), ownerSymbol));
+                } else if (resolvedSymbol.getOrigin() == FirDeclarationOrigin.Library.INSTANCE) {
+                    if (resolvedSymbol.getFir().getContainerSource() instanceof JvmPackagePartSource) {
+                        JvmPackagePartSource source = (JvmPackagePartSource) resolvedSymbol.getFir().getContainerSource();
+                        if (source.getFacadeClassName() != null) {
+                            resolvedDeclaringType = TypeUtils.asFullyQualified(type(convertKotlinFqToJavaFq(source.getFacadeClassName().toString())));
+                        } else {
+                            resolvedDeclaringType = TypeUtils.asFullyQualified(type(convertKotlinFqToJavaFq(source.getClassName().toString())));
+                        }
+                    }
+                } else if (resolvedSymbol.getOrigin() == FirDeclarationOrigin.Source.INSTANCE && ownerSymbol != null) {
+                    if (ownerSymbol instanceof FirFileSymbol) {
+                        resolvedDeclaringType = TypeUtils.asFullyQualified(type(((FirFileSymbol) ownerSymbol).getFir()));
+                    } else if (ownerSymbol instanceof FirNamedFunctionSymbol) {
+                        resolvedDeclaringType = TypeUtils.asFullyQualified(type(((FirNamedFunctionSymbol) ownerSymbol).getFir()));
+                    } else if (ownerSymbol instanceof FirRegularClassSymbol) {
+                        resolvedDeclaringType = TypeUtils.asFullyQualified(type(((FirRegularClassSymbol) ownerSymbol).getFir()));
                     }
                 }
             }
-
-//            returnType = type(methodType.restype);
-
-//        } else if (selectType instanceof Type.UnknownType) {
-//            returnType = JavaType.Unknown.getInstance();
-//        }
-
-        // Currently impossible to set.
-        JavaType.FullyQualified resolvedDeclaringType = null;
-        if (resolvedDeclaringType == null) {
-            return null;
         }
 
-        assert returnType != null;
+        JavaType returnType = type(functionCall.getTypeRef(), ownerSymbol);
 
         method.unsafeSet(resolvedDeclaringType,
                 constructor != null ? resolvedDeclaringType : returnType,
@@ -474,7 +492,17 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         List<JavaType.FullyQualified> annotations = listAnnotations(symbol.getAnnotations());
 
         JavaType resolvedOwner = owner;
-        // TODO: Resolve owner ... there isn't a clear way to access this yet.
+        if (owner == null && ownerFallBack != null) {
+            // There isn't a way to link a Callable back to the owner unless it's a class member, but class members already set the owner.
+            // The fallback isn't always safe and may result in type erasure.
+            // We'll need to find the owner in the parser to set this on properties and variables in local scopes.
+            resolvedOwner = type(ownerFallBack.getFir());
+        }
+
+        if (resolvedOwner == null) {
+            resolvedOwner = JavaType.Unknown.getInstance();
+        }
+
         FirTypeRef typeRef = symbol.getFir() instanceof FirJavaField ? symbol.getFir().getReturnTypeRef() :
                 symbol.getResolvedReturnTypeRef();
                 variable.unsafeSet(resolvedOwner, type(typeRef), annotations);
@@ -647,7 +675,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                                 FirBasedSymbol<?> callRefSymbol = (((FirResolvedNamedReference) accessExpression.getCalleeReference()).getResolvedSymbol());
                                 if (callRefSymbol instanceof FirEnumEntrySymbol) {
                                     FirEnumEntrySymbol enumEntrySymbol = (FirEnumEntrySymbol) callRefSymbol;
-                                    if ("kotlin.annotation.AnnotationRetention$SOURCE".equals(KotlinTypeSignatureBuilder.convertKotlinFqToJavaFq(enumEntrySymbol.getCallableId().toString()))) {
+                                    if ("kotlin.annotation.AnnotationRetention$SOURCE".equals(convertKotlinFqToJavaFq(enumEntrySymbol.getCallableId().toString()))) {
                                         continue outer;
                                     }
                                 }
