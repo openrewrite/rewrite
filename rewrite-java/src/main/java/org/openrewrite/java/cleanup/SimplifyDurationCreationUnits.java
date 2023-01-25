@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -61,12 +60,12 @@ public class SimplifyDurationCreationUnits extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Simplifies java.time.Duration units to be more human-readable.";
+        return "Simplifies `java.time.Duration` units to be more human-readable.";
     }
 
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new UsesMethod(new MethodMatcher("java.time.Duration of*(long)"));
+        return new UsesMethod<>(new MethodMatcher("java.time.Duration of*(long)"));
     }
 
     @Override
