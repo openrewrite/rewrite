@@ -402,16 +402,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             boolean omitParensOnMethod = method.getMarkers().findFirst(OmitParentheses.class).isPresent();
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
-                boolean omitParens = arg.getElement().getMarkers()
-                        .findFirst(OmitParentheses.class)
-                        .isPresent() ||
-                        arg.getElement().getMarkers()
-                                .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
-                                .isPresent();
 
-                if (i == 0 && !omitParens && !omitParensOnMethod) {
+                if (i == 0 && !omitParensOnMethod) {
                     p.out.append('(');
-                } else if (i > 0 && omitParens && (
+                } else if (i > 0 && omitParensOnMethod && (
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
                                 !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent())) {
                     p.out.append(')');
@@ -421,7 +415,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
 
-                if (i == args.size() - 1 && !omitParens && !omitParensOnMethod) {
+                if (i == args.size() - 1 && !omitParensOnMethod) {
                     p.out.append(')');
                 }
             }

@@ -920,10 +920,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     !(extensionReceiver instanceof FirNoReceiverExpression || extensionReceiver instanceof FirThisReceiverExpression)) {
                 FirElement visit;
                 if (dispatchReceiver instanceof FirFunctionCall ||
-                        dispatchReceiver instanceof FirPropertyAccessExpression) {
+                        dispatchReceiver instanceof FirPropertyAccessExpression ||
+                        dispatchReceiver instanceof FirConstExpression) {
                     visit = dispatchReceiver;
                 } else if (extensionReceiver instanceof FirFunctionCall ||
-                        extensionReceiver instanceof FirPropertyAccessExpression) {
+                        extensionReceiver instanceof FirPropertyAccessExpression ||
+                        extensionReceiver instanceof FirConstExpression) {
                     visit = extensionReceiver;
                 } else if (dispatchReceiver instanceof FirCheckedSafeCallSubject) {
                     visit = ((FirCheckedSafeCallSubject) dispatchReceiver).getOriginalReceiverRef().getValue();
