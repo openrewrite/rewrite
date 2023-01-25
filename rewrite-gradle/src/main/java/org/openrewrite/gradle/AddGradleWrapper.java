@@ -81,7 +81,7 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(GradleWrapper.validate(ctx, org.openrewrite.internal.StringUtils.isBlank(version) ? "latest.release" : version, distribution, gradleWrapper));
+        return super.validate(ctx).and(GradleWrapper.validate(ctx, version == null ? "latest.release" : version, distribution, gradleWrapper));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
