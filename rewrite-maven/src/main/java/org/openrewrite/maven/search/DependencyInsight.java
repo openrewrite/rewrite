@@ -18,6 +18,7 @@ package org.openrewrite.maven.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
@@ -116,7 +117,8 @@ public class DependencyInsight extends Recipe {
                                     match.getArtifactId(),
                                     match.getVersion(),
                                     match.getDatedSnapshotVersion(),
-                                    match.getRequested().getScope(),
+                                    StringUtils.isBlank(match.getRequested().getScope()) ? "compile" :
+                                            match.getRequested().getScope(),
                                     match.getDepth()
                             ));
                         }

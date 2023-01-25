@@ -25,6 +25,7 @@ import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
@@ -186,7 +187,8 @@ public class DependencyInsight extends Recipe {
                                 match.getArtifactId(),
                                 match.getVersion(),
                                 match.getDatedSnapshotVersion(),
-                                match.getRequested().getScope(),
+                                StringUtils.isBlank(match.getRequested().getScope()) ? "compile" :
+                                        match.getRequested().getScope(),
                                 match.getDepth()
                         ));
 
