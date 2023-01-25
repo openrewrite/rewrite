@@ -22,7 +22,7 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
     implementation("org.codehaus.groovy:groovy:latest.release")
-    implementation("org.openrewrite.gradle.tooling:model:latest.release")
+    api("org.openrewrite.gradle.tooling:model:latest.release")
 
     compileOnly("org.gradle:gradle-base-services:latest.release")
     compileOnly("org.gradle:gradle-core-api:latest.release")
