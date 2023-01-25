@@ -227,15 +227,9 @@ public class NoDoubleBraceInitialization extends Recipe {
     }
 
     private static class AddWarningMessage extends JavaIsoVisitor<String> {
-
         static <T extends J> T addWarningComment(T nc, String methodName) {
             //noinspection unchecked
             return (T) new AddWarningMessage().visitNonNull(nc, methodName);
-        }
-
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, String s) {
-            return method;
         }
 
         @Override

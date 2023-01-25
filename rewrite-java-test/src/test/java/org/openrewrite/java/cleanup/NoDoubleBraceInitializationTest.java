@@ -122,9 +122,15 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
               import java.util.Map;
               class A<T> {
                   void example() {
-                      Map<String, String> map = new HashMap<>(){{notCollectionRelated();}};
+                      Map<String, String> map = new HashMap<String, String>() {
+                          {
+                            func1();
+                            func2();
+                          }
+                          void func2() {}
+                       };
                   }
-                  void notCollectionRelated() {
+                  void func1() {
                   }
               }
               """
