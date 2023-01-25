@@ -56,7 +56,7 @@ public class SimplifyDurationCreationUnits extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Simplify java.time.Duration units";
+        return "Simplify `java.time.Duration` units";
     }
 
     @Override
