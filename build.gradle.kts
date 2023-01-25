@@ -82,18 +82,11 @@ dependencies {
     testImplementation("org.openrewrite:rewrite-test")
 
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
-
-//    testImplementation("org.gradle:gradle-kotlin-dsl:latest.release")
-//    testImplementation("org.gradle:gradle-language-java:latest.release")
-//    testImplementation("org.gradle:gradle-core-api:latest.release")
-//    testImplementation("org.gradle:gradle-plugins:latest.release")
 }
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
     jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
-//    minHeapSize = "512m"
-//    maxHeapSize = "1024m"
 }
 
 tasks.withType<JavaCompile>().configureEach {

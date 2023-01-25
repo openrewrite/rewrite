@@ -178,9 +178,17 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         if (classpath != null) {
             for (Path path : classpath) {
-                addJvmClasspathRoot(compilerConfiguration, path.toFile());
+                File file;
+                try {
+                    file = path.toFile();
+                } catch (UnsupportedOperationException ex) {
+                    continue;
+                }
+                addJvmClasspathRoot(compilerConfiguration, file);
             }
         }
+
+        addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
         configureJdkClasspathRoots(compilerConfiguration);
