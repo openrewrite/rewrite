@@ -15,19 +15,18 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class NoDoubleBraceInitialization extends Recipe {
@@ -84,6 +83,7 @@ public class NoDoubleBraceInitialization extends Recipe {
             if (nc.getBody() != null && !nc.getBody().getStatements().isEmpty()
                     && nc.getBody().getStatements().get(0) instanceof J.Block
                     && getCursor().getParent(3) != null) {
+
                 return TypeUtils.isAssignableTo(MAP_TYPE, nc.getType())
                         || TypeUtils.isAssignableTo(LIST_TYPE, nc.getType())
                         || TypeUtils.isAssignableTo(SET_TYPE, nc.getType());
@@ -98,9 +98,25 @@ public class NoDoubleBraceInitialization extends Recipe {
                 Cursor parentBlockCursor = getCursor().dropParentUntil(J.Block.class::isInstance);
                 J.VariableDeclarations.NamedVariable var = getCursor().firstEnclosing(J.VariableDeclarations.NamedVariable.class);
                 //noinspection ConstantConditions
-                List<Statement> initStatements = ((J.Block) nc.getBody().getStatements().get(0)).getStatements();
+                J.Block secondBlock = (J.Block) nc.getBody().getStatements().get(0);
+                List<Statement> initStatements = secondBlock.getStatements();
 
-                if (var != null && parentBlockCursor.getParent() != null) {
+                boolean maybeMistakenlyMissedAddingElement = !initStatements.isEmpty()
+                    && initStatements.stream().allMatch(statement -> statement instanceof J.NewClass);
+
+                if (maybeMistakenlyMissedAddingElement) {
+                    JavaType newClassType = nc.getType();
+                    String addToCollectionMethod = TypeUtils.isAssignableTo(MAP_TYPE, newClassType) ? "put()" : "add()";
+                    return AddWarningMessage.addWarningComment(nc, addToCollectionMethod);
+                }
+
+                // If not any method invocation (like add(), push(), etc) happened in the double brace to initialize
+                // the content of the collection, it means the intention of the code in the double brace is uncertain
+                // or maybe a custom code bug (like issue: https://github.com/openrewrite/rewrite/issues/2674),
+                // we don't want to rewrite code for this case to avoid introducing other warnings.
+                boolean hasMethodInvocationInDoubleBrace = FindMethodInvocationInDoubleBrace.find(secondBlock).get();
+
+                if (hasMethodInvocationInDoubleBrace && var != null && parentBlockCursor.getParent() != null) {
                     if (parentBlockCursor.getParent().getValue() instanceof J.ClassDeclaration) {
                         JavaType.FullyQualified fq = TypeUtils.asFullyQualified(nc.getType());
                         if (fq != null && fq.getSupertype() != null) {
@@ -168,7 +184,7 @@ public class NoDoubleBraceInitialization extends Recipe {
         public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
             J.Block bl = super.visitBlock(block, ctx);
             Map<Statement, List<Statement>> initStatements = getCursor().pollMessage("INIT_STATEMENTS");
-            Map<Statement, List<Statement>> methodInitStatemnts = getCursor().pollMessage("METHOD_DECL_STATEMENTS");
+            Map<Statement, List<Statement>> methodInitStatements = getCursor().pollMessage("METHOD_DECL_STATEMENTS");
 
             if (initStatements != null) {
                 for (Map.Entry<Statement, List<Statement>> objectListEntry : initStatements.entrySet()) {
@@ -194,8 +210,8 @@ public class NoDoubleBraceInitialization extends Recipe {
                                 initBlock, ctx, getCursor().getParent(2));
                     }
                 }
-            } else if (methodInitStatemnts != null) {
-                for (Map.Entry<Statement, List<Statement>> objectListEntry : methodInitStatemnts.entrySet()) {
+            } else if (methodInitStatements != null) {
+                for (Map.Entry<Statement, List<Statement>> objectListEntry : methodInitStatements.entrySet()) {
                     int statementIndex = bl.getStatements().indexOf(objectListEntry.getKey());
                     if (statementIndex > -1) {
                         //noinspection ConstantConditions
@@ -205,6 +221,55 @@ public class NoDoubleBraceInitialization extends Recipe {
                 }
             }
             return bl;
+        }
+    }
+
+    private static class AddWarningMessage extends JavaIsoVisitor<String> {
+        private int count = 0;
+
+        static J.NewClass addWarningComment(J.NewClass nc, String methodName) {
+            return (J.NewClass) new AddWarningMessage().visit(nc, methodName);
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, String methodName) {
+            count++;
+            // skip the root which starts from 1, and only comment for the 1st raw constructor which has count as 2.
+            if (count == 2) {
+                String comment = "Did you mean to invoke " + methodName + " method to the collection?";
+                return SearchResult.found(newClass, comment);
+            }
+
+            return super.visitNewClass(newClass, methodName);
+        }
+    }
+
+    private static class FindMethodInvocationInDoubleBrace extends JavaIsoVisitor<AtomicBoolean> {
+        /**
+         * Find whether any collection content initialization method(e.g add() or put()) is invoked in the double brace.
+         * @param j The subtree to search, supposed to be the 2nd brace (J.Block)
+         * @return true if any method invocation found in the double brace, otherwise false.
+         */
+        static AtomicBoolean find(J j) {
+            return new FindMethodInvocationInDoubleBrace()
+                .reduce(j, new AtomicBoolean());
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
+            if (atomicBoolean.get()) {
+                return method;
+            }
+
+            // In double brace initialization of a new class, methods to initialize collection content like `add()` or
+            // `put()` are all belonged to the anonymous class and have type `JavaType.Parameterized`.
+            if (method.getMethodType() != null
+                && method.getMethodType().getDeclaringType() instanceof JavaType.Parameterized) {
+                atomicBoolean.set(true);
+                return method;
+            }
+
+            return super.visitMethodInvocation(method, atomicBoolean);
         }
     }
 }

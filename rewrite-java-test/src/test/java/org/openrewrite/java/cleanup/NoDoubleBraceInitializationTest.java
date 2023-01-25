@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,8 +29,95 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
         spec.recipe(new NoDoubleBraceInitialization());
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2674")
     @Test
-    void doubleBranchInitializationForArg() {
+    void possibleMistakenlyMissedAddingToCollection() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              class A {
+                  void example() {
+                      OTList otList = new OTList() {{ new OTElement();}};
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              class A {
+                  void example() {
+                      OTList otList = new OTList() {{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new OTElement();}};
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              class OTElement {
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.ArrayList;
+              class OTList extends ArrayList {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2674")
+    @Test
+    void possibleMistakenlyMissedAddingToCollectionWithDifferentMethodName() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.*;
+
+              class A {
+                  private final Map<String, String> map = new HashMap<>() {{ new AbstractMap.SimpleEntry<>("key", "value"); }};
+                  private final List<String> list = new ArrayList<>() {{ new String("foo"); new String("bar"); }};
+                  private final Set<String> set = new HashSet<>(){{ new String("foo"); new String("bar"); }};
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.*;
+
+              class A {
+                  private final Map<String, String> map = new HashMap<>() {{ /*~~(Did you mean to invoke put() method to the collection?)~~>*/new AbstractMap.SimpleEntry<>("key", "value"); }};
+                  private final List<String> list = new ArrayList<>() {{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo"); new String("bar"); }};
+                  private final Set<String> set = new HashSet<>(){{ /*~~(Did you mean to invoke add() method to the collection?)~~>*/new String("foo"); new String("bar"); }};
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2674")
+    @Test
+    void noCollectionInitializedInDoubleBraceIgnored() {
+        rewriteRun(
+          java(
+            """
+              import java.util.HashMap;
+              import java.util.Map;
+              class A {
+                  void example() {
+                      Map<String, String> map = new HashMap<>(){{notCollectionRelated();}};
+                  }
+                  void notCollectionRelated() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleBranchInitializationForArgIgnored() {
         rewriteRun(
           java(
             """
@@ -48,13 +136,13 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
     }
 
     @Test
-    void doubleBranchInitializationForNewClassArg() {
+    void doubleBranchInitializationForNewClassArgIgnored() {
         rewriteRun(
           java(
             """
               package abc;
               import java.util.List;
-                          
+
               public class Thing {
                   private final List<String> stuff;
                   public Thing(List<String> stuff) {
@@ -68,7 +156,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
               package abc;
               import java.util.ArrayList;
               import java.util.List;
-                            
+
               class A {
                   Thing t = new Thing(new ArrayList<String>(){{add("abc"); add("def");}});
               }
@@ -78,7 +166,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
     }
 
     @Test
-    void doubleBraceInitWithinConstructorArg() {
+    void doubleBraceInitWithinConstructorArgIgnored() {
         rewriteRun(
           java(
             """
