@@ -590,7 +590,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 break;
             default:
                 // are there more?
-                System.out.println();
                 break;
         }
 

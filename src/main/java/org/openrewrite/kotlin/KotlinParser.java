@@ -177,20 +177,14 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         ModuleChunk moduleChunk = configureModuleChunk(compilerConfiguration, arguments, buildFile);
         List<Module> chunk = moduleChunk.getModules();
 
+        if (classpath != null) {
+            for (Path path : classpath) {
+                addJvmClasspathRoot(compilerConfiguration, path.toFile());
+            }
+        }
+
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
-
         configureJdkClasspathRoots(compilerConfiguration);
-        addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
-
-//        if (classpath != null && !classpath.isEmpty()) {
-//            for (Path path : classpath) {
-//                if (path.toFile().toString().endsWith(".jar") || path.toFile().toString().endsWith(".java")) {
-//                    addJvmClasspathRoot(compilerConfiguration, path.toFile());
-//                } else if (path.toFile().toString().endsWith(".kt")) {
-//                    addKotlinSourceRoot(compilerConfiguration, path.toString());
-//                }
-//            }
-//        }
 
         Disposable disposable = Disposer.newDisposable();
 
@@ -301,25 +295,25 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
         compilerConfiguration.put(CommonConfigurationKeys.MODULE_NAME, moduleName);
-        compilerConfiguration.put(USE_FIR,  true);
-        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT, true);
-        compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS,  true);
-//        compilerConfiguration.put(INCREMENTAL_COMPILATION,  true);
-
         compilerConfiguration.put(MESSAGE_COLLECTOR_KEY, logCompilationWarningsAndErrors ?
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());
 
-//        compilerConfiguration.put(SAM_CONVERSIONS, JvmClosureGenerationScheme.CLASS);
+        compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7, ApiVersion.KOTLIN_1_7));
+
+        compilerConfiguration.put(USE_FIR,  true);
+        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT, false);
+        compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS,  true);
+        compilerConfiguration.put(INCREMENTAL_COMPILATION,  true);
+
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
-        compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7, ApiVersion.KOTLIN_1_7));
         return compilerConfiguration;
     }
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".kt") || path.toString().endsWith(".kts");
+        return path.toString().endsWith(".kt");
     }
 
     @Override
