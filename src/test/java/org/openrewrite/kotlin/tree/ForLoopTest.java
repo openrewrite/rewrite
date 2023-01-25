@@ -72,13 +72,12 @@ public class ForLoopTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void arrayWithIndex() {
         rewriteRun(
           kotlin(
             """
-                fun method ( array : Array ) {
+                fun method ( array : Array<Int> ) {
                     for ( ( index , value ) in array.withIndex ( ) ) {
                     }
                 }
