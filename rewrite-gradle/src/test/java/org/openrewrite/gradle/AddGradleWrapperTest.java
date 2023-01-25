@@ -18,6 +18,9 @@ package org.openrewrite.gradle;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.PathUtils;
 import org.openrewrite.RecipeRun;
 import org.openrewrite.Result;
@@ -103,8 +106,10 @@ class AddGradleWrapperTest implements RewriteTest {
     }
 
 
-    @Test
-    void addWrapperWithReleaseTag() {
+    @ParameterizedTest
+    @ValueSource(strings = {"","  "})
+    @NullSource
+    void addWrapperWithReleaseTag(String desiredVersion) {
 
         AtomicReference<String> output = new AtomicReference<>("");
         rewriteRun(
@@ -121,8 +126,10 @@ class AddGradleWrapperTest implements RewriteTest {
                     description: Add latest release of the gradle wrapper
                     recipeList:
                       - org.openrewrite.gradle.AddGradleWrapper:
-                          version: null
-                    """.getBytes()
+                          version: %s
+                    """
+                    .formatted(desiredVersion)
+                    .getBytes()
                 ),
                 "org.openrewrite.test.AddGradleWrapper"
               )
