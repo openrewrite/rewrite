@@ -2511,7 +2511,39 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         FirWhileLoop forLoop = (FirWhileLoop) firBlock.getStatements().get(1);
         FirProperty receiver = (FirProperty) forLoop.getBlock().getStatements().get(0);
-        J.VariableDeclarations variable = (J.VariableDeclarations) visitElement(receiver, ctx);
+        int paramCount = 1;
+        if ("<destruct>".equals(receiver.getName().asString())) {
+            paramCount = ((FirResolvedTypeRef) receiver.getReturnTypeRef()).getType().getTypeArguments().length;
+        }
+
+        J.VariableDeclarations variable;
+        if (paramCount == 1) {
+            variable = (J.VariableDeclarations) visitElement(receiver, ctx);
+        } else {
+            Space variablePrefix = sourceBefore("(");
+            List<FirStatement> statements = forLoop.getBlock().getStatements();
+            List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(paramCount);
+            for (int i = 1; i < paramCount + 1; i++) {
+                FirStatement statement = statements.get(i);
+                J.VariableDeclarations part = (J.VariableDeclarations) visitElement(statement, ctx);
+                JRightPadded<J.VariableDeclarations.NamedVariable> named = part.getPadding().getVariables().get(0);
+                named = named.withElement(named.getElement().withPrefix(part.getPrefix()));
+                Space after = i == paramCount ? sourceBefore(")") : sourceBefore(",");
+                named = named.withAfter(after);
+                variables.add(named);
+            }
+
+            variable = new J.VariableDeclarations(
+                    randomId(),
+                    variablePrefix,
+                    Markers.EMPTY,
+                    emptyList(),
+                    emptyList(),
+                    null,
+                    null,
+                    emptyList(),
+                    variables);
+        }
         Space afterVariable = sourceBefore("in");
 
         FirProperty loopCondition = (FirProperty) firBlock.getStatements().get(0);
@@ -2527,7 +2559,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         JRightPadded<Statement> body = null;
         if (forLoop.getBlock().getStatements().size() > 1) {
             Set<FirElement> skip = Collections.newSetFromMap(new IdentityHashMap<>());
-            skip.add(forLoop.getBlock().getStatements().get(0));
+            List<FirStatement> statements = forLoop.getBlock().getStatements();
+            for (int i = 0; i < 1 + paramCount; i++) {
+                skip.add(statements.get(i));
+            }
+
             Statement block = (Statement) visitBlock(forLoop.getBlock(), skip, ctx);
             body = padRight(block, EMPTY);
         }

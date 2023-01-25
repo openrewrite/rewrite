@@ -71,4 +71,34 @@ public class ForLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Disabled
+    @Test
+    void arrayWithIndex() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( array : Array ) {
+                    for ( ( index , value ) in array.withIndex ( ) ) {
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void downToWithStep() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                    for ( i in 6 downTo 0 step 2 ) {
+                    }
+                }
+            """
+          )
+        );
+    }
 }

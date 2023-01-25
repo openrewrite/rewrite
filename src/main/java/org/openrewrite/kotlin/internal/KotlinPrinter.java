@@ -508,6 +508,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(ReceiverType.class).isPresent();
+            // This may be changed after K.VariableDeclaration is added and getters and setters exist on the model.
+            // The implicit receiver should be added to the first position of the methods.
             int variablePos = 0;
             if (containsTypeReceiver) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> receiver = multiVariable.getPadding().getVariables().get(0);
@@ -516,24 +518,40 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 variablePos = 1;
             }
 
-            JRightPadded<J.VariableDeclarations.NamedVariable> variable = multiVariable.getPadding().getVariables().get(variablePos);
-            beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
-            visit(variable.getElement().getName(), p);
-
-            if (multiVariable.getTypeExpression() != null) {
-                TypeReferencePrefix typeReferencePrefix = multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
-                if (typeReferencePrefix != null) {
-                    KotlinPrinter.this.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
-                    p.append(":");
-                }
-                visit(multiVariable.getTypeExpression(), p);
+            List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
+            if (variables.size() > 1 && !containsTypeReceiver) {
+                p.out.append("(");
             }
 
-            boolean implicitEquals = variable.getElement().getInitializer() instanceof K.StatementExpression &&
-                    ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration;
-            visitLeftPadded(implicitEquals ? "" : "=", variable.getElement().getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+            // V1: Covers and unique case in `mapForLoop` of the KotlinParserVisitor caused by how the FirElement represents for loops.
+            for (int i = variablePos; i < variables.size(); i++) {
+                JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
+                beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
+                visit(variable.getElement().getName(), p);
 
-            visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
+                if (multiVariable.getTypeExpression() != null) {
+                    TypeReferencePrefix typeReferencePrefix = multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
+                    if (typeReferencePrefix != null) {
+                        KotlinPrinter.this.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
+                        p.append(":");
+                    }
+                    visit(multiVariable.getTypeExpression(), p);
+                }
+
+                boolean implicitEquals = variable.getElement().getInitializer() instanceof K.StatementExpression &&
+                        ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration;
+                visitLeftPadded(implicitEquals ? "" : "=", variable.getElement().getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+
+                visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
+                if (i < variables.size() - 1) {
+                    p.out.append(",");
+                }
+            }
+
+            if (variables.size() > 1 && !containsTypeReceiver) {
+                p.out.append(")");
+            }
+
             visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);
             afterSyntax(multiVariable, p);
             return multiVariable;
