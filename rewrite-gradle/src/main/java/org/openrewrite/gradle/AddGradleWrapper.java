@@ -47,8 +47,6 @@ import static org.openrewrite.gradle.util.GradleWrapper.*;
 @EqualsAndHashCode(callSuper = true)
 public class AddGradleWrapper extends Recipe {
 
-    public static final String RELEASE = "RELEASE";
-
     @Override
     public String getDisplayName() {
         return "Add Gradle wrapper";
