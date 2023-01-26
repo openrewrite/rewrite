@@ -21,12 +21,20 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ReplaceLambdaWithMethodReference extends Recipe {
 
@@ -116,7 +124,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     JavaType.Method methodType = method.getMethodType();
                     if (methodType != null) {
                         JavaType.FullyQualified declaringType = methodType.getDeclaringType();
-                        if (methodType.hasFlags(Flag.Static)) {
+                        if (methodType.hasFlags(Flag.Static) || methodSelectMatchesFirstLambdaParameter(method, lambda)) {
                             maybeAddImport(declaringType);
                             return l.withTemplate(JavaTemplate.builder(this::getCursor,
                                             "#{}::#{}").build(), l.getCoordinates().replace(),
@@ -141,25 +149,48 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
             }
 
             private boolean methodArgumentsMatchLambdaParameters(J.MethodInvocation method, J.Lambda lambda) {
-                List<Expression> methodArgs = method.getArguments();
-                List<J> lambdaParameters = lambda.getParameters().getParameters();
-                if (methodArgs.size() != lambdaParameters.size() || method.getMethodType() == null) {
+                JavaType.Method methodType = method.getMethodType();
+                if (methodType == null) {
                     return false;
                 }
-                if(method.getMethodType().getParameterTypes().size() > 0) {
-                    for (int i = 0; i < lambdaParameters.size(); i++) {
-                        if (!(lambdaParameters.get(i) instanceof J.VariableDeclarations) || !(methodArgs.get(i) instanceof J.Identifier)) {
-                            return false;
-                        }
-                        J.Identifier lambdaParam = ((J.VariableDeclarations) lambdaParameters.get(i)).getVariables().get(0).getName();
-                        J.Identifier methodArgument = (J.Identifier) methodArgs.get(i);
-                        if (!lambdaParam.getSimpleName().equals(methodArgument.getSimpleName())) {
-                            return false;
-                        }
-                    }
+                boolean statik = methodType.hasFlags(Flag.Static);
+                List<Expression> methodArgs = method.getArguments().stream()
+                        .filter(a -> !(a instanceof J.Empty))
+                        .collect(Collectors.toList());
+                List<J.VariableDeclarations.NamedVariable> lambdaParameters = lambda.getParameters().getParameters().stream()
+                        .filter(J.VariableDeclarations.class::isInstance)
+                        .map(J.VariableDeclarations.class::cast)
+                        .map(v -> v.getVariables().get(0))
+                        .collect(Collectors.toList());
+                if (methodArgs.isEmpty() && lambdaParameters.isEmpty()) {
                     return true;
                 }
-                return methodArgs.get(0) instanceof J.Empty && lambdaParameters.get(0) instanceof J.Empty;
+                if (!statik && methodSelectMatchesFirstLambdaParameter(method, lambda)) {
+                    methodArgs.add(0, method.getSelect());
+                }
+                if (methodArgs.size() != lambdaParameters.size()) {
+                    return false;
+                }
+                for (int i = 0; i < lambdaParameters.size(); i++) {
+                    JavaType lambdaParam = lambdaParameters.get(i).getVariableType();
+                    if (!(methodArgs.get(i) instanceof J.Identifier)) {
+                        return false;
+                    }
+                    JavaType methodArgument = ((J.Identifier) methodArgs.get(i)).getFieldType();
+                    if (lambdaParam != methodArgument) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            private boolean methodSelectMatchesFirstLambdaParameter(J.MethodInvocation method, J.Lambda lambda) {
+                if (!(method.getSelect() instanceof J.Identifier) || !(lambda.getParameters().getParameters().get(0) instanceof J.VariableDeclarations)) {
+                    return false;
+                }
+                J.VariableDeclarations firstLambdaParameter = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
+                return ((J.Identifier) method.getSelect()).getFieldType() == firstLambdaParameter.getVariables().get(
+                        0).getVariableType();
             }
 
             private boolean isNullCheck(J j1, J j2) {

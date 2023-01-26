@@ -18,7 +18,6 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -28,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings({"RedundantCast", "SimplifyStreamApiCallChains", "Convert2MethodRef", "CodeBlock2Expr", "RedundantOperationOnEmptyContainer", "ResultOfMethodCallIgnored"})
+@SuppressWarnings({"unchecked", "RedundantCast", "SimplifyStreamApiCallChains", "Convert2MethodRef", "CodeBlock2Expr", "RedundantOperationOnEmptyContainer", "ResultOfMethodCallIgnored"})
 class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
     @Override
@@ -384,6 +383,64 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                     return memberRef;
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void methodSelectMatchingSingleLambdaParameter() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Collectors;
+
+              class Test {
+                  List<String> filter(List<Object> l) {
+                      return l.stream()
+                          .map(o -> o.toString())
+                          .collect(Collectors.toList());
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.stream.Collectors;
+
+              class Test {
+                  List<String> filter(List<Object> l) {
+                      return l.stream()
+                          .map(Object::toString)
+                          .collect(Collectors.toList());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodSelectMatchingMultipleLambdaParameters() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.BiFunction;
+
+              class Test {
+                  void foo() {
+                      BiFunction<Integer, Integer, Integer> f = (i1, i2) -> i1.compareTo(i2);
+                  }
+              }
+              """,
+            """
+              import java.util.function.BiFunction;
+               
+              class Test {
+                  void foo() {
+                      BiFunction<Integer, Integer, Integer> f = Integer::compareTo;
+                  }
+              }
+              """
           )
         );
     }
