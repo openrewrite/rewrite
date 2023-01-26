@@ -30,7 +30,6 @@ public class ArrayTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void arrayWithTypeParameter() {
         rewriteRun(
@@ -38,7 +37,6 @@ public class ArrayTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void initialized() {
         rewriteRun(

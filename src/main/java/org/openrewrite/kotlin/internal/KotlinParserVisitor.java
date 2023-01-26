@@ -201,7 +201,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             throw new UnsupportedOperationException("Unsupported anonymous function expression.");
         }
 
-        Space prefix = sourceBefore("{");
+        Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
+        if (source.startsWith("{", cursor)) {
+            skip("{");
+        } else {
+            markers = markers.addIfAbsent(new OmitBraces(randomId()));
+        }
+
         JavaType closureType = null;
 
         FirAnonymousFunction anonymousFunction = anonymousFunctionExpression.getAnonymousFunction();
@@ -261,7 +268,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new J.Lambda(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                markers,
                 params,
                 EMPTY,
                 body,
@@ -929,7 +936,34 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 cursor(saveCursor);
             }
 
-            JContainer<Expression> args = mapFunctionalCallArguments(functionCall.getArgumentList().getArguments());
+            JContainer<Expression> args;
+            List<FirExpression> arrExpressions = new ArrayList<>(functionCall.getArgumentList().getArguments().size());
+            FirLambdaArgumentExpression init = null;
+            if (functionCall.getArgumentList() instanceof FirResolvedArgumentList) {
+                for (Map.Entry<FirExpression, FirValueParameter> entry : ((FirResolvedArgumentList) functionCall.getArgumentList()).getMapping().entrySet()) {
+                    if (entry.getKey() instanceof FirLambdaArgumentExpression && "init".equals(entry.getValue().getName().asString())) {
+                        init = (FirLambdaArgumentExpression) entry.getKey();
+                    } else {
+                        arrExpressions.add(entry.getKey());
+                    }
+                }
+            } else {
+                arrExpressions = functionCall.getArgumentList().getArguments();
+            }
+
+            args = mapFunctionalCallArguments(arrExpressions);
+
+            J.Block body = null;
+            if (init != null) {
+                body = new J.Block(
+                        randomId(),
+                        sourceBefore("{"),
+                        Markers.EMPTY,
+                        new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                        singletonList(padRight((Statement) visitElement(init, ctx), EMPTY)),
+                        sourceBefore("}"));
+            }
+
             return new J.NewClass(
                     randomId(),
                     prefix,
@@ -938,7 +972,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     EMPTY,
                     name,
                     args,
-                    null,
+                    body,
                     typeMapping.methodInvocationType(functionCall, getCurrentFile()));
 
         } else if (namedReference instanceof FirResolvedNamedReference) {
