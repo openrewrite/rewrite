@@ -24,6 +24,7 @@ public class KSpace {
         INFIX_FUNCTION_DECLARATION_RECEIVER,
         IS_NULLABLE_PREFIX,
         KSTRING,
+        LIST_LITERAL,
         TOP_LEVEL_STATEMENT,
         TYPE_REFERENCE_PREFIX,
         WHEN_PREFIX,

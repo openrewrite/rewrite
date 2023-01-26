@@ -374,6 +374,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitArrayOfCall(FirArrayOfCall arrayOfCall, ExecutionContext ctx) {
+        return new K.ListLiteral(
+                randomId(),
+                sourceBefore("["),
+                Markers.EMPTY,
+                arrayOfCall.getArgumentList().getArguments().isEmpty() ?
+                        JContainer.build(singletonList(new JRightPadded<>(new J.Empty(randomId(), EMPTY, Markers.EMPTY), sourceBefore("]"), Markers.EMPTY))) :
+                        JContainer.build(EMPTY, convertAll(arrayOfCall.getArgumentList().getArguments(), commaDelim, t -> sourceBefore("]"), ctx), Markers.EMPTY),
+                typeMapping.type(arrayOfCall));
+    }
+
+    @Override
     public J visitBinaryLogicExpression(FirBinaryLogicExpression binaryLogicExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
         Expression left = (Expression) visitElement(binaryLogicExpression.getLeftOperand(), ctx);
@@ -2333,8 +2345,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitAnonymousFunctionExpression((FirAnonymousFunctionExpression) firElement, ctx);
         } else if (firElement instanceof FirAnonymousObject) {
             return visitAnonymousObject((FirAnonymousObject) firElement, ctx);
-        }  else if (firElement instanceof FirAnonymousObjectExpression) {
+        } else if (firElement instanceof FirAnonymousObjectExpression) {
             return visitAnonymousObjectExpression((FirAnonymousObjectExpression) firElement, ctx);
+        } else if (firElement instanceof FirArrayOfCall) {
+            return visitArrayOfCall((FirArrayOfCall) firElement, ctx);
         } else if (firElement instanceof FirBinaryLogicExpression) {
             return visitBinaryLogicExpression((FirBinaryLogicExpression) firElement, ctx);
         } else if (firElement instanceof FirBlock) {

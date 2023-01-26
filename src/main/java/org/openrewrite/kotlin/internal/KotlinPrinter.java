@@ -134,6 +134,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitListLiteral(K.ListLiteral listLiteral, PrintOutputCapture<P> p) {
+        beforeSyntax(listLiteral, KSpace.Location.LIST_LITERAL, p);
+        visitContainer("[", listLiteral.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS,
+                ",", "]", p);
+        afterSyntax(listLiteral, p);
+        return listLiteral;
+    }
+
+    @Override
     public J visitWhen(K.When when, PrintOutputCapture<P> p) {
         beforeSyntax(when, KSpace.Location.WHEN_PREFIX, p);
         p.append("when");

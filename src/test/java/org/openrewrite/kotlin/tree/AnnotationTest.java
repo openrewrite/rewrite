@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -35,7 +34,6 @@ public class AnnotationTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void arrayArgument() {
         rewriteRun(

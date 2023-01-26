@@ -106,6 +106,21 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return v;
     }
 
+    public J visitListLiteral(K.ListLiteral listLiteral, P p) {
+        K.ListLiteral l = listLiteral;
+        l = l.withPrefix(visitSpace(l.getPrefix(), KSpace.Location.LIST_LITERAL, p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(l, p);
+        if (!(temp instanceof K.ListLiteral)) {
+            return temp;
+        } else {
+            l = (K.ListLiteral) temp;
+        }
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS, p));
+        l = l.withType(visitType(l.getType(), p));
+        return l;
+    }
+
     public J visitWhen(K.When when, P p) {
         K.When w = when;
         w = w.withPrefix(visitSpace(w.getPrefix(), KSpace.Location.WHEN_PREFIX, p));
