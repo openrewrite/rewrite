@@ -241,7 +241,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      *  Generate a ConeTypeProject signature.
      */
     public String coneTypeProjectionSignature(ConeTypeProjection type) {
-        // TODO: refactor to handle recursive generics.
         String typeSignature;
         StringBuilder s = new StringBuilder();
         if (type instanceof ConeKotlinTypeProjectionIn) {

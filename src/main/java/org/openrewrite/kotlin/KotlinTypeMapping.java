@@ -85,6 +85,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         if (type instanceof String) {
+            // Strings are passed into `type(..)` to resolve owners until there is a means to use a `ClassId` to look up the
+            // symbol.
             JavaType javaType = JavaType.ShallowClass.build((String) type);
             typeCache.put(signature, javaType);
             return javaType;

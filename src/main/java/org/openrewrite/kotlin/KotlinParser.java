@@ -141,7 +141,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
         Map<FirSession, List<CompiledKotlinSource>> firSessionToCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
-        FirSession firSession = firSessionToCus.keySet().toArray(new FirSession[1])[0];
+        FirSession firSession = (FirSession) firSessionToCus.keySet().toArray()[0];
         List<CompiledKotlinSource> compilerCus = firSessionToCus.get(firSession);
         List<K.CompilationUnit> cus = new ArrayList<>(firSessionToCus.get(firSession).size());
 
