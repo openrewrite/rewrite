@@ -203,10 +203,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
-        if (source.startsWith("{", cursor)) {
-            skip("{");
-        } else {
+        boolean omitBraces = !source.startsWith("{", cursor);
+        if (omitBraces) {
             markers = markers.addIfAbsent(new OmitBraces(randomId()));
+        } else {
+            skip("{");
         }
 
         JavaType closureType = null;
@@ -248,7 +249,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         J body = anonymousFunction.getBody() == null ? null : visitElement(anonymousFunction.getBody(), ctx);
-        if (body instanceof J.Block) {
+        if (body instanceof J.Block && !omitBraces) {
             body = ((J.Block) body).withEnd(sourceBefore("}"));
         }
 
