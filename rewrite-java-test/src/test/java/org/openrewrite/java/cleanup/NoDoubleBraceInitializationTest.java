@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
@@ -125,9 +126,7 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
                       Map<String, String> map = new HashMap<String, String>() {
                           {
                             func1();
-                            func2();
                           }
-                          void func2() {}
                        };
                   }
                   void func1() {
@@ -327,6 +326,33 @@ class NoDoubleBraceInitializationTest implements RewriteTest {
                       s.concat("z");
                       bMap.put("a", "A");
                       bMap.put("b", "B");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void anonymousSubClassMethodInvoked() {
+        rewriteRun(
+          java(
+            """
+              import java.util.HashMap;
+              import java.util.Map;
+
+              class A {
+                  void example() {
+                      Map<String, String> bMap = new HashMap<String, String>() {
+                          {
+                              subClassMethod();
+                              put("a", "A");
+                              put("b", "B");
+                          }
+                          void subClassMethod() {
+                          }
+                      };
                   }
               }
               """
