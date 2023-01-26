@@ -39,6 +39,8 @@ public class DataTable<Row> {
     @Language("markdown")
     private final String description;
 
+    private boolean enabled = true;
+
     public DataTable(Recipe recipe, Class<Row> type, String name,
                      @Language("markdown") String displayName,
                      @Language("markdown") String description) {
@@ -49,12 +51,18 @@ public class DataTable<Row> {
         recipe.addDataTable(this);
     }
 
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     public void insertRow(ExecutionContext ctx, Row row) {
-        ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
-            //noinspection unchecked
-            List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
-            dataTablesOfType.add(row);
-            return allDataTables;
-        });
+        if (enabled) {
+            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
+                //noinspection unchecked
+                List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
+                dataTablesOfType.add(row);
+                return allDataTables;
+            });
+        }
     }
 }

@@ -155,7 +155,7 @@ public class Cursor {
         CursorIterator iter = new CursorIterator(this);
         while (iter.hasNext()) {
             Object value = iter.next();
-            if (tClass.isInstance(value)) {
+            if (tClass.isAssignableFrom(value.getClass())) {
                 //noinspection unchecked
                 return (T) value;
             }

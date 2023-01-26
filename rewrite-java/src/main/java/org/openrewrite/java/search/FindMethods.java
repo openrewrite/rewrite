@@ -93,10 +93,13 @@ public class FindMethods extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (!flowEnabled) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
-                                method.printTrimmed(getCursor())
-                        ));
+                        JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        if(javaSourceFile != null) {
+                            methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                    javaSourceFile.getSourcePath().toString(),
+                                    method.printTrimmed(getCursor())
+                            ));
+                        }
                         m = SearchResult.found(m);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(method)));
@@ -110,10 +113,13 @@ public class FindMethods extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType())) {
                     if (!flowEnabled) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
-                                memberRef.printTrimmed(getCursor())
-                        ));
+                        JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        if(javaSourceFile != null) {
+                            methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                    javaSourceFile.getSourcePath().toString(),
+                                    memberRef.printTrimmed(getCursor())
+                            ));
+                        }
                         m = m.withReference(SearchResult.found(m.getReference()));
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(memberRef)));
@@ -127,10 +133,13 @@ public class FindMethods extends Recipe {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
                     if (!flowEnabled) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
-                                newClass.printTrimmed(getCursor())
-                        ));
+                        JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                        if(javaSourceFile != null) {
+                            methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                    javaSourceFile.getSourcePath().toString(),
+                                    newClass.printTrimmed(getCursor())
+                            ));
+                        }
                         n = SearchResult.found(n);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(newClass)));
@@ -183,8 +192,10 @@ public class FindMethods extends Recipe {
      * @return A set of {@link J.MethodInvocation}, {@link J.MemberReference}, and {@link J.NewClass} representing calls to this method.
      */
     public static Set<J> find(J j, String methodPattern, boolean matchOverrides) {
+        FindMethods findMethods = new FindMethods(methodPattern, null, null);
+        findMethods.methodCalls.setEnabled(false);
         return TreeVisitor.collect(
-                        new FindMethods(methodPattern, null, null).getVisitor(),
+                        findMethods.getVisitor(),
                         j,
                         new HashSet<>()
                 )
