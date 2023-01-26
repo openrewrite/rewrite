@@ -23,10 +23,18 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class NewClassTest implements RewriteTest {
 
     @Test
+    void multipleParameters() {
+        rewriteRun(
+          kotlin("class Test(val a: Int, val b: Int)"),
+          kotlin("val t = Test ( 1 , 2 )")
+        );
+    }
+
+    @Test
     void anonymousClass() {
         rewriteRun(
           kotlin("""
-              open class Test ( ) {
+              open class Test ( val a: Int, val b: Int ) {
                   open fun base() : Boolean {
                       return false
                   }
@@ -34,7 +42,7 @@ public class NewClassTest implements RewriteTest {
           """),
           kotlin(
             """
-                val t = object : Test ( ) {
+                val t = object : Test ( 1 , 2 ) {
                     override fun base ( ) : Boolean {
                         return true
                     }

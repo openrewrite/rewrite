@@ -21,38 +21,41 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class AnnotationTest implements RewriteTest {
+@Disabled
+public class ArrayTest implements RewriteTest {
 
     @Test
-    void annotationWithDefaultArgument() {
+    void notInitialized() {
         rewriteRun(
-          kotlin(
-            """
-                @SuppressWarnings ( "ConstantConditions" , "unchecked" )
-                class A
-            """
-          )
+          kotlin("val arr = IntArray ( 3 )")
         );
     }
 
-    @Disabled
     @Test
-    void arrayArgument() {
+    void arrayWithTypeParameter() {
         rewriteRun(
-          kotlin(
-            """
-                @Target ( AnnotationTarget . LOCAL_VARIABLE )
-                @Retention ( AnnotationRetention . SOURCE )
-                annotation class Test ( val values : Array < String > ) {
-                }
-            """
-          ),
-          kotlin(
-            """
-                @Test( values = [ "a" , "b" , "c" ] )
-                val a = 42
-            """
-          )
+          kotlin("val arr = Array < Int > ( 3 ) { 0 }")
+        );
+    }
+
+    @Test
+    void initialized() {
+        rewriteRun(
+          kotlin("val arr = Array ( 3 ) { i -> i * 1 }")
+        );
+    }
+
+    @Test
+    void constructed() {
+        rewriteRun(
+          kotlin("val arr = Array ( 3 , { i -> i * 1 } )")
+        );
+    }
+
+    @Test
+    void twoDimensional() {
+        rewriteRun(
+          kotlin("val arr = Array ( 1 ) { Array < Int > ( 2 ) { 3 } }")
         );
     }
 }

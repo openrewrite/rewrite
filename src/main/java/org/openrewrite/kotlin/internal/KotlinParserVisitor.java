@@ -234,8 +234,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         .withAfter(arrowPrefix)));
             } else {
                 params = params.getPadding().withParams(
-                        ListUtils.mapLast(params.getPadding().getParams(), param -> param.withAfter(arrowPrefix))
-                );
+                        ListUtils.mapLast(params.getPadding().getParams(), param -> param.withAfter(arrowPrefix)));
             }
         } else {
             cursor(saveCursor);
@@ -282,9 +281,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         Space before = whitespace();
         if (source.startsWith("(", cursor)) {
-            skip("(");
-            args = JContainer.build(before,
-                    singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+            if (!anonymousObject.getDeclarations().isEmpty() &&
+                    anonymousObject.getDeclarations().get(0) instanceof FirPrimaryConstructor &&
+                    !((FirPrimaryConstructor) anonymousObject.getDeclarations().get(0)).getDelegatedConstructor().getArgumentList().getArguments().isEmpty()) {
+                cursor(saveCursor);
+                args = mapFunctionalCallArguments(((FirPrimaryConstructor) anonymousObject.getDeclarations().get(0)).getDelegatedConstructor().getArgumentList().getArguments());
+            } else {
+                skip("(");
+                args = JContainer.build(before,
+                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+            }
         } else {
             cursor(saveCursor);
             args = JContainer.<Expression>empty()
@@ -904,7 +910,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 name = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, name, mapTypeArguments(functionCall.getTypeArguments()));
             }
 
-            JContainer<Expression> args = mapFunctionalCallArguments(functionCall);
+            JContainer<Expression> args = mapFunctionalCallArguments(functionCall.getArgumentList().getArguments());
             return new J.NewClass(
                     randomId(),
                     prefix,
@@ -914,7 +920,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     name,
                     args,
                     null,
-                    null);
+                    typeMapping.methodInvocationType(functionCall, getCurrentFile()));
 
         } else if (namedReference instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
@@ -988,7 +994,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             JContainer<Expression> args;
             if (source.startsWith("(", cursor)) {
                 cursor(saveCursor);
-                args = mapFunctionalCallArguments(functionCall);
+                args = mapFunctionalCallArguments(functionCall.getArgumentList().getArguments());
             } else {
                 cursor(saveCursor);
                 markers = markers.addIfAbsent(new OmitParentheses(randomId()));
@@ -1016,9 +1022,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         throw new UnsupportedOperationException("Unsupported function call.");
     }
 
-    private JContainer<Expression> mapFunctionalCallArguments(FirFunctionCall functionCall) {
+     private JContainer<Expression> mapFunctionalCallArguments(List<FirExpression> firExpressions) {
         JContainer<Expression> args;
-        List<FirExpression> firExpressions = functionCall.getArgumentList().getArguments();
         if (firExpressions.size() == 1) {
             FirExpression firExpression = firExpressions.get(0);
             if (firExpression instanceof FirVarargArgumentsExpression) {

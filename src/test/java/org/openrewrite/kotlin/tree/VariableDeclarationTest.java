@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -49,14 +48,6 @@ public class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin("open class Test"),
           kotlin("val o : Test = object : Test ( ) { }")
-        );
-    }
-
-    @Disabled("Requires size and init to be parsed.")
-    @Test
-    void diamondOperator() {
-        rewriteRun(
-          kotlin("val a : Array < Int > = Array < Int > ( 1 ) { 1 }")
         );
     }
 
