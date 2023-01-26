@@ -918,8 +918,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (namedReference instanceof FirResolvedNamedReference &&
                 ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
             TypeTree name = (J.Identifier) visitElement(namedReference, null);
-            if (!functionCall.getTypeArguments().isEmpty()) {
+
+            int saveCursor = cursor;
+            whitespace();
+
+            if (source.startsWith("<", cursor) && !functionCall.getTypeArguments().isEmpty()) {
+                cursor(saveCursor);
                 name = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, name, mapTypeArguments(functionCall.getTypeArguments()));
+            } else {
+                cursor(saveCursor);
             }
 
             JContainer<Expression> args = mapFunctionalCallArguments(functionCall.getArgumentList().getArguments());

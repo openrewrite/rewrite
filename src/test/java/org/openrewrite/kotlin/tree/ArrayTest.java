@@ -21,7 +21,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-@Disabled
 public class ArrayTest implements RewriteTest {
 
     @Test
@@ -31,6 +30,7 @@ public class ArrayTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void arrayWithTypeParameter() {
         rewriteRun(
@@ -38,6 +38,7 @@ public class ArrayTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void initialized() {
         rewriteRun(
@@ -52,6 +53,7 @@ public class ArrayTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void twoDimensional() {
         rewriteRun(
