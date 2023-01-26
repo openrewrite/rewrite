@@ -22,8 +22,6 @@ import org.openrewrite.*;
 import java.util.Collections;
 import java.util.Set;
 
-import static org.openrewrite.Validated.required;
-
 @Getter
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @RequiredArgsConstructor

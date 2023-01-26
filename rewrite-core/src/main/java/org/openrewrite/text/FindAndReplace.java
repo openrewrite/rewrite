@@ -36,7 +36,7 @@ public class FindAndReplace extends Recipe {
             example = "denylist")
     String replace;
     @Option(displayName = "Regex",
-            description = "Default false. If true, `find` will be interepreted as a Regular Expression, and capture group contents will be available in `replace`.",
+            description = "Default false. If true, `find` will be interpreted as a Regular Expression, and capture group contents will be available in `replace`.",
             required = false)
     @Nullable
     Boolean regex;

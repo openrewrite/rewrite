@@ -16,8 +16,11 @@
 package org.openrewrite;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -26,11 +29,14 @@ import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,6 +131,49 @@ class RecipeLifecycleTest implements RewriteTest {
             "hello",
             (String) null
           )
+        );
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/2711")
+    @Test
+    void yamlApplicability() {
+        //language=yaml
+        String yamlRecipe = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.ApplicabilityExactlyOnce
+          displayName: Applicability test runs once for the whole recipe list
+          description: >
+            An applicability test should be run once and if a match is found, all recipes in the list should be run.
+            So if one of the recipes in the list makes a change which would cause the applicability test to no longer match,
+            subsequent recipes in the list should still execute.
+            
+            Given a text file containing the number "1", running this recipe should result in a file which contains "3".
+            If the applicability test is incorrectly applied to individual recipes in the list, the (incorrect) result would be "2".
+          applicability:
+            anySource:
+              - org.openrewrite.text.FindAndReplace:
+                  find: "1"
+                  replace: "Applicable"
+          recipeList:
+            - org.openrewrite.text.ChangeText:
+                  toText: "2"
+            - org.openrewrite.text.ChangeText:
+                  toText: "3"
+          """;
+
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder()
+            .scanRuntimeClasspath()
+            .load(
+              new YamlResourceLoader(
+                new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
+                Paths.get("applicability.yml").toUri(),
+                new Properties()))
+            .build()
+            .activateRecipes("org.openrewrite.ApplicabilityExactlyOnce")),
+          text("1", "3")
         );
     }
 
