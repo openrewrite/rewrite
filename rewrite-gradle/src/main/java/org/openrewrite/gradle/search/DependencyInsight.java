@@ -34,7 +34,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.maven.table.DependencyInUse;
+import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.xml.tree.Xml;
 
@@ -49,7 +49,7 @@ import static java.util.stream.Collectors.toMap;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class DependencyInsight extends Recipe {
-    transient DependencyInUse dependencyInUse = new DependencyInUse(this);
+    transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -180,7 +180,7 @@ public class DependencyInsight extends Recipe {
                         Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
                                 .findFirst(JavaSourceSet.class);
 
-                        dependencyInUse.insertRow(ctx, new DependencyInUse.Row(
+                        dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                                 javaProject.map(JavaProject::getProjectName).orElse(""),
                                 javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
                                 match.getGroupId(),

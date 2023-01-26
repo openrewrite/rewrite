@@ -23,7 +23,7 @@ import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
-import org.openrewrite.maven.table.DependencyInUse;
+import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.tree.Xml;
@@ -41,7 +41,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class DependencyInsight extends Recipe {
-    transient DependencyInUse dependencyInUse = new DependencyInUse(this);
+    transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
 
     @Option(displayName = "Group pattern",
             description = "Group glob pattern used to match dependencies.",
@@ -110,7 +110,7 @@ public class DependencyInsight extends Recipe {
                             Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
                                     .findFirst(JavaSourceSet.class);
 
-                            dependencyInUse.insertRow(ctx, new DependencyInUse.Row(
+                            dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
                                     javaProject.map(JavaProject::getProjectName).orElse(""),
                                     javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
                                     match.getGroupId(),

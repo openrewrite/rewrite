@@ -26,8 +26,10 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.FindLocalFlowPaths;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
 import org.openrewrite.java.dataflow.LocalTaintFlowSpec;
+import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
@@ -40,6 +42,7 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode(callSuper = true)
 @Value
 public class FindMethods extends Recipe {
+    transient MethodCalls methodCalls = new MethodCalls(this);
 
     /**
      * A method pattern that is used to find matching method invocations.
@@ -90,6 +93,10 @@ public class FindMethods extends Recipe {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (!flowEnabled) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
+                                method.printTrimmed(getCursor())
+                        ));
                         m = SearchResult.found(m);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(method)));
@@ -103,6 +110,10 @@ public class FindMethods extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType())) {
                     if (!flowEnabled) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
+                                memberRef.printTrimmed(getCursor())
+                        ));
                         m = m.withReference(SearchResult.found(m.getReference()));
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(memberRef)));
@@ -116,6 +127,10 @@ public class FindMethods extends Recipe {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
                     if (!flowEnabled) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getSourcePath().toString(),
+                                newClass.printTrimmed(getCursor())
+                        ));
                         n = SearchResult.found(n);
                     } else {
                         doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(newClass)));
@@ -128,7 +143,6 @@ public class FindMethods extends Recipe {
                 switch (flow) {
                     case "data":
                         return new LocalFlowSpec<Expression, Expression>() {
-
                             @Override
                             public boolean isSource(Expression expression, Cursor cursor) {
                                 return expression == source;

@@ -21,27 +21,18 @@ import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 
 @JsonIgnoreType
-public class DependencyInUse extends DataTable<DependencyInUse.Row> {
+public class DependencyResolutions extends DataTable<DependencyResolutions.Row> {
 
-    public DependencyInUse(Recipe recipe) {
-        super(recipe, Row.class,
-                DependencyInUse.class.getName(),
-                "Dependencies in use", "Direct and transitive dependencies in use.");
+    public DependencyResolutions(Recipe recipe) {
+        super(recipe, Row.class, DependencyResolutions.class.getName(),
+                "Dependency resolutions",
+                "Latencies of individual dependency resolution requests and their outcomes.");
     }
 
     @Value
     public static class Row {
-        @Option(displayName = "Project name",
-                description = "The name of the project that contains the dependency.")
-        String projectName;
-
-        @Option(displayName = "Source set",
-                description = "The source set that contains the dependency.")
-        String sourceSet;
-
         @Option(displayName = "Group",
                 description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.")
         String groupId;
@@ -54,18 +45,16 @@ public class DependencyInUse extends DataTable<DependencyInUse.Row> {
                 description = "The resolved version.")
         String version;
 
-        @Column(displayName = "Dated snapshot version",
-                description = "The resolved dated snapshot version or null if this dependency is not a snapshot.")
-        @Nullable
-        String datedSnapshotVersion;
+        @Option(displayName = "Repository URI",
+                description = "The artifact repository that this dependency attempted to resolve from.")
+        String repositoryUri;
 
-        @Column(displayName = "Scope",
-                description = "Dependency scope. This will be `compile` if the dependency is direct and a scope is not explicitly " +
-                              "specified in the POM.")
-        String scope;
+        @Column(displayName = "HTTP status",
+                description = "The HTTP status code of the response.")
+        Integer httpStatus;
 
-        @Column(displayName = "Depth",
-                description = "How many levels removed from a direct dependency. This will be 0 for direct dependencies.")
-        Integer depth;
+        @Column(displayName = "Latency (ms)",
+                description = "The time in milliseconds that it took to resolve this dependency.")
+        Long latencyMillis;
     }
 }
