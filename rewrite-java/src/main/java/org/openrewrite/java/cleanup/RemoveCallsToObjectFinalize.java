@@ -34,7 +34,7 @@ public class RemoveCallsToObjectFinalize extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove garbage collection invocations";
+        return "Remove `Object.finalize()` invocations";
     }
 
     @Override
