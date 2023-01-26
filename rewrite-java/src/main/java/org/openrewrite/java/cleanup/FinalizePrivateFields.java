@@ -17,20 +17,33 @@ package org.openrewrite.java.cleanup;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
 
 public class FinalizePrivateFields extends Recipe {
     @Override
@@ -89,9 +102,13 @@ public class FinalizePrivateFields extends Recipe {
                     .allMatch(v -> privateFieldsToBeFinalized.contains(v));
 
                 if (canAllVariablesBeFinalized) {
-                    mv = autoFormat(mv.withModifiers(ListUtils.concat(mv.getModifiers(),
-                        new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final,
-                            Collections.emptyList()))), ctx);
+                    mv = autoFormat(mv.withVariables(ListUtils.map(mv.getVariables(), v -> {
+                        JavaType.Variable type = v.getVariableType();
+                        return type != null ? v.withVariableType(type.withFlags(
+                                Flag.bitMapToFlags(type.getFlagsBitMap() | Flag.Final.getBitMask()))) : null;
+                    })).withModifiers(ListUtils.concat(mv.getModifiers(),
+                            new J.Modifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final,
+                                    emptyList()))), ctx);
                 }
 
                 return mv;
