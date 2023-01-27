@@ -2656,7 +2656,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space afterVariable = sourceBefore("in");
 
         FirProperty loopCondition = (FirProperty) firBlock.getStatements().get(0);
-        Expression expression = (Expression) visitElement(((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver(), ctx);
+        Expression expression;
+        if (loopCondition.getInitializer() instanceof FirFunctionCall &&
+                ((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver() instanceof FirFunctionCall) {
+            expression = (Expression) visitElement(((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver(), ctx);
+        } else {
+            expression = (Expression) visitElement(((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver(), ctx);
+        }
+
         Space afterExpression = sourceBefore(")");
         J.ForEachLoop.Control control = new J.ForEachLoop.Control(
                 randomId(),
@@ -2666,7 +2673,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 padRight(expression, afterExpression));
 
         JRightPadded<Statement> body = null;
-        if (forLoop.getBlock().getStatements().size() > 1) {
+        if (!forLoop.getBlock().getStatements().isEmpty()) {
             Set<FirElement> skip = Collections.newSetFromMap(new IdentityHashMap<>());
             List<FirStatement> statements = forLoop.getBlock().getStatements();
             for (int i = 0; i < 1 + additionalVariables; i++) {
