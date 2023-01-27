@@ -18,15 +18,14 @@ package org.openrewrite;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
-import org.openrewrite.internal.FindRecipeRunException;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MetricsHelper;
-import org.openrewrite.internal.RecipeRunException;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.*;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
+import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Paths;
@@ -151,6 +150,16 @@ public interface RecipeScheduler {
             }
         }
 
+        for (Result result : results) {
+            SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
+            for (RecipeDescriptor recipeThatMadeChange : result.getRecipeDescriptorsThatMadeChanges()) {
+                resultsTable.insertRow(ctx, new SourcesFileResults.Row(
+                        result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
+                        result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
+                        recipeThatMadeChange.getName()));
+            }
+        }
+
         return recipeRun
                 .withResults(results)
                 .withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
@@ -216,6 +225,7 @@ public interface RecipeScheduler {
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
         }
 
+        SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after;
         final List<Boolean> newSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
@@ -229,7 +239,6 @@ public interface RecipeScheduler {
                 Timer.Sample sample = Timer.start();
 
                 S afterFile = s;
-
                 try {
                     if (newSingleSourceApplicableTestResult != null && !newSingleSourceApplicableTestResult.isEmpty()) {
                         if (!newSingleSourceApplicableTestResult.get(index)) {
@@ -275,6 +284,14 @@ public interface RecipeScheduler {
                         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
                         // and instead we add a marker to the top of the source file to record the exception message.
                         afterFile = Markup.error(afterFile, t);
+                    }
+
+                    if (s != null) {
+                        errorsTable.insertRow(ctx, new SourcesFileErrors.Row(
+                                s.getSourcePath().toString(),
+                                recipe.getName(),
+                                ExceptionUtils.sanitizeStackTrace(t, RecipeScheduler.class)
+                        ));
                     }
                 }
 

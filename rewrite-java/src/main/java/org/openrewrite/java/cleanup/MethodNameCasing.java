@@ -148,7 +148,7 @@ public class MethodNameCasing extends Recipe {
             }
 
             private boolean containsValidModifiers(J.MethodDeclaration method) {
-                return !method.hasModifier(J.Modifier.Type.Public) || !Boolean.FALSE.equals(renamePublicMethods);
+                return !method.hasModifier(J.Modifier.Type.Public) || Boolean.TRUE.equals(renamePublicMethods);
             }
 
             private boolean methodExists(JavaType.Method method, String newName) {

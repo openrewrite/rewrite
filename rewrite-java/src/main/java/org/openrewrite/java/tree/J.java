@@ -5536,13 +5536,9 @@ public interface J extends Tree {
             }
 
             public boolean isField(Cursor cursor) {
-                return cursor
-                        .getParentOrThrow() // JRightPadded
-                        .getParentOrThrow() // J.VariableDeclarations
-                        .getParentOrThrow() // JRightPadded
-                        .getParentOrThrow() // J.Block
-                        .getParentOrThrow() // maybe J.ClassDeclaration
-                        .getValue() instanceof ClassDeclaration;
+                Cursor declaringScope = cursor.dropParentUntil(it -> it instanceof J.MethodDeclaration || it instanceof J.Lambda
+                        || it instanceof J.ClassDeclaration || it == Cursor.ROOT_VALUE);
+                return declaringScope.getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {
