@@ -247,6 +247,31 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2722")
+    @Test
+    void removeAllImportsInFileWithHeader() {
+        rewriteRun(
+          java(
+            """
+              /*
+               * header
+               */
+              package x;
+              import java.util.List;
+              class A {}
+              """,
+            """
+              /*
+               * header
+               */
+              package x;
+
+              class A {}
+              """
+          )
+        );
+    }
+
     @Test
     void removeStarImportIfNoTypesReferredTo() {
         rewriteRun(

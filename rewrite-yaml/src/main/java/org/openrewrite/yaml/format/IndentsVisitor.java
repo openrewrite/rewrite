@@ -22,7 +22,6 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
@@ -58,15 +57,15 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
     @Nullable
     @Override
     public Yaml preVisit(Yaml tree, P p) {
-        if (Optional.ofNullable(getCursor().<Boolean>getNearestMessage("stop")).orElse(false)) {
+        if (getCursor().getNearestMessage("stop", false)) {
             return tree;
         }
 
         Yaml y = tree;
-        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
+        int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (y.getPrefix().contains("\n") && !isUnindentedTopLevel()) {
             if (y instanceof Yaml.Sequence.Entry) {
-                indent = Optional.ofNullable(getCursor().getParentOrThrow().<Integer>getMessage("sequenceEntryIndent")).orElse(indent);
+                indent = getCursor().getParentOrThrow().getMessage("sequenceEntryIndent", indent);
 
                 y = y.withPrefix(indentTo(y.getPrefix(), indent + style.getIndentSize()));
 
