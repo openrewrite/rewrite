@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.RecipesThatMadeChanges;
