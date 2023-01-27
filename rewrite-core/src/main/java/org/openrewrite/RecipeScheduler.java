@@ -427,7 +427,7 @@ class RecipeSchedulerUtils {
             if (exceptionMapped != before) {
                 return exceptionMapped;
             }
-        }
+    }
 
         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
         // and instead we add a new file to record the exception message.

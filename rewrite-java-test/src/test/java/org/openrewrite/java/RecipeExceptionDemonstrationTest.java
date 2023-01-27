@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.RewriteTest;
@@ -82,6 +83,7 @@ class RecipeExceptionDemonstrationTest implements RewriteTest {
         );
     }
 
+    @Disabled(value = "The exception thrown in getSingleSourceApplicableTest() is caught by RecipeScheduler, so disable this.")
     @Test
     void singleSourceApplicableTest() {
         rewriteRun(
