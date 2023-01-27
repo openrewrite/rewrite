@@ -566,6 +566,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance();
         } else if (type instanceof ConeTypeParameterType) {
             name = type.toString();
+        } else if (type instanceof ConeFlexibleType) {
+            return type(((ConeFlexibleType) type).getLowerBound());
         } else {
             throw new IllegalStateException("Implement me.");
         }

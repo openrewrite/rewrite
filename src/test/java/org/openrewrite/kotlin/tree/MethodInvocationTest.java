@@ -227,4 +227,20 @@ public class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void anonymousObject() {
+        rewriteRun(
+          kotlin("open class Test"),
+          kotlin(
+            """
+                fun test ( a : Test ) { }
+                
+                fun method ( ) {
+                    test ( object : Test ( ) {
+                    } )
+                }
+            """)
+        );
+    }
 }

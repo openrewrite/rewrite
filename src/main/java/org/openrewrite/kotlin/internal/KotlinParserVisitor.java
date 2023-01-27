@@ -1396,6 +1396,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitGetClassCall(FirGetClassCall getClassCall, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("Unsupported operation. type::class.java");
+    }
+
+    @Override
     public J visitLambdaArgumentExpression(FirLambdaArgumentExpression lambdaArgumentExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
         J j = visitElement(lambdaArgumentExpression.getExpression(), ctx);
@@ -2433,6 +2438,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitFunctionCall((FirFunctionCall) firElement, ctx);
         } else if (firElement instanceof FirFunctionTypeRef) {
             return visitFunctionTypeRef((FirFunctionTypeRef) firElement, ctx);
+        } else if (firElement instanceof FirGetClassCall) {
+            return visitGetClassCall((FirGetClassCall) firElement, ctx);
         } else if (firElement instanceof FirLambdaArgumentExpression) {
             return visitLambdaArgumentExpression((FirLambdaArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirNamedArgumentExpression) {

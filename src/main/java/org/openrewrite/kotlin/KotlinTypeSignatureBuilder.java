@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter;
 import org.jetbrains.kotlin.fir.references.FirNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
+import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
@@ -104,6 +105,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 if (classifierSymbol != null && classifierSymbol.getFir() instanceof FirTypeParameter) {
                     return genericSignature(classifierSymbol.getFir());
                 }
+            } else if (coneKotlinType instanceof ConeFlexibleType) {
+                return typeRefClassSignature(((ConeFlexibleType) coneKotlinType).getLowerBound());
             }
             return coneKotlinType.getTypeArguments().length > 0 ? parameterizedTypeRef(coneKotlinType) : typeRefClassSignature(coneKotlinType);
         } else if (type instanceof FirTypeParameter) {
@@ -151,6 +154,11 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             if (symbol != null) {
                 resolveType = symbol.getFir();
             }
+        } else if (type instanceof ConeClassLikeLookupTag) {
+            FirRegularClassSymbol symbol = LookupTagUtilsKt.toFirRegularClassSymbol((ConeClassLikeLookupTag) type, firSession);
+            if (symbol != null) {
+                resolveType = symbol.getFir();
+            }
         } else if (type instanceof FirFile) {
             return ((FirFile) type).getName();
         }
@@ -182,7 +190,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      *  Convert the ConeKotlinType to a {@link org.openrewrite.java.tree.JavaType} style FQN.
      */
     public String typeRefClassSignature(ConeKotlinType type) {
-        ClassId classId = ConeTypeUtilsKt.getClassId(type);
+        ClassId classId = ConeTypeUtilsKt.getClassId(type instanceof ConeFlexibleType ? ((ConeFlexibleType) type).getLowerBound() : type);
         return classId == null ? "{undefined}" : convertClassIdToFqn(classId);
     }
 
@@ -278,6 +286,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s.append("}");
         } else if (type instanceof ConeFlexibleType) {
             s.append(signature(((ConeFlexibleType) type).getLowerBound()));
+        } else if (type instanceof ConeDefinitelyNotNullType) {
+            s.append("Generic{");
+            s.append(type);
+            s.append("}");
         } else {
             throw new UnsupportedOperationException("Unsupported ConeTypeProjection.");
         }
@@ -370,7 +382,9 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      *  Generate the method declaration signature.
      */
     public String methodDeclarationSignature(FirFunctionSymbol<? extends FirFunction> symbol) {
-        String s = symbol instanceof FirConstructorSymbol ? classSignature(symbol.getResolvedReturnTypeRef()) : classSignature(symbol.getDispatchReceiverType());
+        String s = symbol instanceof FirConstructorSymbol ? classSignature(symbol.getResolvedReturnTypeRef()) :
+                symbol.getDispatchReceiverType() != null ? classSignature(symbol.getDispatchReceiverType()) :
+                        classSignature(ClassMembersKt.containingClass(symbol));
 
         if (symbol instanceof FirConstructorSymbol) {
             s += "{name=<constructor>,return=" + s;
