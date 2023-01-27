@@ -412,6 +412,9 @@ public interface K extends J {
         Expression right;
 
         @With
+        Space after;
+
+        @With
         @Nullable
         JavaType type;
 
@@ -428,6 +431,7 @@ public interface K extends J {
 
         public enum Type {
             Contains,
+            Get,
             RangeTo
         }
 
@@ -455,7 +459,7 @@ public interface K extends J {
             }
 
             public K.Binary withOperator(JLeftPadded<K.Binary.Type> operator) {
-                return t.operator == operator ? t : new K.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
+                return t.operator == operator ? t : new K.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.after, t.type);
             }
         }
     }

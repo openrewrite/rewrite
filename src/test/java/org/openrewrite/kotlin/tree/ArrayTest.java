@@ -56,4 +56,15 @@ public class ArrayTest implements RewriteTest {
           kotlin("val arr = Array ( 1 ) { Array < Int > ( 2 ) { 3 } }")
         );
     }
+
+    @Test
+    void arrayAccess() {
+        rewriteRun(
+          kotlin(
+            """
+                val arr = IntArray ( 1 )
+                val a = arr [ 0 ]
+            """)
+        );
+    }
 }

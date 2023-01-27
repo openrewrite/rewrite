@@ -913,7 +913,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             String operatorName = functionCall.getCalleeReference().getName().asString();
             if (isUnaryOperation(operatorName)) {
                 j = mapUnaryOperation(functionCall);
-            } else if ("contains".equals(operatorName) || "rangeTo".equals(operatorName)) {
+            } else if ("contains".equals(operatorName) || "rangeTo".equals(operatorName) || "get".equals(operatorName)) {
                 j = mapKotlinBinaryOperation(functionCall);
             } else {
                 j = mapBinaryOperation(functionCall);
@@ -1199,16 +1199,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private J mapKotlinBinaryOperation(FirFunctionCall functionCall) {
         Space prefix = whitespace();
 
+
+        Expression left;
         Space opPrefix;
         K.Binary.Type kotlinBinaryType;
+        Expression right;
+        Space after = EMPTY;
 
         String name = functionCall.getCalleeReference().getName().asString();
         if ("contains".equals(name)) {
-            if (functionCall.getArgumentList().getArguments().size() > 1) {
-                throw new UnsupportedOperationException("Unsupported number of arguments in contains operator.");
-            }
-
-            Expression left;
             // Prevent SOE of methods with an implicit LHS that refers to the subject of a when expression.
             if (functionCall.getArgumentList().getArguments().get(0) instanceof FirWhenSubjectExpression) {
                 left = new J.Empty(randomId(), EMPTY, Markers.EMPTY);
@@ -1219,29 +1218,36 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             // The `in` keyword is a function call to `contains` applied to a primitive range. I.E., `IntRange`, `LongRange`.
             opPrefix = sourceBefore("in");
             kotlinBinaryType = K.Binary.Type.Contains;
-            Expression right = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
-            return new K.Binary(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    left,
-                    padLeft(opPrefix, kotlinBinaryType),
-                    right,
-                    typeMapping.type(functionCall));
+
+            right = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
+
+        } else if ("get".equals(name)) {
+            left = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
+
+            opPrefix = sourceBefore("[");
+            kotlinBinaryType = K.Binary.Type.Get;
+
+            right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+
+            after = sourceBefore("]");
         } else {
-            Expression left = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
-            kotlinBinaryType = K.Binary.Type.RangeTo;
+            left = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
+
             opPrefix = sourceBefore("..");
-            Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
-            return new K.Binary(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    left,
-                    padLeft(opPrefix, kotlinBinaryType),
-                    right,
-                    typeMapping.type(functionCall));
+            kotlinBinaryType = K.Binary.Type.RangeTo;
+
+            right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
         }
+
+        return new K.Binary(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                left,
+                padLeft(opPrefix, kotlinBinaryType),
+                right,
+                after,
+                typeMapping.type(functionCall));
     }
 
     private J mapBinaryOperation(FirFunctionCall functionCall) {

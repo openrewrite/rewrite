@@ -88,8 +88,17 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visit(binary.getLeft(), p);
         visitSpace(binary.getPadding().getOperator().getBefore(), KSpace.Location.BINARY_OPERATOR, p);
         p.append(keyword);
+        if (binary.getOperator() == K.Binary.Type.Get) {
+            p.out.append("[");
+        }
+
         visit(binary.getRight(), p);
         afterSyntax(binary, p);
+
+        visitSpace(binary.getAfter(), KSpace.Location.BINARY_SUFFIX, p);
+        if (binary.getOperator() == K.Binary.Type.Get) {
+            p.out.append("]");
+        }
         return binary;
     }
 
