@@ -136,7 +136,7 @@ class RecipeLifecycleTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2711")
     @Test
-    void yamlApplicability() {
+    void yamlApplicabilityWithAnySource() {
         //language=yaml
         String yamlRecipe = """
           ---
@@ -172,6 +172,49 @@ class RecipeLifecycleTest implements RewriteTest {
                 new Properties()))
             .build()
             .activateRecipes("org.openrewrite.ApplicabilityExactlyOnce")),
+          text("1", "3"),
+          text("unknown", "3")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2711")
+    @Test
+    void yamlApplicabilityWithSingleSource() {
+        //language=yaml
+        String yamlRecipe = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.ApplicabilityExactlyOnce
+          displayName: Applicability test runs once for the whole recipe list
+          description: >
+            An applicability test should be run once and if a match is found, all recipes in the list should be run.
+            So if one of the recipes in the list makes a change which would cause the applicability test to no longer match,
+            subsequent recipes in the list should still execute.
+            
+            Given a text file containing the number "1", running this recipe should result in a file which contains "3".
+            If the applicability test is incorrectly applied to individual recipes in the list, the (incorrect) result would be "2".
+          applicability:
+            singleSource:
+              - org.openrewrite.text.FindAndReplace:
+                  find: "1"
+                  replace: "A"
+          recipeList:
+            - org.openrewrite.text.ChangeText:
+                  toText: "2"
+            - org.openrewrite.text.ChangeText:
+                  toText: "3"
+          """;
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder()
+              .scanRuntimeClasspath()
+              .load(
+                new YamlResourceLoader(
+                  new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
+                  Paths.get("applicability.yml").toUri(),
+                  new Properties()))
+              .build()
+              .activateRecipes("org.openrewrite.ApplicabilityExactlyOnce"))
+            .expectedCyclesThatMakeChanges(2),
           text("1", "3")
         );
     }
