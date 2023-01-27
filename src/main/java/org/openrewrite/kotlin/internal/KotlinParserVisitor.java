@@ -1349,6 +1349,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 arrow,
                 body,
                 closureType);
+
         return new K.FunctionType(
                 randomId(),
                 lambda,
@@ -1360,17 +1361,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = sourceBefore("import");
         JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
 
-        J.FieldAccess qualid;
-        if (firImport.getImportedFqName() == null) {
-            throw new IllegalStateException("implement me.");
-        } else {
-            Space space = whitespace();
-            String packageName = firImport.isAllUnder() ?
-                    firImport.getImportedFqName().asString() + ".*" :
-                    firImport.getImportedFqName().asString();
-            qualid = TypeTree.build(packageName).withPrefix(space);
-            skip(qualid.toString());
-        }
+        Space space = whitespace();
+        String packageName = firImport.isAllUnder() ?
+                firImport.getImportedFqName().asString() + ".*" :
+                firImport.getImportedFqName().asString();
+        J.FieldAccess qualid = TypeTree.build(packageName).withPrefix(space);
+        skip(qualid.toString());
         return new J.Import(
                 randomId(),
                 prefix,
@@ -1383,21 +1379,30 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitPackageDirective(FirPackageDirective packageDirective, ExecutionContext ctx) {
         Space pkgPrefix = whitespace();
         cursor += "package".length();
-        Space space = whitespace();
 
+        Space pkgNamePrefix = whitespace();
         String packageName = packageDirective.getPackageFqName().asString();
         skip(packageName);
         return new J.Package(
                 randomId(),
                 pkgPrefix,
                 Markers.EMPTY,
-                TypeTree.build(packageName).withPrefix(space),
+                TypeTree.build(packageName).withPrefix(pkgNamePrefix),
                 emptyList());
     }
 
     @Override
     public J visitGetClassCall(FirGetClassCall getClassCall, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("Unsupported operation. type::class.java");
+        return new J.MemberReference(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                padRight((Expression) visitElement(getClassCall.getArgument(), ctx), sourceBefore("::")),
+                null,
+                padLeft(whitespace(), createIdentifier("class")),
+                typeMapping.type(getClassCall),
+                null,
+                null);
     }
 
     @Override

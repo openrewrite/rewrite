@@ -133,12 +133,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if (coneKotlinType instanceof ConeTypeParameterType) {
                 FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);
                 if (classifierSymbol != null && classifierSymbol.getFir() instanceof FirTypeParameter) {
-                    return generic((FirTypeParameter) classifierSymbol.getFir(), signature, ownerFallBack);
+                    return generic((FirTypeParameter) classifierSymbol.getFir(), signature);
                 }
             }
             return classType(type, signature, ownerFallBack);
         } else if (type instanceof FirTypeParameter) {
-            return generic((FirTypeParameter) type, signature, ownerFallBack);
+            return generic((FirTypeParameter) type, signature);
         } else if (type instanceof FirVariableAssignment) {
             return type(((FirVariableAssignment) type).getCalleeReference(), ownerFallBack);
         }
@@ -561,9 +561,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         } else if (type instanceof ConeStarProjection) {
             name = "*";
         } else if (type instanceof ConeClassLikeType) {
-            ConeClassLikeType classLikeType = (ConeClassLikeType) type;
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(classLikeType, firSession);
-            return classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance();
+            return resolveConeLikeClassType((ConeClassLikeType) type, signature, ownerSymbol);
         } else if (type instanceof ConeTypeParameterType) {
             name = type.toString();
         } else if (type instanceof ConeFlexibleType) {
@@ -580,10 +578,18 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return gtv;
     }
 
-    private JavaType generic(FirTypeParameter typeParameter, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
-        String name = typeParameter.getName().asString();
-        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
-                name, INVARIANT, null);
+    private JavaType resolveConeLikeClassType(ConeClassLikeType coneClassLikeType, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
+        FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(coneClassLikeType, firSession);
+        if (classSymbol == null) {
+            typeCache.put(signature, JavaType.Unknown.getInstance());
+            return JavaType.Unknown.getInstance();
+        }
+
+        return type(classSymbol.getFir(), ownerSymbol);
+    }
+
+    private JavaType generic(FirTypeParameter typeParameter, String signature) {
+        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeParameter.getName().asString(), INVARIANT, null);
         typeCache.put(signature, gtv);
 
         List<JavaType> bounds = null;
