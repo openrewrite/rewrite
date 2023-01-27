@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -86,6 +87,43 @@ public class YamlResourceLoaderTest implements RewriteTest {
           text(
             "Hello, world!",
             "Hello!",
+            spec -> spec.path("goodbye.txt")
+          )
+        );
+    }
+
+    // todo, kunli, how to test with expected exception?
+    @Disabled
+    @Test
+    void anySourceAndSingleSourceApplicability() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ByteArrayInputStream(
+              //language=yml
+              """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.ChangeTextToHello
+                displayName: Change text to hello
+                applicability:
+                    anySource:
+                        - org.openrewrite.FindSourceFiles:
+                            filePattern: '**/hello.txt'
+                    singleSource:
+                        - org.openrewrite.FindSourceFiles:
+                            filePattern: '**/hello.txt'
+                recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello!
+                """.getBytes()
+            ),
+            "test.ChangeTextToHello"
+          ),
+          text(
+            "Hello, world!",
+            spec -> spec.path("hello.txt")
+          ),
+          text(
+            "Hello, world!",
             spec -> spec.path("goodbye.txt")
           )
         );

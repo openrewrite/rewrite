@@ -134,7 +134,6 @@ class RecipeLifecycleTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/2711")
     @Test
     void yamlApplicability() {

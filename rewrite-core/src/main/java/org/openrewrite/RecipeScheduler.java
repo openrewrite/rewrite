@@ -161,16 +161,26 @@ public interface RecipeScheduler {
             ((WatchableExecutionContext) ctx).resetHasNewMessages();
         }
         try {
-            for (Recipe r : recipeStack) {
-                nextTest:
-                for (TreeVisitor<?, ExecutionContext> applicableTest : r.getApplicableTests()) {
+            if (!recipe.getApplicableTests().isEmpty() && !recipe.getSingleSourceApplicableTests().isEmpty()) {
+                throw new IllegalArgumentException("It's not allowed to have both `singleSource` and `anySource` since it's ambiguous. ");
+            }
+
+            if (!recipe.getApplicableTests().isEmpty()) {
+                boolean anyMatch = false;
+                for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
                     for (S s : before) {
                         if (applicableTest.visit(s, ctx) != s) {
-                            continue nextTest;
+                            anyMatch = true;
+                            break;
                         }
                     }
+                }
+                if (!anyMatch) {
                     return before;
                 }
+            } else if (!recipe.getSingleSourceApplicableTests().isEmpty()) {
+                // SingleSourceApplicableTests are handed below in the below tasks parallel running
+                // todo, kun, refactor to move the logic here
             }
         } catch (Throwable t) {
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
