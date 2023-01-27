@@ -101,7 +101,7 @@ public class FinalizeLocalVariables extends Recipe {
         /**
          * @param j        The subtree to search.
          * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for any reassignment calls.
-         * @return A set of {@link NameTree} locations of reassignment calls to this variable.
+         * @return An {@link AtomicBoolean} that is true if the variable has been reassigned and false otherwise.
          */
         static AtomicBoolean find(J j, J.VariableDeclarations.NamedVariable variable) {
             return new FindAssignmentReferencesToVariable(variable)
