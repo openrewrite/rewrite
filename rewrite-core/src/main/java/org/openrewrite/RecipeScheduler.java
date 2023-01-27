@@ -95,12 +95,7 @@ public interface RecipeScheduler {
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
-            after = scheduleVisit(recipeRun.getStats(),
-                recipeStack,
-                acc,
-                null,
-                ctxWithWatch,
-                recipeThatAddedOrDeletedSourceFile);
+            after = scheduleVisit(recipeRun.getStats(), recipeStack, acc, null, ctxWithWatch, recipeThatAddedOrDeletedSourceFile);
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
