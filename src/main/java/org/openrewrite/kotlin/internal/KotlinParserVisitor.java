@@ -19,10 +19,7 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;
-import org.jetbrains.kotlin.fir.ClassMembersKt;
-import org.jetbrains.kotlin.fir.FirElement;
-import org.jetbrains.kotlin.fir.FirPackageDirective;
-import org.jetbrains.kotlin.fir.FirSession;
+import org.jetbrains.kotlin.fir.*;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter;
@@ -235,7 +232,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         Space arrowPrefix = whitespace();
         if (source.startsWith("->", cursor)) {
-            cursor += "->".length();
+            skip("->");
             if (params.getParameters().isEmpty()) {
                 params = params.getPadding().withParams(singletonList(JRightPadded
                         .build((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY))
@@ -465,7 +462,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         for (int i = 0; i < firStatements.size(); i++) {
             FirElement firElement = firStatements.get(i);
             // Skip receiver of the unary post increment or decrement.
-            if (firElement instanceof FirProperty && ("<unary>".equals(((FirProperty) firElement).getName().asString()))) {
+            if (firElement.getSource().getKind() instanceof KtFakeSourceElementKind.DesugaredIncrementOrDecrement &&
+                    !(firElement instanceof FirVariableAssignment)) {
                 continue;
             }
 
@@ -482,22 +480,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     expr = mapForLoop(check);
                 }
             }
-            // Note: Labeled items like FirWhileLoop need to be detected here to create a J.Label, since labels exist on
-            // The labeled FirElement.
 
             if (expr == null) {
                 boolean explicitReturn = false;
                 Space returnPrefix = EMPTY;
                 if (i == firStatements.size() - 1) {
-                    // Skip the implicit return from a unary pre increment or decrement operation.
-                    if (!statements.isEmpty() && statements.get(statements.size() - 1).getElement() instanceof J.Unary) {
-                        continue;
-                    }
-
                     saveCursor = cursor;
                     returnPrefix = whitespace();
                     if (source.startsWith("return", cursor)) {
-                        cursor += "return".length();
+                        skip("return");
                         explicitReturn = true;
                     } else {
                         cursor(saveCursor);
@@ -534,7 +525,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 stat = stat
                         .withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
                         .withAfter(beforeSemicolon);
-                cursor++;
+                skip(";");
             } else {
                 cursor(saveCursor);
             }
@@ -554,7 +545,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitBreakExpression(FirBreakExpression breakExpression, ExecutionContext ctx) {
         Space prefix = sourceBefore("break");
 
-        J.Identifier label = breakExpression.getTarget().getLabelName() == null ? null : createIdentifier(breakExpression.getTarget().getLabelName());
+        J.Identifier label = null;
+        if (breakExpression.getTarget().getLabelName() != null) {
+            skip("@");
+            label = createIdentifier(breakExpression.getTarget().getLabelName());
+        }
+
         return new J.Break(
                 randomId(),
                 prefix,
@@ -856,7 +852,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitContinueExpression(FirContinueExpression continueExpression, ExecutionContext ctx) {
         Space prefix = sourceBefore("continue");
-        J.Identifier label = continueExpression.getTarget().getLabelName() == null ? null : createIdentifier(continueExpression.getTarget().getLabelName());
+
+        J.Identifier label = null;
+        if (continueExpression.getTarget().getLabelName() != null) {
+            skip("@");
+            label = createIdentifier(continueExpression.getTarget().getLabelName());
+        }
+
         return new J.Continue(
                 randomId(),
                 prefix,
@@ -866,15 +868,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitDoWhileLoop(FirDoWhileLoop doWhileLoop, ExecutionContext ctx) {
-        Space prefix = whitespace();
+        J.Label label = null;
+        if (doWhileLoop.getLabel() != null) {
+            label = (J.Label) visitElement(doWhileLoop.getLabel(), ctx);
+        }
 
+        Space prefix = whitespace();
         skip("do");
-        return new J.DoWhileLoop(
+        J.DoWhileLoop statement = new J.DoWhileLoop(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 JRightPadded.build((Statement) visitElement(doWhileLoop.getBlock(), ctx)),
                 padLeft(sourceBefore("while"), mapControlParentheses(doWhileLoop.getCondition())));
+
+        return label != null ? label.withStatement(statement) : statement;
     }
 
     @Override
@@ -1378,7 +1386,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitPackageDirective(FirPackageDirective packageDirective, ExecutionContext ctx) {
         Space pkgPrefix = whitespace();
-        cursor += "package".length();
+        skip("package");
 
         Space pkgNamePrefix = whitespace();
         String packageName = packageDirective.getPackageFqName().asString();
@@ -1402,6 +1410,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 padLeft(whitespace(), createIdentifier("class")),
                 typeMapping.type(getClassCall),
                 null,
+                null);
+    }
+
+    @Override
+    public J visitLabel(FirLabel label, ExecutionContext ctx) {
+        return new J.Label(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                padRight(createIdentifier(label.getName()), sourceBefore("@")),
+                // The label exists on the FIR statement, and needs to be set in the statements visit.
                 null);
     }
 
@@ -1482,7 +1501,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         Space exprPrefix = whitespace();
         if (property.getInitializer() != null && source.startsWith("=", cursor)) {
-            cursor += "=".length();
+            skip("=");
             expr = visitExpression(property.getInitializer(), ctx);
             if (expr instanceof Statement && !(expr instanceof Expression)) {
                 expr = new K.StatementExpression(randomId(), (Statement) expr);
@@ -1778,7 +1797,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 body = body.withPrefix(blockPrefix);
                 body = body.withMarkers(body.getMarkers().addIfAbsent(singleExpressionBlock));
             } else {
-                throw new IllegalStateException("Implement me.");
+                throw new IllegalStateException("Unexpected single block expression.");
             }
         } else {
             cursor(saveCursor);
@@ -2087,8 +2106,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null);
                 }
             }
-        } else {
-            throw new IllegalStateException("Implement me.");
         }
 
         // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
@@ -2363,32 +2380,33 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Expression right = (Expression) visitElement(rhs.getArgumentList().getArguments().get(1), ctx);
         Space after = whitespace();
         if (source.startsWith(",", cursor)) {
-            cursor++;
+            skip(",");
         } else {
-            cursor += "->".length();
+            skip("->");
         }
         expressions.add(padRight(right, after));
     }
 
     @Override
     public J visitWhileLoop(FirWhileLoop whileLoop, ExecutionContext ctx) {
-        Space prefix = whitespace();
 
-        if (source.startsWith("while", cursor)) {
-            skip("while");
-            J.ControlParentheses<Expression> controlParentheses = mapControlParentheses(whileLoop.getCondition());
-            Statement body = (Statement) visitElement(whileLoop.getBlock(), ctx);
-            return new J.WhileLoop(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    controlParentheses,
-                    JRightPadded.build(body));
-        } else if (source.startsWith("for", cursor)) {
-            throw new UnsupportedOperationException("For loop should be converted in visitBlock.");
-        } else {
-            throw new UnsupportedOperationException("Unsupported loop starts with " + source.substring(cursor, cursor + 10));
+        J.Label label = null;
+        if (whileLoop.getLabel() != null) {
+            label = (J.Label) visitElement(whileLoop.getLabel(), ctx);
         }
+
+        Space prefix = whitespace();
+        skip("while");
+        J.ControlParentheses<Expression> controlParentheses = mapControlParentheses(whileLoop.getCondition());
+        Statement body = (Statement) visitElement(whileLoop.getBlock(), ctx);
+        J.WhileLoop statement = new J.WhileLoop(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                controlParentheses,
+                JRightPadded.build(body));
+
+        return label != null ? label.withStatement(statement) : statement;
     }
 
     /**
@@ -2445,6 +2463,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitFunctionTypeRef((FirFunctionTypeRef) firElement, ctx);
         } else if (firElement instanceof FirGetClassCall) {
             return visitGetClassCall((FirGetClassCall) firElement, ctx);
+        } else if (firElement instanceof FirLabel) {
+            return visitLabel((FirLabel) firElement, ctx);
         } else if (firElement instanceof FirLambdaArgumentExpression) {
             return visitLambdaArgumentExpression((FirLambdaArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirNamedArgumentExpression) {
@@ -2585,13 +2605,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 convert(firElement, t -> sourceBefore(")"), ctx));
     }
 
-    private J.ForEachLoop mapForLoop(FirBlock firBlock) {
-        Space prefix = whitespace();
-        skip("for");
-        Space controlPrefix = sourceBefore("(");
+    private J mapForLoop(FirBlock firBlock) {
 
         FirWhileLoop forLoop = (FirWhileLoop) firBlock.getStatements().get(1);
         FirProperty receiver = (FirProperty) forLoop.getBlock().getStatements().get(0);
+
+        J.Label label = null;
+        if (forLoop.getLabel() != null) {
+            label = (J.Label) visitElement(forLoop.getLabel(), ctx);
+        }
+
+        Space prefix = whitespace();
+        skip("for");
+        Space controlPrefix = sourceBefore("(");
 
         J.VariableDeclarations variable;
 
@@ -2651,12 +2677,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             body = padRight(block, EMPTY);
         }
 
-        return new J.ForEachLoop(
+        J.ForEachLoop statement = new J.ForEachLoop(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 control,
                 body);
+
+        return label != null ? label.withStatement(statement) : statement;
     }
 
     private List<J.Annotation> mapModifiers(List<FirAnnotation> firAnnotations, String stopWord) {

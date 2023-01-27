@@ -85,8 +85,9 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         if (type instanceof String) {
-            // Strings are passed into `type(..)` to resolve owners until there is a means to use a `ClassId` to look up the
-            // symbol.
+            // Kotlin only resolves the members necessary in a file like `Collection.kt` that wraps `listOf`, `mapOf`, etc.
+            // The owner type may be constructed through a String and is represented with a ShallowClass.
+            // type(..) handles the string value to reuse the same shallow class.
             JavaType javaType = JavaType.ShallowClass.build((String) type);
             typeCache.put(signature, javaType);
             return javaType;
@@ -111,7 +112,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         } else if (type instanceof FirFunctionTypeRef) {
             return type(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerFallBack);
         } else if (type instanceof FirJavaTypeRef) {
-            // TODO: There isn't time to convert the JavaTypeReference to a JavaType.
+            // TODO: Translate FirJavaTypeRef to a JavaType$Class.
             return JavaType.Class.Unknown.getInstance();
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
@@ -150,10 +151,11 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         FirClass firClass;
         FirResolvedTypeRef resolvedTypeRef = null;
         if (classType instanceof FirResolvedTypeRef) {
+            // The resolvedTypeRef is used to create parameterized types.
             resolvedTypeRef = (FirResolvedTypeRef) classType;
             FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(resolvedTypeRef.getType(), firSession);
             if (symbol == null) {
-                throw new UnsupportedOperationException("Symbol was not resolved for " + resolvedTypeRef.getType());
+                return JavaType.Unknown.getInstance();
             }
             firClass = symbol.getFir();
         } else {
@@ -220,8 +222,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                     // Skipped since inner classes don't exist on the JavaType$Class.
                 } else if (declaration instanceof FirEnumEntry) {
                     enumEntries.add((FirEnumEntry) declaration);
-                } else {
-                    throw new IllegalStateException("Implement me.");
                 }
             }
 
@@ -252,6 +252,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                     fields.add(variableType(field.getSymbol(), clazz, ownerFallBack));
                 }
             }
+
             List<JavaType.Method> methods = null;
             if(!functions.isEmpty()) {
                 methods = new ArrayList<>(functions.size());

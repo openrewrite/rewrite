@@ -224,6 +224,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitBreak(J.Break breakStatement, PrintOutputCapture<P> p) {
+            beforeSyntax(breakStatement, Space.Location.BREAK_PREFIX, p);
+            p.append("break");
+            if (breakStatement.getLabel() != null) {
+                p.append("@");
+            }
+            visit(breakStatement.getLabel(), p);
+            afterSyntax(breakStatement, p);
+            return breakStatement;
+        }
+
+        @Override
         public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
             String kind;
             if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Class || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Annotation) {
@@ -268,6 +280,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(classDecl, p);
             return classDecl;
+        }
+
+        @Override
+        public J visitContinue(J.Continue continueStatement, PrintOutputCapture<P> p) {
+            beforeSyntax(continueStatement, Space.Location.CONTINUE_PREFIX, p);
+            p.append("continue");
+            if (continueStatement.getLabel() != null) {
+                p.append("@");
+            }
+            visit(continueStatement.getLabel(), p);
+            afterSyntax(continueStatement, p);
+            return continueStatement;
         }
 
         @Override
@@ -317,6 +341,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(instanceOf.getPattern(), p);
             afterSyntax(instanceOf, p);
             return instanceOf;
+        }
+
+        @Override
+        public J visitLabel(J.Label label, PrintOutputCapture<P> p) {
+            beforeSyntax(label, Space.Location.LABEL_PREFIX, p);
+            visitRightPadded(label.getPadding().getLabel(), JRightPadded.Location.LABEL, "@", p);
+            visit(label.getStatement(), p);
+            afterSyntax(label, p);
+            return label;
         }
 
         @Override

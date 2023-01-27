@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,22 +30,6 @@ public class ContinueTest implements RewriteTest {
               class Test {
                   fun test ( ) {
                       while ( true ) continue
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Disabled
-    @Test
-    void continueFromLabeledWhileLoop() {
-        rewriteRun(
-          kotlin(
-            """
-              class Test {
-                  fun test ( ) {
-                      labeled@ while ( true ) continue@labeled
                   }
               }
               """

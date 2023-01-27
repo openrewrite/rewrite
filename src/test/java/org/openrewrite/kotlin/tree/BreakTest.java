@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -32,22 +31,6 @@ public class BreakTest implements RewriteTest {
                     while ( true ) break
                 }
             """
-          )
-        );
-    }
-
-    @Disabled
-    @Test
-    void breakFromLabeledWhileLoop() {
-        rewriteRun(
-          kotlin(
-            """
-                fun method ( ) {
-                    labeled@ while ( true ) {
-                        break@labeled
-                    }
-                }
-              """
           )
         );
     }
