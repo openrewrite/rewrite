@@ -731,7 +731,7 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class When implements K, Statement {
+    final class When implements K, Statement, Expression {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -749,9 +749,27 @@ public interface K extends J {
         @With
         Block branches;
 
+        @Nullable
+        JavaType type;
+
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitWhen(this, p);
+        }
+
+        @Nullable
+        @Override
+        public JavaType getType() {
+            return type;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public When withType(@Nullable JavaType type) {
+            if (type == this.type) {
+                return this;
+            }
+            return new When(id, prefix, markers, selector, branches, this.type);
         }
 
         @Override

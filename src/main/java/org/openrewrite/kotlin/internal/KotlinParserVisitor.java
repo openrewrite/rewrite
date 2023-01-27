@@ -482,8 +482,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             if (expr == null) {
-                boolean explicitReturn = false;
                 Space returnPrefix = EMPTY;
+                boolean explicitReturn = false;
+
                 if (i == firStatements.size() - 1) {
                     saveCursor = cursor;
                     returnPrefix = whitespace();
@@ -491,22 +492,27 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         skip("return");
                         explicitReturn = true;
                     } else {
+                        returnPrefix = EMPTY;
                         cursor(saveCursor);
                     }
                 }
 
-                expr = visitElement(firElement, ctx);
-                if (i == firStatements.size() - 1 && (expr instanceof Expression)) {
-                    if (!explicitReturn) {
-                        returnPrefix = expr.getPrefix();
-                        expr = expr.withPrefix(EMPTY);
+                if (!(firElement instanceof FirReturnExpression && ((FirReturnExpression) firElement).getResult() instanceof FirUnitExpression)) {
+                    expr = visitElement(firElement, ctx);
+                }
+
+                if (i == firStatements.size() - 1) {
+                    if (expr == null) {
+                        expr = new J.Return(randomId(), returnPrefix, Markers.EMPTY, null);
+                    } if (expr instanceof Expression) {
+                        expr = new J.Return(randomId(), returnPrefix, Markers.EMPTY, (Expression) expr);
+                    } else if (explicitReturn) {
+                        expr = expr.withPrefix(returnPrefix);
                     }
-                    expr = new J.Return(randomId(), returnPrefix, expr.getMarkers(), (Expression) expr);
+
                     if (!explicitReturn) {
-                        expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
+                        expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new ImplicitReturn(randomId())));
                     }
-                } else if (i == firStatements.size() - 1 && expr instanceof J.Return && ((J.Return) expr).getExpression() == null) {
-                    expr = expr.withMarkers(expr.getMarkers().add(new ImplicitReturn(randomId())));
                 }
 
                 if (!(expr instanceof Statement)) {
@@ -2321,7 +2327,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     prefix,
                     Markers.EMPTY,
                     controlParentheses,
-                    body);
+                    body,
+                    typeMapping.type(whenExpression));
         }
 
         // Otherwise, create an if branch.
