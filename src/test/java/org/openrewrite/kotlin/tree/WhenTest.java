@@ -23,7 +23,7 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class WhenTest implements RewriteTest {
 
     @Test
-    void when() {
+    void unaryConditions() {
         rewriteRun(
           kotlin(
             """
@@ -31,6 +31,25 @@ public class WhenTest implements RewriteTest {
                       when (i) {
                           1 -> return "1"
                           2 -> return "2"
+                          else -> {
+                              return "42"
+                          }
+                      }
+                  }
+              """
+          )
+        );
+    }
+
+    @Test
+    void binaryConditions() {
+        rewriteRun(
+          kotlin(
+            """
+                  fun method(i: Int) : String {
+                      when {
+                          i == 1 -> return "1"
+                          i == 2 -> return "2"
                           else -> {
                               return "42"
                           }

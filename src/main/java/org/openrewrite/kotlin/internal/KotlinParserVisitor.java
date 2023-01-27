@@ -1008,17 +1008,20 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (visit == null) {
                     visit = getReceiver(functionCall.getExplicitReceiver());
                 }
-                Expression selectExpr = (Expression) visitElement(visit, ctx);
-                Space after = whitespace();
-                if (source.startsWith(".", cursor)) {
-                    skip(".");
-                } else if (source.startsWith("?.", cursor)) {
-                    skip("?.");
-                    markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
-                }
 
-                select = JRightPadded.build(selectExpr)
-                        .withAfter(after);
+                if (visit != null) {
+                    Expression selectExpr = (Expression) visitElement(visit, ctx);
+                    Space after = whitespace();
+                    if (source.startsWith(".", cursor)) {
+                        skip(".");
+                    } else if (source.startsWith("?.", cursor)) {
+                        skip("?.");
+                        markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+                    }
+
+                    select = JRightPadded.build(selectExpr)
+                            .withAfter(after);
+                }
             }
 
             if (isInfix) {
@@ -2294,10 +2297,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         }
                     }
 
-                    for (int i = 0; i < arguments.size(); i++) {
-                        FirExpression argument = arguments.get(i);
-                        Expression expr = (Expression) visitElement(argument, ctx);
-                        expressions.add(padRight(expr, i == arguments.size() - 1 ? sourceBefore("->") : sourceBefore(",")));
+                    if (arguments.size() == 1) {
+                        expressions.add(padRight((Expression) visitElement(arguments.get(0), ctx), sourceBefore("->")));
+                    } else {
+                        Expression expr = (Expression) visitElement(whenBranch.getCondition(), ctx);
+                        expressions.add(padRight(expr, sourceBefore("->")));
                     }
                 }
 
