@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
@@ -202,7 +201,7 @@ class FinalizeLocalVariablesTest implements RewriteTest {
     }
 
     @Test
-    void classInitializersIgnored() {
+    void staticInitializer() {
         rewriteRun(
           java(
             """
@@ -213,7 +212,16 @@ class FinalizeLocalVariablesTest implements RewriteTest {
                           }
                       }
                   }
-              """
+              """,
+            """
+              class Test {
+                  static {
+                      final int n = 1;
+                      for(int i = 0; i < n; i++) {
+                      }
+                  }
+              }
+            """
           )
         );
     }
@@ -299,7 +307,6 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void localVariableInInitializerBlockMadeFinal() {
         rewriteRun(
