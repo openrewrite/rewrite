@@ -177,7 +177,12 @@ public class DeclarativeRecipe extends CompositeRecipe {
         }
     }
 
+
     public enum RecipeUse {
+        /**
+         * If multiple applicable tests configured for SingleSourceApplicability or AnySourceApplicability, the final
+         * result of the applicable test depends on all conditions being met, that is, a logical 'AND' relationship.
+         */
         SingleSourceApplicability,
         AnySourceApplicability,
         Recipe

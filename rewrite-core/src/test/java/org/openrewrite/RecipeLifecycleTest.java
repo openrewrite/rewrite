@@ -161,7 +161,6 @@ class RecipeLifecycleTest implements RewriteTest {
             - org.openrewrite.text.ChangeText:
                   toText: "3"
           """;
-
         rewriteRun(
           spec -> spec.recipe(Environment.builder()
             .scanRuntimeClasspath()

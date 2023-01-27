@@ -217,7 +217,8 @@ public abstract class Recipe implements Cloneable {
 
     /**
      * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
-     * particular source file.
+     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
+     * on all conditions being met, that is, a logical 'AND' relationship.
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not included in the results.
@@ -262,7 +263,8 @@ public abstract class Recipe implements Cloneable {
 
     /**
      * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
-     * particular source file.
+     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
+     * on all conditions being met, that is, a logical 'AND' relationship.
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not included in the results.

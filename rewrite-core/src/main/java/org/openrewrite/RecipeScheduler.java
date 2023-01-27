@@ -166,16 +166,22 @@ public interface RecipeScheduler {
             }
 
             if (!recipe.getApplicableTests().isEmpty()) {
-                boolean anyMatch = false;
-                for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
-                    for (S s : before) {
-                        if (applicableTest.visit(s, ctx) != s) {
-                            anyMatch = true;
+                boolean anySourceMatch = false;
+                for (S s : before) {
+                    boolean allMatch = true;
+                    for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
+                        if (applicableTest.visit(s, ctx) == s) {
+                            allMatch = false;
                             break;
                         }
                     }
+                    if (allMatch) {
+                        anySourceMatch = true;
+                        break;
+                    }
                 }
-                if (!anyMatch) {
+
+                if (!anySourceMatch) {
                     return before;
                 }
             } else if (!recipe.getSingleSourceApplicableTests().isEmpty()) {
