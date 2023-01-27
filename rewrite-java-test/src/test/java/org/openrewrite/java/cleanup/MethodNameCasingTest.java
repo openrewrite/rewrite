@@ -126,7 +126,7 @@ class MethodNameCasingTest implements RewriteTest {
               class Test {
                   public void getFoo_bar() {}
               }
-              """
+            """
           )
         );
     }
