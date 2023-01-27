@@ -231,4 +231,13 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void object() {
+        rewriteRun(
+          kotlin(
+            " object Test"
+          )
+        );
+    }
 }

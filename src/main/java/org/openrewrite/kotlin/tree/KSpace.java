@@ -17,7 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 public class KSpace {
     public enum Location {
-        ANONYMOUS_OBJECT_PREFIX,
+        OBJECT_PREFIX,
         BINARY_PREFIX,
         BINARY_OPERATOR,
         FUNCTION_TYPE_RECEIVER,

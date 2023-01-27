@@ -279,7 +279,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitAnonymousObject(FirAnonymousObject anonymousObject, ExecutionContext ctx) {
         Space objectPrefix = sourceBefore("object");
-        Markers markers = Markers.EMPTY.addIfAbsent(new AnonymousObjectPrefix(randomId(), objectPrefix));
+        Markers markers = Markers.EMPTY.addIfAbsent(new KObject(randomId(), objectPrefix));
         Space typeExpressionPrefix = sourceBefore(":");
         Space prefix = whitespace();
 
@@ -588,6 +588,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitClass(FirClass klass, ExecutionContext ctx) {
         FirRegularClass firRegularClass = (FirRegularClass) klass;
         Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
 
         // Not used until it's possible to handle K.Modifiers.
         List<J> modifiers = emptyList();
@@ -596,6 +597,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         String stopWord;
         if (ClassKind.INTERFACE == classKind) {
             stopWord = "interface";
+        } else if (ClassKind.OBJECT == classKind) {
+            stopWord = "object";
         } else {
             stopWord = "class";
         }
@@ -606,6 +609,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.ClassDeclaration.Kind kind;
         if (ClassKind.INTERFACE == classKind) {
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Interface);
+        } else if (ClassKind.OBJECT == classKind) {
+            markers = markers.addIfAbsent(new KObject(randomId(), EMPTY));
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("object"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         } else {
             // Enums and Interfaces are modifiers in kotlin and require the modifier prefix to preserve source code.
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
@@ -763,7 +769,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new J.ClassDeclaration(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                markers,
                 leadingAnnotation,
                 emptyList(), // Requires a K view to add K specific modifiers. Modifiers specific to Kotlin are added as annotations for now.
                 kind,

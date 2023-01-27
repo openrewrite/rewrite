@@ -231,9 +231,17 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             for (J.Modifier m : classDecl.getModifiers()) {
                 visitModifier(m, p);
             }
+
             visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
             visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
-            p.append(kind);
+
+            KObject KObject = classDecl.getMarkers().findFirst(KObject.class).orElse(null);
+            if (KObject != null) {
+                p.out.append("object");
+            } else {
+                p.append(kind);
+            }
+
             visit(classDecl.getName(), p);
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
 
@@ -435,15 +443,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitNewClass(J.NewClass newClass, PrintOutputCapture<P> p) {
-            AnonymousObjectPrefix anonymousObjectPrefix = newClass.getMarkers().findFirst(AnonymousObjectPrefix.class).orElse(null);
-            if (anonymousObjectPrefix != null) {
-                KotlinPrinter.this.visitSpace(anonymousObjectPrefix.getPrefix(), KSpace.Location.ANONYMOUS_OBJECT_PREFIX, p);
+            KObject kObject = newClass.getMarkers().findFirst(KObject.class).orElse(null);
+            if (kObject != null) {
+                KotlinPrinter.this.visitSpace(kObject.getPrefix(), KSpace.Location.OBJECT_PREFIX, p);
                 p.out.append("object");
             }
 
             beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
 
-            if (anonymousObjectPrefix != null) {
+            if (kObject != null) {
                 p.out.append(":");
             }
 
