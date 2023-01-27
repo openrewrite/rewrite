@@ -2254,12 +2254,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             // Create the entire when expression here to simplify visiting `WhenBranch`, since `if` and `when` share the same data structure.
             skip("when");
 
-            J.ControlParentheses<Expression> controlParentheses = new J.ControlParentheses<>(
-                    randomId(),
-                    sourceBefore("("),
-                    Markers.EMPTY,
-                    padRight((Expression) visitElement(whenExpression.getSubject(), ctx), sourceBefore(")"))
-            );
+            J.ControlParentheses<Expression> controlParentheses = null;
+            if (whenExpression.getSubject() != null) {
+                controlParentheses =  new J.ControlParentheses<>(
+                        randomId(),
+                        sourceBefore("("),
+                        Markers.EMPTY,
+                        padRight((Expression) visitElement(whenExpression.getSubject(), ctx), sourceBefore(")"))
+                );
+            }
 
             Space bodyPrefix = sourceBefore("{");
             List<JRightPadded<Statement>> statements = new ArrayList<>(whenExpression.getBranches().size());

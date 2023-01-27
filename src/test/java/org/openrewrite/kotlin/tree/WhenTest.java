@@ -75,4 +75,20 @@ public class WhenTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void withOutCondition() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method(i: Int) : String {
+                    when {
+                        i.mod(2).equals(0) -> return "even"
+                        else -> return "odd"
+                    }
+                }
+            """
+          )
+        );
+    }
 }
