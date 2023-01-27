@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.*;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Optional;
 
 public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -69,7 +68,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
         Iterator<Object> itr = parent.getPath(J.class::isInstance);
         J next = (itr.hasNext()) ? (J) itr.next() : null;
-        preVisit(next, p);
+        if (next != null) {
+            preVisit(next, p);
+        }
 
         return visit(tree, p);
     }
@@ -130,10 +131,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             return space;
         }
 
-        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
+        int indent = getCursor().getNearestMessage("lastIndent", 0);
 
-        IndentType indentType = Optional.ofNullable(getCursor().getParentOrThrow().
-                <IndentType>getNearestMessage("indentType")).orElse(IndentType.ALIGN);
+        IndentType indentType = getCursor().getParentOrThrow().getNearestMessage("indentType", IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
         boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&
@@ -186,7 +186,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         T t = right.getElement();
         Space after;
 
-        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
+        int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (right.getElement() instanceof J) {
             J elem = (J) right.getElement();
             if ((right.getAfter().getLastWhitespace().contains("\n") ||
@@ -351,7 +351,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         Space before;
         List<JRightPadded<J2>> js;
 
-        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
+        int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (container.getBefore().getLastWhitespace().contains("\n")) {
             switch (loc) {
                 case TYPE_PARAMETERS:

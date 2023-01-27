@@ -25,7 +25,6 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
-import java.util.Optional;
 
 public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     @Nullable
@@ -97,10 +96,9 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
             return space;
         }
 
-        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
+        int indent = getCursor().getNearestMessage("lastIndent", 0);
 
-        IndentType indentType = Optional.ofNullable(getCursor().getParentOrThrow().
-                <IndentType>getNearestMessage("indentType")).orElse(IndentType.ALIGN);
+        IndentType indentType = getCursor().getParentOrThrow().getNearestMessage("indentType", IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
         boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_CLOSE)|| loc.equals(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX);
@@ -136,7 +134,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         T t = right.getElement();
         Space after;
 
-        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
+        int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (right.getElement() instanceof Hcl) {
             Hcl elem = (Hcl) right.getElement();
             if ((right.getAfter().getLastWhitespace().contains("\n") ||
@@ -203,7 +201,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         Space before;
         List<HclRightPadded<H>> js;
 
-        int indent = Optional.ofNullable(getCursor().<Integer>getNearestMessage("lastIndent")).orElse(0);
+        int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (container.getBefore().getLastWhitespace().contains("\n")) {
             if (loc == HclContainer.Location.FUNCTION_CALL_ARGUMENTS) {
                 before = indentTo(container.getBefore(), indent + style.getIndentSize(), loc.getBeforeLocation());
