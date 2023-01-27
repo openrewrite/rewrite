@@ -118,6 +118,21 @@ class MethodNameCasingTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2424")
     @Test
+    void doNotRenamePublicMethodsNullOptions() {
+        rewriteRun(
+        spec -> spec.recipe(new MethodNameCasing(null, null)),
+          java(
+            """
+              class Test {
+                  public void getFoo_bar() {}
+              }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2424")
+    @Test
     void okToRenamePublicMethods() {
         rewriteRun(
           spec -> spec.recipe(new MethodNameCasing(true, true)),
