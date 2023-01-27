@@ -991,42 +991,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeMapping.methodInvocationType(functionCall, getCurrentFile()));
 
         } else if (namedReference instanceof FirResolvedNamedReference) {
-            FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
-            FirBasedSymbol<?> owner = null;
-            if (symbol instanceof FirNamedFunctionSymbol) {
-                FirNamedFunctionSymbol namedFunctionSymbol = (FirNamedFunctionSymbol) symbol;
-                ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
-                if (lookupTag != null) {
-                    owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
-                } else if (currentFile != null) {
-                    owner = getCurrentFile();
-                }
-            }
-
             Markers markers = Markers.EMPTY;
             JRightPadded<Expression> select = null;
-            FirElement dispatchReceiver = functionCall.getDispatchReceiver();
-            FirElement extensionReceiver = functionCall.getExtensionReceiver();
-            if (!(functionCall instanceof FirImplicitInvokeCall) &&
-                    (!(dispatchReceiver instanceof FirNoReceiverExpression || dispatchReceiver instanceof FirThisReceiverExpression)) ||
-                    !(extensionReceiver instanceof FirNoReceiverExpression || extensionReceiver instanceof FirThisReceiverExpression)) {
-                FirElement visit;
-                if (dispatchReceiver instanceof FirFunctionCall ||
-                        dispatchReceiver instanceof FirPropertyAccessExpression ||
-                        dispatchReceiver instanceof FirConstExpression) {
-                    visit = dispatchReceiver;
-                } else if (extensionReceiver instanceof FirFunctionCall ||
-                        extensionReceiver instanceof FirPropertyAccessExpression ||
-                        extensionReceiver instanceof FirConstExpression) {
-                    visit = extensionReceiver;
-                } else if (dispatchReceiver instanceof FirCheckedSafeCallSubject) {
-                    visit = ((FirCheckedSafeCallSubject) dispatchReceiver).getOriginalReceiverRef().getValue();
-                } else if (extensionReceiver instanceof FirCheckedSafeCallSubject) {
-                    visit = ((FirCheckedSafeCallSubject) extensionReceiver).getOriginalReceiverRef().getValue();
-                } else {
-                    throw new UnsupportedOperationException("Unsupported FunctionCall selection type.");
-                }
 
+            if (!(functionCall instanceof FirImplicitInvokeCall)) {
+                FirElement visit = getReceiver(functionCall.getDispatchReceiver());
+                if (visit == null) {
+                    visit = getReceiver(functionCall.getExtensionReceiver());
+                }
+                if (visit == null) {
+                    visit = getReceiver(functionCall.getExplicitReceiver());
+                }
                 Expression selectExpr = (Expression) visitElement(visit, ctx);
                 Space after = whitespace();
                 if (source.startsWith(".", cursor)) {
@@ -1076,6 +1051,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 args = JContainer.build(arguments);
             }
 
+            FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
+            FirBasedSymbol<?> owner = null;
+            if (symbol instanceof FirNamedFunctionSymbol) {
+                FirNamedFunctionSymbol namedFunctionSymbol = (FirNamedFunctionSymbol) symbol;
+                ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
+                if (lookupTag != null) {
+                    owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
+                } else if (currentFile != null) {
+                    owner = getCurrentFile();
+                }
+            }
+
             return new J.MethodInvocation(
                     randomId(),
                     prefix,
@@ -1090,7 +1077,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         throw new UnsupportedOperationException("Unsupported function call.");
     }
 
-     private JContainer<Expression> mapFunctionalCallArguments(List<FirExpression> firExpressions) {
+    @Nullable
+    private FirElement getReceiver(FirElement firElement) {
+        FirElement receiver = null;
+        if (firElement instanceof FirFunctionCall ||
+                firElement instanceof FirPropertyAccessExpression ||
+                firElement instanceof FirConstExpression ||
+                firElement instanceof FirResolvedQualifier) {
+            receiver = firElement;
+        } else if (firElement instanceof FirCheckedSafeCallSubject) {
+            receiver = ((FirCheckedSafeCallSubject) firElement).getOriginalReceiverRef().getValue();
+        }
+
+        return receiver;
+    }
+
+    private JContainer<Expression> mapFunctionalCallArguments(List<FirExpression> firExpressions) {
         JContainer<Expression> args;
         if (firExpressions.size() == 1) {
             FirExpression firExpression = firExpressions.get(0);
