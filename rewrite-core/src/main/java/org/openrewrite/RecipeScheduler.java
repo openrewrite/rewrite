@@ -175,11 +175,8 @@ public interface RecipeScheduler {
         if (ctx instanceof WatchableExecutionContext) {
             ((WatchableExecutionContext) ctx).resetHasNewMessages();
         }
-        try {
-            if (!recipe.getApplicableTests().isEmpty() && !recipe.getSingleSourceApplicableTests().isEmpty()) {
-                throw new IllegalArgumentException("It's not allowed to have both `singleSource` and `anySource` since it's ambiguous. ");
-            }
 
+        try {
             if (!recipe.getApplicableTests().isEmpty()) {
                 boolean anySourceMatch = false;
                 for (S s : before) {
@@ -199,7 +196,9 @@ public interface RecipeScheduler {
                 if (!anySourceMatch) {
                     return before;
                 }
-            } else if (!recipe.getSingleSourceApplicableTests().isEmpty()) {
+            }
+
+            if (!recipe.getSingleSourceApplicableTests().isEmpty()) {
                 if (singleSourceApplicableTestResult == null || singleSourceApplicableTestResult.isEmpty()) {
                     if (singleSourceApplicableTestResult == null) {
                         singleSourceApplicableTestResult = new ArrayList<>(before.size());
@@ -427,7 +426,7 @@ class RecipeSchedulerUtils {
             if (exceptionMapped != before) {
                 return exceptionMapped;
             }
-    }
+        }
 
         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
         // and instead we add a new file to record the exception message.
