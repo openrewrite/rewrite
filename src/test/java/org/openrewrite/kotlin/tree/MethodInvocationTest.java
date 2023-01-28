@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -172,7 +171,6 @@ public class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires support of infix function `to`")
     @Test
     void mapOf() {
         rewriteRun(

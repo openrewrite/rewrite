@@ -60,6 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
+import static java.lang.Math.exp;
 import static java.lang.Math.max;
 import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
@@ -485,7 +486,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Space returnPrefix = EMPTY;
                 boolean explicitReturn = false;
 
-                if (i == firStatements.size() - 1) {
+                if (firElement instanceof FirReturnExpression) {
                     saveCursor = cursor;
                     returnPrefix = whitespace();
                     if (source.startsWith("return", cursor)) {
@@ -501,16 +502,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     expr = visitElement(firElement, ctx);
                 }
 
-                if (i == firStatements.size() - 1) {
+                if (firElement instanceof FirReturnExpression) {
                     if (expr == null) {
-                        expr = new J.Return(randomId(), returnPrefix, Markers.EMPTY, null);
-                    } if (expr instanceof Expression) {
-                        expr = new J.Return(randomId(), returnPrefix, Markers.EMPTY, (Expression) expr);
-                    } else if (explicitReturn) {
-                        expr = expr.withPrefix(returnPrefix);
+                        expr = new J.Return(randomId(), EMPTY, Markers.EMPTY, null);
+                    } else if (expr instanceof Statement && !(expr instanceof Expression)) {
+                        expr = new J.Return(randomId(), EMPTY, Markers.EMPTY, new K.StatementExpression(randomId(), (Statement) expr));
+                    } else if (expr instanceof Expression) {
+                        expr = new J.Return(randomId(), EMPTY, Markers.EMPTY, (Expression) expr);
                     }
 
-                    if (!explicitReturn) {
+                    if (explicitReturn) {
+                        expr = expr.withPrefix(returnPrefix);
+                    } else {
                         expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new ImplicitReturn(randomId())));
                     }
                 }

@@ -77,5 +77,18 @@ public class ReturnTest implements RewriteTest {
         );
     }
 
-
+    @Test
+    void returnStatement() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) : Unit {
+                    return try {
+                    } catch (e : Exception) {
+                    }
+                }
+            """
+          )
+        );
+    }
 }
