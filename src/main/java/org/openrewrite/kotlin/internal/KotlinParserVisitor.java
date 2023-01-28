@@ -1709,17 +1709,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(simpleFunction.getAnnotations(), simpleFunction.getName().asString());
 
-        boolean isInfix = false;
-        for (J.Annotation annotation : annotations) {
-            if (annotation.getAnnotationType() instanceof J.Identifier &&
-                    "infix".equals(((J.Identifier) annotation.getAnnotationType()).getSimpleName())) {
-                isInfix = true;
-                break;
-            }
-        }
-
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
-        if (isInfix && simpleFunction.getReceiverTypeRef() != null) {
+        if (simpleFunction.getReceiverTypeRef() != null) {
             // Infix functions are de-sugared during the backend phase of the compiler.
             // The de-sugaring process moves the infix receiver to the first position of the method declaration.
             // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
@@ -1757,7 +1748,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 JContainer.build(paramFmt, convertAll(simpleFunction.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
-        if (isInfix) {
+        if (simpleFunction.getReceiverTypeRef() != null) {
             // Insert the infix receiver to the list of parameters.
             J.VariableDeclarations implicitParam = new J.VariableDeclarations(
                     randomId(),

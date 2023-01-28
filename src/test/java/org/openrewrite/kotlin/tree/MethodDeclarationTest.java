@@ -144,4 +144,12 @@ public class MethodDeclarationTest implements RewriteTest {
           kotlin("fun <T : Number > method ( type : T ) { }")
         );
     }
+
+    @Test
+    void typeReceiver() {
+        rewriteRun(
+          kotlin("class Test"),
+          kotlin("fun Test . method ( ) { }")
+        );
+    }
 }

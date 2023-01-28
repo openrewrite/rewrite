@@ -102,7 +102,7 @@ public class WhenTest implements RewriteTest {
             """
                 fun method(i: Int) : String {
                     when {
-                        i.mod(2).equals(0) -> return "even"
+                        i . mod ( 2 ) . equals ( 0 ) -> return "even"
                         else -> return "odd"
                     }
                 }
