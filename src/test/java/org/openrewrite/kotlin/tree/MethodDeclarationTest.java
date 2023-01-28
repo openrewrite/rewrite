@@ -146,10 +146,30 @@ public class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void typeReceiver() {
+    void receiverType() {
         rewriteRun(
           kotlin("class Test"),
           kotlin("fun Test . method ( ) { }")
+        );
+    }
+
+    @Test
+    void methodInvocationOnReceiverType() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    fun build ( s : ( ) -> String ) {
+                    }
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun Test . method ( ) = build {
+                    "42"
+                }
+            """)
         );
     }
 }

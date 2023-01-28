@@ -1743,10 +1743,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Identifier name = createIdentifier(methodName, simpleFunction);
 
         JContainer<Statement> params;
-        Space paramFmt = sourceBefore("(");
+        Space before = sourceBefore("(");
         params = !simpleFunction.getValueParameters().isEmpty() ?
-                JContainer.build(paramFmt, convertAll(simpleFunction.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
-                JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+                JContainer.build(before, convertAll(simpleFunction.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
+                JContainer.build(before, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
         if (simpleFunction.getReceiverTypeRef() != null) {
             // Insert the infix receiver to the list of parameters.
@@ -1767,36 +1767,37 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             params = params.getPadding().withElements(newStatements);
         }
 
-        int saveCursor;
+        int saveCursor = cursor;
         TypeTree returnTypeExpression = null;
-        if (!(simpleFunction.getReturnTypeRef() instanceof FirImplicitUnitTypeRef)) {
-            Space delimiterPrefix = whitespace();
-            boolean addTypeReferencePrefix = source.startsWith(":", cursor);
+        before = whitespace();
+        if (source.startsWith(":", cursor)) {
             skip(":");
-            if (addTypeReferencePrefix) {
-                markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
-            }
+            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
+
             returnTypeExpression = (TypeTree) visitElement(simpleFunction.getReturnTypeRef(), ctx);
+
             saveCursor = cursor;
-            Space maybeNullablePrefix = whitespace();
+            before = whitespace();
             if (source.startsWith("?", cursor)) {
                 returnTypeExpression = returnTypeExpression.withMarkers(
-                        returnTypeExpression.getMarkers().addIfAbsent(new IsNullable(randomId(), maybeNullablePrefix)));
+                        returnTypeExpression.getMarkers().addIfAbsent(new IsNullable(randomId(), before)));
             } else {
                 cursor(saveCursor);
             }
+        } else {
+            cursor(saveCursor);
         }
 
         J.Block body;
         saveCursor = cursor;
-        Space blockPrefix = whitespace();
+        before = whitespace();
         if (simpleFunction.getBody() instanceof FirSingleExpressionBlock) {
             if (source.startsWith("=", cursor)) {
                 skip("=");
                 SingleExpressionBlock singleExpressionBlock = new SingleExpressionBlock(randomId());
 
                 body = convertOrNull(simpleFunction.getBody(), ctx);
-                body = body.withPrefix(blockPrefix);
+                body = body.withPrefix(before);
                 body = body.withMarkers(body.getMarkers().addIfAbsent(singleExpressionBlock));
             } else {
                 throw new IllegalStateException("Unexpected single block expression.");
