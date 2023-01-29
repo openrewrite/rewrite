@@ -29,7 +29,7 @@ class RemoveCallsToObjectFinalizeTest implements RewriteTest {
     }
 
     @Test
-    void removeSimpleFinalize() {
+    void removeCallToFinalize() {
         rewriteRun(
           java(
             """
@@ -49,15 +49,113 @@ class RemoveCallsToObjectFinalizeTest implements RewriteTest {
                   }
               """,
             """
-              public class A {
+                public class A {
+                
+                        @Override
+                        protected void finalize() {
+                            super.finalize();
+                        }
+                
+                        public static void main(String[] args) throws Throwable {
+                
+                            A a = new A();
+                            System.out.println("Clean object");
+                        }
+                    }
+                """
+          )
+        );
+    }
 
-                  public static void main(String[] args) throws Throwable {
-                       A a = new A();
-                       System.out.println("Clean object");
+
+    @Test
+    void privateFinalizeIsNotChanged() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+              
+                      private void finalize() {
+                         System.out.println("I am just a friendly finalizer");
+                      }
+                      
+                      public static void main(String[] args) throws Throwable {
+              
+                          A a = new A();
+                          System.out.println("Clean object");
+                          a.finalize();
+                      }
                   }
-              }
               """
           )
         );
+    }
+
+
+    @Test
+    void publicFinalizeIsNotChanged() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+              
+                      public void finalize() {
+                         System.out.println("I am just a friendly finalizer");
+                      }
+                      
+                      public static void main(String[] args) throws Throwable {
+              
+                          A a = new A();
+                          System.out.println("Clean object");
+                          a.finalize();
+                      }
+                  }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void protectedFinalizeIsNotRemoved() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+              
+                      protected void finalize() {
+                         System.out.println("I am just a friendly finalizer");
+                      }
+                      
+                      public static void main(String[] args) throws Throwable {
+              
+                          A a = new A();
+                          System.out.println("Clean object");
+                          a.finalize();
+                      }
+                  }
+              """
+          )
+        );
+    }
+        @Test
+        void staticFinalizeIsNotRemoved() {
+            rewriteRun(
+              java(
+                """
+                  public class A {
+                  
+                          static void finalize() {
+                             System.out.println("I am just a friendly finalizer");
+                          }
+                          
+                          public static void main(String[] args) throws Throwable {
+                  
+                              A.finalize();
+                          }
+                      }
+                  """
+              )
+            );
     }
 }

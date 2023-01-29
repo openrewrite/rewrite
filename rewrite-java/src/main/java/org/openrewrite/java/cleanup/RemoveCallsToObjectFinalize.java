@@ -65,7 +65,7 @@ public class RemoveCallsToObjectFinalize extends Recipe {
                 J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
 
                 if (invocation.getMethodType() != null && "finalize".equals(invocation.getMethodType().getName())
-                        &&(Object.class.getName().equalsIgnoreCase(invocation.getMethodType().getDeclaringType().getFullyQualifiedName())|| (invocation.getMethodType().getDeclaringType().getSupertype() != null && Object.class.getName().equals(invocation.getMethodType().getDeclaringType().getSupertype().getFullyQualifiedName())))) {
+                        &&(invocation.getMethodType().getDeclaringType().getSupertype() != null && Object.class.getName().equals(invocation.getMethodType().getDeclaringType().getSupertype().getFullyQualifiedName()))) {
                     doAfterVisit(new EmptyBlock());
                     return null;
                 }
