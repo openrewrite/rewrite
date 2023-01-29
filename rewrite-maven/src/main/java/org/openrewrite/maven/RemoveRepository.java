@@ -37,6 +37,8 @@ public class RemoveRepository extends Recipe {
 
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories/repository");
 
+    private static final XPathMatcher PLUGIN_REPOS_MATCHER = new XPathMatcher("/project/pluginRepositories/pluginRepository");
+
     @Option(required = false, description = "Repository id")
     @Nullable
     private String id;
@@ -93,7 +95,7 @@ public class RemoveRepository extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag repo = super.visitTag(tag, ctx);
 
-                if (REPOS_MATCHER.matches(getCursor())) {
+                if (REPOS_MATCHER.matches(getCursor()) || PLUGIN_REPOS_MATCHER.matches(getCursor())) {
                     if (id == null && (isReleasesEqual(repo) && isSnapshotsEqual(repo)) &&
                                         url.equals(repo.getChildValue("url").orElse(null))) {
                         return null;
