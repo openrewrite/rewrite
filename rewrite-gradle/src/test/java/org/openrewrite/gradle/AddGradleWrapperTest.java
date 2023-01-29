@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -34,7 +35,6 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -47,14 +47,7 @@ import static org.openrewrite.test.SourceSpecs.other;
 @SuppressWarnings("UnusedProperty")
 class AddGradleWrapperTest implements RewriteTest {
     @Language("properties")
-    private static final String GRADLE_WRAPPER_PROPERTIES = """
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
-          distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-      """;
+    private static final String GRADLE_WRAPPER_PROPERTIES = createWrapperPropertyFile("gradle-7.4.2-bin.zip","29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda");
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -111,7 +104,6 @@ class AddGradleWrapperTest implements RewriteTest {
     @NullSource
     void addWrapperWithReleaseTag(String desiredVersion) {
 
-        AtomicReference<String> output = new AtomicReference<>("");
         rewriteRun(
           spec ->
             spec
@@ -139,15 +131,7 @@ class AddGradleWrapperTest implements RewriteTest {
 
                   var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
                   assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
-                  assertThat(gradleWrapperJar.getUri().toString()).endsWith("-bin.zip");
-
-                  var wrapperProperties =  run.getResults().stream()
-                    .map(Result::getAfter)
-                    .filter(Objects::nonNull)
-                    .filter(r -> r.getSourcePath().endsWith("gradle-wrapper.properties"))
-                    .findFirst().orElseThrow();
-
-                  output.set(wrapperProperties.printAll());
+                  assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.6-bin.zip"));
 
               }),
 
@@ -155,8 +139,20 @@ class AddGradleWrapperTest implements RewriteTest {
 
           dir(
             "gradle/wrapper",
-            properties(null, output, spec -> spec.path(Paths.get("gradle-wrapper.properties")))
+            properties(null, createWrapperPropertyFile("gradle-7.6-bin.zip","7ba68c54029790ab444b39d7e293d3236b2632631fb5f2e012bb28b4ff669e4b"), spec -> spec.path(Paths.get("gradle-wrapper.properties")))
           ));
+    }
+
+    @NotNull
+    private static String createWrapperPropertyFile(String filename, String hash) {
+        return """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/%s
+              distributionSha256Sum=%s
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+          """.formatted(filename,hash);
     }
 
     private void validateGradlewFiles(RecipeRun run) {
