@@ -118,6 +118,54 @@ public class RemoveRepositoryTest implements RewriteTest {
                     <url>http://myrepo.maven.com/repo</url>
                   </pluginRepository>
                 </pluginRepositories>
+                 <repositories>
+                  <repository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                  </repository>
+                </repositories>
+              </project>
+              """,
+            """
+             <project>
+               <groupId>com.mycompany.app</groupId>
+               <artifactId>my-app</artifactId>
+               <version>1</version>
+               <pluginRepositories>
+               </pluginRepositories>
+                <repositories>
+               </repositories>
+             </project>
+              """
+
+          )
+        );
+    }
+
+
+    @Test
+    void removesBoth() {
+
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+            null, null, null,
+            null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>myRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                  </pluginRepository>
+                  <pluginRepository>
+                    <id>identicalRepo</id>
+                    <url>http://myrepo.maven.com/repo</url>
+                  </pluginRepository>
+                </pluginRepositories>
               </project>
               """,
             """
