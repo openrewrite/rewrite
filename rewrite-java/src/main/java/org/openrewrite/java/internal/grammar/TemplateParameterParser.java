@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/TemplateParameterParser.g4 by ANTLR 4.9.3
+// Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
 public class TemplateParameterParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -90,7 +90,7 @@ public class TemplateParameterParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "TemplateParameterParser.g4"; }
+	public String getGrammarFileName() { return "java-escape"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -106,6 +106,7 @@ public class TemplateParameterParser extends Parser {
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class MatcherPatternContext extends ParserRuleContext {
 		public MatcherNameContext matcherName() {
 			return getRuleContext(MatcherNameContext.class,0);
@@ -151,7 +152,7 @@ public class TemplateParameterParser extends Parser {
 			setState(11);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FullyQualifiedName) | (1L << Number) | (1L << Identifier))) != 0)) {
+			while (((_la) & ~0x3f) == 0 && ((1L << _la) & 1792L) != 0) {
 				{
 				{
 				setState(8);
@@ -177,6 +178,7 @@ public class TemplateParameterParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class MatcherParameterContext extends ParserRuleContext {
 		public TerminalNode FullyQualifiedName() { return getToken(TemplateParameterParser.FullyQualifiedName, 0); }
 		public TerminalNode Identifier() { return getToken(TemplateParameterParser.Identifier, 0); }
@@ -209,7 +211,7 @@ public class TemplateParameterParser extends Parser {
 			{
 			setState(16);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << FullyQualifiedName) | (1L << Number) | (1L << Identifier))) != 0)) ) {
+			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 1792L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -230,6 +232,7 @@ public class TemplateParameterParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class MatcherNameContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(TemplateParameterParser.Identifier, 0); }
 		public MatcherNameContext(ParserRuleContext parent, int invokingState) {
@@ -273,12 +276,20 @@ public class TemplateParameterParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\f\27\4\2\t\2\4\3"+
-		"\t\3\4\4\t\4\3\2\3\2\3\2\7\2\f\n\2\f\2\16\2\17\13\2\3\2\3\2\3\3\3\3\3"+
-		"\4\3\4\3\4\2\2\5\2\4\6\2\3\3\2\n\f\2\24\2\b\3\2\2\2\4\22\3\2\2\2\6\24"+
-		"\3\2\2\2\b\t\5\6\4\2\t\r\7\3\2\2\n\f\5\4\3\2\13\n\3\2\2\2\f\17\3\2\2\2"+
-		"\r\13\3\2\2\2\r\16\3\2\2\2\16\20\3\2\2\2\17\r\3\2\2\2\20\21\7\4\2\2\21"+
-		"\3\3\2\2\2\22\23\t\2\2\2\23\5\3\2\2\2\24\25\7\f\2\2\25\7\3\2\2\2\3\r";
+		"\u0004\u0001\n\u0015\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0002\u0007\u0002\u0001\u0000\u0001\u0000\u0001\u0000\u0005\u0000\n\b"+
+		"\u0000\n\u0000\f\u0000\r\t\u0000\u0001\u0000\u0001\u0000\u0001\u0001\u0001"+
+		"\u0001\u0001\u0002\u0001\u0002\u0001\u0002\u0000\u0000\u0003\u0000\u0002"+
+		"\u0004\u0000\u0001\u0001\u0000\b\n\u0012\u0000\u0006\u0001\u0000\u0000"+
+		"\u0000\u0002\u0010\u0001\u0000\u0000\u0000\u0004\u0012\u0001\u0000\u0000"+
+		"\u0000\u0006\u0007\u0003\u0004\u0002\u0000\u0007\u000b\u0005\u0001\u0000"+
+		"\u0000\b\n\u0003\u0002\u0001\u0000\t\b\u0001\u0000\u0000\u0000\n\r\u0001"+
+		"\u0000\u0000\u0000\u000b\t\u0001\u0000\u0000\u0000\u000b\f\u0001\u0000"+
+		"\u0000\u0000\f\u000e\u0001\u0000\u0000\u0000\r\u000b\u0001\u0000\u0000"+
+		"\u0000\u000e\u000f\u0005\u0002\u0000\u0000\u000f\u0001\u0001\u0000\u0000"+
+		"\u0000\u0010\u0011\u0007\u0000\u0000\u0000\u0011\u0003\u0001\u0000\u0000"+
+		"\u0000\u0012\u0013\u0005\n\u0000\u0000\u0013\u0005\u0001\u0000\u0000\u0000"+
+		"\u0001\u000b";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {
