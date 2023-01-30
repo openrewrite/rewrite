@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
@@ -105,6 +106,28 @@ class SpacesTest implements RewriteTest {
             """
               class Test {
                   void method1 () {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method1() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void beforeParensMethodDeclarationFalse2() {
+        rewriteRun(
+          spaces(style -> style.withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(false))),
+          java(
+            """
+              class Test {
+                  void method1    () {
                   }
               }
               """,
@@ -2377,6 +2400,28 @@ class SpacesTest implements RewriteTest {
         );
     }
 
+    @Disabled
+    @Test
+    void withinMethodDeclarationParenthesesTrue2() {
+        rewriteRun(
+          spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))),
+          java(
+            """
+              class Test {
+                  public void foo(int x, int y    ) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  public void foo( int x, int y ) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void withinMethodDeclarationParenthesesFalse() {
         rewriteRun(
@@ -3317,9 +3362,9 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       Map<String,String> m = new HashMap<String,String>();
-                      Test.<String,Integer>bar();
+                      Test.<String,Integer>bar(1,2);
                   }
-                  static <A, B> void bar() {
+                  static <A,B> void bar(int x,int y) {
                   }
               }
               """,
@@ -3330,9 +3375,9 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       Map<String, String> m = new HashMap<String, String>();
-                      Test.<String, Integer>bar();
+                      Test.<String, Integer>bar(1, 2);
                   }
-                  static <A, B> void bar() {
+                  static <A, B> void bar(int x, int y) {
                   }
               }
               """
