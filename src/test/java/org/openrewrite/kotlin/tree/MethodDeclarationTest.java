@@ -172,4 +172,14 @@ public class MethodDeclarationTest implements RewriteTest {
             """)
         );
     }
+
+    @Test
+    void nullableReturnType() {
+        rewriteRun(
+          kotlin("""
+              fun method() : Array<Int> ? {
+              }
+          """)
+        );
+    }
 }
