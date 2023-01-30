@@ -1121,7 +1121,7 @@ public interface JavaType {
         @NonFinal
         Integer managedReference;
 
-        @With(AccessLevel.NONE)
+        @With(AccessLevel.PRIVATE)
         long flagsBitMap;
 
         @With
@@ -1173,6 +1173,10 @@ public interface JavaType {
 
         public Set<Flag> getFlags() {
             return Flag.bitMapToFlags(flagsBitMap);
+        }
+
+        public Variable withFlags(Set<Flag> flags) {
+            return withFlagsBitMap(Flag.flagsToBitMap(flags));
         }
 
         @Override

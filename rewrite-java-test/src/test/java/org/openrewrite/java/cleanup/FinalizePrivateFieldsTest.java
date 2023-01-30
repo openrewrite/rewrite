@@ -17,15 +17,40 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class FinalizePrivateFieldsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FinalizePrivateFields());
+    }
+
+    @Test
+    void modifierAndVariableTypeFlagSet() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private static String TEST_STRING = "ABC";
+              }
+              """,
+            """
+              class A {
+                  private static final String TEST_STRING = "ABC";
+              }
+              """, spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations declarations = (J.VariableDeclarations) cu.getClasses().get(
+                  0).getBody().getStatements().get(0);
+                assertThat(declarations.getModifiers()).anySatisfy(
+                  m -> assertThat(m.getType()).isEqualTo(J.Modifier.Type.Final));
+                assertThat(declarations.getVariables().get(0).getVariableType().getFlags()).contains(Flag.Final);
+            })));
     }
 
     @Test
