@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/jon/Projects/github/openrewrite/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.9.3
+// Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
 public class AnnotationSignatureParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -100,7 +100,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "AnnotationSignatureParser.g4"; }
+	public String getGrammarFileName() { return "java-escape"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -116,6 +116,7 @@ public class AnnotationSignatureParser extends Parser {
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class AnnotationContext extends ParserRuleContext {
 		public TerminalNode AT() { return getToken(AnnotationSignatureParser.AT, 0); }
 		public AnnotationNameContext annotationName() {
@@ -200,6 +201,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class AnnotationNameContext extends ParserRuleContext {
 		public QualifiedNameContext qualifiedName() {
 			return getRuleContext(QualifiedNameContext.class,0);
@@ -244,6 +246,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class QualifiedNameContext extends ParserRuleContext {
 		public List<TerminalNode> Identifier() { return getTokens(AnnotationSignatureParser.Identifier); }
 		public TerminalNode Identifier(int i) {
@@ -322,6 +325,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ElementValuePairsContext extends ParserRuleContext {
 		public List<ElementValuePairContext> elementValuePair() {
 			return getRuleContexts(ElementValuePairContext.class);
@@ -390,6 +394,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ElementValuePairContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
 		public TerminalNode ASSIGN() { return getToken(AnnotationSignatureParser.ASSIGN, 0); }
@@ -440,6 +445,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ElementValueContext extends ParserRuleContext {
 		public PrimaryContext primary() {
 			return getRuleContext(PrimaryContext.class,0);
@@ -484,6 +490,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class PrimaryContext extends ParserRuleContext {
 		public LiteralContext literal() {
 			return getRuleContext(LiteralContext.class,0);
@@ -550,6 +557,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class TypeContext extends ParserRuleContext {
 		public ClassOrInterfaceTypeContext classOrInterfaceType() {
 			return getRuleContext(ClassOrInterfaceTypeContext.class,0);
@@ -619,6 +627,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ClassOrInterfaceTypeContext extends ParserRuleContext {
 		public List<TerminalNode> Identifier() { return getTokens(AnnotationSignatureParser.Identifier); }
 		public TerminalNode Identifier(int i) {
@@ -697,6 +706,7 @@ public class AnnotationSignatureParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class LiteralContext extends ParserRuleContext {
 		public TerminalNode IntegerLiteral() { return getToken(AnnotationSignatureParser.IntegerLiteral, 0); }
 		public TerminalNode FloatingPointLiteral() { return getToken(AnnotationSignatureParser.FloatingPointLiteral, 0); }
@@ -731,7 +741,7 @@ public class AnnotationSignatureParser extends Parser {
 			{
 			setState(74);
 			_la = _input.LA(1);
-			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral))) != 0)) ) {
+			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 62L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -753,26 +763,50 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\30O\4\2\t\2\4\3\t"+
-		"\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t\13\3"+
-		"\2\3\2\3\2\3\2\3\2\5\2\34\n\2\3\2\5\2\37\n\2\3\3\3\3\3\4\3\4\3\4\7\4&"+
-		"\n\4\f\4\16\4)\13\4\3\5\3\5\3\5\7\5.\n\5\f\5\16\5\61\13\5\3\6\3\6\3\6"+
-		"\3\6\3\7\3\7\3\b\3\b\5\b;\n\b\3\t\3\t\3\t\7\t@\n\t\f\t\16\tC\13\t\3\n"+
-		"\3\n\3\n\7\nH\n\n\f\n\16\nK\13\n\3\13\3\13\3\13\2\2\f\2\4\6\b\n\f\16\20"+
-		"\22\24\2\4\4\2\r\r\26\26\3\2\3\7\2L\2\26\3\2\2\2\4 \3\2\2\2\6\"\3\2\2"+
-		"\2\b*\3\2\2\2\n\62\3\2\2\2\f\66\3\2\2\2\16:\3\2\2\2\20<\3\2\2\2\22D\3"+
-		"\2\2\2\24L\3\2\2\2\26\27\7\24\2\2\27\36\5\4\3\2\30\33\7\b\2\2\31\34\5"+
-		"\b\5\2\32\34\5\f\7\2\33\31\3\2\2\2\33\32\3\2\2\2\33\34\3\2\2\2\34\35\3"+
-		"\2\2\2\35\37\7\t\2\2\36\30\3\2\2\2\36\37\3\2\2\2\37\3\3\2\2\2 !\5\6\4"+
-		"\2!\5\3\2\2\2\"\'\7\30\2\2#$\t\2\2\2$&\7\30\2\2%#\3\2\2\2&)\3\2\2\2\'"+
-		"%\3\2\2\2\'(\3\2\2\2(\7\3\2\2\2)\'\3\2\2\2*/\5\n\6\2+,\7\f\2\2,.\5\n\6"+
-		"\2-+\3\2\2\2.\61\3\2\2\2/-\3\2\2\2/\60\3\2\2\2\60\t\3\2\2\2\61/\3\2\2"+
-		"\2\62\63\7\30\2\2\63\64\7\16\2\2\64\65\5\f\7\2\65\13\3\2\2\2\66\67\5\16"+
-		"\b\2\67\r\3\2\2\28;\5\24\13\29;\5\20\t\2:8\3\2\2\2:9\3\2\2\2;\17\3\2\2"+
-		"\2<A\5\22\n\2=>\7\n\2\2>@\7\13\2\2?=\3\2\2\2@C\3\2\2\2A?\3\2\2\2AB\3\2"+
-		"\2\2B\21\3\2\2\2CA\3\2\2\2DI\7\30\2\2EF\t\2\2\2FH\7\30\2\2GE\3\2\2\2H"+
-		"K\3\2\2\2IG\3\2\2\2IJ\3\2\2\2J\23\3\2\2\2KI\3\2\2\2LM\t\3\2\2M\25\3\2"+
-		"\2\2\t\33\36\'/:AI";
+		"\u0004\u0001\u0016M\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
+		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0002\u0007\u0007\u0007\u0002"+
+		"\b\u0007\b\u0002\t\u0007\t\u0001\u0000\u0001\u0000\u0001\u0000\u0001\u0000"+
+		"\u0001\u0000\u0003\u0000\u001a\b\u0000\u0001\u0000\u0003\u0000\u001d\b"+
+		"\u0000\u0001\u0001\u0001\u0001\u0001\u0002\u0001\u0002\u0001\u0002\u0005"+
+		"\u0002$\b\u0002\n\u0002\f\u0002\'\t\u0002\u0001\u0003\u0001\u0003\u0001"+
+		"\u0003\u0005\u0003,\b\u0003\n\u0003\f\u0003/\t\u0003\u0001\u0004\u0001"+
+		"\u0004\u0001\u0004\u0001\u0004\u0001\u0005\u0001\u0005\u0001\u0006\u0001"+
+		"\u0006\u0003\u00069\b\u0006\u0001\u0007\u0001\u0007\u0001\u0007\u0005"+
+		"\u0007>\b\u0007\n\u0007\f\u0007A\t\u0007\u0001\b\u0001\b\u0001\b\u0005"+
+		"\bF\b\b\n\b\f\bI\t\b\u0001\t\u0001\t\u0001\t\u0000\u0000\n\u0000\u0002"+
+		"\u0004\u0006\b\n\f\u000e\u0010\u0012\u0000\u0002\u0002\u0000\u000b\u000b"+
+		"\u0014\u0014\u0001\u0000\u0001\u0005J\u0000\u0014\u0001\u0000\u0000\u0000"+
+		"\u0002\u001e\u0001\u0000\u0000\u0000\u0004 \u0001\u0000\u0000\u0000\u0006"+
+		"(\u0001\u0000\u0000\u0000\b0\u0001\u0000\u0000\u0000\n4\u0001\u0000\u0000"+
+		"\u0000\f8\u0001\u0000\u0000\u0000\u000e:\u0001\u0000\u0000\u0000\u0010"+
+		"B\u0001\u0000\u0000\u0000\u0012J\u0001\u0000\u0000\u0000\u0014\u0015\u0005"+
+		"\u0012\u0000\u0000\u0015\u001c\u0003\u0002\u0001\u0000\u0016\u0019\u0005"+
+		"\u0006\u0000\u0000\u0017\u001a\u0003\u0006\u0003\u0000\u0018\u001a\u0003"+
+		"\n\u0005\u0000\u0019\u0017\u0001\u0000\u0000\u0000\u0019\u0018\u0001\u0000"+
+		"\u0000\u0000\u0019\u001a\u0001\u0000\u0000\u0000\u001a\u001b\u0001\u0000"+
+		"\u0000\u0000\u001b\u001d\u0005\u0007\u0000\u0000\u001c\u0016\u0001\u0000"+
+		"\u0000\u0000\u001c\u001d\u0001\u0000\u0000\u0000\u001d\u0001\u0001\u0000"+
+		"\u0000\u0000\u001e\u001f\u0003\u0004\u0002\u0000\u001f\u0003\u0001\u0000"+
+		"\u0000\u0000 %\u0005\u0016\u0000\u0000!\"\u0007\u0000\u0000\u0000\"$\u0005"+
+		"\u0016\u0000\u0000#!\u0001\u0000\u0000\u0000$\'\u0001\u0000\u0000\u0000"+
+		"%#\u0001\u0000\u0000\u0000%&\u0001\u0000\u0000\u0000&\u0005\u0001\u0000"+
+		"\u0000\u0000\'%\u0001\u0000\u0000\u0000(-\u0003\b\u0004\u0000)*\u0005"+
+		"\n\u0000\u0000*,\u0003\b\u0004\u0000+)\u0001\u0000\u0000\u0000,/\u0001"+
+		"\u0000\u0000\u0000-+\u0001\u0000\u0000\u0000-.\u0001\u0000\u0000\u0000"+
+		".\u0007\u0001\u0000\u0000\u0000/-\u0001\u0000\u0000\u000001\u0005\u0016"+
+		"\u0000\u000012\u0005\f\u0000\u000023\u0003\n\u0005\u00003\t\u0001\u0000"+
+		"\u0000\u000045\u0003\f\u0006\u00005\u000b\u0001\u0000\u0000\u000069\u0003"+
+		"\u0012\t\u000079\u0003\u000e\u0007\u000086\u0001\u0000\u0000\u000087\u0001"+
+		"\u0000\u0000\u00009\r\u0001\u0000\u0000\u0000:?\u0003\u0010\b\u0000;<"+
+		"\u0005\b\u0000\u0000<>\u0005\t\u0000\u0000=;\u0001\u0000\u0000\u0000>"+
+		"A\u0001\u0000\u0000\u0000?=\u0001\u0000\u0000\u0000?@\u0001\u0000\u0000"+
+		"\u0000@\u000f\u0001\u0000\u0000\u0000A?\u0001\u0000\u0000\u0000BG\u0005"+
+		"\u0016\u0000\u0000CD\u0007\u0000\u0000\u0000DF\u0005\u0016\u0000\u0000"+
+		"EC\u0001\u0000\u0000\u0000FI\u0001\u0000\u0000\u0000GE\u0001\u0000\u0000"+
+		"\u0000GH\u0001\u0000\u0000\u0000H\u0011\u0001\u0000\u0000\u0000IG\u0001"+
+		"\u0000\u0000\u0000JK\u0007\u0001\u0000\u0000K\u0013\u0001\u0000\u0000"+
+		"\u0000\u0007\u0019\u001c%-8?G";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

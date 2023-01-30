@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-json/src/main/antlr/JSON5.g4 by ANTLR 4.9.3
+// Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.json.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
 public class JSON5Parser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -48,7 +48,7 @@ public class JSON5Parser extends Parser {
 	private static String[] makeLiteralNames() {
 		return new String[] {
 			null, "'{'", "','", "'}'", "':'", "'['", "']'", null, null, null, null, 
-			null, null, null, null, null, "'\uFEFF'"
+			null, null, null, null, null, "'\\uFEFF'"
 		};
 	}
 	private static final String[] _LITERAL_NAMES = makeLiteralNames();
@@ -94,7 +94,7 @@ public class JSON5Parser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "JSON5.g4"; }
+	public String getGrammarFileName() { return "java-escape"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -110,6 +110,7 @@ public class JSON5Parser extends Parser {
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class Json5Context extends ParserRuleContext {
 		public TerminalNode EOF() { return getToken(JSON5Parser.EOF, 0); }
 		public ValueContext value() {
@@ -144,7 +145,7 @@ public class JSON5Parser extends Parser {
 			setState(15);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
-			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << T__0) | (1L << T__4) | (1L << LITERAL) | (1L << STRING) | (1L << NUMBER) | (1L << NUMERIC_LITERAL) | (1L << SYMBOL))) != 0)) {
+			if (((_la) & ~0x3f) == 0 && ((1L << _la) & 15906L) != 0) {
 				{
 				setState(14);
 				value();
@@ -166,6 +167,7 @@ public class JSON5Parser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ObjContext extends ParserRuleContext {
 		public List<MemberContext> member() {
 			return getRuleContexts(MemberContext.class);
@@ -262,6 +264,7 @@ public class JSON5Parser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class MemberContext extends ParserRuleContext {
 		public KeyContext key() {
 			return getRuleContext(KeyContext.class,0);
@@ -313,6 +316,7 @@ public class JSON5Parser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class KeyContext extends ParserRuleContext {
 		public TerminalNode STRING() { return getToken(JSON5Parser.STRING, 0); }
 		public TerminalNode IDENTIFIER() { return getToken(JSON5Parser.IDENTIFIER, 0); }
@@ -365,6 +369,7 @@ public class JSON5Parser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ValueContext extends ParserRuleContext {
 		public TerminalNode STRING() { return getToken(JSON5Parser.STRING, 0); }
 		public NumberContext number() {
@@ -455,6 +460,7 @@ public class JSON5Parser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ArrContext extends ParserRuleContext {
 		public List<ValueContext> value() {
 			return getRuleContexts(ValueContext.class);
@@ -551,6 +557,7 @@ public class JSON5Parser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class NumberContext extends ParserRuleContext {
 		public TerminalNode NUMERIC_LITERAL() { return getToken(JSON5Parser.NUMERIC_LITERAL, 0); }
 		public TerminalNode NUMBER() { return getToken(JSON5Parser.NUMBER, 0); }
@@ -615,26 +622,52 @@ public class JSON5Parser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\22L\4\2\t\2\4\3\t"+
-		"\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\3\2\5\2\22\n\2\3\2\3\2\3\3"+
-		"\3\3\3\3\3\3\7\3\32\n\3\f\3\16\3\35\13\3\3\3\5\3 \n\3\3\3\3\3\3\3\3\3"+
-		"\5\3&\n\3\3\4\3\4\3\4\3\4\3\5\3\5\3\6\3\6\3\6\3\6\3\6\5\6\63\n\6\3\7\3"+
-		"\7\3\7\3\7\7\79\n\7\f\7\16\7<\13\7\3\7\5\7?\n\7\3\7\3\7\3\7\3\7\5\7E\n"+
-		"\7\3\b\5\bH\n\b\3\b\3\b\3\b\2\2\t\2\4\6\b\n\f\16\2\4\4\2\f\f\20\20\3\2"+
-		"\r\16\2P\2\21\3\2\2\2\4%\3\2\2\2\6\'\3\2\2\2\b+\3\2\2\2\n\62\3\2\2\2\f"+
-		"D\3\2\2\2\16G\3\2\2\2\20\22\5\n\6\2\21\20\3\2\2\2\21\22\3\2\2\2\22\23"+
-		"\3\2\2\2\23\24\7\2\2\3\24\3\3\2\2\2\25\26\7\3\2\2\26\33\5\6\4\2\27\30"+
-		"\7\4\2\2\30\32\5\6\4\2\31\27\3\2\2\2\32\35\3\2\2\2\33\31\3\2\2\2\33\34"+
-		"\3\2\2\2\34\37\3\2\2\2\35\33\3\2\2\2\36 \7\4\2\2\37\36\3\2\2\2\37 \3\2"+
-		"\2\2 !\3\2\2\2!\"\7\5\2\2\"&\3\2\2\2#$\7\3\2\2$&\7\5\2\2%\25\3\2\2\2%"+
-		"#\3\2\2\2&\5\3\2\2\2\'(\5\b\5\2()\7\6\2\2)*\5\n\6\2*\7\3\2\2\2+,\t\2\2"+
-		"\2,\t\3\2\2\2-\63\7\f\2\2.\63\5\16\b\2/\63\5\4\3\2\60\63\5\f\7\2\61\63"+
-		"\7\13\2\2\62-\3\2\2\2\62.\3\2\2\2\62/\3\2\2\2\62\60\3\2\2\2\62\61\3\2"+
-		"\2\2\63\13\3\2\2\2\64\65\7\7\2\2\65:\5\n\6\2\66\67\7\4\2\2\679\5\n\6\2"+
-		"8\66\3\2\2\29<\3\2\2\2:8\3\2\2\2:;\3\2\2\2;>\3\2\2\2<:\3\2\2\2=?\7\4\2"+
-		"\2>=\3\2\2\2>?\3\2\2\2?@\3\2\2\2@A\7\b\2\2AE\3\2\2\2BC\7\7\2\2CE\7\b\2"+
-		"\2D\64\3\2\2\2DB\3\2\2\2E\r\3\2\2\2FH\7\17\2\2GF\3\2\2\2GH\3\2\2\2HI\3"+
-		"\2\2\2IJ\t\3\2\2J\17\3\2\2\2\13\21\33\37%\62:>DG";
+		"\u0004\u0001\u0010J\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
+		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0001\u0000\u0003\u0000\u0010"+
+		"\b\u0000\u0001\u0000\u0001\u0000\u0001\u0001\u0001\u0001\u0001\u0001\u0001"+
+		"\u0001\u0005\u0001\u0018\b\u0001\n\u0001\f\u0001\u001b\t\u0001\u0001\u0001"+
+		"\u0003\u0001\u001e\b\u0001\u0001\u0001\u0001\u0001\u0001\u0001\u0001\u0001"+
+		"\u0003\u0001$\b\u0001\u0001\u0002\u0001\u0002\u0001\u0002\u0001\u0002"+
+		"\u0001\u0003\u0001\u0003\u0001\u0004\u0001\u0004\u0001\u0004\u0001\u0004"+
+		"\u0001\u0004\u0003\u00041\b\u0004\u0001\u0005\u0001\u0005\u0001\u0005"+
+		"\u0001\u0005\u0005\u00057\b\u0005\n\u0005\f\u0005:\t\u0005\u0001\u0005"+
+		"\u0003\u0005=\b\u0005\u0001\u0005\u0001\u0005\u0001\u0005\u0001\u0005"+
+		"\u0003\u0005C\b\u0005\u0001\u0006\u0003\u0006F\b\u0006\u0001\u0006\u0001"+
+		"\u0006\u0001\u0006\u0000\u0000\u0007\u0000\u0002\u0004\u0006\b\n\f\u0000"+
+		"\u0002\u0002\u0000\n\n\u000e\u000e\u0001\u0000\u000b\fN\u0000\u000f\u0001"+
+		"\u0000\u0000\u0000\u0002#\u0001\u0000\u0000\u0000\u0004%\u0001\u0000\u0000"+
+		"\u0000\u0006)\u0001\u0000\u0000\u0000\b0\u0001\u0000\u0000\u0000\nB\u0001"+
+		"\u0000\u0000\u0000\fE\u0001\u0000\u0000\u0000\u000e\u0010\u0003\b\u0004"+
+		"\u0000\u000f\u000e\u0001\u0000\u0000\u0000\u000f\u0010\u0001\u0000\u0000"+
+		"\u0000\u0010\u0011\u0001\u0000\u0000\u0000\u0011\u0012\u0005\u0000\u0000"+
+		"\u0001\u0012\u0001\u0001\u0000\u0000\u0000\u0013\u0014\u0005\u0001\u0000"+
+		"\u0000\u0014\u0019\u0003\u0004\u0002\u0000\u0015\u0016\u0005\u0002\u0000"+
+		"\u0000\u0016\u0018\u0003\u0004\u0002\u0000\u0017\u0015\u0001\u0000\u0000"+
+		"\u0000\u0018\u001b\u0001\u0000\u0000\u0000\u0019\u0017\u0001\u0000\u0000"+
+		"\u0000\u0019\u001a\u0001\u0000\u0000\u0000\u001a\u001d\u0001\u0000\u0000"+
+		"\u0000\u001b\u0019\u0001\u0000\u0000\u0000\u001c\u001e\u0005\u0002\u0000"+
+		"\u0000\u001d\u001c\u0001\u0000\u0000\u0000\u001d\u001e\u0001\u0000\u0000"+
+		"\u0000\u001e\u001f\u0001\u0000\u0000\u0000\u001f \u0005\u0003\u0000\u0000"+
+		" $\u0001\u0000\u0000\u0000!\"\u0005\u0001\u0000\u0000\"$\u0005\u0003\u0000"+
+		"\u0000#\u0013\u0001\u0000\u0000\u0000#!\u0001\u0000\u0000\u0000$\u0003"+
+		"\u0001\u0000\u0000\u0000%&\u0003\u0006\u0003\u0000&\'\u0005\u0004\u0000"+
+		"\u0000\'(\u0003\b\u0004\u0000(\u0005\u0001\u0000\u0000\u0000)*\u0007\u0000"+
+		"\u0000\u0000*\u0007\u0001\u0000\u0000\u0000+1\u0005\n\u0000\u0000,1\u0003"+
+		"\f\u0006\u0000-1\u0003\u0002\u0001\u0000.1\u0003\n\u0005\u0000/1\u0005"+
+		"\t\u0000\u00000+\u0001\u0000\u0000\u00000,\u0001\u0000\u0000\u00000-\u0001"+
+		"\u0000\u0000\u00000.\u0001\u0000\u0000\u00000/\u0001\u0000\u0000\u0000"+
+		"1\t\u0001\u0000\u0000\u000023\u0005\u0005\u0000\u000038\u0003\b\u0004"+
+		"\u000045\u0005\u0002\u0000\u000057\u0003\b\u0004\u000064\u0001\u0000\u0000"+
+		"\u00007:\u0001\u0000\u0000\u000086\u0001\u0000\u0000\u000089\u0001\u0000"+
+		"\u0000\u00009<\u0001\u0000\u0000\u0000:8\u0001\u0000\u0000\u0000;=\u0005"+
+		"\u0002\u0000\u0000<;\u0001\u0000\u0000\u0000<=\u0001\u0000\u0000\u0000"+
+		"=>\u0001\u0000\u0000\u0000>?\u0005\u0006\u0000\u0000?C\u0001\u0000\u0000"+
+		"\u0000@A\u0005\u0005\u0000\u0000AC\u0005\u0006\u0000\u0000B2\u0001\u0000"+
+		"\u0000\u0000B@\u0001\u0000\u0000\u0000C\u000b\u0001\u0000\u0000\u0000"+
+		"DF\u0005\r\u0000\u0000ED\u0001\u0000\u0000\u0000EF\u0001\u0000\u0000\u0000"+
+		"FG\u0001\u0000\u0000\u0000GH\u0007\u0001\u0000\u0000H\r\u0001\u0000\u0000"+
+		"\u0000\t\u000f\u0019\u001d#08<BE";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {

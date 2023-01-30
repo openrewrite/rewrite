@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Generated from /Users/yoshi/Development/Repos/openrewrite/rewrite/rewrite-maven/src/main/antlr/VersionRangeParser.g4 by ANTLR 4.9.3
+// Generated from java-escape by ANTLR 4.11.1
 package org.openrewrite.maven.internal.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -24,9 +24,9 @@ import java.util.List;
 import java.util.Iterator;
 import java.util.ArrayList;
 
-@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
+@SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast", "CheckReturnValue"})
 public class VersionRangeParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.9.3", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.11.1", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -93,7 +93,7 @@ public class VersionRangeParser extends Parser {
 	}
 
 	@Override
-	public String getGrammarFileName() { return "VersionRangeParser.g4"; }
+	public String getGrammarFileName() { return "java-escape"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -109,6 +109,7 @@ public class VersionRangeParser extends Parser {
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class VersionRequirementContext extends ParserRuleContext {
 		public List<RangeContext> range() {
 			return getRuleContexts(RangeContext.class);
@@ -177,6 +178,7 @@ public class VersionRangeParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class RangeContext extends ParserRuleContext {
 		public BoundsContext bounds() {
 			return getRuleContext(BoundsContext.class,0);
@@ -246,6 +248,7 @@ public class VersionRangeParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class BoundsContext extends ParserRuleContext {
 		public BoundedLowerContext boundedLower() {
 			return getRuleContext(BoundedLowerContext.class,0);
@@ -316,6 +319,7 @@ public class VersionRangeParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class ExactlyContext extends ParserRuleContext {
 		public TerminalNode Version() { return getToken(VersionRangeParser.Version, 0); }
 		public ExactlyContext(ParserRuleContext parent, int invokingState) {
@@ -358,6 +362,7 @@ public class VersionRangeParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class BoundedLowerContext extends ParserRuleContext {
 		public List<TerminalNode> Version() { return getTokens(VersionRangeParser.Version); }
 		public TerminalNode Version(int i) {
@@ -419,6 +424,7 @@ public class VersionRangeParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class UnboundedLowerContext extends ParserRuleContext {
 		public TerminalNode COMMA() { return getToken(VersionRangeParser.COMMA, 0); }
 		public TerminalNode Version() { return getToken(VersionRangeParser.Version, 0); }
@@ -475,6 +481,7 @@ public class VersionRangeParser extends Parser {
 		return _localctx;
 	}
 
+	@SuppressWarnings("CheckReturnValue")
 	public static class VersionContext extends ParserRuleContext {
 		public TerminalNode Version() { return getToken(VersionRangeParser.Version, 0); }
 		public TerminalNode PROPERTY_OPEN() { return getToken(VersionRangeParser.PROPERTY_OPEN, 0); }
@@ -541,20 +548,37 @@ public class VersionRangeParser extends Parser {
 	}
 
 	public static final String _serializedATN =
-		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3\13\63\4\2\t\2\4\3"+
-		"\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\3\2\3\2\3\2\7\2\24\n\2\f"+
-		"\2\16\2\27\13\2\3\3\3\3\3\3\3\3\3\4\3\4\3\4\5\4 \n\4\3\5\3\5\3\6\3\6\3"+
-		"\6\5\6\'\n\6\3\7\3\7\5\7+\n\7\3\b\3\b\3\b\3\b\5\b\61\n\b\3\b\2\2\t\2\4"+
-		"\6\b\n\f\16\2\4\4\2\6\6\b\b\4\2\7\7\t\t\2\61\2\20\3\2\2\2\4\30\3\2\2\2"+
-		"\6\37\3\2\2\2\b!\3\2\2\2\n#\3\2\2\2\f(\3\2\2\2\16\60\3\2\2\2\20\25\5\4"+
-		"\3\2\21\22\7\3\2\2\22\24\5\4\3\2\23\21\3\2\2\2\24\27\3\2\2\2\25\23\3\2"+
-		"\2\2\25\26\3\2\2\2\26\3\3\2\2\2\27\25\3\2\2\2\30\31\t\2\2\2\31\32\5\6"+
-		"\4\2\32\33\t\3\2\2\33\5\3\2\2\2\34 \5\n\6\2\35 \5\f\7\2\36 \5\b\5\2\37"+
-		"\34\3\2\2\2\37\35\3\2\2\2\37\36\3\2\2\2 \7\3\2\2\2!\"\7\n\2\2\"\t\3\2"+
-		"\2\2#$\7\n\2\2$&\7\3\2\2%\'\7\n\2\2&%\3\2\2\2&\'\3\2\2\2\'\13\3\2\2\2"+
-		"(*\7\3\2\2)+\7\n\2\2*)\3\2\2\2*+\3\2\2\2+\r\3\2\2\2,\61\7\n\2\2-.\7\4"+
-		"\2\2./\7\n\2\2/\61\7\5\2\2\60,\3\2\2\2\60-\3\2\2\2\61\17\3\2\2\2\7\25"+
-		"\37&*\60";
+		"\u0004\u0001\t1\u0002\u0000\u0007\u0000\u0002\u0001\u0007\u0001\u0002"+
+		"\u0002\u0007\u0002\u0002\u0003\u0007\u0003\u0002\u0004\u0007\u0004\u0002"+
+		"\u0005\u0007\u0005\u0002\u0006\u0007\u0006\u0001\u0000\u0001\u0000\u0001"+
+		"\u0000\u0005\u0000\u0012\b\u0000\n\u0000\f\u0000\u0015\t\u0000\u0001\u0001"+
+		"\u0001\u0001\u0001\u0001\u0001\u0001\u0001\u0002\u0001\u0002\u0001\u0002"+
+		"\u0003\u0002\u001e\b\u0002\u0001\u0003\u0001\u0003\u0001\u0004\u0001\u0004"+
+		"\u0001\u0004\u0003\u0004%\b\u0004\u0001\u0005\u0001\u0005\u0003\u0005"+
+		")\b\u0005\u0001\u0006\u0001\u0006\u0001\u0006\u0001\u0006\u0003\u0006"+
+		"/\b\u0006\u0001\u0006\u0000\u0000\u0007\u0000\u0002\u0004\u0006\b\n\f"+
+		"\u0000\u0002\u0002\u0000\u0004\u0004\u0006\u0006\u0002\u0000\u0005\u0005"+
+		"\u0007\u0007/\u0000\u000e\u0001\u0000\u0000\u0000\u0002\u0016\u0001\u0000"+
+		"\u0000\u0000\u0004\u001d\u0001\u0000\u0000\u0000\u0006\u001f\u0001\u0000"+
+		"\u0000\u0000\b!\u0001\u0000\u0000\u0000\n&\u0001\u0000\u0000\u0000\f."+
+		"\u0001\u0000\u0000\u0000\u000e\u0013\u0003\u0002\u0001\u0000\u000f\u0010"+
+		"\u0005\u0001\u0000\u0000\u0010\u0012\u0003\u0002\u0001\u0000\u0011\u000f"+
+		"\u0001\u0000\u0000\u0000\u0012\u0015\u0001\u0000\u0000\u0000\u0013\u0011"+
+		"\u0001\u0000\u0000\u0000\u0013\u0014\u0001\u0000\u0000\u0000\u0014\u0001"+
+		"\u0001\u0000\u0000\u0000\u0015\u0013\u0001\u0000\u0000\u0000\u0016\u0017"+
+		"\u0007\u0000\u0000\u0000\u0017\u0018\u0003\u0004\u0002\u0000\u0018\u0019"+
+		"\u0007\u0001\u0000\u0000\u0019\u0003\u0001\u0000\u0000\u0000\u001a\u001e"+
+		"\u0003\b\u0004\u0000\u001b\u001e\u0003\n\u0005\u0000\u001c\u001e\u0003"+
+		"\u0006\u0003\u0000\u001d\u001a\u0001\u0000\u0000\u0000\u001d\u001b\u0001"+
+		"\u0000\u0000\u0000\u001d\u001c\u0001\u0000\u0000\u0000\u001e\u0005\u0001"+
+		"\u0000\u0000\u0000\u001f \u0005\b\u0000\u0000 \u0007\u0001\u0000\u0000"+
+		"\u0000!\"\u0005\b\u0000\u0000\"$\u0005\u0001\u0000\u0000#%\u0005\b\u0000"+
+		"\u0000$#\u0001\u0000\u0000\u0000$%\u0001\u0000\u0000\u0000%\t\u0001\u0000"+
+		"\u0000\u0000&(\u0005\u0001\u0000\u0000\')\u0005\b\u0000\u0000(\'\u0001"+
+		"\u0000\u0000\u0000()\u0001\u0000\u0000\u0000)\u000b\u0001\u0000\u0000"+
+		"\u0000*/\u0005\b\u0000\u0000+,\u0005\u0002\u0000\u0000,-\u0005\b\u0000"+
+		"\u0000-/\u0005\u0003\u0000\u0000.*\u0001\u0000\u0000\u0000.+\u0001\u0000"+
+		"\u0000\u0000/\r\u0001\u0000\u0000\u0000\u0005\u0013\u001d$(.";
 	public static final ATN _ATN =
 		new ATNDeserializer().deserialize(_serializedATN.toCharArray());
 	static {
