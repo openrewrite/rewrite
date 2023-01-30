@@ -1712,30 +1712,30 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(simpleFunction.getAnnotations(), simpleFunction.getName().asString());
 
+        J.TypeParameters typeParameters = simpleFunction.getTypeParameters().isEmpty() ? null :
+                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
+                        emptyList(),
+                        convertAll(simpleFunction.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
+
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (simpleFunction.getReceiverTypeRef() != null) {
             // Infix functions are de-sugared during the backend phase of the compiler.
             // The de-sugaring process moves the infix receiver to the first position of the method declaration.
             // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
-            J.Identifier receiver = (J.Identifier) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
+            Expression receiver = (Expression) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
             infixReceiver = JRightPadded.build(new J.VariableDeclarations.NamedVariable(
                     randomId(),
                     EMPTY,
-                    Markers.EMPTY,
-                    receiver,
+                    Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "<receiverType>", null, null),
                     emptyList(),
-                    null,
+                    padLeft(EMPTY, receiver),
                     null))
                     .withAfter(sourceBefore("."));
         }
 
-        J.TypeParameters typeParameters = simpleFunction.getTypeParameters().isEmpty() ? null :
-                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
-                emptyList(),
-                convertAll(simpleFunction.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
-
-        String methodName = "";
+        String methodName;
         if ("<no name provided>".equals(simpleFunction.getName().asString())) {
             // Extract name from source.
             throw new IllegalStateException("Unresolved function.");

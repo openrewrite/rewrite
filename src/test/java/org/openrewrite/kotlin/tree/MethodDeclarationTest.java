@@ -182,4 +182,13 @@ public class MethodDeclarationTest implements RewriteTest {
           """)
         );
     }
+
+    @Test
+    void typeParameterAndTypeReceiver() {
+        rewriteRun(
+          kotlin("""
+              fun <T: Any> Array<Int>.method(t: T) = Unit
+          """)
+        );
+    }
 }

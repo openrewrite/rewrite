@@ -394,14 +394,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitModifier(m, p);
             }
 
-            boolean isInfix = method.getMarkers().findFirst(ReceiverType.class).isPresent();
-            if (isInfix) {
-                J.VariableDeclarations infixReceiver = (J.VariableDeclarations) method.getParameters().get(0);
-                JRightPadded<J.VariableDeclarations.NamedVariable> receiver = infixReceiver.getPadding().getVariables().get(0);
-                visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, p);
-                p.append(".");
-            }
-
             J.TypeParameters typeParameters = method.getAnnotations().getTypeParameters();
             if (typeParameters != null) {
                 visit(typeParameters.getAnnotations(), p);
@@ -412,12 +404,19 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append(">");
             }
 
+            boolean hasReceiverType = method.getMarkers().findFirst(ReceiverType.class).isPresent();
+            if (hasReceiverType) {
+                J.VariableDeclarations infixReceiver = (J.VariableDeclarations) method.getParameters().get(0);
+                JRightPadded<J.VariableDeclarations.NamedVariable> receiver = infixReceiver.getPadding().getVariables().get(0);
+                visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, ".", p);
+            }
+
             visit(method.getName(), p);
 
             JContainer<Statement> params = method.getPadding().getParameters();
             beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
             p.append("(");
-            int i = isInfix ? 1 : 0;
+            int i = hasReceiverType ? 1 : 0;
             List<JRightPadded<Statement>> elements = params.getPadding().getElements();
             for (;i < elements.size(); i++) {
                 JRightPadded<Statement> element = elements.get(i);
@@ -434,12 +433,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(":");
                 }
                 visit(method.getReturnTypeExpression(), p);
-
-                IsNullable isNullable = method.getReturnTypeExpression().getMarkers().findFirst(IsNullable.class).orElse(null);
-                if (isNullable != null) {
-                    KotlinPrinter.this.visitSpace(isNullable.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p);
-                    p.append("?");
-                }
             }
             visit(method.getBody(), p);
             afterSyntax(method, p);
@@ -512,6 +505,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(newClass.getBody(), p);
             afterSyntax(newClass, p);
             return newClass;
+        }
+
+        @Override
+        public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
+            beforeSyntax(type, Space.Location.PARAMETERIZED_TYPE_PREFIX, p);
+            visit(type.getClazz(), p);
+            visitContainer("<", type.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            IsNullable isNullable = type.getMarkers().findFirst(IsNullable.class).orElse(null);
+            if (isNullable != null) {
+                KotlinPrinter.this.visitSpace(isNullable.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
+                p.append("?");
+            }
+            afterSyntax(type, p);
+            return type;
         }
 
         @Override
@@ -619,6 +626,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);
             afterSyntax(multiVariable, p);
             return multiVariable;
+        }
+
+        @Override
+        public J visitVariable(J.VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
+            beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
+            boolean isTypeReceiver = variable.getMarkers().findFirst(ReceiverType.class).isPresent();
+            if (!isTypeReceiver) {
+                visit(variable.getName(), p);
+            }
+            visitLeftPadded(isTypeReceiver ? "" : "=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+            afterSyntax(variable, p);
+            return variable;
         }
 
         protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
