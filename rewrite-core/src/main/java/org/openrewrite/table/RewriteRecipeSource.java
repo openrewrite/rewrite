@@ -25,8 +25,7 @@ import org.openrewrite.Recipe;
 public class RewriteRecipeSource extends DataTable<RewriteRecipeSource.Row> {
 
     public RewriteRecipeSource(Recipe recipe) {
-        super(recipe, Row.class,
-                RewriteRecipeSource.class.getName(),
+        super(recipe,
                 "Rewrite recipe source code",
                 "This table contains the source code of recipes along with their metadata " +
                 "for use in an experiment fine-tuning large language models to produce more recipes."

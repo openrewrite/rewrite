@@ -23,8 +23,7 @@ import org.openrewrite.Recipe;
 public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
 
     public SourcesFileResults(Recipe recipe) {
-        super(recipe, Row.class, SourcesFileResults.class.getName(),
-                "Source files that had results",
+        super(recipe, "Source files that had results",
                 "Source files that were modified by the recipe run.");
     }
 

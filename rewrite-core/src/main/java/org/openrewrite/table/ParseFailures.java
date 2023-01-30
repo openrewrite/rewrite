@@ -24,7 +24,7 @@ import org.openrewrite.Recipe;
 @JsonIgnoreType
 public class ParseFailures extends DataTable<ParseFailures.Row> {
     public ParseFailures(Recipe recipe) {
-        super(recipe, Row.class, ParseFailures.class.getName(),
+        super(recipe,
                 "Parser failures",
                 "A list of files that failed to parse along with stack traces of their failures.");
     }

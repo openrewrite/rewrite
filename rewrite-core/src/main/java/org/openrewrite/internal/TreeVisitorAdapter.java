@@ -37,11 +37,13 @@ public class TreeVisitorAdapter {
         classLoaders.remove(parentClassLoader);
     }
 
-    public static <Adapted> Adapted adapt(TreeVisitor<?, ?> delegate, Class<Adapted> adaptTo) {
+    @SafeVarargs
+    public static <T extends Tree, Adapted> Adapted adapt(TreeVisitor<T, ?> delegate, Class<Adapted> adaptTo,
+                                                          TreeVisitor<? extends T, ?>... mixins) {
         Timer.Sample timer = Timer.start();
 
         String adaptedName = delegate.getClass().getName().trim().replace('$', '_') +
-                "_" + adaptTo.getSimpleName();
+                             "_" + adaptTo.getSimpleName();
 
         //noinspection rawtypes
         Class<? extends TreeVisitor> delegateType = adapterDelegateType(delegate);
@@ -53,7 +55,7 @@ public class TreeVisitorAdapter {
 
         if (!cl.hasClass(adaptedName)) {
             synchronized (classCreationLock) {
-                if(!cl.hasClass(adaptedName)) {
+                if (!cl.hasClass(adaptedName)) {
                     try (ClassCreator creator = ClassCreator.builder()
                             .classOutput(cl)
                             .className(adaptedName)
@@ -188,6 +190,6 @@ public class TreeVisitorAdapter {
             }
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                "type hierarhcy of visitor " + delegate.getClass().getName());
+                                           "type hierarchy of visitor " + delegate.getClass().getName());
     }
 }

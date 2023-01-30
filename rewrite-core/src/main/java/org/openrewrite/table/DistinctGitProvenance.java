@@ -26,8 +26,7 @@ import org.openrewrite.marker.GitProvenance;
 public class DistinctGitProvenance extends DataTable<DistinctGitProvenance.Row> {
 
     public DistinctGitProvenance(Recipe recipe) {
-        super(recipe, Row.class,
-                DistinctGitProvenance.class.getName(),
+        super(recipe,
                 "Distinct Git Provenance",
                 "List out the contents of each unique `GitProvenance` marker in the set of source files. " +
                 "When everything is working correctly, exactly one such marker should be printed as all source files are " +

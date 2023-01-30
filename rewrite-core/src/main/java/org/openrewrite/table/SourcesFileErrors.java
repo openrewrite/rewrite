@@ -23,8 +23,7 @@ import org.openrewrite.Recipe;
 public class SourcesFileErrors extends DataTable<SourcesFileErrors.Row> {
 
     public SourcesFileErrors(Recipe recipe) {
-        super(recipe, Row.class, SourcesFileErrors.class.getName(),
-                "Source files that errored on a recipe",
+        super(recipe, "Source files that errored on a recipe",
                 "The details of all errors produced by a recipe run.");
     }
 

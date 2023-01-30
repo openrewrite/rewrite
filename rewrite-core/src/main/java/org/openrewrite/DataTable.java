@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -44,8 +45,20 @@ public class DataTable<Row> {
     public DataTable(Recipe recipe, Class<Row> type, String name,
                      @Language("markdown") String displayName,
                      @Language("markdown") String description) {
-        this.name = name;
         this.type = type;
+        this.name = name;
+        this.displayName = displayName;
+        this.description = description;
+        recipe.addDataTable(this);
+    }
+
+    public DataTable(Recipe recipe,
+                     @Language("markdown") String displayName,
+                     @Language("markdown") String description) {
+        //noinspection unchecked
+        this.type = (Class<Row>) ((ParameterizedType) getClass().getGenericSuperclass())
+                .getActualTypeArguments()[0];
+        this.name = getClass().getName();
         this.displayName = displayName;
         this.description = description;
         recipe.addDataTable(this);

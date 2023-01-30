@@ -25,8 +25,9 @@ import org.openrewrite.Recipe;
 public class MethodCalls extends DataTable<MethodCalls.Row> {
 
     public MethodCalls(Recipe recipe) {
-        super(recipe, Row.class, MethodCalls.class.getName(),
-                "Method calls", "The text of matching method invocations.");
+        super(recipe,
+                "Method calls",
+                "The text of matching method invocations.");
     }
 
     @Value

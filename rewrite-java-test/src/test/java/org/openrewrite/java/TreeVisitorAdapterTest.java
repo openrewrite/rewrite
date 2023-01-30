@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
@@ -24,17 +26,51 @@ import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.java.tree.J;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-public class TreeVisitorAdapterTest {
-    @Test
-    @Disabled
-    void interceptor() {
-        //noinspection unchecked
-        JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(new Adaptable(), JavaVisitor.class);
+import static org.assertj.core.api.Assertions.assertThat;
 
+public class TreeVisitorAdapterTest {
+
+    @Test
+    void adapter() {
+        AtomicInteger n = new AtomicInteger();
+        //noinspection unchecked
+        JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(new Adaptable(n), JavaVisitor.class);
         J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}").get(0);
         jv.visit(cu, 0);
+        assertThat(n.get()).isEqualTo(4);
+    }
+
+    @Test
+    @Disabled
+    void mixins() {
+        AtomicInteger n = new AtomicInteger();
+        //noinspection unchecked
+        JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(
+          new Adaptable(n),
+          JavaVisitor.class,
+          new JavaIsoVisitor<Integer>() {
+              @Override
+              public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
+                  n.incrementAndGet();
+                  return identifier;
+              }
+
+              @Override
+              public J preVisit(J tree, Integer integer) {
+                  n.incrementAndGet();
+                  return tree;
+              }
+          }
+        );
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}").get(0);
+        jv.visit(cu, 0);
+        assertThat(n.get()).isEqualTo(
+          /* Adaptable preVisit */ 4 +
+            /* mixin preVisit */ 4 +
+            /* mixin visitIdentifier */ 1);
     }
 
     @Test
@@ -52,16 +88,20 @@ public class TreeVisitorAdapterTest {
 
         //noinspection unchecked
         JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(
-                new FindRecipeRunException(e.get()), JavaVisitor.class);
+          new FindRecipeRunException(e.get()), JavaVisitor.class);
 
         jv.visitNonNull(cu, 0);
     }
 }
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 class Adaptable extends TreeVisitor<Tree, Integer> {
+    AtomicInteger visitCount;
+
     @Override
     public Tree preVisit(Tree tree, Integer p) {
-        System.out.println("pre-visited " + tree);
+        visitCount.incrementAndGet();
         return super.preVisit(tree, p);
     }
 }
