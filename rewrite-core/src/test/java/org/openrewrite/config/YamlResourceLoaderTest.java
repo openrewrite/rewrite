@@ -17,7 +17,6 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
-
 import java.io.ByteArrayInputStream;
 
 import static org.openrewrite.test.SourceSpecs.text;
@@ -87,6 +86,42 @@ public class YamlResourceLoaderTest implements RewriteTest {
             "Hello, world!",
             "Hello!",
             spec -> spec.path("goodbye.txt")
+          )
+        );
+    }
+
+    @Test
+    void bothAnySourceAndSingleSourceApplicability() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new ByteArrayInputStream(
+              //language=yml
+              """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.ChangeTextToHello
+                displayName: Change text to hello
+                applicability:
+                    anySource:
+                        - org.openrewrite.FindSourceFiles:
+                            filePattern: '**/day.txt'
+                    singleSource:
+                        - org.openrewrite.FindSourceFiles:
+                            filePattern: '**/night.txt'
+                recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello!
+                """.getBytes()
+            ),
+            "test.ChangeTextToHello"
+          ),
+          text(
+            "Good morning!",
+            spec -> spec.path("day.txt")
+          ),
+          text(
+            "Good night!",
+            "Hello!",
+            spec -> spec.path("night.txt")
           )
         );
     }
