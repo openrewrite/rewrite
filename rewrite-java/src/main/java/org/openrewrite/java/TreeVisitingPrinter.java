@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,10 @@
  */
 package org.openrewrite.java;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Spliterators;
+import java.util.*;
 import java.util.stream.Collectors;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Tree;
+
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
@@ -50,6 +45,7 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     private static final String UNVISITED_PREFIX = "#";
     private static final char BRANCH_CONTINUE_CHAR = '|';
     private static final char BRANCH_END_CHAR = '\\';
+    private static final int CONTENT_MAX_LENGTH = 120;
 
     private List<Object> lastCursorStack;
     private final List<StringBuilder> outputLines;
@@ -62,6 +58,13 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     }
 
     /**
+     * print the entire LST tree with skip unvisited elements by given any cursor in this tree.
+     */
+    public static String printTree(Cursor cursor) {
+        return findRootOfJType(cursor).map(TreeVisitingPrinter::printTree).orElse("");
+    }
+
+    /**
      * print tree with skip unvisited elements
      */
     public static String printTree(J j) {
@@ -71,12 +74,29 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     }
 
     /**
+     * print entire tree including all unvisited elements by given any cursor in this tree.
+     */
+    public static String printTreeAll(Cursor cursor) {
+        return findRootOfJType(cursor).map(TreeVisitingPrinter::printTreeAll).orElse("");
+    }
+
+    /**
      * print tree including all unvisited elements
      */
     public static String printTreeAll(J j) {
         TreeVisitingPrinter visitor = new TreeVisitingPrinter(false);
         visitor.visit(j, new InMemoryExecutionContext());
         return visitor.print();
+    }
+
+    private static Optional<J> findRootOfJType(Cursor cursor) {
+        List<Object> cursorStack =
+            stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
+                .collect(Collectors.toList());
+        Collections.reverse(cursorStack);
+        return cursorStack.stream().filter(obj -> obj instanceof J)
+            .map(obj -> (J) obj)
+            .findFirst();
     }
 
     private String print() {
@@ -135,14 +155,31 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
             || tree instanceof J.Literal
             || tree instanceof J.Try
             || tree instanceof J.Try.Catch
+            || tree instanceof J.ForLoop
             || tree instanceof J.WhileLoop
+            || tree instanceof J.DoWhileLoop
             || tree instanceof J.Lambda
             || tree instanceof J.Lambda.Parameters
         ) {
             return "";
         }
 
-        return tree.toString();
+        String[] lines = tree.toString().split("\n");
+        StringBuilder output = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            output.append(lines[i].trim());
+            if (i < lines.length - 1) {
+                output.append(" ");
+            }
+        }
+        return output.toString();
+    }
+
+    private String truncate(String content) {
+        if (content.length() > CONTENT_MAX_LENGTH) {
+            return content.substring(0, CONTENT_MAX_LENGTH - 3) + "...";
+        }
+        return content;
     }
 
     @Override
@@ -212,7 +249,7 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
             line.append(leftPadding(depth)).append(typeName);
         }
 
-        String content = printTreeElement(tree);
+        String content = truncate(printTreeElement(tree));
         if (!content.isEmpty()) {
             line.append(" | \"").append(content).append("\"");
         }
