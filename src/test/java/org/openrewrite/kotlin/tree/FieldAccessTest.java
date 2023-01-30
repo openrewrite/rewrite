@@ -81,11 +81,13 @@ public class FieldAccessTest implements RewriteTest {
     @Test
     void qualifier() {
         rewriteRun(
-          kotlin("""
-              import java.nio.ByteBuffer
-              
-              private val crlf: ByteBuffer = ByteBuffer.wrap("\\r\\n".toByteArray())
-          """)
+          kotlin(
+            """
+                import java.nio.ByteBuffer
+                
+                private val crlf: ByteBuffer = ByteBuffer.wrap("\\r\\n".toByteArray())
+            """
+          )
         );
     }
 }

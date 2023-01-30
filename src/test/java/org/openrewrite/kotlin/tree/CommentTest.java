@@ -34,7 +34,7 @@ class CommentTest implements RewriteTest {
                     /*
                      * C2
                      */
-                 }
+                }
             """
           )
         );
@@ -45,9 +45,9 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class Test { // /*
-              }
-              """
+                class Test { // /*
+                }
+            """
           )
         );
     }

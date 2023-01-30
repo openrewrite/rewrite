@@ -106,27 +106,21 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void modifierOrdering() {
         rewriteRun(
-          kotlin(
-            "public /* comment */ abstract open class A"
-          )
+          kotlin("public /* comment */ abstract open class A")
         );
     }
 
     @Test
     void annotationClass() {
         rewriteRun(
-          kotlin(
-            "annotation class A"
-          )
+          kotlin("annotation class A")
         );
     }
 
     @Test
     void enumClass() {
         rewriteRun(
-          kotlin(
-            "enum class A"
-          )
+          kotlin("enum class A")
         );
     }
 
@@ -152,18 +146,14 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void quotedIdentifier() {
         rewriteRun(
-          kotlin(
-            "class `Quoted id here`"
-          )
+          kotlin("class `Quoted id here`")
         );
     }
 
     @Test
     void typeArguments() {
         rewriteRun(
-          kotlin(
-            "open class B < T > { }"
-          )
+          kotlin("open class B < T > { }")
         );
     }
 
@@ -172,11 +162,11 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  interface A
-                  interface B
-                  
-                  class KotlinTypeGoat < T : A , S : B>
-              """
+                interface A
+                interface B
+                
+                class KotlinTypeGoat < T : A , S : B>
+            """
           )
         );
     }
@@ -184,21 +174,15 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void implicitConstructor() {
         rewriteRun(
-          kotlin(
-            "class Test ( val answer : Int )"
-          )
+          kotlin("class Test ( val answer : Int )")
         );
     }
 
     @Test
     void implicitConstructorWithSuperType() {
         rewriteRun(
-          kotlin(
-            "class Other"
-          ),
-          kotlin(
-            "class Test ( val answer : Int ) : Other ( ) { }"
-          )
+          kotlin("class Other"),
+          kotlin("class Test ( val answer : Int ) : Other ( ) { }")
         );
     }
 
@@ -207,10 +191,10 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              @Deprecated ( "" )
-              // Some comment
-              open class A
-              """
+                @Deprecated ( "" )
+                // Some comment
+                open class A
+            """
           )
         );
     }
@@ -221,13 +205,13 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  interface A
-                  interface B
-                  interface C
-                  interface D
-                  
-                  class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
-              """
+                interface A
+                interface B
+                interface C
+                interface D
+                
+                class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
+            """
           )
         );
     }
@@ -235,9 +219,7 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void object() {
         rewriteRun(
-          kotlin(
-            " object Test"
-          )
+          kotlin(" object Test")
         );
     }
 }

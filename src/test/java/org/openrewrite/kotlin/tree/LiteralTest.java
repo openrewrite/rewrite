@@ -38,22 +38,14 @@ public class LiteralTest implements RewriteTest {
     @Test
     void literalField() {
         rewriteRun(
-          kotlin(
-            """
-                val n : Int = 0
-            """
-          )
+          kotlin("val n : Int = 0 ")
         );
     }
 
     @Test
     void literalCharacter() {
         rewriteRun(
-          kotlin(
-            """
-                val c : Character = 'c'
-            """
-          )
+          kotlin("val c : Character = 'c' ")
         );
     }
 

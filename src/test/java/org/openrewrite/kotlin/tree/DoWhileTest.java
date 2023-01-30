@@ -27,11 +27,11 @@ public class DoWhileTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun test() {
-                      var i = 0
-                      do { i++ } while ( i < 10 )
-                  }
-              """
+                fun test() {
+                    var i = 0
+                    do { i++ } while ( i < 10 )
+                }
+            """
           )
         );
     }

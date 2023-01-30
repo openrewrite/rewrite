@@ -28,10 +28,10 @@ public class WhileLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun test ( ) {
-                      while ( true ) { }
-                  }
-              """
+                fun test ( ) {
+                    while ( true ) { }
+                }
+            """
           )
         );
     }
@@ -41,10 +41,10 @@ public class WhileLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun test ( ) {
-                      while ( true ) test ( )
-                  }
-              """
+                fun test ( ) {
+                    while ( true ) test ( )
+                }
+            """
           )
         );
     }

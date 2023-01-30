@@ -39,20 +39,14 @@ public class MethodReferenceTest implements RewriteTest {
     @Test
     void methodReference() {
         rewriteRun(
-          kotlin(
-            """
-                val str = 42::toString
-            """)
+          kotlin("val str = 42::toString ")
         );
     }
 
     @Test
     void getJavaClass() {
         rewriteRun(
-          kotlin(
-            """
-                val a = Integer :: class . java
-            """)
+          kotlin("val a = Integer :: class . java ")
         );
     }
 }

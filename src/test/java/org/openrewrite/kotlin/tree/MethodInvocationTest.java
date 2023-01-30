@@ -105,11 +105,11 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("fun method ( arg : Any ) { }"),
           kotlin(
             """
-              fun callMethodWithLambda ( ) {
-                  method {
-                  }
-              }
-              """
+                fun callMethodWithLambda ( ) {
+                    method {
+                    }
+                }
+            """
           )
         );
     }

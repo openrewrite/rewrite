@@ -59,12 +59,12 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun test ( ) {
-                      labeled@ for (i in 1..10) {
-                          break@labeled
-                      }
-                  }
-              """
+                fun test ( ) {
+                    labeled@ for (i in 1..10) {
+                        break@labeled
+                    }
+                }
+            """
           )
         );
     }

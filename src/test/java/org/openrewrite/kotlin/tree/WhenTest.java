@@ -27,16 +27,16 @@ public class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun method(i: Int) : String {
-                      when (i) {
-                          1 -> return "1"
-                          2 -> return "2"
-                          else -> {
-                              return "42"
-                          }
-                      }
-                  }
-              """
+                fun method(i: Int) : String {
+                    when (i) {
+                        1 -> return "1"
+                        2 -> return "2"
+                        else -> {
+                            return "42"
+                        }
+                    }
+                }
+            """
           )
         );
     }
@@ -46,16 +46,16 @@ public class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun method(i: Int) : String {
-                      when {
-                          i == 1 -> return "1"
-                          i == 2 -> return "2"
-                          else -> {
-                              return "42"
-                          }
-                      }
-                  }
-              """
+                fun method(i: Int) : String {
+                    when {
+                        i == 1 -> return "1"
+                        i == 2 -> return "2"
+                        else -> {
+                            return "42"
+                        }
+                    }
+                }
+            """
           )
         );
     }
@@ -65,15 +65,15 @@ public class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun method(i: Int) : String {
-                      when (i) {
-                          1 , 2 , 3 -> return "1 or 2 or 3"
-                          else -> {
-                              return "42"
-                          }
-                      }
-                  }
-              """
+                fun method(i: Int) : String {
+                    when (i) {
+                        1 , 2 , 3 -> return "1 or 2 or 3"
+                        else -> {
+                            return "42"
+                        }
+                    }
+                }
+            """
           )
         );
     }
@@ -83,14 +83,14 @@ public class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun method(i: Int) : String {
-                      when (i) {
-                          in 1..10 -> return "in range 1"
-                          !in 10..20 -> return "not in range 2"
-                          else -> "42"
-                      }
-                  }
-              """
+                fun method(i: Int) : String {
+                    when (i) {
+                        in 1..10 -> return "in range 1"
+                        !in 10..20 -> return "not in range 2"
+                        else -> "42"
+                    }
+                }
+            """
           )
         );
     }

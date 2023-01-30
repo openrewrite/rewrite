@@ -64,7 +64,8 @@ public class ArrayTest implements RewriteTest {
             """
                 val arr = IntArray ( 1 )
                 val a = arr [ 0 ]
-            """)
+            """
+          )
         );
     }
 }
