@@ -81,9 +81,9 @@ public class NoDoubleBraceInitialization extends Recipe {
                 return false;
             }
             if (nc.getBody() != null && !nc.getBody().getStatements().isEmpty()
+                    && nc.getBody().getStatements().size() == 1
                     && nc.getBody().getStatements().get(0) instanceof J.Block
                     && getCursor().getParent(3) != null) {
-
                 return TypeUtils.isAssignableTo(MAP_TYPE, nc.getType())
                         || TypeUtils.isAssignableTo(LIST_TYPE, nc.getType())
                         || TypeUtils.isAssignableTo(SET_TYPE, nc.getType());
