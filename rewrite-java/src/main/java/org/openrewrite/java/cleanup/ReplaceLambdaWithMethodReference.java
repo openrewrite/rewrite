@@ -66,6 +66,10 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
             public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
                 J.Lambda l = (J.Lambda) super.visitLambda(lambda, executionContext);
 
+                if (TypeUtils.isOfClassType(lambda.getType(), "groovy.lang.Closure")) {
+                    return l;
+                }
+
                 String code = "";
                 J body = l.getBody();
                 if (body instanceof J.Block && ((J.Block) body).getStatements().size() == 1) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,38 +22,21 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class MinimumSwitchCasesTest implements RewriteTest {
+public class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new MinimumSwitchCases());
+        spec.recipe(new ReplaceLambdaWithMethodReference());
     }
 
-    @SuppressWarnings("GrMethodMayBeStatic")
     @Issue("https://github.com/openrewrite/rewrite/issues/2566")
     @Test
-    void nonIdentifierEnum() {
+    void groovyLangClosure() {
         rewriteRun(
           groovy(
             """
-              import java.nio.file.*
-              class Test {
-                  void test(OpenOption o) {
-                      switch(o) {
-                          case StandardOpenOption.READ:
-                              System.out.println("read")
-                      }
-                  }
-              }
-              """,
-            """
-              import java.nio.file.*
-              class Test {
-                  void test(OpenOption o) {
-                      if (o == StandardOpenOption.READ) {
-                          System.out.println("read")
-                      }
-                  }
+              repositories {
+                  mavenLocal()
               }
               """
           )
