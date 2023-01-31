@@ -20,6 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.SpacesStyle;
@@ -53,19 +54,27 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
-        if (spaceBefore && StringUtils.isNullOrEmpty(j.getPrefix().getWhitespace())) {
+        if (!j.getComments().isEmpty()) {
+            return j;
+        }
+
+        if (spaceBefore && notSingleSpace(j.getPrefix().getWhitespace())) {
             return j.withPrefix(j.getPrefix().withWhitespace(" "));
-        } else if (!spaceBefore && " ".equals(j.getPrefix().getWhitespace()) && j.getComments().isEmpty()) {
+        } else if (!spaceBefore && onlySpacesAndNotEmpty(j.getPrefix().getWhitespace())) {
             return j.withPrefix(j.getPrefix().withWhitespace(""));
         } else {
             return j;
         }
     }
 
-    <T> JContainer<T> spaceBefore(JContainer<T> container, boolean spaceBefore) {
-        if (spaceBefore && StringUtils.isNullOrEmpty(container.getBefore().getWhitespace())) {
+    <T> JContainer<T> spaceBefore( JContainer<T> container, boolean spaceBefore ) {
+        if (!container.getBefore().getComments().isEmpty()) {
+            return container;
+        }
+
+        if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && " ".equals(container.getBefore().getWhitespace())) {
+        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(""));
         } else {
             return container;
@@ -73,9 +82,13 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     <T extends J> JLeftPadded<T> spaceBefore(JLeftPadded<T> container, boolean spaceBefore) {
-        if (spaceBefore && StringUtils.isNullOrEmpty(container.getBefore().getWhitespace())) {
+        if (!container.getBefore().getComments().isEmpty()) {
+            return container;
+        }
+
+        if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(" "));
-        } else if (!spaceBefore && container.getBefore().getWhitespace().equals(" ")) {
+        } else if (!spaceBefore && onlySpacesAndNotEmpty(container.getBefore().getWhitespace())) {
             return container.withBefore(container.getBefore().withWhitespace(""));
         } else {
             return container;
@@ -91,13 +104,38 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     <T extends J> JRightPadded<T> spaceAfter(JRightPadded<T> container, boolean spaceAfter) {
-        if (spaceAfter && StringUtils.isNullOrEmpty(container.getAfter().getWhitespace())) {
+        if (!container.getAfter().getComments().isEmpty()) {
+            return container;
+        }
+
+        if (spaceAfter && notSingleSpace(container.getAfter().getWhitespace())) {
             return container.withAfter(container.getAfter().withWhitespace(" "));
-        } else if (!spaceAfter && container.getAfter().getWhitespace().equals(" ") && container.getAfter().getComments().isEmpty()) {
+        } else if (!spaceAfter && onlySpacesAndNotEmpty(container.getAfter().getWhitespace())) {
             return container.withAfter(container.getAfter().withWhitespace(""));
         } else {
             return container;
         }
+    }
+
+    /**
+     * Checks if a string only contains spaces (excluding newline characters).
+     * @return true if contains spaces only, or true for empty string.
+     */
+    private static boolean onlySpaces(String str) {
+        for (int i = 0; i < str.length(); i++) {
+            if (str.charAt(i) != ' ') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean onlySpacesAndNotEmpty(String s) {
+        return !StringUtils.isNullOrEmpty(s) && onlySpaces(s);
+    }
+
+    private static boolean notSingleSpace(String str) {
+        return onlySpaces(str) && !" ".equals(str);
     }
 
     @Override
