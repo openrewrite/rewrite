@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -663,6 +664,60 @@ public interface K extends J {
             Infix,
             Operator,
             Data
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class KReturn implements K, Statement {
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        J.Return expression;
+
+        @With
+        @Nullable
+        J.Identifier label;
+
+        @Override
+        public Space getPrefix() {
+            return expression.getPrefix();
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withExpression(expression.withPrefix(space));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getMarkers();
+        }
+
+        @Override
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withExpression(expression.withMarkers(markers));
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitKReturn(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
         }
     }
 

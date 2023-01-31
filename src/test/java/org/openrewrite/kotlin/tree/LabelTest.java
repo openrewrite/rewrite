@@ -8,6 +8,23 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class LabelTest implements RewriteTest {
 
     @Test
+    void anonymousFunction() {
+        rewriteRun(
+          kotlin(
+            """
+                fun foo() {
+                    run loop@ {
+                        listOf ( 1 , 2 , 3 , 4 , 5 ) . forEach {
+                            if ( it == 3 ) return@loop
+                            println ( it )
+                        }
+                    }
+                }
+            """
+          )
+        );
+    }
+    @Test
     void breakFromLabeledWhileLoop() {
         rewriteRun(
           kotlin(

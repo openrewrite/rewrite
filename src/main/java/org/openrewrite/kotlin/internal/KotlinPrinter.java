@@ -121,8 +121,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitKReturn(K.KReturn kReturn, PrintOutputCapture<P> p) {
+        visit(kReturn.getExpression(), p);
+        if (kReturn.getLabel() != null) {
+            p.append("@");
+            visit(kReturn.getLabel(), p);
+        }
+        return kReturn;
+    }
+
+    @Override
     public J visitKString(K.KString kString, PrintOutputCapture<P> p) {
-        beforeSyntax(kString, KSpace.Location.KSTRING, p);
+        beforeSyntax(kString, KSpace.Location.KSTRING_PREFIX, p);
 
         String delimiter = kString.getDelimiter();
         p.append(delimiter);
@@ -136,7 +146,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitKStringValue(K.KString.Value value, PrintOutputCapture<P> p) {
-        beforeSyntax(value, KSpace.Location.KSTRING, p);
+        beforeSyntax(value, KSpace.Location.KSTRING_PREFIX, p);
         if (value.isEnclosedInBraces()) {
             p.append("${");
         } else {
@@ -152,7 +162,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitListLiteral(K.ListLiteral listLiteral, PrintOutputCapture<P> p) {
-        beforeSyntax(listLiteral, KSpace.Location.LIST_LITERAL, p);
+        beforeSyntax(listLiteral, KSpace.Location.LIST_LITERAL_PREFIX, p);
         visitContainer("[", listLiteral.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS,
                 ",", "]", p);
         afterSyntax(listLiteral, p);

@@ -199,17 +199,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitAnonymousFunction(FirAnonymousFunction anonymousFunction, ExecutionContext ctx) {
-        throw new IllegalStateException("Implement me.");
-    }
+        Markers markers = Markers.EMPTY;
 
-    @Override
-    public J visitAnonymousFunctionExpression(FirAnonymousFunctionExpression anonymousFunctionExpression, ExecutionContext ctx) {
-        if (!anonymousFunctionExpression.getAnonymousFunction().isLambda()) {
-            throw new UnsupportedOperationException("Unsupported anonymous function expression.");
+        J.Label label = null;
+        if (anonymousFunction.getLabel() != null &&
+                anonymousFunction.getLabel().getSource().getKind() != KtFakeSourceElementKind.GeneratedLambdaLabel.INSTANCE) {
+            label = (J.Label) visitElement(anonymousFunction.getLabel(),ctx);
         }
 
         Space prefix = whitespace();
-        Markers markers = Markers.EMPTY;
         boolean omitBraces = !source.startsWith("{", cursor);
         if (omitBraces) {
             markers = markers.addIfAbsent(new OmitBraces(randomId()));
@@ -219,7 +217,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         JavaType closureType = null;
 
-        FirAnonymousFunction anonymousFunction = anonymousFunctionExpression.getAnonymousFunction();
         List<JRightPadded<J>> paramExprs = new ArrayList<>(anonymousFunction.getValueParameters().size());
         if (!anonymousFunction.getValueParameters().isEmpty()) {
             List<FirValueParameter> parameters = anonymousFunction.getValueParameters();
@@ -273,7 +270,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     EMPTY);
         }
 
-        return new J.Lambda(
+        J.Lambda lambda = new J.Lambda(
                 randomId(),
                 prefix,
                 markers,
@@ -281,6 +278,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 EMPTY,
                 body,
                 closureType);
+
+        return label != null ? label.withStatement(lambda) : lambda;
+    }
+
+    @Override
+    public J visitAnonymousFunctionExpression(FirAnonymousFunctionExpression anonymousFunctionExpression, ExecutionContext ctx) {
+        if (!anonymousFunctionExpression.getAnonymousFunction().isLambda()) {
+            throw new UnsupportedOperationException("Unsupported anonymous function expression.");
+        }
+
+        return visitAnonymousFunction(anonymousFunctionExpression.getAnonymousFunction(), ctx);
     }
 
     @Override
@@ -469,8 +477,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
-        for (int i = 0; i < firStatements.size(); i++) {
-            FirElement firElement = firStatements.get(i);
+        for (FirElement firElement : firStatements) {
             // Skip receiver of the unary post increment or decrement.
             if (firElement.getSource().getKind() instanceof KtFakeSourceElementKind.DesugaredIncrementOrDecrement &&
                     !(firElement instanceof FirVariableAssignment)) {
@@ -513,11 +520,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
                 if (firElement instanceof FirReturnExpression) {
                     if (expr == null) {
-                        expr = new J.Return(randomId(), EMPTY, Markers.EMPTY, null);
+                        expr = new K.KReturn(randomId(), new J.Return(randomId(), EMPTY, Markers.EMPTY, null), null);
                     } else if (expr instanceof Statement && !(expr instanceof Expression)) {
-                        expr = new J.Return(randomId(), EMPTY, Markers.EMPTY, new K.StatementExpression(randomId(), (Statement) expr));
+                        expr = new K.KReturn(randomId(), new J.Return(randomId(), EMPTY, Markers.EMPTY, new K.StatementExpression(randomId(), (Statement) expr)), null);
                     } else if (expr instanceof Expression) {
-                        expr = new J.Return(randomId(), EMPTY, Markers.EMPTY, (Expression) expr);
+                        expr = new K.KReturn(randomId(), new J.Return(randomId(), EMPTY, Markers.EMPTY, (Expression) expr), null);
                     }
 
                     if (explicitReturn) {
@@ -1079,8 +1086,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
                 List<JRightPadded<Expression>> arguments = new ArrayList<>(functionCall.getArgumentList().getArguments().size());
                 for (FirExpression argument : functionCall.getArgumentList().getArguments()) {
-                    Expression expression = (Expression) visitElement(argument, null);
-                    JRightPadded<Expression> padded = JRightPadded.build(expression);
+                    J j = visitElement(argument, null);
+                    if (j instanceof Statement && !(j instanceof Expression)) {
+                        j = new K.StatementExpression(randomId(), (Statement) j);
+                    }
+                    JRightPadded<Expression> padded = JRightPadded.build((Expression) j);
                     arguments.add(padded);
                 }
                 args = JContainer.build(arguments);
@@ -1691,11 +1701,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitReturnExpression(FirReturnExpression returnExpression, ExecutionContext ctx) {
         if (returnExpression.getResult() instanceof FirUnitExpression) {
             Space prefix = whitespace();
-            if (source.startsWith("return", cursor)) {
-                throw new IllegalStateException("FirReturnExpression.");
+            J.Identifier label = null;
+            if (source.startsWith("return@", cursor)) {
+                skip("return@");
+                label = createIdentifier(returnExpression.getTarget().getLabelName());
             }
 
-            return new K.Return(randomId(), prefix, Markers.EMPTY, null);
+            return new K.KReturn(randomId(), new J.Return(randomId(), prefix, Markers.EMPTY, null), label);
         }
 
         return visitElement(returnExpression.getResult(), ctx);

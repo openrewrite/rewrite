@@ -84,9 +84,16 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return f;
     }
 
+    public J visitKReturn(K.KReturn kReturn, P p) {
+        K.KReturn r = kReturn;
+        r = r.withPrefix(visitSpace(r.getPrefix(), KSpace.Location.KRETURN_PREFIX, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        return r;
+    }
+
     public J visitKString(K.KString kString, P p) {
         K.KString k = kString;
-        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.KSTRING, p));
+        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.KSTRING_PREFIX, p));
         k = k.withMarkers(visitMarkers(k.getMarkers(), p));
         Expression temp = (Expression) visitExpression(k, p);
         if (!(temp instanceof K.KString)) {
@@ -108,7 +115,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public J visitListLiteral(K.ListLiteral listLiteral, P p) {
         K.ListLiteral l = listLiteral;
-        l = l.withPrefix(visitSpace(l.getPrefix(), KSpace.Location.LIST_LITERAL, p));
+        l = l.withPrefix(visitSpace(l.getPrefix(), KSpace.Location.LIST_LITERAL_PREFIX, p));
         l = l.withMarkers(visitMarkers(l.getMarkers(), p));
         Expression temp = (Expression) visitExpression(l, p);
         if (!(temp instanceof K.ListLiteral)) {
