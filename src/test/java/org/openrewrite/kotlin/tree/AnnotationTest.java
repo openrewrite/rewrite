@@ -23,6 +23,19 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class AnnotationTest implements RewriteTest {
 
     @Test
+    void fileScope() {
+        rewriteRun(
+          kotlin(
+            """
+                @file : Suppress ( "DEPRECATION_ERROR" , "RedundantUnitReturnType" )
+
+                class A
+            """
+          )
+        );
+    }
+
+    @Test
     void annotationWithDefaultArgument() {
         rewriteRun(
           kotlin(

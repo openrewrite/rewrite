@@ -123,6 +123,10 @@ public interface K extends J {
             return withCharsetName(charset.name());
         }
 
+        @With
+        @Getter
+        List<Annotation> annotations;
+
         @Nullable
         JRightPadded<Package> packageDeclaration;
 
@@ -219,7 +223,7 @@ public interface K extends J {
 
             public K.CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
                 return t.packageDeclaration == packageDeclaration ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
-                        packageDeclaration, t.imports, t.statements, t.eof);
+                        t.annotations, packageDeclaration, t.imports, t.statements, t.eof);
             }
 
             @Override
@@ -230,7 +234,7 @@ public interface K extends J {
             @Override
             public K.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
                 return t.imports == imports ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
-                        t.packageDeclaration, imports, t.statements, t.eof);
+                        t.annotations, t.packageDeclaration, imports, t.statements, t.eof);
             }
 
             public List<JRightPadded<Statement>> getStatements() {
@@ -239,7 +243,7 @@ public interface K extends J {
 
             public K.CompilationUnit withStatements(List<JRightPadded<Statement>> statements) {
                 return t.statements == statements ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath,
-                        t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, t.imports, statements, t.eof);
+                        t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
         }
     }
@@ -432,6 +436,8 @@ public interface K extends J {
         public enum Type {
             Contains,
             Get,
+            IdentityEquals,
+            IdentityNotEquals,
             RangeTo
         }
 

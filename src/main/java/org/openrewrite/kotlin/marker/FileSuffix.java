@@ -28,7 +28,7 @@ import java.util.UUID;
 @Incubating(since = "0.0")
 @Value
 @With
-public class KObject implements Marker {
+public class FileSuffix implements Marker {
     UUID id;
-    Space prefix;
+    Space suffix;
 }

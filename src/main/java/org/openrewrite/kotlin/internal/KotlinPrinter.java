@@ -54,6 +54,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
 
+        visit(((K.CompilationUnit) sourceFile).getAnnotations(), p);
+
         JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
         if (pkg != null) {
             visit(pkg.getElement(), p);
@@ -79,6 +81,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         switch (binary.getOperator()) {
             case Contains:
                 keyword = "in";
+                break;
+            case IdentityEquals:
+                keyword = "===";
+                break;
+            case IdentityNotEquals:
+                keyword = "!==";
                 break;
             case RangeTo:
                 keyword = "..";
@@ -187,6 +195,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             boolean isKModifier = annotation.getMarkers().findFirst(Modifier.class).isPresent();
             if (!isKModifier) {
                 p.append("@");
+            }
+
+            FileSuffix suffix = annotation.getMarkers().findFirst(FileSuffix.class).orElse(null);
+            if (suffix != null) {
+                p.append("file");
+                KotlinPrinter.this.visitSpace(suffix.getSuffix(), KSpace.Location.FILE_ANNOTATION_SUFFIX, p);
+                p.append(":");
             }
             visit(annotation.getAnnotationType(), p);
             if (!isKModifier) {

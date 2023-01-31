@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;
+import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget;
 import org.jetbrains.kotlin.fir.*;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter;
@@ -60,7 +61,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
-import static java.lang.Math.exp;
 import static java.lang.Math.max;
 import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
@@ -103,6 +103,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitFile(FirFile file, ExecutionContext ctx) {
         currentFile = file;
 
+        List<J.Annotation> annotations = mapAnnotations(file.getAnnotations());
+
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
             pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
@@ -128,6 +130,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 charset.name(),
                 charsetBomMarked,
                 null,
+                annotations,
                 pkg,
                 imports,
                 statements,
@@ -159,7 +162,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitAnnotationCall(FirAnnotationCall annotationCall, ExecutionContext ctx) {
         Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
         skip("@");
+        if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.FILE) {
+            skip("file");
+            markers = markers.addIfAbsent(new FileSuffix(randomId(), sourceBefore(":")));
+        }
+
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
         JContainer<Expression> args = null;
         if (annotationCall.getArgumentList().getArguments().size() > 0) {
@@ -183,7 +192,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new J.Annotation(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                markers,
                 name,
                 args);
     }
@@ -848,14 +857,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         FirOperation op = equalityOperatorCall.getOperation();
         FirElement right = equalityOperatorCall.getArgumentList().getArguments().get(1);
 
-        return new J.Binary(
-                randomId(),
-                whitespace(),
-                Markers.EMPTY,
-                (Expression) visitElement(left, ctx),
-                padLeft(sourceBefore(op.getOperator()), mapOperation(op)),
-                (Expression) visitElement(right, ctx),
-                typeMapping.type(equalityOperatorCall));
+        if (op == FirOperation.IDENTITY || op == FirOperation.NOT_IDENTITY) {
+            return new K.Binary(
+                    randomId(),
+                    whitespace(),
+                    Markers.EMPTY,
+                    (Expression) visitElement(left, ctx),
+                    padLeft(sourceBefore(op.getOperator()), op == FirOperation.IDENTITY ? K.Binary.Type.IdentityEquals : K.Binary.Type.IdentityNotEquals),
+                    (Expression) visitElement(right, ctx),
+                    EMPTY,
+                    typeMapping.type(equalityOperatorCall)
+            );
+        } else {
+            return new J.Binary(
+                    randomId(),
+                    whitespace(),
+                    Markers.EMPTY,
+                    (Expression) visitElement(left, ctx),
+                    padLeft(sourceBefore(op.getOperator()), mapOperation(op)),
+                    (Expression) visitElement(right, ctx),
+                    typeMapping.type(equalityOperatorCall));
+        }
+
     }
 
     @Override

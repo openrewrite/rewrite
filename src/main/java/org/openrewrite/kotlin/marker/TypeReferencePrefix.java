@@ -17,12 +17,15 @@ package org.openrewrite.kotlin.marker;
 
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-// TODO: get feed back from team ... a TypeExpression in Kotlin includes a prefix that comes before the `:` delimiter.
+// Ideally, the Space will exist on the AST.
+// For now, we're using a marker to represent whitespace that exists in Kotlin and does not fit into `J`.
+@Incubating(since = "0.0")
 @Value
 @With
 public class TypeReferencePrefix implements Marker {

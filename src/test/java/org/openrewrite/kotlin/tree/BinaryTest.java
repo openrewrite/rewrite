@@ -148,4 +148,30 @@ public class BinaryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void identityOperation() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0 === 0
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void notIdentityOperation() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val a = 0 !== 0
+                }
+            """
+          )
+        );
+    }
 }
