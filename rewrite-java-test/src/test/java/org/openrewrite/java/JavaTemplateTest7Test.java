@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.cleanup.IsEmptyCallOnCollections;
 import org.openrewrite.java.cleanup.UseLambdaForFunctionalInterface;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -33,7 +34,7 @@ public class JavaTemplateTest7Test implements RewriteTest {
     @SuppressWarnings({
       "CachedNumberConstructorCall",
       "Convert2MethodRef"
-    })
+      , "removal"})
     void lambdaIsVariableInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
@@ -186,6 +187,41 @@ public class JavaTemplateTest7Test implements RewriteTest {
                               };
                           }
                       }.run();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhileLoopCondition() {
+        rewriteRun(
+          spec -> spec.recipe(new IsEmptyCallOnCollections()),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+                  void method(List<String> l) {
+                      int i = l.size() - 1;
+                        do {
+                            l.remove(i);
+                            i--;
+                        } while (l.size() > 0);
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+                  void method(List<String> l) {
+                      int i = l.size() - 1;
+                        do {
+                            l.remove(i);
+                            i--;
+                        } while (!l.isEmpty());
                   }
               }
               """

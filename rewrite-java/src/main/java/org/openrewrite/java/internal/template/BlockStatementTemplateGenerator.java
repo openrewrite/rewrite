@@ -238,6 +238,14 @@ public class BlockStatementTemplateGenerator {
             }
 
             after.append('}');
+        } else if (j instanceof J.DoWhileLoop) {
+            J.DoWhileLoop dw = (J.DoWhileLoop) j;
+            if (referToSameElement(prior, dw.getWhileCondition())) {
+                insertControlWithBlock(dw.getBody(), before, after, () -> {
+                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                    after.append(";");
+                });
+            }
         } else if (j instanceof J.Assert) {
             before.insert(0, "assert ");
         } else if (j instanceof J.NewArray) {
