@@ -88,8 +88,6 @@ class SpacesTest implements RewriteTest {
         );
     }
 
-    void method1    /*comment*/ () {
-    }
     @Test
     void beforeParensMethodDeclarationTrueWithComment() {
         rewriteRun(
