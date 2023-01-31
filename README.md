@@ -25,6 +25,9 @@ OpenRewrite is built with [Gradle](https://gradle.org/). It is not typically nec
 
 OpenRewrite requires several JDK versions to be installed on your system. If you are able to access [Adoptium](https://adoptium.net/) then Gradle will automatically download and install any needed JDKs which you may be missing. If your network configuration or security policies do not permit this, then you must manually install JDK versions 8, 11, and 17.
 
+> **Note**
+> If you are developing on a Mac M1 or M2 you must install the Java 1.8 JDK manually (for example using [SDKMAN!](https://sdkman.io/)), as there is no matching JDK available on Adoptium.
+
 To compile and run tests invoke `./gradlew build`. To publish a snapshot build to your maven local repository, run `./gradlew publishToMavenLocal`. 
 
 ### Building within Secure/Isolated environments
