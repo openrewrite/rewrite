@@ -68,11 +68,42 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void method1() {
                   }
+                  void method2()    {
+                  }
+                  void method3()	{
+                  }
               }
               """,
             """
               class Test {
                   void method1 () {
+                  }
+                  void method2 () {
+                  }
+                  void method3 () {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    void method1    /*comment*/ () {
+    }
+    @Test
+    void beforeParensMethodDeclarationTrueWithComment() {
+        rewriteRun(
+          spaces(style -> style.withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))),
+          java(
+            """
+              class Test {
+                  void method1    /*comment*/() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method1    /*comment*/ () {
                   }
               }
               """
@@ -108,6 +139,8 @@ class SpacesTest implements RewriteTest {
                   }
                   void method2    () {
                   }
+                  void method3  	() {
+                  }
               }
               """,
             """
@@ -116,21 +149,28 @@ class SpacesTest implements RewriteTest {
                   }
                   void method2() {
                   }
+                  void method3() {
+                  }
               }
               """
           )
         );
     }
 
-
     @Test
-    void beforeParensMethodDeclarationFalseWithCommentIgnored() {
+    void beforeParensMethodDeclarationFalseWithComment() {
         rewriteRun(
           spaces(style -> style.withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(false))),
           java(
             """
               class Test {
                   void method1    /*comment*/    () {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method1    /*comment*/() {
                   }
               }
               """
@@ -2418,23 +2458,50 @@ class SpacesTest implements RewriteTest {
     }
 
     @Test
-    void withinMethodDeclarationParenthesesTrueWithCommentIgnored() {
+    void compositeMethodDeclarationParentheses() {
         rewriteRun(
-          spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))),
+          spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))
+              .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
+          ),
           java(
             """
               class Test {
-                  void foo(    /*comment*/ int x    ) {
-                  }
-                  void bar(    int y    /*comment*/    ) {
+                  void  /*c1*/   foo  /*c2*/   (  /*c3*/   int x, int y  /*c4*/   ) {
                   }
               }
               """,
             """
               class Test {
-                  void foo(    /*comment*/ int x ) {
+                  void  /*c1*/   foo  /*c2*/ (  /*c3*/   int x, int y  /*c4*/ ) {
                   }
-                  void bar( int y    /*comment*/    ) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withinMethodDeclarationParenthesesTrueWithComment() {
+        rewriteRun(
+          spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))),
+          java(
+            """
+              class Test {
+                  void foo(    /*c1*/    int x    ) {
+                  }
+                  void bar(    int y    /*c2*/    ) {
+                  }
+                  void baz(    /*c3*/    int z    /*c4*/    ) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void foo(    /*c1*/    int x ) {
+                  }
+                  void bar( int y    /*c2*/ ) {
+                  }
+                  void baz(    /*c3*/    int z    /*c4*/ ) {
                   }
               }
               """

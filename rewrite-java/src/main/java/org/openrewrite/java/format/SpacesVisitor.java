@@ -20,11 +20,12 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
+
+import java.util.List;
 
 public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
@@ -69,7 +70,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     <T> JContainer<T> spaceBefore( JContainer<T> container, boolean spaceBefore ) {
         if (!container.getBefore().getComments().isEmpty()) {
-            return container;
+            // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
+            List<Comment> comments = spaceLastCommentSuffix(container.getBefore().getComments(), spaceBefore);
+            return container.withBefore(container.getBefore().withComments(comments));
         }
 
         if (spaceBefore && notSingleSpace(container.getBefore().getWhitespace())) {
@@ -105,7 +108,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     <T extends J> JRightPadded<T> spaceAfter(JRightPadded<T> container, boolean spaceAfter) {
         if (!container.getAfter().getComments().isEmpty()) {
-            return container;
+            // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
+            List<Comment> comments = spaceLastCommentSuffix(container.getAfter().getComments(), spaceAfter);
+            return container.withAfter(container.getAfter().withComments(comments));
         }
 
         if (spaceAfter && notSingleSpace(container.getAfter().getWhitespace())) {
@@ -117,13 +122,29 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         }
     }
 
+    private static List<Comment> spaceLastCommentSuffix(List<Comment> comments, boolean spaceSuffix) {
+        return ListUtils.mapLast(comments,
+            comment -> spaceSuffix(comment, spaceSuffix));
+    }
+
+    private static Comment spaceSuffix(Comment comment, boolean spaceSuffix) {
+        if (spaceSuffix && notSingleSpace(comment.getSuffix())) {
+            return comment.withSuffix(" ");
+        } else if (!spaceSuffix && onlySpacesAndNotEmpty(comment.getSuffix())) {
+            return comment.withSuffix("");
+        } else {
+            return comment;
+        }
+    }
+
     /**
-     * Checks if a string only contains spaces (excluding newline characters).
-     * @return true if contains spaces only, or true for empty string.
+     * Checks if a string only contains spaces or tabs (excluding newline characters).
+     * @return true if contains spaces or tabs only, or true for empty string.
      */
-    private static boolean onlySpaces(String str) {
-        for (int i = 0; i < str.length(); i++) {
-            if (str.charAt(i) != ' ') {
+    private static boolean onlySpaces(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c != ' ' && c != '\t') {
                 return false;
             }
         }
