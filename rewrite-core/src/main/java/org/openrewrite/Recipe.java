@@ -26,6 +26,8 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.scheduling.ForkJoinScheduler;
+import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,6 +37,7 @@ import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
@@ -146,8 +149,13 @@ public abstract class Recipe implements Cloneable {
         return RecipeIntrospectionUtils.recipeDescriptorFromRecipe(this);
     }
 
+    private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
+            dataTableDescriptorFromDataTable(new SourcesFileResults(org.openrewrite.Recipe.noop())),
+            dataTableDescriptorFromDataTable(new SourcesFileErrors(org.openrewrite.Recipe.noop()))
+    );
+
     public List<DataTableDescriptor> getDataTableDescriptors() {
-        return dataTables == null ? emptyList() : dataTables;
+        return ListUtils.concatAll(dataTables == null ? emptyList() : dataTables, GLOBAL_DATA_TABLES);
     }
 
     /**
@@ -239,7 +247,7 @@ public abstract class Recipe implements Cloneable {
         if (dataTables == null) {
             dataTables = new ArrayList<>();
         }
-        dataTables.add(RecipeIntrospectionUtils.dataTableDescriptorFromDataTable(dataTable));
+        dataTables.add(dataTableDescriptorFromDataTable(dataTable));
     }
 
     public List<TreeVisitor<?, ExecutionContext>> getApplicableTests() {
