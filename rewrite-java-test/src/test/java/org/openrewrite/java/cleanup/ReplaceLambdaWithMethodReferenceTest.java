@@ -18,7 +18,6 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -28,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings({"RedundantCast", "SimplifyStreamApiCallChains", "Convert2MethodRef", "CodeBlock2Expr", "RedundantOperationOnEmptyContainer", "ResultOfMethodCallIgnored"})
+@SuppressWarnings({"unchecked", "RedundantCast", "SimplifyStreamApiCallChains", "Convert2MethodRef", "CodeBlock2Expr", "RedundantOperationOnEmptyContainer", "ResultOfMethodCallIgnored", "rawtypes", "UnusedAssignment"})
 class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
     @Override
@@ -389,6 +388,64 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     }
 
     @Test
+    void methodSelectMatchingSingleLambdaParameter() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Collectors;
+
+              class Test {
+                  List<String> filter(List<Object> l) {
+                      return l.stream()
+                          .map(o -> o.toString())
+                          .collect(Collectors.toList());
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+              import java.util.stream.Collectors;
+
+              class Test {
+                  List<String> filter(List<Object> l) {
+                      return l.stream()
+                          .map(Object::toString)
+                          .collect(Collectors.toList());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodSelectMatchingMultipleLambdaParameters() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.BiFunction;
+
+              class Test {
+                  void foo() {
+                      BiFunction<Integer, Integer, Integer> f = (i1, i2) -> i1.compareTo(i2);
+                  }
+              }
+              """,
+            """
+              import java.util.function.BiFunction;
+               
+              class Test {
+                  void foo() {
+                      BiFunction<Integer, Integer, Integer> f = Integer::compareTo;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void notEqualToNull() {
         rewriteRun(
           java(
@@ -566,6 +623,84 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                   void foo() {
                       new ArrayList<List<Integer>>().stream()
                               .map(it -> it.addAll(singletonList(1, 2, 3)));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacedConstructorCalls() {
+        rewriteRun(
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+              
+              class A {
+                  void foo() {
+                      Supplier<?> s;
+                      s = () -> new Object();
+                      s = () -> new java.lang.Object();
+                      s = () -> new java.util.ArrayList();
+                      s = () -> new java.util.ArrayList<>();
+                      s = () -> new java.util.ArrayList<Object>();
+                      s = () -> new ArrayList<Object>();
+                      s = () -> new java.util.HashSet<Object>();
+
+                      Function<Integer, ?> f;
+                      f = i -> new ArrayList(i);
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+              
+              class A {
+                  void foo() {
+                      Supplier<?> s;
+                      s = Object::new;
+                      s = java.lang.Object::new;
+                      s = java.util.ArrayList::new;
+                      s = java.util.ArrayList::new;
+                      s = java.util.ArrayList::new;
+                      s = ArrayList::new;
+                      s = java.util.HashSet::new;
+
+                      Function<Integer, ?> f;
+                      f = ArrayList::new;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void notReplacedConstructorCalls() {
+        rewriteRun(
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+              
+              class A {
+                  void foo() {
+                      Supplier<?> s;
+                      s = () -> new Object() {};
+                      s = () -> new java.util.ArrayList(1);
+
+                      Function<Integer, ?> f;
+                      f = i -> new ArrayList();
+                      f = i -> new ArrayList(i) {};
+
+                      Object o;
+                      o = i -> new ArrayList(i);
                   }
               }
               """

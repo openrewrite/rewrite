@@ -21,12 +21,21 @@ import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ReplaceLambdaWithMethodReference extends Recipe {
 
@@ -63,7 +72,8 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     Statement statement = ((J.Block) body).getStatements().get(0);
                     if (statement instanceof J.MethodInvocation) {
                         body = statement;
-                    } else if (statement instanceof J.Return && (((J.Return) statement).getExpression()) instanceof MethodCall) {
+                    } else if (statement instanceof J.Return &&
+                            (((J.Return) statement).getExpression()) instanceof MethodCall) {
                         body = ((J.Return) statement).getExpression();
                     }
                 } else if (body instanceof J.InstanceOf) {
@@ -76,9 +86,9 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     if (!(((J.TypeCast) body).getExpression() instanceof J.MethodInvocation)) {
                         J.ControlParentheses<TypeTree> j = ((J.TypeCast) body).getClazz();
                         if (j != null) {
-                            @SuppressWarnings("rawtypes")
-                            J tree = ((J.ControlParentheses) j).getTree();
-                            if (tree instanceof J.Identifier && !(j.getType() instanceof JavaType.GenericTypeVariable)) {
+                            @SuppressWarnings("rawtypes") J tree = ((J.ControlParentheses) j).getTree();
+                            if (tree instanceof J.Identifier &&
+                                    !(j.getType() instanceof JavaType.GenericTypeVariable)) {
                                 body = tree;
                                 code = "#{}.class::cast";
                             }
@@ -89,46 +99,53 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                 if (body instanceof J.Identifier && !code.isEmpty()) {
                     J.Identifier identifier = (J.Identifier) body;
                     JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(identifier.getType());
-                    @Language("java")
-                    String stub = fullyQualified == null ? "" : "package " + fullyQualified.getPackageName() + "; public class " + fullyQualified.getClassName();
-                    JavaTemplate template = JavaTemplate
-                            .builder(this::getCursor, code)
-                            .javaParser(() -> JavaParser.fromJavaVersion()
-                                    .dependsOn(stub)
-                                    .build())
+                    @Language("java") String stub = fullyQualified == null ? "" :
+                            "package " + fullyQualified.getPackageName() + "; public class " +
+                                    fullyQualified.getClassName();
+                    JavaTemplate template = JavaTemplate.builder(this::getCursor, code)
+                            .javaParser(() -> JavaParser.fromJavaVersion().dependsOn(stub).build())
                             .doBeforeParseTemplate(System.out::println)
-                            .imports(fullyQualified == null ? "" : fullyQualified.getFullyQualifiedName())
-                            .build();
+                            .imports(fullyQualified == null ? "" : fullyQualified.getFullyQualifiedName()).build();
                     return l.withTemplate(template, l.getCoordinates().replace(), identifier.getSimpleName());
                 } else if (body instanceof J.Binary) {
                     J.Binary binary = (J.Binary) body;
-                    if (isNullCheck(binary.getLeft(), binary.getRight()) || isNullCheck(binary.getRight(), binary.getLeft())) {
+                    if (isNullCheck(binary.getLeft(), binary.getRight()) ||
+                            isNullCheck(binary.getRight(), binary.getLeft())) {
                         maybeAddImport("java.util.Objects");
-                        code = J.Binary.Type.Equal.equals(binary.getOperator()) ? "Objects::isNull" : "Objects::nonNull";
-                        return l.withTemplate(JavaTemplate.builder(this::getCursor, code).imports("java.util.Objects").build(), l.getCoordinates().replace());
+                        code = J.Binary.Type.Equal.equals(binary.getOperator()) ? "Objects::isNull" :
+                                "Objects::nonNull";
+                        return l.withTemplate(
+                                JavaTemplate.builder(this::getCursor, code).imports("java.util.Objects").build(),
+                                l.getCoordinates().replace());
                     }
-                } else if (body instanceof J.MethodInvocation) {
-                    J.MethodInvocation method = (J.MethodInvocation) body;
-                    if (!methodArgumentsMatchLambdaParameters(method, lambda) || multipleMethodInvocations(method)) {
+                } else if (body instanceof MethodCall) {
+                    MethodCall method = (MethodCall) body;
+                    if (method instanceof J.NewClass && ((J.NewClass) method).getBody() != null ||
+                            multipleMethodInvocations(method) ||
+                            !methodArgumentsMatchLambdaParameters(method, lambda)) {
                         return l;
                     }
 
+                    Expression select =
+                            method instanceof J.MethodInvocation ? ((J.MethodInvocation) method).getSelect() : null;
                     JavaType.Method methodType = method.getMethodType();
                     if (methodType != null) {
                         JavaType.FullyQualified declaringType = methodType.getDeclaringType();
-                        if (methodType.hasFlags(Flag.Static)) {
+                        if (methodType.hasFlags(Flag.Static) ||
+                                methodSelectMatchesFirstLambdaParameter(method, lambda)) {
                             maybeAddImport(declaringType);
-                            return l.withTemplate(JavaTemplate.builder(this::getCursor,
-                                            "#{}::#{}").build(), l.getCoordinates().replace(),
-                                    declaringType.getClassName(), method.getSimpleName());
+                            return l.withTemplate(JavaTemplate.builder(this::getCursor, "#{}::#{}").build(),
+                                    l.getCoordinates().replace(), declaringType.getClassName(),
+                                    method.getMethodType().getName());
+                        } else if (method instanceof J.NewClass) {
+                            return l.withTemplate(JavaTemplate.builder(this::getCursor, "#{}::new").build(),
+                                    l.getCoordinates().replace(), className((J.NewClass) method));
                         } else {
-                            String templ = method.getSelect() == null ?
-                                    "#{}::#{}" :
+                            String templ = select == null ? "#{}::#{}" :
                                     "#{any(" + declaringType.getFullyQualifiedName() + ")}::#{}";
                             return l.withTemplate(JavaTemplate.builder(this::getCursor, templ).build(),
-                                    l.getCoordinates().replace(),
-                                    method.getSelect() == null ? "this" : method.getSelect(),
-                                    method.getSimpleName());
+                                    l.getCoordinates().replace(), select == null ? "this" : select,
+                                    method.getMethodType().getName());
                         }
                     }
                 }
@@ -136,35 +153,67 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                 return l;
             }
 
-            private boolean multipleMethodInvocations(J.MethodInvocation method) {
-                return method.getSelect() instanceof J.MethodInvocation;
+            // returns the class name as given in the source code (qualified or unqualified)
+            private String className(J.NewClass method) {
+                TypeTree clazz = method.getClazz();
+                return clazz instanceof J.ParameterizedType ? ((J.ParameterizedType) clazz).getClazz().toString() :
+                        Objects.toString(clazz);
             }
 
-            private boolean methodArgumentsMatchLambdaParameters(J.MethodInvocation method, J.Lambda lambda) {
-                List<Expression> methodArgs = method.getArguments();
-                List<J> lambdaParameters = lambda.getParameters().getParameters();
-                if (methodArgs.size() != lambdaParameters.size() || method.getMethodType() == null) {
+            private boolean multipleMethodInvocations(MethodCall method) {
+                return method instanceof J.MethodInvocation &&
+                        ((J.MethodInvocation) method).getSelect() instanceof J.MethodInvocation;
+            }
+
+            private boolean methodArgumentsMatchLambdaParameters(MethodCall method, J.Lambda lambda) {
+                JavaType.Method methodType = method.getMethodType();
+                if (methodType == null) {
                     return false;
                 }
-                if(method.getMethodType().getParameterTypes().size() > 0) {
-                    for (int i = 0; i < lambdaParameters.size(); i++) {
-                        if (!(lambdaParameters.get(i) instanceof J.VariableDeclarations) || !(methodArgs.get(i) instanceof J.Identifier)) {
-                            return false;
-                        }
-                        J.Identifier lambdaParam = ((J.VariableDeclarations) lambdaParameters.get(i)).getVariables().get(0).getName();
-                        J.Identifier methodArgument = (J.Identifier) methodArgs.get(i);
-                        if (!lambdaParam.getSimpleName().equals(methodArgument.getSimpleName())) {
-                            return false;
-                        }
-                    }
+                boolean statik = methodType.hasFlags(Flag.Static);
+                List<Expression> methodArgs = method.getArguments().stream().filter(a -> !(a instanceof J.Empty))
+                        .collect(Collectors.toList());
+                List<J.VariableDeclarations.NamedVariable> lambdaParameters = lambda.getParameters().getParameters()
+                        .stream().filter(J.VariableDeclarations.class::isInstance)
+                        .map(J.VariableDeclarations.class::cast).map(v -> v.getVariables().get(0))
+                        .collect(Collectors.toList());
+                if (methodArgs.isEmpty() && lambdaParameters.isEmpty()) {
                     return true;
                 }
-                return methodArgs.get(0) instanceof J.Empty && lambdaParameters.get(0) instanceof J.Empty;
+                if (!statik && methodSelectMatchesFirstLambdaParameter(method, lambda)) {
+                    methodArgs.add(0, ((J.MethodInvocation) method).getSelect());
+                }
+                if (methodArgs.size() != lambdaParameters.size()) {
+                    return false;
+                }
+                for (int i = 0; i < lambdaParameters.size(); i++) {
+                    JavaType lambdaParam = lambdaParameters.get(i).getVariableType();
+                    if (!(methodArgs.get(i) instanceof J.Identifier)) {
+                        return false;
+                    }
+                    JavaType methodArgument = ((J.Identifier) methodArgs.get(i)).getFieldType();
+                    if (lambdaParam != methodArgument) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            private boolean methodSelectMatchesFirstLambdaParameter(MethodCall method, J.Lambda lambda) {
+                if (!(method instanceof J.MethodInvocation) ||
+                        !(((J.MethodInvocation) method).getSelect() instanceof J.Identifier) ||
+                        !(lambda.getParameters().getParameters().get(0) instanceof J.VariableDeclarations)) {
+                    return false;
+                }
+                J.VariableDeclarations firstLambdaParameter = (J.VariableDeclarations) lambda.getParameters()
+                        .getParameters().get(0);
+                return ((J.Identifier) ((J.MethodInvocation) method).getSelect()).getFieldType() ==
+                        firstLambdaParameter.getVariables().get(0).getVariableType();
             }
 
             private boolean isNullCheck(J j1, J j2) {
-                return j1 instanceof J.Identifier &&
-                        j2 instanceof J.Literal && "null".equals(((J.Literal) j2).getValueSource());
+                return j1 instanceof J.Identifier && j2 instanceof J.Literal &&
+                        "null".equals(((J.Literal) j2).getValueSource());
             }
         };
     }
