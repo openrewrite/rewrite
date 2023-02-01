@@ -17,6 +17,7 @@ package org.openrewrite.gradle.util;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Validated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -24,7 +25,10 @@ public class GradleWrapperTest {
 
     @Test
     void wrapper() {
-        GradleWrapper gw = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", null).getValue();
+        Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", null);
+        assertThat(validated.isValid()).isTrue();
+
+        GradleWrapper gw = validated.getValue();
         assertThat(gw).isNotNull();
         assertThat(gw.getVersion()).startsWith("7.");
     }
