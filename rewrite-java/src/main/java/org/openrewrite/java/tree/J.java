@@ -4273,6 +4273,11 @@ public interface J extends Tree {
         @Nullable
         JContainer<Expression> typeParameters;
 
+        @With
+        @Getter
+        @Nullable
+        JavaType type;
+
         @Nullable
         public List<Expression> getTypeParameters() {
             return typeParameters == null ? null : typeParameters.getElements();
@@ -4280,20 +4285,6 @@ public interface J extends Tree {
 
         public ParameterizedType withTypeParameters(@Nullable List<Expression> typeParameters) {
             return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
-        }
-
-        @Override
-        public JavaType getType() {
-            return clazz.getType();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public ParameterizedType withType(@Nullable JavaType type) {
-            if (type == clazz.getType()) {
-                return this;
-            }
-            return withClazz(clazz.withType(type));
         }
 
         @Override
@@ -4337,7 +4328,7 @@ public interface J extends Tree {
             }
 
             public ParameterizedType withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new ParameterizedType(t.id, t.prefix, t.markers, t.clazz, typeParameters);
+                return t.typeParameters == typeParameters ? t : new ParameterizedType(t.id, t.prefix, t.markers, t.clazz, typeParameters, t.type);
             }
         }
     }

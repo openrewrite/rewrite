@@ -1741,7 +1741,7 @@ public class GroovyParserVisitor {
                     type, null);
             if (type instanceof JavaType.Parameterized) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
-                        staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()));
+                        staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()), type);
             }
             return ident.withPrefix(prefix);
         }
@@ -1929,7 +1929,7 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null && classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()));
+            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
         }
         return expr.withPrefix(prefix);
     }

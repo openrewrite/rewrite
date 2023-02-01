@@ -1137,7 +1137,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitParameterizedType(ParameterizedTypeTree node, Space fmt) {
-        return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, convert(node.getType()), convertTypeParameters(node.getTypeArguments()));
+        return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, convert(node.getType()), convertTypeParameters(node.getTypeArguments()), typeMapping.type(node));
     }
 
     @Override
