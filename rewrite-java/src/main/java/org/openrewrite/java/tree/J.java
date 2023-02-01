@@ -5318,7 +5318,7 @@ public interface J extends Tree {
         @Override
         @Transient
         public List<J> getSideEffects() {
-            return expression.getSideEffects();
+            return getOperator().isModifying() ? singletonList(this) : expression.getSideEffects();
         }
 
         public enum Type {
