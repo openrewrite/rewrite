@@ -184,7 +184,10 @@ public class GitProvenance implements Marker {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (IllegalArgumentException | GitAPIException e) {
-            e.printStackTrace();
+            // Silently ignore if the project directory is not a git repository
+            if (!"requireGitDirOrWorkTree".equals(e.getStackTrace()[0].getMethodName())) {
+                e.printStackTrace();
+            }
             return null;
         }
     }

@@ -30,7 +30,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -76,6 +78,19 @@ class GitProvenanceTest {
             GitProvenance git = GitProvenance.fromProjectDirectory(projectDir, null);
             assertThat(git).isNotNull();
             assertThat(git.getBranch()).isEqualTo("main");
+        }
+    }
+
+    @Test
+    void nonGitNoStacktrace(@TempDir Path projectDir) throws GitAPIException {
+        PrintStream standardErr = System.err;
+        ByteArrayOutputStream captor = new ByteArrayOutputStream();
+        try {
+            System.setErr(new PrintStream(captor));
+            assertThat(GitProvenance.fromProjectDirectory(projectDir, null)).isNull();
+            assertThat(captor.toString()).doesNotContain("jgit");
+        } finally {
+            System.setErr(standardErr);
         }
     }
 
