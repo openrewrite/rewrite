@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
 
-@SuppressWarnings({"RedundantCast", "DataFlowIssue", "ConstantValue", "CastCanBeRemovedNarrowingVariableType", "ClassInitializerMayBeStatic"})
+@SuppressWarnings({"rawtypes", "unchecked", "RedundantCast", "DataFlowIssue", "ConstantValue", "CastCanBeRemovedNarrowingVariableType", "ClassInitializerMayBeStatic"})
 class InstanceOfPatternMatchTest implements RewriteTest {
 
     @Override
@@ -445,6 +445,81 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                         public class A {
                             boolean test(Object o) {
                                 return o instanceof int[][] && ((int[]) o).length > 1;
+                            }
+                        }
+                        """
+                    ), 17
+                  )
+                );
+            }
+        }
+    }
+
+    @Nested
+    class Generics {
+        @Nested
+        class Positive {
+            @Test
+            void rawInstanceOfAndWildcardParameterizedCast() {
+                rewriteRun(
+                  version(
+                    java(
+                        """
+                        import java.util.List;
+                        public class A {
+                            Object test(Object o) {
+                                return o instanceof List ? ((List<?>) o).get(0) : o.toString();
+                            }
+                        }
+                        """,
+                        """
+                        import java.util.List;
+                        public class A {
+                            Object test(Object o) {
+                                return o instanceof List l ? l.get(0) : o.toString();
+                            }
+                        }
+                        """
+                    ), 17)
+                );
+            }
+            @Test
+            void rawInstanceOfAndObjectParameterizedCast() {
+              rewriteRun(
+                version(
+                  java(
+                    """
+                      import java.util.List;
+                      public class A {
+                          Object test(Object o) {
+                              return o instanceof List ? ((List<Object>) o).get(0) : o.toString();
+                          }
+                      }
+                      """,
+                    """
+                      import java.util.List;
+                      public class A {
+                          Object test(Object o) {
+                              return o instanceof List l ? l.get(0) : o.toString();
+                          }
+                      }
+                      """
+                  ), 17)
+              );
+            }
+        }
+        @Nested
+        class Negative {
+            @Test
+            void rawInstanceOfAndParameterizedCast() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        import java.util.List;
+                        public class A {
+                            String test(Object o) {
+                                return o instanceof List ? ((List<String>) o).get(0) : o.toString();
                             }
                         }
                         """
