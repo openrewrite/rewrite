@@ -20,15 +20,6 @@ import com.gradle.enterprise.gradleplugin.GradleEnterpriseExtension
 import com.gradle.scan.plugin.BuildScanExtension
 import org.gradle.api.initialization.Settings
 
-interface PluginSpec {
-    Plugin id(String i)
-}
-
-interface Plugin {
-    Plugin version(String v)
-    Plugin apply(boolean a)
-}
-
 interface GradleEnterpriseSpec extends GradleEnterpriseExtension {
     void buildScan(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=BuildScanExtension) Closure cl);
 }
