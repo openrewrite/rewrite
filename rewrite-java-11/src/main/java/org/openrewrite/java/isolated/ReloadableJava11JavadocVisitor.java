@@ -1146,7 +1146,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 expression = expression.withAfter(after);
                 expressions.add(expression);
             }
-            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions));
+            return new J.ParameterizedType(randomId(), fmt, Markers.EMPTY, id, JContainer.build(expressions), typeMapping.type(node));
         }
     }
 }

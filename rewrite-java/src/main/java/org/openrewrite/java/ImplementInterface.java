@@ -81,7 +81,8 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
                         Space.EMPTY,
                         Markers.EMPTY,
                         impl,
-                        JContainer.build(Space.EMPTY, elements, Markers.EMPTY)
+                        JContainer.build(Space.EMPTY, elements, Markers.EMPTY),
+                        new JavaType.Parameterized(null, interfaceType, typeParameters.stream().map(Expression::getType).collect(Collectors.toList()))
                 );
 
                 c = c.withImplements(ListUtils.concat(c.getImplements(), typedImpl));

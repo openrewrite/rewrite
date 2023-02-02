@@ -22,7 +22,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
@@ -107,7 +106,7 @@ public class FindFieldsOfType extends Recipe {
     private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
-        } else if (type instanceof JavaType.Class) {
+        } else if (type instanceof JavaType.FullyQualified) {
             return fullyQualifiedName.equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
