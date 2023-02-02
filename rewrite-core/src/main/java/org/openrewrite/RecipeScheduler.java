@@ -223,7 +223,7 @@ public interface RecipeScheduler {
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after;
-        final List<Boolean> newSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final List<Boolean> finalSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
 
         if (!recipe.validate(ctx).isValid()) {
             after = before;
@@ -235,7 +235,7 @@ public interface RecipeScheduler {
 
                 S afterFile = s;
                 try {
-                    if (!RecipeSchedulerUtils.isSingleSourceApplicableTestPass(newSingleSourceApplicableTestResult, index)) {
+                    if (!RecipeSchedulerUtils.isSingleSourceApplicableTestPass(finalSingleSourceApplicableTestResult, index)) {
                         return s;
                     }
 
@@ -306,17 +306,38 @@ public interface RecipeScheduler {
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
         List<SourceFile> afterWidened;
+        final boolean singleSourceApplicableTestAvailable = finalSingleSourceApplicableTestResult != null
+            && !finalSingleSourceApplicableTestResult.isEmpty();
+        final List<Boolean> updatedSingleSourceApplicableTestResult = new ArrayList<>();
+
         try {
             long ownVisitStartTime = System.nanoTime();
-            afterWidened = ListUtils.map((List<SourceFile>) after,
-                (i, sourceAfter) -> {
-                    if (!RecipeSchedulerUtils.isSingleSourceApplicableTestPass(newSingleSourceApplicableTestResult, i)) {
-                        return sourceAfter;
-                    }
+            //noinspection unchecked
+            List<SourceFile> afterSources = (List<SourceFile>) after;
 
-                    return recipe.visit(Collections.singletonList(sourceAfter), ctx).get(0);
-                }
-            );
+            if (afterSources.isEmpty()) {
+                afterWidened = recipe.visit(afterSources, ctx);
+            } else {
+                afterWidened = ListUtils.flatMap(afterSources,
+                    (index, sourceAfter) -> {
+                        if (!RecipeSchedulerUtils.isSingleSourceApplicableTestPass(finalSingleSourceApplicableTestResult, index)) {
+                            if (singleSourceApplicableTestAvailable) {
+                                updatedSingleSourceApplicableTestResult.add(false);
+                            }
+                            return Collections.singletonList(sourceAfter);
+                        } else {
+                            List<SourceFile> out = recipe.visit(Collections.singletonList(sourceAfter), ctx);
+
+                            // after widening source files. need to update `newSingleSourceApplicableTestResult` since
+                            // it's a source file index based array, size changing needs to update the mapping.
+                            if (singleSourceApplicableTestAvailable) {
+                                updatedSingleSourceApplicableTestResult.addAll(Collections.nCopies(out.size(), true));
+                            }
+                            return out;
+                        }
+                    }
+                );
+            }
 
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
@@ -381,7 +402,7 @@ public interface RecipeScheduler {
             afterWidened = scheduleVisit(requireNonNull(nextStats),
                 nextStack,
                 afterWidened,
-                singleSourceApplicableTestResult,
+                updatedSingleSourceApplicableTestResult,
                 ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
