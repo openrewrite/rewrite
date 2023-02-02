@@ -184,6 +184,7 @@ public class GitProvenance implements Marker {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (IllegalArgumentException | GitAPIException e) {
+            e.printStackTrace();
             return null;
         }
     }
