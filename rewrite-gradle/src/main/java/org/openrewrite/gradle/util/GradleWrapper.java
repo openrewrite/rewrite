@@ -59,15 +59,10 @@ public class GradleWrapper {
 
         //noinspection unchecked
         return new Validated.Both(
-                Validated.test("distributionType", "must be a valid distribution type", distributionTypeName, dt -> {
-                    try {
-                        DistributionType.valueOf(dt);
-                        return true;
-                    } catch (Throwable e) {
-                        return false;
-                    }
-                }),
-                Semver.validate(version, null)
+            Validated.test("distributionType", "must be a valid distribution type", distributionTypeName,
+                dt -> Arrays.stream(DistributionType.values())
+                    .anyMatch(type -> type.name().equalsIgnoreCase(dt))),
+            Semver.validate(version, null)
         ) {
             GradleWrapper wrapper;
 
@@ -148,7 +143,8 @@ public class GradleWrapper {
     }
 
     public enum DistributionType {
-        Bin, All
+        Bin,
+        All
     }
 
     @Value

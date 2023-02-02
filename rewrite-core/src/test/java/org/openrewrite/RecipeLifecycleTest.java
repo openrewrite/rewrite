@@ -217,6 +217,7 @@ class RecipeLifecycleTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2754")
     @Test
     void yamlApplicabilityTrueWithRecipesHaveVisitMethodOverridden() {
         //language=yaml
@@ -271,6 +272,7 @@ class RecipeLifecycleTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2754")
     @Test
     void yamlApplicabilityFalseWithRecipesHaveVisitMethodOverridden() {
         //language=yaml

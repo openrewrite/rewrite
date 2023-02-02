@@ -163,9 +163,14 @@ public class NoDoubleBraceInitialization extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
-                if (mi.getMethodType() != null && TypeUtils.isAssignableTo(identifier.getFieldType(), mi.getMethodType().getDeclaringType())) {
-                    if (mi.getSelect() == null
-                            || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier) mi.getSelect()).getSimpleName()))) {
+                if (mi.getMethodType() != null && identifier.getFieldType() != null && mi.getSelect() == null
+                        || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier) mi.getSelect()).getSimpleName()))) {
+                    JavaType rawFieldType = identifier.getFieldType().getType();
+                    rawFieldType = rawFieldType instanceof JavaType.Parameterized ? ((JavaType.Parameterized) rawFieldType).getType() : rawFieldType;
+                    JavaType rawMethodDeclaringType = mi.getMethodType().getDeclaringType();
+                    rawMethodDeclaringType = rawMethodDeclaringType instanceof JavaType.Parameterized ? ((JavaType.Parameterized) rawMethodDeclaringType).getType() : rawMethodDeclaringType;
+
+                    if (TypeUtils.isAssignableTo(rawFieldType, rawMethodDeclaringType)) {
                         return mi.withSelect(identifier);
                     }
                 }

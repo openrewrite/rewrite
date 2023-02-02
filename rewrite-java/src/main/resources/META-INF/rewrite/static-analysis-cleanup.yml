@@ -31,7 +31,6 @@ recipeList:
   - org.openrewrite.java.cleanup.EqualsAvoidsNull
   - org.openrewrite.java.cleanup.ExplicitInitialization
   - org.openrewrite.java.cleanup.ExternalizableHasNoArgsConstructor
-  - org.openrewrite.java.cleanup.FinalizeLocalVariables
   - org.openrewrite.java.cleanup.FinalizePrivateFields
   - org.openrewrite.java.cleanup.FallThrough
   - org.openrewrite.java.cleanup.FinalClass

@@ -67,7 +67,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         // All methods that start with 'get' matching this InvocationMatcher will be considered non-side effecting.
-        InvocationMatcher SAFE_GETTER_METHODS = InvocationMatcher.fromInvocationMatchers(
+        InvocationMatcher SAFE_GETTER_METHODS = InvocationMatcher.fromMethodMatcher(
                 new MethodMatcher("java.io.File *(..)")
         );
 

@@ -37,14 +37,7 @@ import org.gradle.api.tasks.testing.testng.TestNGOptions
 import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
 
-interface PluginSpec {
-    Plugin id(String i)
-}
 
-interface Plugin {
-    Plugin version(String v)
-    Plugin apply(boolean a)
-}
 
 interface DependencyHandlerSpec extends DependencyHandler {
     Dependency annotationProcessor(String dependencyNotation)

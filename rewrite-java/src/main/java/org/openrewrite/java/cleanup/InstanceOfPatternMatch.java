@@ -155,7 +155,7 @@ public class InstanceOfPatternMatch extends Recipe {
             JavaType type = toJavaType((TypedTree) instanceOf.getClazz());
 
             Optional<ExpressionAndType> existing = instanceOfs.keySet().stream()
-                    .filter(k -> k.getType().equals(type)
+                    .filter(k -> TypeUtils.isAssignableTo(type, k.getType())
                             && SemanticallyEqual.areEqual(k.getExpression(), expression))
                     .findAny();
             if (!existing.isPresent()) {
@@ -170,7 +170,7 @@ public class InstanceOfPatternMatch extends Recipe {
             JavaType type = toJavaType(typeCast.getClazz().getTree());
 
             Optional<ExpressionAndType> match = instanceOfs.keySet().stream()
-                    .filter(k -> k.getType().equals(type)
+                    .filter(k -> TypeUtils.isAssignableTo(type, k.getType())
                             && SemanticallyEqual.areEqual(k.getExpression(), expression))
                     .findAny();
             if (match.isPresent()) {

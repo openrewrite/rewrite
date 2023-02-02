@@ -55,7 +55,7 @@ public interface InvocationMatcher {
         }
     }
 
-    static InvocationMatcher fromInvocationMatchers(MethodMatcher... methodMatchers) {
+    static InvocationMatcher fromMethodMatchers(MethodMatcher... methodMatchers) {
         return fromInvocationMatchers(Stream.of(methodMatchers).map(InvocationMatcher::fromMethodMatcher).collect(Collectors.toList()));
     }
 

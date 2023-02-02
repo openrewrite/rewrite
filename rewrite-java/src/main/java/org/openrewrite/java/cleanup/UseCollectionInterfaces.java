@@ -17,7 +17,6 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
@@ -134,7 +133,11 @@ public class UseCollectionInterfaces extends Recipe {
                                         newType.getClassName(),
                                         newType,
                                         null);
-                                typeExpression = parameterizedType.withClazz(returnType);
+                                JavaType.Parameterized javaType = (JavaType.Parameterized) parameterizedType.getType();
+                                typeExpression = parameterizedType.withClazz(returnType)
+                                        .withType(javaType != null ? javaType.withType(newType) :
+                                                new JavaType.Parameterized(null, newType, null)
+                                        );
                             }
                             m = m.withReturnTypeExpression(typeExpression);
                         }
@@ -181,7 +184,11 @@ public class UseCollectionInterfaces extends Recipe {
                                     newType,
                                     null
                             );
-                            typeExpression = parameterizedType.withClazz(returnType);
+                            JavaType.Parameterized javaType = (JavaType.Parameterized) parameterizedType.getType();
+                            typeExpression = parameterizedType.withClazz(returnType)
+                                    .withType(javaType != null ? javaType.withType(newType) :
+                                            new JavaType.Parameterized(null, newType, null)
+                                    );
                         }
 
                         mv = mv.withTypeExpression(typeExpression);
