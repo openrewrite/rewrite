@@ -127,6 +127,48 @@ class HideUtilityClassConstructorTest implements RewriteTest {
     }
 
     @Test
+    void doNotChangeInapplicableNestedClass() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  private A() {}
+                  public static String foo() { return "foo"; }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeApplicableNestedClass() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public A() {}
+                  public static String foo() { return "foo"; }
+                  private static class Builder() {
+                      public Builder() {}
+                      public static String foo() { return "foo"; }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  private A() {}
+                  public static String foo() { return "foo"; }
+                  private static class Builder() {
+                      private Builder() {}
+                      public static String foo() { return "foo"; }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeUtilityClassesWithMixedExposedConstructors() {
         rewriteRun(
           java(

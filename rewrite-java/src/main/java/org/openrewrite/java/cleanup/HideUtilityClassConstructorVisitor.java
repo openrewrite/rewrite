@@ -75,7 +75,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
              * required for HideUtilityClassConstructorVisitor to work.
              */
             c = (J.ClassDeclaration) new UtilityClassWithImplicitDefaultConstructorVisitor<>().visit(c, p, getCursor().getParentOrThrow());
-            c = (J.ClassDeclaration) new UtilityClassWithExposedConstructorInspectionVisitor<>().visit(c, p, getCursor().getParentOrThrow());
+            c = (J.ClassDeclaration) new UtilityClassWithExposedConstructorInspectionVisitor<>(c).visit(c, p, getCursor().getParentOrThrow());
         }
         return c;
     }
@@ -84,20 +84,17 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
      * Adds an empty private constructor if the class has zero explicit constructors. This hides the default implicit constructor.
      */
     private static class UtilityClassWithImplicitDefaultConstructorVisitor<P> extends JavaIsoVisitor<P> {
-        public UtilityClassWithImplicitDefaultConstructorVisitor() {
-        }
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
-            J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-            if (UtilityClassMatcher.hasImplicitDefaultConstructor(c) &&
+            if (UtilityClassMatcher.hasImplicitDefaultConstructor(classDecl) &&
                     !J.ClassDeclaration.Kind.Type.Enum.equals(classDecl.getKind())) {
-                c = c.withTemplate(JavaTemplate.builder(this::getCursor, "private #{}() {}").build(),
-                        c.getBody().getCoordinates().lastStatement(),
+                classDecl = classDecl.withTemplate(JavaTemplate.builder(this::getCursor, "private #{}() {}").build(),
+                        classDecl.getBody().getCoordinates().lastStatement(),
                         classDecl.getSimpleName()
                 );
             }
-            return c;
+            return classDecl;
         }
     }
 
@@ -106,7 +103,15 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
      * The constructor may be "Protected" in cases where it's desirable to subclass the Utility Class.
      */
     private static class UtilityClassWithExposedConstructorInspectionVisitor<P> extends JavaIsoVisitor<P> {
-        public UtilityClassWithExposedConstructorInspectionVisitor() {
+        private final J.ClassDeclaration utilityClass;
+
+        public UtilityClassWithExposedConstructorInspectionVisitor(J.ClassDeclaration utilityClass) {
+            this.utilityClass = utilityClass;
+        }
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
+            return classDecl == utilityClass ? super.visitClassDeclaration(classDecl, p) : classDecl;
         }
 
         @Override
