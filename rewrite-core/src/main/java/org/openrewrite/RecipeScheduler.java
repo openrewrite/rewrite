@@ -235,10 +235,8 @@ public interface RecipeScheduler {
 
                 S afterFile = s;
                 try {
-                    if (newSingleSourceApplicableTestResult != null && !newSingleSourceApplicableTestResult.isEmpty()) {
-                        if (!newSingleSourceApplicableTestResult.get(index)) {
-                            return s;
-                        }
+                    if (!RecipeSchedulerUtils.isSingleSourceApplicableTestPass(newSingleSourceApplicableTestResult, index)) {
+                        return s;
                     }
 
                     Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
@@ -310,8 +308,21 @@ public interface RecipeScheduler {
         List<SourceFile> afterWidened;
         try {
             long ownVisitStartTime = System.nanoTime();
-            //noinspection unchecked
-            afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+            afterWidened = ListUtils.map((List<SourceFile>) after,
+                (i, sourceAfter) -> {
+                    if (!RecipeSchedulerUtils.isSingleSourceApplicableTestPass(newSingleSourceApplicableTestResult, i)) {
+                        return sourceAfter;
+                    }
+
+                    S sourceBefore = before.get(i);
+                    if (sourceBefore == sourceAfter) {
+                        return sourceAfter;
+                    } else {
+                        return recipe.visit(Collections.singletonList(sourceAfter), ctx).get(0);
+                    }
+                }
+            );
+
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
@@ -437,5 +448,16 @@ class RecipeSchedulerUtils {
         exception = Markup.error(exception, t);
         recipeThatAddedOrDeletedSourceFile.put(exception.getId(), recipeStack);
         return ListUtils.concat(before, exception);
+    }
+
+    public static boolean isSingleSourceApplicableTestPass(@Nullable List<Boolean> SingleSourceApplicableTestResult,
+        int sourceIndex
+    ) {
+        if (SingleSourceApplicableTestResult != null
+            && SingleSourceApplicableTestResult.size() > sourceIndex
+            && sourceIndex >= 0) {
+            return !SingleSourceApplicableTestResult.get(sourceIndex);
+        }
+        return true;
     }
 }
