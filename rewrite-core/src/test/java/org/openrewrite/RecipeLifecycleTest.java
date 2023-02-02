@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
@@ -214,6 +215,114 @@ class RecipeLifecycleTest implements RewriteTest {
               .activateRecipes("org.openrewrite.ApplicabilityExactlyOnce")),
           text("1", "3"),
           text("2")
+        );
+    }
+
+    @Test
+    void yamlApplicabilityTrueWithRecipesHaveVisitMethodOverrided() {
+        //language=yaml
+        String yamlRecipe = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.RecipesToTransformMultiFiles
+          displayName: Recipes in the list which override 'visit()' method should be run if applicability test pass
+          description: >
+            A recipe has two different ways to run.
+            1. Override 'getVisitor()' method, and invoke `getVisitor().visit(@Nullable Tree tree, P p)` to transform a single file.
+            2. Override `visit(List<SourceFile> before, ExecutionContext ctx)` method, and invoke it to transform multiple files.
+            Typically, for a recipe, only one of the two methods mentioned above is required to be overrided.
+            The recipe scheduler invokes both methods in different places in the flow, this test is intended to make sure 
+            those recipes that overrides 'visit()' method can be run correctly with the applicability test.
+            
+            All recipes in the list should be run only when the applicability test pass.
+            
+            Given a text file containing the number "1", running this recipe should result in a file which has text "1->2->3".
+          applicability:
+            singleSource:
+              - org.openrewrite.text.FindAndReplace:
+                  find: "1"
+                  replace: "A"
+          recipeList:
+            - org.openrewrite.text.AppendToTextFile:
+                  relativeFileName: "file.txt"
+                  content: "->2"
+                  preamble: "preamble"
+                  appendNewline : false
+                  existingFileStrategy: "continue"
+            - org.openrewrite.text.AppendToTextFile:
+                  relativeFileName: "file.txt"
+                  content: "->3"
+                  preamble: "preamble"
+                  appendNewline : false
+                  existingFileStrategy: "continue"
+          """;
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder()
+            .scanRuntimeClasspath()
+            .load(
+              new YamlResourceLoader(
+                new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
+                Paths.get("applicability.yml").toUri(),
+                new Properties()))
+            .build()
+            .activateRecipes("org.openrewrite.RecipesToTransformMultiFiles")),
+          text("1",
+            "1->2->3",
+            spec -> spec.path("file.txt").noTrim())
+        );
+    }
+
+    @Disabled
+    @Test
+    void yamlApplicabilityFalseWithRecipesHaveVisitMethodOverrided() {
+        //language=yaml
+        String yamlRecipe = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.RecipesToTransformMultiFiles
+          displayName: Recipes in the list which override 'visit()' method should not be run if applicability test fail
+          description: >
+            A recipe has two different ways to run.
+            1. Override 'getVisitor()' method, and invoke `getVisitor().visit(@Nullable Tree tree, P p)` to transform a single file.
+            2. Override `visit(List<SourceFile> before, ExecutionContext ctx)` method, and invoke it to transform multiple files.
+            Typically, for a recipe, only one of the two methods mentioned above is required to be overrided.
+            The recipe scheduler invokes both methods in different places in the flow, this test is intended to make sure 
+            those recipes that overrides 'visit()' method can be run correctly with the applicability test.
+            
+            All recipes in the list should not be run only when the applicability test fail.
+            
+            Given a text file containing the number "2", running this recipe should result with no change.
+          applicability:
+            singleSource:
+              - org.openrewrite.text.FindAndReplace:
+                  find: "1"
+                  replace: "A"
+          recipeList:
+            - org.openrewrite.text.AppendToTextFile:
+                  relativeFileName: "file.txt"
+                  content: "->2"
+                  preamble: "preamble"
+                  appendNewline : false
+                  existingFileStrategy: "continue"
+            - org.openrewrite.text.AppendToTextFile:
+                  relativeFileName: "file.txt"
+                  content: "->3"
+                  preamble: "preamble"
+                  appendNewline : false
+                  existingFileStrategy: "continue"
+          """;
+        rewriteRun(
+          spec -> spec.recipe(Environment.builder()
+            .scanRuntimeClasspath()
+            .load(
+              new YamlResourceLoader(
+                new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
+                Paths.get("applicability.yml").toUri(),
+                new Properties()))
+            .build()
+            .activateRecipes("org.openrewrite.RecipesToTransformMultiFiles")),
+          text("2",
+            spec -> spec.path("file.txt").noTrim())
         );
     }
 
