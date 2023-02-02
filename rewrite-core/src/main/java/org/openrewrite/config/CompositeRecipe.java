@@ -62,6 +62,6 @@ public class CompositeRecipe extends Recipe {
                 dataTableDescriptors.addAll(dtd);
             }
         }
-        return dataTableDescriptors == null ? emptyList() : dataTableDescriptors;
+        return dataTableDescriptors == null ? super.getDataTableDescriptors() : dataTableDescriptors;
     }
 }
