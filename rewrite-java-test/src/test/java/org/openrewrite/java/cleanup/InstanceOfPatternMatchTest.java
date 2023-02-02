@@ -454,4 +454,34 @@ class InstanceOfPatternMatchTest implements RewriteTest {
             }
         }
     }
+
+    @Nested
+    class Various {
+        @Nested
+        class Positive {
+            @Test
+            void unaryWithoutSideEffects() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        public class A {
+                            String test(Object o) {
+                                return ((Object) ("1" + ~1)) instanceof String ? ((String) ((Object) ("1" + ~1))).substring(1) : o.toString();
+                            }
+                        }
+                        """,
+                      """
+                        public class A {
+                            String test(Object o) {
+                                return ((Object) ("1" + ~1)) instanceof String s ? s.substring(1) : o.toString();
+                            }
+                        }
+                        """
+                    ), 17
+                  )
+                );
+            }
+        }
+    }
 }
