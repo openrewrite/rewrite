@@ -17,6 +17,7 @@ package org.openrewrite.internal;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +29,13 @@ class ListUtilsTest {
         var l = List.of(1.0, 2.0, 3.0);
         assertThat(ListUtils.flatMap(l, l2 -> l2.intValue() % 2 == 0 ? List.of(2.0, 2.1, 2.2) : l2))
           .containsExactly(1.0, 2.0, 2.1, 2.2, 3.0);
+    }
+
+    @Test
+    void flatMapWithNoChangeShouldHaveReferenceEquality() {
+        var before = List.of(1, 2, 3);
+        var after = ListUtils.flatMap(before, Collections::singletonList);
+        assertThat(before == after).isTrue();
     }
 
     @Test
