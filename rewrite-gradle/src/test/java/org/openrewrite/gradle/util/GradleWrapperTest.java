@@ -17,15 +17,39 @@ package org.openrewrite.gradle.util;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Validated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class GradleWrapperTest {
 
     @Test
-    void wrapper() {
-        GradleWrapper gw = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", null).getValue();
+    void validateDistributionTypeBin() {
+        Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", null);
+        GradleWrapper gw = validated.getValue();
+        assertThat(validated.isValid()).isTrue();
         assertThat(gw).isNotNull();
         assertThat(gw.getVersion()).startsWith("7.");
+        assertThat(gw.getDistributionInfos().getDownloadUrl()).endsWith("-bin.zip");
+    }
+
+    @Test
+    void validateDistributionTypeAll() {
+        Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "6.x", "all", null);
+        GradleWrapper gw = validated.getValue();
+        assertThat(validated.isValid()).isTrue();
+        assertThat(gw).isNotNull();
+        assertThat(gw.getVersion()).startsWith("6.");
+        assertThat(gw.getDistributionInfos().getDownloadUrl()).endsWith("-all.zip");
+    }
+
+    @Test
+    void validateWithDistributionNull() {
+        Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", null, null);
+        GradleWrapper gw = validated.getValue();
+        assertThat(validated.isValid()).isTrue();
+        assertThat(gw).isNotNull();
+        assertThat(gw.getVersion()).startsWith("7.");
+        assertThat(gw.getDistributionInfos().getDownloadUrl()).endsWith("-bin.zip");
     }
 }
