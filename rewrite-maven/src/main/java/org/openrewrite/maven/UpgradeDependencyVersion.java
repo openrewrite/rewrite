@@ -136,7 +136,7 @@ public class UpgradeDependencyVersion extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    public List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         // first collect all POMs in the list of source files, any dependencies/managed dependencies that reference
         // a project pom should be excluded from consideration when upgrading dependencies
         Set<GroupArtifact> projectArtifacts = new HashSet<>();
