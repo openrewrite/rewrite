@@ -314,12 +314,7 @@ public interface RecipeScheduler {
                         return sourceAfter;
                     }
 
-                    S sourceBefore = before.get(i);
-                    if (sourceBefore == sourceAfter) {
-                        return sourceAfter;
-                    } else {
-                        return recipe.visit(Collections.singletonList(sourceAfter), ctx).get(0);
-                    }
+                    return recipe.visit(Collections.singletonList(sourceAfter), ctx).get(0);
                 }
             );
 
@@ -450,13 +445,13 @@ class RecipeSchedulerUtils {
         return ListUtils.concat(before, exception);
     }
 
-    public static boolean isSingleSourceApplicableTestPass(@Nullable List<Boolean> SingleSourceApplicableTestResult,
+    public static boolean isSingleSourceApplicableTestPass(@Nullable List<Boolean> singleSourceApplicableTestResult,
         int sourceIndex
     ) {
-        if (SingleSourceApplicableTestResult != null
-            && SingleSourceApplicableTestResult.size() > sourceIndex
+        if (singleSourceApplicableTestResult != null
+            && singleSourceApplicableTestResult.size() > sourceIndex
             && sourceIndex >= 0) {
-            return !SingleSourceApplicableTestResult.get(sourceIndex);
+            return singleSourceApplicableTestResult.get(sourceIndex);
         }
         return true;
     }

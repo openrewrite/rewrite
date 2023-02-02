@@ -272,7 +272,6 @@ class RecipeLifecycleTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void yamlApplicabilityFalseWithRecipesHaveVisitMethodOverridden() {
         //language=yaml
