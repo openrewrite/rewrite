@@ -66,6 +66,7 @@ class AddGradleWrapperTest implements RewriteTest {
               recipeList:
                 - org.openrewrite.gradle.AddGradleWrapper:
                     version: "7.4.2"
+                    distribution: bin
               """.getBytes()
           ),
           "org.openrewrite.test.AddGradleWrapper"
