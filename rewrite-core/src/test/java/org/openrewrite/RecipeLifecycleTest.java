@@ -219,7 +219,7 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Test
-    void yamlApplicabilityTrueWithRecipesHaveVisitMethodOverrided() {
+    void yamlApplicabilityTrueWithRecipesHaveVisitMethodOverridden() {
         //language=yaml
         String yamlRecipe = """
           ---
@@ -230,7 +230,7 @@ class RecipeLifecycleTest implements RewriteTest {
             A recipe has two different ways to run.
             1. Override 'getVisitor()' method, and invoke `getVisitor().visit(@Nullable Tree tree, P p)` to transform a single file.
             2. Override `visit(List<SourceFile> before, ExecutionContext ctx)` method, and invoke it to transform multiple files.
-            Typically, for a recipe, only one of the two methods mentioned above is required to be overrided.
+            Typically, for a recipe, only one of the two methods mentioned above is required to be overridden.
             The recipe scheduler invokes both methods in different places in the flow, this test is intended to make sure 
             those recipes that overrides 'visit()' method can be run correctly with the applicability test.
             
@@ -274,7 +274,7 @@ class RecipeLifecycleTest implements RewriteTest {
 
     @Disabled
     @Test
-    void yamlApplicabilityFalseWithRecipesHaveVisitMethodOverrided() {
+    void yamlApplicabilityFalseWithRecipesHaveVisitMethodOverridden() {
         //language=yaml
         String yamlRecipe = """
           ---
@@ -285,7 +285,7 @@ class RecipeLifecycleTest implements RewriteTest {
             A recipe has two different ways to run.
             1. Override 'getVisitor()' method, and invoke `getVisitor().visit(@Nullable Tree tree, P p)` to transform a single file.
             2. Override `visit(List<SourceFile> before, ExecutionContext ctx)` method, and invoke it to transform multiple files.
-            Typically, for a recipe, only one of the two methods mentioned above is required to be overrided.
+            Typically, for a recipe, only one of the two methods mentioned above is required to be overridden.
             The recipe scheduler invokes both methods in different places in the flow, this test is intended to make sure 
             those recipes that overrides 'visit()' method can be run correctly with the applicability test.
             
