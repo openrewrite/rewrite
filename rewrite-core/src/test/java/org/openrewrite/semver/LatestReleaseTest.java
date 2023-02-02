@@ -30,16 +30,23 @@ class LatestReleaseTest {
     }
 
     @Test
-    void onlyNumericPartsValid() {
+    void nonNumericPartsValid() {
         assertThat(latestRelease.isValid("1.0", "1.1.1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1")).isTrue();
-        assertThat(latestRelease.isValid("1.0", "1.1.a")).isFalse();
-        assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.a")).isTrue();
+        assertThat(latestRelease.compare(null, "1.0", "1.1.a")).isLessThan(0);
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isTrue();
+        assertThat(latestRelease.compare(null, "1.0", "1.1.1.1.a")).isLessThan(0);
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.0-SNAPSHOT")).isFalse();
+    }
+
+    @Test
+    void others() {
+        assertThat(latestRelease.compare(null, "2.5.6.SEC03", "6.0.4")).isLessThan(0);
     }
 
     @Test
