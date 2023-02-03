@@ -29,6 +29,9 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -69,7 +72,7 @@ public class InstanceOfPatternMatch extends Recipe {
                 J result = super.postVisit(tree, executionContext);
                 InstanceOfPatternReplacements original = getCursor().getMessage("flowTypeScope");
                 if (original != null && !original.isEmpty()) {
-                    return UseInstanceOfPatternMatching.refactor(result, original, getCursor());
+                    return UseInstanceOfPatternMatching.refactor(result, original, getCursor().getParentOrThrow());
                 }
                 return result;
             }
@@ -194,7 +197,7 @@ public class InstanceOfPatternMatch extends Recipe {
 
         public J.InstanceOf processInstanceOf(J.InstanceOf instanceOf, Cursor cursor) {
             @Nullable JavaType type = toJavaType((TypeTree) instanceOf.getClazz());
-            String name = patternVariableName(instanceOf, cursor);
+            String name = patternVariableName(instanceOf, cursor, root);
             J.InstanceOf result = instanceOf.withPattern(new J.Identifier(
                     randomId(),
                     Space.build(" ", emptyList()),
@@ -245,38 +248,16 @@ public class InstanceOfPatternMatch extends Recipe {
         return typeTree.getType();
     }
 
-    private static String patternVariableName(J.InstanceOf instanceOf, Cursor cursor) {
-        return VariableNameUtils.generateVariableName(shortVariableBaseName((TypeTree) instanceOf.getClazz()), cursor, INCREMENT_NUMBER);
+    private static String patternVariableName(J.InstanceOf instanceOf, Cursor cursor, J root) {
+        VariableNameStrategy strategy = root instanceof J.If
+                ? new VariableNameStrategy(VariableNameStrategy.Style.NORMAL, cursor)
+                : new VariableNameStrategy(VariableNameStrategy.Style.SHORT, cursor);
+        String baseName = variableBaseName((TypeTree) instanceOf.getClazz(), strategy);
+        return VariableNameUtils.generateVariableName(baseName, cursor, INCREMENT_NUMBER);
     }
 
-    private static String shortVariableBaseName(TypeTree typeTree) {
-        return shortVariableBaseName(toJavaType(typeTree));
-    }
-
-    private static String shortVariableBaseName(@Nullable JavaType type) {
-        // the instanceof operator only accepts classes (without generics) and arrays
-        if (type instanceof JavaType.FullyQualified) {
-            String qualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < qualifiedName.length(); i++) {
-                char c = qualifiedName.charAt(i);
-                if (Character.isUpperCase(c)) {
-                    builder.append(Character.toLowerCase(c));
-                }
-            }
-            if (builder.length() > 0) {
-                return builder.toString();
-            }
-        } else if (type instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive) type).getKeyword().substring(0, 1);
-        } else if (type instanceof JavaType.Array) {
-            JavaType elemType = ((JavaType.Array) type).getElemType();
-            while (elemType instanceof JavaType.Array) {
-                elemType = ((JavaType.Array) elemType).getElemType();
-            }
-            return shortVariableBaseName(elemType) + 's';
-        }
-        return "o";
+    private static String variableBaseName(TypeTree typeTree, VariableNameStrategy nameStrategy) {
+        return nameStrategy.variableName(toJavaType(typeTree));
     }
 
     private static class UseInstanceOfPatternMatching extends JavaVisitor<Integer> {
@@ -318,6 +299,66 @@ public class InstanceOfPatternMatch extends Recipe {
                 return replacement;
             }
             return typeCast;
+        }
+    }
+
+    private static class VariableNameStrategy {
+        public static final Pattern NAME_SPLIT_PATTERN = Pattern.compile("[$._]*(?=\\p{Upper}+[\\p{Lower}\\p{Digit}]*)");
+        private final Style style;
+        private final Cursor scope;
+
+        enum Style {
+            SHORT, NORMAL
+        }
+
+        VariableNameStrategy(Style style, Cursor scope) {
+            this.style = style;
+            this.scope = scope;
+        }
+
+        public String variableName(@Nullable JavaType type) {
+            // the instanceof operator only accepts classes (without generics) and arrays
+            if (type instanceof JavaType.FullyQualified) {
+                String className = ((JavaType.FullyQualified) type).getClassName();
+                switch (style) {
+                    case SHORT:
+                        StringBuilder builder = new StringBuilder();
+                        for (int i = 0; i < className.length(); i++) {
+                            char c = className.charAt(i);
+                            if (Character.isUpperCase(c)) {
+                                builder.append(Character.toLowerCase(c));
+                            }
+                        }
+                        if (builder.length() > 0) {
+                            return builder.toString();
+                        }
+                        break;
+                    case NORMAL:
+                        Set<String> namesInScope = VariableNameUtils.findNamesInScope(scope);
+                        List<String> nameSegments = Stream.of(NAME_SPLIT_PATTERN.split(className))
+                                .filter(s -> !s.isEmpty()).collect(Collectors.toList());
+                        for (int i = nameSegments.size() - 1; i >= 0; i--) {
+                            String candidate = String.join("", nameSegments.subList(i, nameSegments.size()));
+                            if (candidate.length() < 2) {
+                                continue;
+                            }
+                            candidate = Character.toLowerCase(candidate.charAt(0)) + candidate.substring(1);
+                            if (!namesInScope.contains(candidate)) {
+                                return candidate;
+                            }
+                        }
+                        return Character.toLowerCase(className.charAt(0)) + className.substring(1);
+                }
+            } else if (type instanceof JavaType.Primitive) {
+                return ((JavaType.Primitive) type).getKeyword().substring(0, 1);
+            } else if (type instanceof JavaType.Array) {
+                JavaType elemType = ((JavaType.Array) type).getElemType();
+                while (elemType instanceof JavaType.Array) {
+                    elemType = ((JavaType.Array) elemType).getElemType();
+                }
+                return variableName(elemType) + 's';
+            }
+            return "o";
         }
     }
 }

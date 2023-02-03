@@ -58,8 +58,8 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                         public class A {
                             void test(Object o) {
                                 Object s = 1;
-                                if (o instanceof String s1 && ((String) (o)).length() > 0) {
-                                    if (s1.length() > 1) {
+                                if (o instanceof String string && ((String) (o)).length() > 0) {
+                                    if (string.length() > 1) {
                                         System.out.println(o);
                                     }
                                 }
@@ -79,7 +79,7 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                       """
                         public class A {
                             void test(Object o, Object o2) {
-                                Object s = 1;
+                                Object string = 1;
                                 if (o instanceof String && o2 instanceof Integer) {
                                     System.out.println((String) o);
                                     System.out.println((Integer) o2);
@@ -90,10 +90,42 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                       """
                         public class A {
                             void test(Object o, Object o2) {
-                                Object s = 1;
-                                if (o instanceof String s1 && o2 instanceof Integer i) {
-                                    System.out.println(s1);
-                                    System.out.println(i);
+                                Object string = 1;
+                                if (o instanceof String string1 && o2 instanceof Integer integer) {
+                                    System.out.println(string1);
+                                    System.out.println(integer);
+                                }
+                            }
+                        }
+                        """
+                    ), 17
+                  )
+                );
+            }
+
+            @Test
+            void longNames() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        import java.util.ArrayList;
+                        public class A {
+                            void test(Object o) {
+                                Object list = 1;
+                                if (o instanceof ArrayList<?>) {
+                                    System.out.println((ArrayList<?>) o);
+                                }
+                            }
+                        }
+                        """,
+                      """
+                        import java.util.ArrayList;
+                        public class A {
+                            void test(Object o) {
+                                Object list = 1;
+                                if (o instanceof ArrayList<?> arrayList) {
+                                    System.out.println(arrayList);
                                 }
                             }
                         }
