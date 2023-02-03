@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -149,7 +150,7 @@ public final class ListUtils {
 
         List<T> newLs = ls;
         boolean widened = false;
-        List<T> outputLs = new ArrayList<>();
+        List<T> outputLs = new ArrayList<>(ls.size());
 
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
@@ -159,11 +160,18 @@ public final class ListUtils {
                 outputLs.add( (T) newTreeOrTrees);
             } else {
                 if (newTreeOrTrees instanceof Iterable) {
-                    //noinspection unchecked
-                    Iterable<T> it = (Iterable<T>) newTreeOrTrees;
-                    List<T> outLs = new ArrayList<>();
-                    for (T t : it) {
-                        outLs.add(t);
+                    List<T> outLs;
+
+                    if (newTreeOrTrees instanceof Collection) {
+                        //noinspection unchecked
+                        outLs = new ArrayList<>((Collection<T>) newTreeOrTrees);
+                    } else {
+                        outLs = new ArrayList<>();
+                        //noinspection unchecked
+                        Iterable<T> it = (Iterable<T>) newTreeOrTrees;
+                        for (T t : it) {
+                            outLs.add(t);
+                        }
                     }
 
                     outputLs.addAll(outLs);
