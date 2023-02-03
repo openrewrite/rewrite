@@ -559,10 +559,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
             if (type instanceof ConeKotlinTypeProjectionIn) {
                 name = convertKotlinFqToJavaFq(((ConeKotlinTypeProjectionIn) type).getType().toString());
-                System.out.println();
             } else if (type instanceof ConeKotlinTypeProjectionOut) {
                 name = convertKotlinFqToJavaFq(((ConeKotlinTypeProjectionOut) type).getType().toString());
-                System.out.println();
             } else if (type instanceof ConeStarProjection) {
                 name = "*";
             } else {

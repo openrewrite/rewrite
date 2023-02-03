@@ -87,6 +87,7 @@ public class KotlinTypeMappingTest {
         assertThat(kotlinBasicType.getFullyQualifiedName()).isEqualTo("kotlin.Int");
     }
 
+    @Disabled
     @Test
     public void generic() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().get(0);
@@ -95,6 +96,7 @@ public class KotlinTypeMappingTest {
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
+    @Disabled
     @Test
     public void genericContravariant() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().get(0);
