@@ -23,8 +23,6 @@ import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -163,8 +161,10 @@ public final class ListUtils {
                 if (newTreeOrTrees instanceof Iterable) {
                     //noinspection unchecked
                     Iterable<T> it = (Iterable<T>) newTreeOrTrees;
-                    List<T> outLs = StreamSupport.stream(it.spliterator(), false)
-                        .collect(Collectors.toList());
+                    List<T> outLs = new ArrayList<>();
+                    for (T t : it) {
+                        outLs.add(t);
+                    }
 
                     outputLs.addAll(outLs);
 
