@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -42,9 +43,11 @@ class ExtractInterfaceTest implements RewriteTest {
 
         @Override
         protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-            return ListUtils.flatMap(before, b ->
-              ExtractInterface.extract((JavaSourceFile) b,
-                "org.openrewrite.interfaces.ITest"));
+            return ListUtils.flatMap(before, b -> {
+                List<JavaSourceFile> ljs = ExtractInterface.extract((JavaSourceFile) b,
+                  "org.openrewrite.interfaces.ITest");
+                return ljs.stream().map(s -> (SourceFile) s).collect(Collectors.toList());
+            });
         }
     }
 

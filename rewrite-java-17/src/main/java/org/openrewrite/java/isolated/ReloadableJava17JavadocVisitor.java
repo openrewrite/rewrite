@@ -444,12 +444,12 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (i == description.size() - 1) {
                 if (desc instanceof Javadoc.Text) {
                     Javadoc.Text text = (Javadoc.Text) desc;
-                    return text.withText(text.getText());
+                    return Collections.singletonList(text.withText(text.getText())) ;
                 } else {
                     return ListUtils.concat(desc, endBrace());
                 }
             }
-            return desc;
+            return Collections.singletonList(desc);
         });
 
         return new Javadoc.Index(
@@ -830,7 +830,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     return ListUtils.concat(sum, endBrace());
                 }
             }
-            return sum;
+            return Collections.singletonList(sum);
         });
 
         return new Javadoc.Summary(

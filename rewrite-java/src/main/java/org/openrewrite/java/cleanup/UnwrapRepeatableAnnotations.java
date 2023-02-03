@@ -25,6 +25,7 @@ import org.openrewrite.java.search.FindRepeatableAnnotations;
 import org.openrewrite.java.tree.J;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class UnwrapRepeatableAnnotations extends Recipe {
@@ -94,7 +95,7 @@ public class UnwrapRepeatableAnnotations extends Recipe {
                         }
                     }.visit(a, 0);
 
-                    return unwrapped.isEmpty() ? a : unwrapped;
+                    return unwrapped.isEmpty() ? Collections.singletonList(a) : unwrapped;
                 });
             }
         };

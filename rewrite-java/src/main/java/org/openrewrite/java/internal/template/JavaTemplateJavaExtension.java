@@ -24,10 +24,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
@@ -128,7 +125,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                         return ListUtils.concat(statement, gen);
                                 }
                             }
-                            return statement;
+                            return Collections.singletonList(statement);
                         }));
                     }
                 }

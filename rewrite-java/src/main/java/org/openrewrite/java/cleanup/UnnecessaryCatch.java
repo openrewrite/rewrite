@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -54,7 +55,7 @@ public class UnnecessaryCatch extends Recipe {
                             return ListUtils.map(aTry.getBody().getStatements(), tryStat -> autoFormat(tryStat, ctx, getCursor()));
                         }
                     }
-                    return statement;
+                    return Collections.singletonList(statement);
                 }));
             }
 

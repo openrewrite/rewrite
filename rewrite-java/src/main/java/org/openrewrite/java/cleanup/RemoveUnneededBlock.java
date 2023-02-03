@@ -23,6 +23,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+
 @Incubating(since = "7.21.0")
 public class RemoveUnneededBlock extends Recipe {
     @Override
@@ -60,7 +62,7 @@ public class RemoveUnneededBlock extends Recipe {
             // Else perform the flattening on this block.
             return block.withStatements(ListUtils.flatMap(bl.getStatements(), stmt -> {
                 if (!(stmt instanceof J.Block)) {
-                    return stmt;
+                    return Collections.singletonList(stmt);
                 }
                 J.Block nested = (J.Block) stmt;
                 return ListUtils.map(nested.getStatements(), inlinedStmt -> maybeAutoFormat(

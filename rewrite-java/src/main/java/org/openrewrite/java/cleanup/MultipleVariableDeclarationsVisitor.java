@@ -25,6 +25,7 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -36,11 +37,11 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
 
         return b.withStatements(ListUtils.flatMap(b.getStatements(), statement -> {
             if(!(statement instanceof J.VariableDeclarations)) {
-                return statement;
+                return Collections.singletonList(statement);
             }
             J.VariableDeclarations mv = (J.VariableDeclarations) statement;
             if(mv.getVariables().size() <= 1) {
-                return mv;
+                return Collections.singletonList(statement);
             }
 
             List<J.VariableDeclarations> newDecls = new ArrayList<>(mv.getVariables().size());
@@ -65,7 +66,9 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
                 vd = autoFormat(vd, ctx, getCursor());
                 newDecls.add(vd);
             }
-            return newDecls;
+            return newDecls.stream()
+                .map(nc -> (Statement) nc)
+                .collect(Collectors.toList());
         }));
     }
 }

@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Set;
 
 import static java.util.Collections.singleton;
@@ -68,7 +69,7 @@ public class CatchClauseOnlyRethrows extends Recipe {
                             return ListUtils.map(aTry.getBody().getStatements(), tryStat -> autoFormat(tryStat, ctx, getCursor()));
                         }
                     }
-                    return statement;
+                    return Collections.singletonList(statement);
                 }));
             }
 

@@ -105,7 +105,7 @@ public class MinimumSwitchCases extends Recipe {
                 return block.withStatements(ListUtils.flatMap(block.getStatements(), (statement) -> {
                     Statement visited = (Statement) visit(statement, executionContext, getCursor());
                     if (!(visited instanceof J.Switch) || !visited.getMarkers().findFirst(DefaultOnly.class).isPresent()) {
-                        return visited;
+                        return Collections.singletonList(visited);
                     }
                     // Unwrap the contents of the default block, discarding the break statement if one exists
                     J.Case defaultCase = (J.Case) ((J.Switch) visited).getCases().getStatements().get(0);

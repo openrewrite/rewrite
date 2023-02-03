@@ -17,8 +17,10 @@ package org.openrewrite.internal;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,8 +29,16 @@ class ListUtilsTest {
     @Test
     void flatMap() {
         var l = List.of(1.0, 2.0, 3.0);
-        assertThat(ListUtils.flatMap(l, l2 -> l2.intValue() % 2 == 0 ? List.of(2.0, 2.1, 2.2) : l2))
+        assertThat(ListUtils.flatMap(l, l2 -> l2.intValue() % 2 == 0 ? List.of(2.0, 2.1, 2.2) : List.of(l2)))
           .containsExactly(1.0, 2.0, 2.1, 2.2, 3.0);
+    }
+
+    @Test
+    void flatMapList() {
+        var before = List.of(List.of(1, 2), List.of(3, 4));
+        var after = ListUtils.flatMap2(before,
+          list -> Collections.singletonList(list.stream().map(n -> n * 2).collect(Collectors.toList())));
+        assertThat(after).containsExactly(List.of(2, 4), List.of(6, 8));
     }
 
     @Test
@@ -48,7 +58,7 @@ class ListUtilsTest {
     @Test
     void removeSingleItem() {
         var l = List.of(1, 2, 3);
-        assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? null : l1))
+        assertThat(ListUtils.flatMap(l, l1 -> l1.equals(2) ? null : List.of(l1)))
           .containsExactly(1, 3);
     }
 

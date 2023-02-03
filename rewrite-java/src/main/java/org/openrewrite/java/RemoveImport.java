@@ -153,7 +153,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                     return unfoldStarImport(impoort, otherTypesInPackageUsed);
                 }
             }
-            return impoort;
+            return Collections.singletonList(impoort);
         }));
 
         if (c != cu && c.getPackageDeclaration() == null && c.getImports().isEmpty() &&
@@ -164,7 +164,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         return c;
     }
 
-    private Object unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed) {
+    private List<J.Import> unfoldStarImport(J.Import starImport, Set<String> otherImportsUsed) {
         List<J.Import> unfoldedImports = new ArrayList<>(otherImportsUsed.size());
         int i = 0;
         for (String other : otherImportsUsed) {

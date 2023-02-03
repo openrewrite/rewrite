@@ -18,7 +18,6 @@ package org.openrewrite.internal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -142,7 +141,7 @@ public final class ListUtils {
         return map(ls, (i, t) -> map.apply(t));
     }
 
-    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
+    public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, List<T>> flatMap) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
             return ls;
@@ -154,52 +153,20 @@ public final class ListUtils {
 
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
-            Object newTreeOrTrees = flatMap.apply(i, tree);
-            if (newTreeOrTrees == tree) {
-                //noinspection unchecked
-                outputLs.add( (T) newTreeOrTrees);
-            } else {
-                if (newTreeOrTrees instanceof Iterable) {
-                    List<T> outLs;
+            List<T> newTreeOrTrees = flatMap.apply(i, tree);
+            outputLs.addAll(newTreeOrTrees);
 
-                    if (newTreeOrTrees instanceof Collection) {
-                        //noinspection unchecked
-                        outLs = new ArrayList<>((Collection<T>) newTreeOrTrees);
-                    } else {
-                        outLs = new ArrayList<>();
-                        //noinspection unchecked
-                        Iterable<T> it = (Iterable<T>) newTreeOrTrees;
-                        for (T t : it) {
-                            outLs.add(t);
-                        }
-                    }
-
-                    outputLs.addAll(outLs);
-
-                    if (!widened) {
-                        if (outLs.size() == 1) {
-                            T newTree = outLs.get(0);
-                            if (newTree != tree) {
-                                if (newLs == ls) {
-                                    newLs = new ArrayList<>(ls);
-                                }
-                                newLs.set(i, newTree);
-                            }
-                        } else {
-                            widened = true;
-                        }
-                    }
-                } else {
-                    //noinspection unchecked
-                    outputLs.add((T) newTreeOrTrees);
-
-                    if (!widened) {
+            if (!widened) {
+                if (newTreeOrTrees.size() == 1) {
+                    T newTree = newTreeOrTrees.get(0);
+                    if (newTree != tree) {
                         if (newLs == ls) {
                             newLs = new ArrayList<>(ls);
                         }
-                        //noinspection unchecked
-                        newLs.set(i,  (T) newTreeOrTrees);
+                        newLs.set(i, newTree);
                     }
+                } else {
+                    widened = true;
                 }
             }
         }
@@ -218,7 +185,7 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> flatMap(@Nullable List<T> ls, Function<T, Object> flatMap) {
+    public static <T> List<T> flatMap(@Nullable List<T> ls, Function<T, List<T>> flatMap) {
         return flatMap(ls, (i, t) -> flatMap.apply(t));
     }
 

@@ -276,7 +276,7 @@ public class ImportLayoutStyle implements JavaStyle {
         return ListUtils.flatMap(originalImports, (i, anImport) -> {
             if (starFold.get() && i >= starFoldFrom.get() && i < starFoldTo.get()) {
                 return i == starFoldFrom.get() ?
-                        finalToAdd /* only add the star import once */ :
+                        Collections.singletonList(finalToAdd) /* only add the star import once */ :
                         null;
             } else if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
                 if (starFold.get()) {
@@ -284,7 +284,7 @@ public class ImportLayoutStyle implements JavaStyle {
                     if (starFoldFrom.get() == starFoldTo.get()) {
                         return Arrays.asList(finalToAdd, finalAfter);
                     } else {
-                        return finalAfter;
+                        return Collections.singletonList(finalAfter);
                     }
                 } else if (isNewBlock.get()) {
                     return anImport.getElement().isStatic() && !finalToAdd.getElement().isStatic() ?
@@ -295,7 +295,7 @@ public class ImportLayoutStyle implements JavaStyle {
             } else if (i == originalImports.size() - 1 && (finalAfter == null)) {
                 return Arrays.asList(anImport, finalToAdd);
             }
-            return anImport;
+            return Collections.singletonList(anImport);
         });
     }
 
