@@ -106,7 +106,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
     private JavaType resolveType(Object type, String signature, @Nullable FirBasedSymbol<?> ownerFallBack) {
         if (type instanceof ConeTypeProjection) {
-            return generic((ConeTypeProjection) type, signature, ownerFallBack);
+            return resolveConeTypeProjection((ConeTypeProjection) type, signature, ownerFallBack);
         } else if (type instanceof FirExpression) {
             return type(((FirExpression) type).getTypeRef(), ownerFallBack);
         } else if (type instanceof FirFunctionTypeRef) {
@@ -134,12 +134,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if (coneKotlinType instanceof ConeTypeParameterType) {
                 FirClassifierSymbol<?> classifierSymbol = LookupTagUtilsKt.toSymbol(((ConeTypeParameterType) coneKotlinType).getLookupTag(), firSession);
                 if (classifierSymbol != null && classifierSymbol.getFir() instanceof FirTypeParameter) {
-                    return generic((FirTypeParameter) classifierSymbol.getFir(), signature);
+                    return resolveConeTypeProjection((FirTypeParameter) classifierSymbol.getFir(), signature);
                 }
             }
             return classType(type, signature, ownerFallBack);
         } else if (type instanceof FirTypeParameter) {
-            return generic((FirTypeParameter) type, signature);
+            return resolveConeTypeProjection((FirTypeParameter) type, signature);
         } else if (type instanceof FirVariableAssignment) {
             return type(((FirVariableAssignment) type).getCalleeReference(), ownerFallBack);
         }
@@ -155,6 +155,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             resolvedTypeRef = (FirResolvedTypeRef) classType;
             FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(resolvedTypeRef.getType(), firSession);
             if (symbol == null) {
+                typeCache.put(signature, JavaType.Unknown.getInstance());
                 return JavaType.Unknown.getInstance();
             }
             firClass = symbol.getFir();
@@ -254,7 +255,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             }
 
             List<JavaType.Method> methods = null;
-            if(!functions.isEmpty()) {
+            if (!functions.isEmpty()) {
                 methods = new ArrayList<>(functions.size());
                 for (FirFunction function : functions) {
                     methods.add(methodDeclarationType(function, clazz, ownerFallBack));
@@ -542,41 +543,61 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         throw new UnsupportedOperationException("Unknown primitive type " + type);
     }
 
-    private JavaType generic(ConeTypeProjection type, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
+    private JavaType resolveConeTypeProjection(ConeTypeProjection type, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
+        JavaType resolvedType = JavaType.Unknown.getInstance();
+
         // TODO: fix for multiple bounds.
-        String name = "";
-        JavaType.GenericTypeVariable.Variance variance = INVARIANT;
-        List<JavaType> bounds = null;
-        if (type instanceof ConeKotlinTypeProjectionIn) {
-            ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
-            variance = CONTRAVARIANT;
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(in.getType(), firSession);
-            bounds = new ArrayList<>(1);
-            bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
-        } else if (type instanceof ConeKotlinTypeProjectionOut) {
-            ConeKotlinTypeProjectionOut out = (ConeKotlinTypeProjectionOut) type;
-            variance = COVARIANT;
-            FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(out.getType(), firSession);
-            bounds = new ArrayList<>(1);
-            bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
-        } else if (type instanceof ConeStarProjection) {
-            name = "*";
-        } else if (type instanceof ConeClassLikeType) {
-            return resolveConeLikeClassType((ConeClassLikeType) type, signature, ownerSymbol);
-        } else if (type instanceof ConeTypeParameterType) {
-            name = type.toString();
-        } else if (type instanceof ConeFlexibleType) {
-            return type(((ConeFlexibleType) type).getLowerBound());
+        boolean isGeneric = type instanceof ConeKotlinTypeProjectionIn ||
+                type instanceof ConeKotlinTypeProjectionOut ||
+                type instanceof ConeStarProjection ||
+                type instanceof ConeTypeParameterType;
+
+        if (isGeneric) {
+            String name;
+            JavaType.GenericTypeVariable.Variance variance = INVARIANT;
+            List<JavaType> bounds = null;
+
+            if (type instanceof ConeKotlinTypeProjectionIn) {
+                name = convertKotlinFqToJavaFq(((ConeKotlinTypeProjectionIn) type).getType().toString());
+                System.out.println();
+            } else if (type instanceof ConeKotlinTypeProjectionOut) {
+                name = convertKotlinFqToJavaFq(((ConeKotlinTypeProjectionOut) type).getType().toString());
+                System.out.println();
+            } else if (type instanceof ConeStarProjection) {
+                name = "*";
+            } else {
+                name = type.toString();
+            }
+
+            JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, name, INVARIANT, null);
+            typeCache.put(signature, gtv);
+
+            if (type instanceof ConeKotlinTypeProjectionIn) {
+                ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
+                variance = CONTRAVARIANT;
+                FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(in.getType(), firSession);
+                bounds = new ArrayList<>(1);
+                bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
+            } else if (type instanceof ConeKotlinTypeProjectionOut) {
+                ConeKotlinTypeProjectionOut out = (ConeKotlinTypeProjectionOut) type;
+                variance = COVARIANT;
+                FirRegularClassSymbol classSymbol = TypeUtilsKt.toRegularClassSymbol(out.getType(), firSession);
+                bounds = new ArrayList<>(1);
+                bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
+            }
+
+            gtv.unsafeSet(variance, bounds);
+            resolvedType = gtv;
         } else {
-            throw new IllegalStateException("Implement me.");
+            // The ConeTypeProjection is not a generic type, so it must be a class type.
+            if (type instanceof ConeClassLikeType) {
+                resolvedType = resolveConeLikeClassType((ConeClassLikeType) type, signature, ownerSymbol);
+            } else if (type instanceof ConeFlexibleType) {
+                resolvedType = type(((ConeFlexibleType) type).getLowerBound());
+            }
         }
 
-        JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
-                name, variance, null);
-        typeCache.put(signature, gtv);
-
-        gtv.unsafeSet(variance, bounds);
-        return gtv;
+        return resolvedType;
     }
 
     private JavaType resolveConeLikeClassType(ConeClassLikeType coneClassLikeType, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
@@ -589,7 +610,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return type(classSymbol.getFir(), ownerSymbol);
     }
 
-    private JavaType generic(FirTypeParameter typeParameter, String signature) {
+    private JavaType resolveConeTypeProjection(FirTypeParameter typeParameter, String signature) {
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, typeParameter.getName().asString(), INVARIANT, null);
         typeCache.put(signature, gtv);
 
@@ -600,6 +621,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             for (FirTypeRef bound : typeParameter.getBounds()) {
                 bounds.add(type(bound));
             }
+
             if ("out".equals(typeParameter.getVariance().getLabel())) {
                 variance = COVARIANT;
             } else if ("in".equals(typeParameter.getVariance().getLabel())) {
