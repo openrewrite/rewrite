@@ -34,6 +34,7 @@ class InstanceOfPatternMatchTest implements RewriteTest {
     @Nested
     class If {
 
+        @SuppressWarnings({"PatternVariableCanBeUsed", "UnnecessaryLocalVariable"})
         @Nested
         class Positive {
 
@@ -126,6 +127,37 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                                 Object list = 1;
                                 if (o instanceof ArrayList<?> arrayList) {
                                     System.out.println(arrayList);
+                                }
+                            }
+                        }
+                        """
+                    ), 17
+                  )
+                );
+            }
+
+            @Test
+            void matchingVariableInBody() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        public class A {
+                            void test(Object o) {
+                                if (o instanceof String) {
+                                    String str = (String) o;
+                                    String str2 = (String) o;
+                                    System.out.println(str + str2);
+                                }
+                            }
+                        }
+                        """,
+                      """
+                        public class A {
+                            void test(Object o) {
+                                if (o instanceof String str) {
+                                    String str2 = str;
+                                    System.out.println(str + str2);
                                 }
                             }
                         }
@@ -232,6 +264,27 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                                     if (((String) o).length() > 1) {
                                         System.out.println(o);
                                     }
+                                }
+                            }
+                        }
+                        """
+                    ), 17
+                  )
+                );
+            }
+
+            @Test
+            void negatedInstanceOfMatchedInElse() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        public class A {
+                            void test(Object o) {
+                                if (!(o instanceof String)) {
+                                    System.out.println(((String) o).length());
+                                } else {
+                                    System.out.println(((String) o).length());
                                 }
                             }
                         }

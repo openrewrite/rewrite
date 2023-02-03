@@ -97,6 +97,10 @@ public class InstanceOfPatternMatch extends Recipe {
                         } else {
                             flowScopeBreakEncountered = true;
                         }
+                    } else if (value instanceof J.Unary && ((J.Unary) value).getOperator() == J.Unary.Type.Not) {
+                        // TODO this could be improved (the pattern variable may be applicable in the else case
+                        // or even in subsequent statements (due to the flow scope semantics)
+                        flowScopeBreakEncountered = true;
                     } else if (value instanceof Statement) {
                         maybeReplacementRoot = next;
                         break;
@@ -152,6 +156,7 @@ public class InstanceOfPatternMatch extends Recipe {
         private final Map<ExpressionAndType, J.InstanceOf> instanceOfs = new HashMap<>();
         private final Map<J.InstanceOf, Set<J>> contexts = new HashMap<>();
         private final Map<J.TypeCast, J.InstanceOf> replacements = new HashMap<>();
+        private final Map<J.InstanceOf, J.VariableDeclarations.NamedVariable> variablesToDelete = new HashMap<>();
 
         public void registerInstanceOf(J.InstanceOf instanceOf, Set<J> contexts) {
             org.openrewrite.java.tree.Expression expression = instanceOf.getExpression();
@@ -177,12 +182,18 @@ public class InstanceOfPatternMatch extends Recipe {
                             && SemanticallyEqual.areEqual(k.getExpression(), expression))
                     .findAny();
             if (match.isPresent()) {
+                Cursor parent = cursor.getParentTreeCursor();
                 J.InstanceOf instanceOf = instanceOfs.get(match.get());
                 Set<J> validContexts = contexts.get(instanceOf);
                 for (Iterator<?> it = cursor.getPath(); it.hasNext(); ) {
                     Object next = it.next();
                     if (validContexts.contains(next)) {
-                        replacements.put(typeCast, instanceOf);
+                        if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable
+                                && !variablesToDelete.containsKey(instanceOf)) {
+                            variablesToDelete.put(instanceOf, parent.getValue());
+                        } else {
+                            replacements.put(typeCast, instanceOf);
+                        }
                         break;
                     } else if (root == next) {
                         break;
@@ -192,12 +203,12 @@ public class InstanceOfPatternMatch extends Recipe {
         }
 
         public boolean isEmpty() {
-            return replacements.isEmpty();
+            return replacements.isEmpty() && variablesToDelete.isEmpty();
         }
 
         public J.InstanceOf processInstanceOf(J.InstanceOf instanceOf, Cursor cursor) {
             @Nullable JavaType type = toJavaType((TypeTree) instanceOf.getClazz());
-            String name = patternVariableName(instanceOf, cursor, root);
+            String name = patternVariableName(instanceOf, cursor);
             J.InstanceOf result = instanceOf.withPattern(new J.Identifier(
                     randomId(),
                     Space.build(" ", emptyList()),
@@ -213,6 +224,20 @@ public class InstanceOfPatternMatch extends Recipe {
                 }
             }
             return result;
+        }
+
+        private String patternVariableName(J.InstanceOf instanceOf, Cursor cursor) {
+            VariableNameStrategy strategy;
+            if (root instanceof J.If) {
+                J.VariableDeclarations.NamedVariable variable = variablesToDelete.get(instanceOf);
+                strategy = variable != null
+                        ? VariableNameStrategy.exact(cursor, variable.getSimpleName())
+                        : VariableNameStrategy.normal(cursor);
+            } else {
+                strategy = VariableNameStrategy.short_(cursor);
+            }
+            String baseName = variableBaseName((TypeTree) instanceOf.getClazz(), strategy);
+            return VariableNameUtils.generateVariableName(baseName, cursor, INCREMENT_NUMBER);
         }
 
         @Nullable
@@ -233,6 +258,11 @@ public class InstanceOfPatternMatch extends Recipe {
             }
             return null;
         }
+
+        @Nullable
+        public J processVariableDeclarations(J.VariableDeclarations multiVariable) {
+            return multiVariable.getVariables().stream().anyMatch(variablesToDelete::containsValue) ? null : multiVariable;
+        }
     }
 
     // FIXME remove this method when https://github.com/openrewrite/rewrite/issues/2713 is addressed and use `TypedTree#getType()`
@@ -246,14 +276,6 @@ public class InstanceOfPatternMatch extends Recipe {
             return result;
         }
         return typeTree.getType();
-    }
-
-    private static String patternVariableName(J.InstanceOf instanceOf, Cursor cursor, J root) {
-        VariableNameStrategy strategy = root instanceof J.If
-                ? new VariableNameStrategy(VariableNameStrategy.Style.NORMAL, cursor)
-                : new VariableNameStrategy(VariableNameStrategy.Style.SHORT, cursor);
-        String baseName = variableBaseName((TypeTree) instanceOf.getClazz(), strategy);
-        return VariableNameUtils.generateVariableName(baseName, cursor, INCREMENT_NUMBER);
     }
 
     private static String variableBaseName(TypeTree typeTree, VariableNameStrategy nameStrategy) {
@@ -300,25 +322,49 @@ public class InstanceOfPatternMatch extends Recipe {
             }
             return typeCast;
         }
+
+        @SuppressWarnings("NullableProblems")
+        @Override
+        @Nullable
+        public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer integer) {
+            multiVariable = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, integer);
+            return replacements.processVariableDeclarations(multiVariable);
+        }
     }
 
     private static class VariableNameStrategy {
         public static final Pattern NAME_SPLIT_PATTERN = Pattern.compile("[$._]*(?=\\p{Upper}+[\\p{Lower}\\p{Digit}]*)");
         private final Style style;
         private final Cursor scope;
+        @Nullable
+        private final String name;
 
         enum Style {
-            SHORT, NORMAL
+            SHORT, NORMAL, EXACT
         }
 
-        VariableNameStrategy(Style style, Cursor scope) {
+        private VariableNameStrategy(Style style, Cursor scope, @Nullable String name) {
             this.style = style;
             this.scope = scope;
+            this.name = name;
+        }
+
+        static VariableNameStrategy short_(Cursor scope) {
+            return new VariableNameStrategy(Style.SHORT, scope, null);
+        }
+        static VariableNameStrategy normal(Cursor scope) {
+            return new VariableNameStrategy(Style.NORMAL, scope, null);
+        }
+        static VariableNameStrategy exact(Cursor scope, String name) {
+            return new VariableNameStrategy(Style.EXACT, scope, name);
         }
 
         public String variableName(@Nullable JavaType type) {
             // the instanceof operator only accepts classes (without generics) and arrays
-            if (type instanceof JavaType.FullyQualified) {
+            if (style == Style.EXACT) {
+                //noinspection DataFlowIssue
+                return name;
+            } if (type instanceof JavaType.FullyQualified) {
                 String className = ((JavaType.FullyQualified) type).getClassName();
                 switch (style) {
                     case SHORT:
