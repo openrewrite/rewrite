@@ -10,62 +10,22 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch: {}
+  schedule:
+    - cron: 0 18 * * *
 
-env:
-  GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx2048m -XX:+HeapDumpOnOutOfMemoryError"'
-  GRADLE_SWITCHES: "-s --console=plain --info --stacktrace"
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: ["ubuntu-latest"]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: set-up-jdk
-        uses: actions/setup-java@v3.9.0
-        with:
-          distribution: zulu
-          java-version: 17
-      - name: setup-cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-      - name: build
-        run: ./gradlew ${GRADLE_SWITCHES} build test
-
-  publish-snapshots:
-    needs: [build]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: set-up-jdk
-        uses: actions/setup-java@v3.9.0
-        with:
-          distribution: zulu
-          java-version: 17
-      - name: setup-cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-      - name: publish-snapshots
-        if: github.event_name == 'push'
-        timeout-minutes: 30
-        run: ./gradlew ${GRADLE_SWITCHES} snapshot
+    uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
+    secrets:
+      gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+      gradle_enterprise_cache_username: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
+      gradle_enterprise_cache_password: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+      ossrh_username: ${{ secrets.OSSRH_USERNAME }}
+      ossrh_token: ${{ secrets.OSSRH_TOKEN }}
+      ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
+      ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
