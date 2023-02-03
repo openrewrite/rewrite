@@ -65,8 +65,6 @@ public class RemoveOwaspSuppressions extends Recipe {
             if (!new XPathMatcher("/suppressions").matches(getCursor()) || t.getContent() == null) {
                 return t;
             }
-//            List<? extends Content> lc =  ListUtils.flatMap(t.getContent(),
-//                (i, c) -> isPastDueSuppression(c) ? null : Collections.singletonList(c));
             List<? extends Content> lc =  ListUtils.map(t.getContent(),
                 c -> isPastDueSuppression(c) ? null : c);
             return t.withContent(lc);

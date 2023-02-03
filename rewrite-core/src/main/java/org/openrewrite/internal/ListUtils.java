@@ -154,7 +154,12 @@ public final class ListUtils {
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
             List<T> newTreeOrTrees = flatMap.apply(i, tree);
-            outputLs.addAll(newTreeOrTrees);
+
+            if (newTreeOrTrees == null) {
+                widened = true;
+            } else {
+                outputLs.addAll(newTreeOrTrees);
+            }
 
             if (!widened) {
                 if (newTreeOrTrees.size() == 1) {

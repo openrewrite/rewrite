@@ -36,7 +36,7 @@ class ListUtilsTest {
     @Test
     void flatMapList() {
         var before = List.of(List.of(1, 2), List.of(3, 4));
-        var after = ListUtils.flatMap2(before,
+        var after = ListUtils.flatMap(before,
           list -> Collections.singletonList(list.stream().map(n -> n * 2).collect(Collectors.toList())));
         assertThat(after).containsExactly(List.of(2, 4), List.of(6, 8));
     }
