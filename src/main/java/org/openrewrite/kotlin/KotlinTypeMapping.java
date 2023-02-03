@@ -557,10 +557,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             JavaType.GenericTypeVariable.Variance variance = INVARIANT;
             List<JavaType> bounds = null;
 
-            if (type instanceof ConeKotlinTypeProjectionIn) {
-                name = convertKotlinFqToJavaFq(((ConeKotlinTypeProjectionIn) type).getType().toString());
-            } else if (type instanceof ConeKotlinTypeProjectionOut) {
-                name = convertKotlinFqToJavaFq(((ConeKotlinTypeProjectionOut) type).getType().toString());
+            if (type instanceof ConeKotlinTypeProjectionIn || type instanceof ConeKotlinTypeProjectionOut) {
+                name = "";
             } else if (type instanceof ConeStarProjection) {
                 name = "*";
             } else {
