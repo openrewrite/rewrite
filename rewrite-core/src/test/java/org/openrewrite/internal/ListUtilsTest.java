@@ -35,7 +35,7 @@ class ListUtilsTest {
     void flatMapWithNoChangeShouldHaveReferenceEquality() {
         var before = List.of(1, 2, 3);
         var after = ListUtils.flatMap(before, Collections::singletonList);
-        assertThat(before == after).isTrue();
+        assertThat(before).isSameAs(after);
     }
 
     @Test
