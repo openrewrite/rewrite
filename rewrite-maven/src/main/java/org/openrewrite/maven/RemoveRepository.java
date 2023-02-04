@@ -17,19 +17,16 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.apache.commons.lang3.StringUtils;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Objects;
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -96,11 +93,7 @@ public class RemoveRepository extends Recipe {
                 Xml.Tag repo = super.visitTag(tag, ctx);
 
                 if (REPOS_MATCHER.matches(getCursor()) || PLUGIN_REPOS_MATCHER.matches(getCursor())) {
-                    if (id == null && (isReleasesEqual(repo) && isSnapshotsEqual(repo)) &&
-                                        url.equals(repo.getChildValue("url").orElse(null))) {
-                        return null;
-                    } else if (id != null && (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
-                                url.equals(repo.getChildValue("url").orElse(null))) {
+                    if (isSameUrlAndID(repo) && (isReleasesEqual(repo) && isSnapshotsEqual(repo))) {
                         return null;
                     }
                 }
@@ -108,6 +101,14 @@ public class RemoveRepository extends Recipe {
             }
         };
     }
+
+    private boolean isSameUrlAndID(Xml.Tag repo) {
+        boolean sameURL = StringUtils.isBlank(this.url) || StringUtils.equals(this.url,repo.getChildValue("url").orElse(null));
+        boolean sameID = StringUtils.isBlank(this.id) || StringUtils.equals(this.id,repo.getChildValue("id").orElse(null));
+
+        return sameURL && sameID;
+    }
+
 
     private boolean isReleasesEqual(Xml.Tag repo) {
         Xml.Tag releases = repo.getChild("releases").orElse(null);
