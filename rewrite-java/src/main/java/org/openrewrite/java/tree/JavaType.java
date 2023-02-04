@@ -648,6 +648,7 @@ public interface JavaType {
         Integer managedReference;
 
         @With
+        @NonFinal
         @Getter
         String name;
 
@@ -685,7 +686,8 @@ public interface JavaType {
             return this;
         }
 
-        public GenericTypeVariable unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
+        public GenericTypeVariable unsafeSet(String name, Variance variance, @Nullable List<JavaType> bounds) {
+            this.name = name;
             this.variance = variance;
             this.bounds = nullIfEmpty(bounds);
             return this;

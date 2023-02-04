@@ -198,7 +198,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
             }
         }
 
-        gtv.unsafeSet(variance, bounds);
+        gtv.unsafeSet(gtv.getName(), variance, bounds);
         return gtv;
     }
 
