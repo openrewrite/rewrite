@@ -66,9 +66,8 @@ public class MultipleVariableDeclarationsVisitor extends JavaIsoVisitor<Executio
                 vd = autoFormat(vd, ctx, getCursor());
                 newDecls.add(vd);
             }
-            return newDecls.stream()
-                .map(nc -> (Statement) nc)
-                .collect(Collectors.toList());
+
+            return new ArrayList<>(newDecls);
         }));
     }
 }

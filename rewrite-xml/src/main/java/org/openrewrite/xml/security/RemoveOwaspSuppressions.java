@@ -29,8 +29,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
-import java.util.Collections;
-import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -65,9 +63,7 @@ public class RemoveOwaspSuppressions extends Recipe {
             if (!new XPathMatcher("/suppressions").matches(getCursor()) || t.getContent() == null) {
                 return t;
             }
-            List<? extends Content> lc =  ListUtils.map(t.getContent(),
-                c -> isPastDueSuppression(c) ? null : c);
-            return t.withContent(lc);
+            return t.withContent(ListUtils.map(t.getContent(), c -> isPastDueSuppression(c) ? null : c));
         }
 
         private boolean isPastDueSuppression(Content content) {
