@@ -166,6 +166,38 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                   )
                 );
             }
+
+            @Test
+            void conflictingVariableInBody() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        public class A {
+                            void test(Object o) {
+                                if (o instanceof String) {
+                                    String string = 'x';
+                                    System.out.println((String) o);
+                        //            String string1 = "y";
+                                }
+                            }
+                        }
+                        """,
+                      """
+                        public class A {
+                            void test(Object o) {
+                                if (o instanceof String string1) {
+                                    String string = 'x';
+                                    System.out.println(string1);
+                        //            String string1 = "y";
+                                }
+                            }
+                        }
+                        """
+                    ), 17
+                  )
+                );
+            }
         }
 
         @Nested
@@ -549,15 +581,39 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                 rewriteRun(
                   version(
                     java(
-                        """
+                      """
+                      import java.util.List;
+                      public class A {
+                          Object test(Object o) {
+                              return o instanceof List ? ((List<?>) o).get(0) : o.toString();
+                          }
+                      }
+                      """,
+                      """
+                      import java.util.List;
+                      public class A {
+                          Object test(Object o) {
+                              return o instanceof List l ? l.get(0) : o.toString();
+                          }
+                      }
+                      """
+                    ), 17)
+                );
+            }
+            @Test
+            void rawInstanceOfAndObjectParameterizedCast() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
                         import java.util.List;
                         public class A {
                             Object test(Object o) {
-                                return o instanceof List ? ((List<?>) o).get(0) : o.toString();
+                                return o instanceof List ? ((List<Object>) o).get(0) : o.toString();
                             }
                         }
                         """,
-                        """
+                      """
                         import java.util.List;
                         public class A {
                             Object test(Object o) {
@@ -567,30 +623,6 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                         """
                     ), 17)
                 );
-            }
-            @Test
-            void rawInstanceOfAndObjectParameterizedCast() {
-              rewriteRun(
-                version(
-                  java(
-                    """
-                      import java.util.List;
-                      public class A {
-                          Object test(Object o) {
-                              return o instanceof List ? ((List<Object>) o).get(0) : o.toString();
-                          }
-                      }
-                      """,
-                    """
-                      import java.util.List;
-                      public class A {
-                          Object test(Object o) {
-                              return o instanceof List l ? l.get(0) : o.toString();
-                          }
-                      }
-                      """
-                  ), 17)
-              );
             }
         }
         @Nested
@@ -610,6 +642,25 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                         """
                     ), 17
                   )
+                );
+            }
+            @Test
+            void unboundGenericTypeVariable() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        import java.util.List;
+                        public class A<T> {
+                            void test(Object t) {
+                                if (t instanceof List) {
+                                    List<T> l = (List<T>) t;
+                                    System.out.println(l.size());
+                                }
+                            }
+                        }
+                        """
+                    ), 17)
                 );
             }
         }

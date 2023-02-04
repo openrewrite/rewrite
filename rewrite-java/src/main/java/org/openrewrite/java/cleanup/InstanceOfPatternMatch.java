@@ -155,6 +155,7 @@ public class InstanceOfPatternMatch extends Recipe {
         private final J root;
         private final Map<ExpressionAndType, J.InstanceOf> instanceOfs = new HashMap<>();
         private final Map<J.InstanceOf, Set<J>> contexts = new HashMap<>();
+        private final Map<J.InstanceOf, Set<Cursor>> contextScopes = new HashMap<>();
         private final Map<J.TypeCast, J.InstanceOf> replacements = new HashMap<>();
         private final Map<J.InstanceOf, J.VariableDeclarations.NamedVariable> variablesToDelete = new HashMap<>();
 
@@ -194,6 +195,7 @@ public class InstanceOfPatternMatch extends Recipe {
                         } else {
                             replacements.put(typeCast, instanceOf);
                         }
+                        contextScopes.computeIfAbsent(instanceOf, k -> new HashSet<>()).add(cursor);
                         break;
                     } else if (root == next) {
                         break;
@@ -232,7 +234,7 @@ public class InstanceOfPatternMatch extends Recipe {
                 J.VariableDeclarations.NamedVariable variable = variablesToDelete.get(instanceOf);
                 strategy = variable != null
                         ? VariableNameStrategy.exact(cursor, variable.getSimpleName())
-                        : VariableNameStrategy.normal(cursor);
+                        : VariableNameStrategy.normal(cursor, contextScopes.get(instanceOf));
             } else {
                 strategy = VariableNameStrategy.short_(cursor);
             }
@@ -338,25 +340,27 @@ public class InstanceOfPatternMatch extends Recipe {
         private final Cursor scope;
         @Nullable
         private final String name;
+        private final Set<Cursor> contextScopes;
 
         enum Style {
             SHORT, NORMAL, EXACT
         }
 
-        private VariableNameStrategy(Style style, Cursor scope, @Nullable String name) {
+        private VariableNameStrategy(Style style, Cursor scope, @Nullable String exactName, Set<Cursor> contextScopes) {
             this.style = style;
             this.scope = scope;
-            this.name = name;
+            this.name = exactName;
+            this.contextScopes = contextScopes;
         }
 
         static VariableNameStrategy short_(Cursor scope) {
-            return new VariableNameStrategy(Style.SHORT, scope, null);
+            return new VariableNameStrategy(Style.SHORT, scope, null, Collections.emptySet());
         }
-        static VariableNameStrategy normal(Cursor scope) {
-            return new VariableNameStrategy(Style.NORMAL, scope, null);
+        static VariableNameStrategy normal(Cursor scope, Set<Cursor> contextScopes) {
+            return new VariableNameStrategy(Style.NORMAL, scope, null, contextScopes);
         }
         static VariableNameStrategy exact(Cursor scope, String name) {
-            return new VariableNameStrategy(Style.EXACT, scope, name);
+            return new VariableNameStrategy(Style.EXACT, scope, name, Collections.emptySet());
         }
 
         public String variableName(@Nullable JavaType type) {
@@ -364,8 +368,9 @@ public class InstanceOfPatternMatch extends Recipe {
             if (style == Style.EXACT) {
                 //noinspection DataFlowIssue
                 return name;
-            } if (type instanceof JavaType.FullyQualified) {
+            } else if (type instanceof JavaType.FullyQualified) {
                 String className = ((JavaType.FullyQualified) type).getClassName();
+                String baseName = null;
                 switch (style) {
                     case SHORT:
                         StringBuilder builder = new StringBuilder();
@@ -375,26 +380,44 @@ public class InstanceOfPatternMatch extends Recipe {
                                 builder.append(Character.toLowerCase(c));
                             }
                         }
-                        if (builder.length() > 0) {
-                            return builder.toString();
-                        }
+                        baseName = builder.length() > 0 ? builder.toString() : "o";
                         break;
                     case NORMAL:
-                        Set<String> namesInScope = VariableNameUtils.findNamesInScope(scope);
+                        Set<String> namesInScope = contextScopes.stream()
+                                .flatMap(c -> VariableNameUtils.findNamesInScope(c).stream())
+                                .collect(Collectors.toSet());
                         List<String> nameSegments = Stream.of(NAME_SPLIT_PATTERN.split(className))
                                 .filter(s -> !s.isEmpty()).collect(Collectors.toList());
                         for (int i = nameSegments.size() - 1; i >= 0; i--) {
-                            String candidate = String.join("", nameSegments.subList(i, nameSegments.size()));
-                            if (candidate.length() < 2) {
+                            String name = String.join("", nameSegments.subList(i, nameSegments.size()));
+                            if (name.length() < 2) {
                                 continue;
                             }
-                            candidate = Character.toLowerCase(candidate.charAt(0)) + candidate.substring(1);
-                            if (!namesInScope.contains(candidate)) {
-                                return candidate;
+                            name = Character.toLowerCase(name.charAt(0)) + name.substring(1);
+                            if (!namesInScope.contains(name)) {
+                                baseName = name;
+                                break;
                             }
                         }
-                        return Character.toLowerCase(className.charAt(0)) + className.substring(1);
+                        if (baseName == null) {
+                            baseName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
+                        }
+                        break;
+                    default:
+                        baseName = "obj";
                 }
+                String candidate = baseName;
+                OUTER: while (true) {
+                    for (Cursor scope : contextScopes) {
+                        String newCandidate = VariableNameUtils.generateVariableName(candidate, scope, VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER);
+                        if (!newCandidate.equals(candidate)) {
+                            candidate = newCandidate;
+                            break OUTER;
+                        }
+                    }
+                    break;
+                }
+                return candidate;
             } else if (type instanceof JavaType.Primitive) {
                 return ((JavaType.Primitive) type).getKeyword().substring(0, 1);
             } else if (type instanceof JavaType.Array) {
