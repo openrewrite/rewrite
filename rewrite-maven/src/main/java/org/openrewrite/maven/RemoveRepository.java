@@ -38,42 +38,11 @@ public class RemoveRepository extends Recipe {
 
     @Option(required = false, description = "Repository id")
     @Nullable
-    private String id;
+    String id;
 
     @Option(description = "Repository URL")
-    private String url;
-
-    @Option(required = false, description = "Repository name")
     @Nullable
-    private String repoName;
-
-    @Option(required = false, description = "Repository layout")
-    @Nullable
-    private String layout;
-
-    @Option(required = false, description = "Snapshots from the repository are available")
-    @Nullable
-    private Boolean snapshotsEnabled;
-
-    @Option(required = false, description = "Snapshots checksum policy")
-    @Nullable
-    private String snapshotsChecksumPolicy;
-
-    @Option(required = false, description = "Snapshots update policy policy")
-    @Nullable
-    private String snapshotsUpdatePolicy;
-
-    @Option(required = false, description = "Releases from the repository are available")
-    @Nullable
-    private Boolean releasesEnabled;
-
-    @Option(required = false, description = "Releases checksum policy")
-    @Nullable
-    private String releasesChecksumPolicy;
-
-    @Option(required = false, description = "Releases update policy")
-    @Nullable
-    private String releasesUpdatePolicy;
+    String url;
 
     @Override
     public String getDisplayName() {
@@ -93,7 +62,7 @@ public class RemoveRepository extends Recipe {
                 Xml.Tag repo = super.visitTag(tag, ctx);
 
                 if (REPOS_MATCHER.matches(getCursor()) || PLUGIN_REPOS_MATCHER.matches(getCursor())) {
-                    if (isSameUrlAndID(repo) && (isReleasesEqual(repo) && isSnapshotsEqual(repo))) {
+                    if (isSameUrlAndID(repo)) {
                         return null;
                     }
                 }
@@ -109,35 +78,5 @@ public class RemoveRepository extends Recipe {
         return sameURL && sameID;
     }
 
-
-    private boolean isReleasesEqual(Xml.Tag repo) {
-        Xml.Tag releases = repo.getChild("releases").orElse(null);
-        if (releases == null) {
-            return isNoReleases();
-        } else {
-            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null))
-                    && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
-                    && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
-        }
-    }
-
-    private boolean isNoReleases() {
-        return releasesEnabled == null && releasesUpdatePolicy == null && releasesChecksumPolicy == null;
-    }
-
-    private boolean isSnapshotsEqual(Xml.Tag repo) {
-        Xml.Tag snapshots = repo.getChild("snapshots").orElse(null);
-        if (snapshots == null) {
-            return isNoSnapshots();
-        } else {
-            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null))
-                    && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
-                    && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
-        }
-    }
-
-    private boolean isNoSnapshots() {
-        return snapshotsEnabled == null && snapshotsUpdatePolicy == null && snapshotsChecksumPolicy == null;
-    }
 
 }

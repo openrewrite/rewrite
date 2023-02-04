@@ -28,9 +28,7 @@ public class RemoveRepositoryTest implements RewriteTest {
     void removesRepoAndIdCombination() {
 
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository("myRepo", "https://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null)),
+          spec -> spec.recipe(new RemoveRepository("myRepo", "https://myrepo.maven.com/repo")),
           pomXml(
             """
               <project>
@@ -91,9 +89,7 @@ public class RemoveRepositoryTest implements RewriteTest {
     void removeSimpleRepoWithUrlOnly() {
 
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository(null, "https://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null)),
+          spec -> spec.recipe(new RemoveRepository(null, "https://myrepo.maven.com/repo")),
           pomXml(
             """
               <project>
