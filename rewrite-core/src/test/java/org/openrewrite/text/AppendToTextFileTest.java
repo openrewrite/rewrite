@@ -15,6 +15,7 @@
  */
 package org.openrewrite.text;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
@@ -153,6 +154,48 @@ class AppendToTextFileTest implements RewriteTest {
               content2
               """,
             spec -> spec.path("file2.txt").noTrim()
+          )
+        );
+    }
+
+    // This test is just to demonstrate RewriteRun defect, it's expected to fail since new file `file1.txt` generated but pass.
+    // todo, kunli, to be removed after this PR.
+    @Disabled("Expected to be failed since new file generated")
+    @Test
+    void demonstrateRewriteRunDefect() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
+            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+          text(
+            "existing2",
+            """
+              preamble2
+              content2
+              """,
+            spec -> spec.path("file2.txt").noTrim()
+          )
+        );
+    }
+
+    @Test
+    void changeAndCreatedFilesIfNeeded() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
+            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+          text(
+            "existing2",
+            """
+              preamble2
+              content2
+              """,
+            spec -> spec.path("file2.txt").noTrim()
+          ),
+          text(
+            null,
+            """
+              preamble1
+              content1
+              """
           )
         );
     }
