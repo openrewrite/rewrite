@@ -245,18 +245,19 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         return clazz;
     }
 
-    private JavaType.Class.Kind getKind(Symbol.ClassSymbol sym) {
-        JavaType.Class.Kind kind;
-        if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
-            kind = JavaType.Class.Kind.Enum;
-        } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
-            kind = JavaType.Class.Kind.Annotation;
-        } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
-            kind = JavaType.Class.Kind.Interface;
-        } else {
-            kind = JavaType.Class.Kind.Class;
+    private JavaType.FullyQualified.Kind getKind(Symbol.ClassSymbol sym) {
+        switch (sym.getKind()) {
+            case ENUM:
+                return JavaType.FullyQualified.Kind.Enum;
+            case ANNOTATION_TYPE:
+                return JavaType.FullyQualified.Kind.Annotation;
+            case INTERFACE:
+                return JavaType.FullyQualified.Kind.Interface;
+            case RECORD:
+                return JavaType.FullyQualified.Kind.Record;
+            default:
+                return JavaType.FullyQualified.Kind.Class;
         }
-        return kind;
     }
 
     @SuppressWarnings("ConstantConditions")
