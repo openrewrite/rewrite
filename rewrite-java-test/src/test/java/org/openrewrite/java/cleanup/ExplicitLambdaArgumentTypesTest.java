@@ -62,6 +62,7 @@ class ExplicitLambdaArgumentTypesTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.List;
               import java.util.function.Consumer;
 
               class Test {

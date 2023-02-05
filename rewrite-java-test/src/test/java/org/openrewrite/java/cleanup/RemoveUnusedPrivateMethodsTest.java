@@ -91,7 +91,7 @@ class RemoveUnusedPrivateMethodsTest implements RewriteTest {
                       @MethodSource("sourceExample")
                       void test(String input) {
                       }
-                      private Stream<Arguments> sourceExample() {
+                      private Stream<Object> sourceExample() {
                           return null;
                       }
                   }
