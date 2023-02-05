@@ -20,6 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings("DoubleNegation")
 class BooleanChecksNotInvertedTest implements RewriteTest {
 
     @SuppressWarnings("StatementWithEmptyBody")
@@ -47,6 +48,29 @@ class BooleanChecksNotInvertedTest implements RewriteTest {
                           if ( a != 2) {
                           }
                           boolean b = i >= 10;
+                      }
+                  }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleNegation() {
+        rewriteRun(
+          spec -> spec.recipe(new BooleanChecksNotInverted()),
+          java(
+            """
+                  public class Test {
+                      boolean test(boolean b) {
+                          return !(!b);
+                      }
+                  }
+              """,
+            """
+                  public class Test {
+                      boolean test(boolean b) {
+                          return b;
                       }
                   }
               """
