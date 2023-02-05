@@ -379,4 +379,25 @@ class CombineSemanticallyEqualCatchBlocksTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dontCombineCatchBlocksWithDifferentMethodInvocationParameters() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test() {
+                      try {
+                      } catch (IllegalStateException e) {
+                          log("ise" + e.getMessage());
+                      } catch (RuntimeException e) {
+                          log(e.getMessage());
+                      }
+                  }
+                  void log(String msg) {}
+              }
+              """
+          )
+        );
+    }
 }
