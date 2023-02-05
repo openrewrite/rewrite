@@ -137,6 +137,34 @@ class InstanceOfPatternMatchTest implements RewriteTest {
             }
 
             @Test
+            void primitiveArray() {
+                rewriteRun(
+                  version(
+                    java(
+                      """
+                        public class A {
+                            void test(Object o) {
+                                if (o instanceof int[]) {
+                                    System.out.println((int[]) o);
+                                }
+                            }
+                        }
+                        """,
+                      """
+                        public class A {
+                            void test(Object o) {
+                                if (o instanceof int[] ints) {
+                                    System.out.println(ints);
+                                }
+                            }
+                        }
+                        """
+                    ), 17
+                  )
+                );
+            }
+
+            @Test
             void matchingVariableInBody() {
                 rewriteRun(
                   version(

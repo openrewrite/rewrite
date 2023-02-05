@@ -412,14 +412,15 @@ public class InstanceOfPatternMatch extends Recipe {
                         String newCandidate = VariableNameUtils.generateVariableName(candidate, scope, VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER);
                         if (!newCandidate.equals(candidate)) {
                             candidate = newCandidate;
-                            break OUTER;
+                            continue OUTER;
                         }
                     }
                     break;
                 }
                 return candidate;
             } else if (type instanceof JavaType.Primitive) {
-                return ((JavaType.Primitive) type).getKeyword().substring(0, 1);
+                String keyword = ((JavaType.Primitive) type).getKeyword();
+                return style == Style.SHORT ? keyword.substring(0, 1) : keyword;
             } else if (type instanceof JavaType.Array) {
                 JavaType elemType = ((JavaType.Array) type).getElemType();
                 while (elemType instanceof JavaType.Array) {
@@ -427,7 +428,7 @@ public class InstanceOfPatternMatch extends Recipe {
                 }
                 return variableName(elemType) + 's';
             }
-            return "o";
+            return style == Style.SHORT ? "o" : "obj";
         }
     }
 }
