@@ -237,7 +237,7 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                         public class A {
                             void test(Object o) {
                                 if (o instanceof String) {
-                                    System.out.println(s);
+                                    System.out.println(o);
                                 }
                             }
                         }
@@ -255,9 +255,9 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                         public class A {
                             void test(Object o) {
                                 if (o instanceof String) {
-                                    System.out.println(s);
+                                    System.out.println(o);
                                 } else {
-                                    System.out.println((String) s);
+                                    System.out.println((String) o);
                                 }
                             }
                         }

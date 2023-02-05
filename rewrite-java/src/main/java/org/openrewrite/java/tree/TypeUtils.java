@@ -179,11 +179,7 @@ public class TypeUtils {
                 if (genericTo.getBounds().isEmpty()) {
                     return genericTo.getName().equals("?");
                 }
-                for (JavaType bound : genericTo.getBounds()) {
-                    if (isAssignableTo(bound, from)) {
-                        return true;
-                    }
-                }
+                return false;
             } else if (to instanceof JavaType.Variable) {
                 return isAssignableTo(((JavaType.Variable) to).getType(), from);
             } else if (to instanceof JavaType.Method) {
