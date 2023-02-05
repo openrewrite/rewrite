@@ -340,7 +340,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c;
                  Set<Integer> s = new HashSet<>();
-                 List<String> l = singletonList("a","b","c");
+                 Map<String, String> m = new HashMap<>();
+                 List<String> l = new ArrayList<>();
               }
               """
           )
@@ -832,7 +833,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static java.util.Collections.*;
               
               class Test {
-                  ConcurrentHashMap<String, String> m = emptyMap();
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap(emptyMap());
               }
               """
           )
@@ -1194,7 +1195,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               class A {
                  Collection<Integer> c = emptyList();
                  Set<Integer> s = emptySet();
-                 List<String> l = singletonList("c","b","a");
+                 List<String> l = List.of("c","b","a");
                  Iterator<Short> i = emptyIterator();
                  Entry<String, Integer> entry;
               }

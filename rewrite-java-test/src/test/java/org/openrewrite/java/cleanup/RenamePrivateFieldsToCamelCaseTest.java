@@ -75,9 +75,9 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
                       private final String _var = "";
                       private void a() {
                           if (true) {
-                              Thread t = new Thread(){
+                              Thread t = new Thread() {
                                   public void run() {
-                                      String var = _val;
+                                      String var = "a";
                                   }
                               };
                           }
