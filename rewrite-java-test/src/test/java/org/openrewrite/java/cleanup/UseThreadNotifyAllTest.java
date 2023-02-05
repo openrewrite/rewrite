@@ -22,16 +22,16 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-class UseThreadNotifyAllTest implements RewriteTest {
+class UseObjectNotifyAllTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UseThreadNotifyAll());
+        spec.recipe(new UseObjectNotifyAll());
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1645")
     @Test
-    void useThreadNotifyAll() {
+    void useObjectNotifyAll() {
         rewriteRun(
           java(
             """

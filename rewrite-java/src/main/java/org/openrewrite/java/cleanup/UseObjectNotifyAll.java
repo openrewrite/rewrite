@@ -29,27 +29,27 @@ import java.util.Collections;
 import java.util.Set;
 
 /**
- * Recipe to use {@link Thread#notifyAll()} instead of {@link Thread#notify()}
+ * Recipe to use {@link Object#notifyAll()} instead of {@link Object#notify()}
  * <p>
- * {@link Thread#notify()} and {@link Thread#notifyAll()} both wake up sleeping threads, but {@link Thread#notify()} only rouses one,
- * while {@link Thread#notifyAll()} rouses all of them.
- * Since {@link Thread#notify()} might not wake up the right thread, {@link Thread#notifyAll()} should be used instead.
+ * {@link Object#notify()} and {@link Object#notifyAll()} both wake up sleeping threads, but {@link Object#notify()} only rouses one,
+ * while {@link Object#notifyAll()} rouses all of them.
+ * Since {@link Object#notify()} might not wake up the right thread, {@link Object#notifyAll()} should be used instead.
  *
  * @see <a href="https://rules.sonarsource.com/java/quickfix/RSPEC-2446"></a>
  * @see <a href="https://wiki.sei.cmu.edu/confluence/display/java/THI02-J.+Notify+all+waiting+threads+rather+than+a+single+thread"></a>
  */
-public class UseThreadNotifyAll extends Recipe {
+public class UseObjectNotifyAll extends Recipe {
 
     private static final MethodMatcher OBJECT_NOTIFY = new MethodMatcher("java.lang.Object notify()");
 
     @Override
     public String getDisplayName() {
-        return "Replaces `Thread#notify()` with `Thread#notifyAll()`";
+        return "Replaces `Object.notify()` with `Object.notifyAll()`";
     }
 
     @Override
     public String getDescription() {
-        return "`Thread#notifyAll()` should be used instead of `Thread#notify()` as the latter might not wake up the right thread.";
+        return "`Object.notifyAll()` should be used instead of `Object.notify()` as the latter might not wake up the right thread.";
     }
 
     @Override
