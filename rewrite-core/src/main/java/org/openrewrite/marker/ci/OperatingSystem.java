@@ -16,11 +16,17 @@
 package org.openrewrite.marker.ci;
 
 import com.sun.jna.platform.win32.Kernel32Util;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.With;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -148,6 +154,13 @@ public abstract class OperatingSystem {
 
     public abstract String getFamilyName();
 
+    public abstract LineEnding getLineEnding();
+
+    protected enum LineEnding {
+        CRLF,
+        LF
+    }
+
     /**
      * Locates the given executable in the system path. Returns null if not found.
      */
@@ -198,11 +211,23 @@ public abstract class OperatingSystem {
         return "PATH";
     }
 
-    static class Windows extends OperatingSystem {
-        private final String nativePrefix;
+    @AllArgsConstructor
+    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    static class Windows extends OperatingSystem implements Marker {
+        String nativePrefix;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
 
         Windows() {
             nativePrefix = resolveNativePrefix();
+            id = UUID.randomUUID();
+        }
+
+        @Override
+        public LineEnding getLineEnding() {
+            return LineEnding.CRLF;
         }
 
         @Override
@@ -277,13 +302,31 @@ public abstract class OperatingSystem {
         public String getPathVar() {
             return "Path";
         }
+
+        @Override
+        @NonNull
+        public UUID getId() {
+            return id;
+        }
     }
 
-    static class Unix extends OperatingSystem {
-        private final String nativePrefix;
+    @AllArgsConstructor
+    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    static class Unix extends OperatingSystem implements Marker {
+        String nativePrefix;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
 
         Unix() {
-            this.nativePrefix = resolveNativePrefix();
+            nativePrefix = resolveNativePrefix();
+            id = UUID.randomUUID();
+        }
+
+        @Override
+        public LineEnding getLineEnding() {
+            return LineEnding.LF;
         }
 
         @Override
@@ -386,6 +429,12 @@ public abstract class OperatingSystem {
                 osPrefix = osPrefix.substring(0, space);
             }
             return osPrefix;
+        }
+
+        @Override
+        @NonNull
+        public UUID getId() {
+            return id;
         }
     }
 
