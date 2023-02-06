@@ -35,7 +35,7 @@ import static java.util.Collections.emptyList;
  * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/OperatingSystem.java</a>
  */
 @SuppressWarnings("StaticInitializerReferencesSubClass")
-public abstract class OperatingSystem {
+public abstract class OperatingSystem implements Marker {
     public static final Windows WINDOWS = new Windows();
     public static final MacOs MAC_OS = new MacOs();
     public static final Solaris SOLARIS = new Solaris();
@@ -213,7 +213,7 @@ public abstract class OperatingSystem {
 
     @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
-    static class Windows extends OperatingSystem implements Marker {
+    static class Windows extends OperatingSystem {
         String nativePrefix;
 
         @With
@@ -312,7 +312,7 @@ public abstract class OperatingSystem {
 
     @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
-    static class Unix extends OperatingSystem implements Marker {
+    static class Unix extends OperatingSystem {
         String nativePrefix;
 
         @With
