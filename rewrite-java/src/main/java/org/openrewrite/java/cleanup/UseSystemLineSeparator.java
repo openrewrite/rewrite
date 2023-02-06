@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
@@ -53,20 +54,20 @@ public class UseSystemLineSeparator extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
+    protected JavaVisitor<ExecutionContext> getVisitor() {
+        return new JavaVisitor<ExecutionContext>() {
+            final JavaTemplate template = JavaTemplate
+                    .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()")
+                    .build();
 
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx){
+                J invocation = super.visitMethodInvocation(method, ctx);
                 if ("System.getProperty(\"line.separator\")".equalsIgnoreCase(invocation.toString())){
-
-                    return invocation
-                            .withName(invocation.getName().withSimpleName("lineSeparator"))
-                            .withArguments(new ArrayList<>());
+                    return method.withTemplate(template,
+                            method.getCoordinates().replace(),
+                            method.getSelect());
                 }
-
-                return invocation;
+                return super.visitMethodInvocation(method, ctx);
             }
         };
     }
