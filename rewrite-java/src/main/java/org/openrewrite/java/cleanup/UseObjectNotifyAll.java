@@ -40,7 +40,8 @@ public class UseObjectNotifyAll extends Recipe {
     @Override
     public String getDescription() {
         return "`Object.notifyAll()` and `Object.notify()` both wake up sleeping threads, but `Object.notify()` only rouses one while `Object.notifyAll()` rouses all of them. " +
-                "Since `Object.notify()` might not wake up the right thread, `Object.notifyAll()` should be used instead.See [this](https://wiki.sei.cmu.edu/confluence/display/java/THI02-J.+Notify+all+waiting+threads+rather+than+a+single+thread) for more information.";
+                "Since `Object.notify()` might not wake up the right thread, `Object.notifyAll()` should be used instead. " +
+                "See [this](https://wiki.sei.cmu.edu/confluence/display/java/THI02-J.+Notify+all+waiting+threads+rather+than+a+single+thread) for more information.";
     }
 
     @Override
