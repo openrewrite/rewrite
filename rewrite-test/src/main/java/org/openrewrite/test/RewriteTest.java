@@ -460,6 +460,7 @@ public interface RewriteTest extends SourceSpecs {
                 } else if (result.getBefore() == null
                     && !(result.getAfter() instanceof Remote)
                     && !expectedNewResults.contains(result)
+                    && testMethodSpec.afterRecipes.isEmpty()
                 ) {
                     // falsely added files detected.
                     fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
