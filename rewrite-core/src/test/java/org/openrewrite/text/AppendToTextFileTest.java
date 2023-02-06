@@ -162,7 +162,7 @@ class AppendToTextFileTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2796")
     @Test
-    void missingUnexpectedGeneratedFiles() {
+    void missingExpectedGeneratedFiles() {
         assertThrows(AssertionError.class, () ->
           rewriteRun(
             spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
