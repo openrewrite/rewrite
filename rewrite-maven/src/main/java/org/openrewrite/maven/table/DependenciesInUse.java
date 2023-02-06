@@ -34,15 +34,15 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
 
     @Value
     public static class Row {
-        @Option(displayName = "Project name",
+        @Column(displayName = "Project name",
                 description = "The name of the project that contains the dependency.")
         String projectName;
 
-        @Option(displayName = "Source set",
+        @Column(displayName = "Source set",
                 description = "The source set that contains the dependency.")
         String sourceSet;
 
-        @Option(displayName = "Group",
+        @Column(displayName = "Group",
                 description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.")
         String groupId;
 
