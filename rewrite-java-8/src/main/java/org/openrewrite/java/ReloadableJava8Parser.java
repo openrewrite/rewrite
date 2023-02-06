@@ -255,6 +255,15 @@ class ReloadableJava8Parser implements JavaParser {
     }
 
     @Override
+    public JavaParser reset(Collection<URI> uris) {
+        if (!uris.isEmpty()) {
+            compilerLog.reset(uris);
+        }
+        pfm.flush();
+        return this;
+    }
+
+    @Override
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
     }
@@ -304,6 +313,15 @@ class ReloadableJava8Parser implements JavaParser {
 
         public void reset() {
             sourceMap.clear();
+        }
+
+        public void reset(Collection<URI> uris) {
+            for (Iterator<JavaFileObject> itr = sourceMap.keySet().iterator(); itr.hasNext();) {
+                JavaFileObject f = itr.next();
+                if (uris.contains(f.toUri())) {
+                    itr.remove();
+                }
+            }
         }
     }
 
