@@ -209,6 +209,9 @@ public class InstanceOfPatternMatch extends Recipe {
         }
 
         public J.InstanceOf processInstanceOf(J.InstanceOf instanceOf, Cursor cursor) {
+            if (!contextScopes.containsKey(instanceOf)) {
+                return instanceOf;
+            }
             @Nullable JavaType type = toJavaType((TypeTree) instanceOf.getClazz());
             String name = patternVariableName(instanceOf, cursor);
             J.InstanceOf result = instanceOf.withPattern(new J.Identifier(
