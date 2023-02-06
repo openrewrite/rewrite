@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
-import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 
