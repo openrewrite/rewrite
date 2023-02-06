@@ -246,6 +246,31 @@ public abstract class CoordinateBuilder {
         }
     }
 
+    public static class Unary extends Statement {
+        Unary(J.Unary tree) {
+            super(tree);
+        }
+
+        @Override
+        JavaCoordinates after(Space.Location location) {
+            return after(isModifying() ? Space.Location.STATEMENT_PREFIX : Space.Location.EXPRESSION_PREFIX);
+        }
+
+        @Override
+        public JavaCoordinates before() {
+            return before(isModifying() ? Space.Location.STATEMENT_PREFIX : Space.Location.EXPRESSION_PREFIX);
+        }
+
+        @Override
+        public JavaCoordinates replace() {
+            return replace(isModifying() ? Space.Location.STATEMENT_PREFIX : Space.Location.EXPRESSION_PREFIX);
+        }
+
+        private boolean isModifying() {
+            return ((J.Unary) tree).getOperator().isModifying();
+        }
+    }
+
     public static class Package extends Statement {
         Package(J.Package tree) {
             super(tree);
