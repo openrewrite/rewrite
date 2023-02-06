@@ -332,7 +332,7 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         Collection<SourceSpec<?>> expectedNewSources = Collections.newSetFromMap(new IdentityHashMap<>());
-        Collection<Result> expectedNewResults = Collections.newSetFromMap(new IdentityHashMap<>());;
+        Collection<Result> expectedNewResults = Collections.newSetFromMap(new IdentityHashMap<>());
 
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             if (sourceSpec.before == null) {
