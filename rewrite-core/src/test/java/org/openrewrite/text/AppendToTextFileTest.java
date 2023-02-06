@@ -17,12 +17,14 @@ package org.openrewrite.text;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Supplier;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class AppendToTextFileTest implements RewriteTest {
@@ -158,25 +160,25 @@ class AppendToTextFileTest implements RewriteTest {
         );
     }
 
-    // This test is just to demonstrate RewriteRun defect, it's expected to fail since new file `file1.txt` generated but pass.
-    // todo, kunli, to be removed after this PR.
-    @Disabled("Expected to be failed since new file generated")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2796")
     @Test
-    void demonstrateRewriteRunDefect() {
-        rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
-            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
-          text(
-            "existing2",
-            """
-              preamble2
-              content2
-              """,
-            spec -> spec.path("file2.txt").noTrim()
-          )
-        );
+    void missingUnexpectedGeneratedFiles() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
+              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+            text(
+              "existing2",
+              """
+                preamble2
+                content2
+                """,
+              spec -> spec.path("file2.txt").noTrim()
+            )
+          ));
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2796")
     @Test
     void changeAndCreatedFilesIfNeeded() {
         rewriteRun(
