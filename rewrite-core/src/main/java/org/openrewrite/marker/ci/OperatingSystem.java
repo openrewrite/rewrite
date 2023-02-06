@@ -217,6 +217,7 @@ public abstract class OperatingSystem {
         String nativePrefix;
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         Windows() {
@@ -315,6 +316,7 @@ public abstract class OperatingSystem {
         String nativePrefix;
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         Unix() {
