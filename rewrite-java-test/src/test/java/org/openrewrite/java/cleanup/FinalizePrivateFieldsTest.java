@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -122,6 +123,35 @@ class FinalizePrivateFieldsTest implements RewriteTest {
 
                   A() {
                       name = "XYZ";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2807")
+    @Test
+    void fieldAssignedInConstructorMightHaveBeenNotInitializedIgnored() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private int a;
+                  private int b;
+
+                  A(boolean condition, int type) {
+                      if (condition) {
+                          a = 1;
+                      }
+
+                      switch (type) {
+                          case 0:
+                              b = 2;
+                              break;
+                          default:
+                              break;
+                      }
                   }
               }
               """

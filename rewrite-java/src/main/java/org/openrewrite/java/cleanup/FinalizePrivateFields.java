@@ -25,11 +25,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -183,7 +179,7 @@ public class FinalizePrivateFields extends Recipe {
             JavaType.Variable privateField = null;
 
             if (expression instanceof J.FieldAccess) {
-                // to support case of field accessed via 'this' like 'this.member'.
+                // to support case of field accessed via 'this' like 'A.this.member'.
                 J.Identifier lastId = FindLastIdentifier.getLastIdentifier(expression);
                 if (lastId != null && assignedCountMap.containsKey(lastId.getFieldType())) {
                     privateField = lastId.getFieldType();
@@ -236,9 +232,15 @@ public class FinalizePrivateFields extends Recipe {
          * @return true if the cursor is in a constructor or an initializer block (both static or non-static)
          */
         private static boolean isInitializedByClass(Cursor cursor) {
-            Object endParent = cursor.dropParentUntil(
-                parent -> parent instanceof J.MethodDeclaration || parent instanceof J.ClassDeclaration).getValue();
-            return (isConstructor(endParent) || isInitializerBlock(endParent));
+            Object parent = cursor.dropParentWhile(p -> p instanceof J.Block
+                    || p instanceof JRightPadded
+                    || p instanceof JLeftPadded)
+                .getValue();
+
+            if (parent instanceof J.MethodDeclaration || parent instanceof J.ClassDeclaration) {
+                return (isConstructor(parent) || isInitializerBlock(parent));
+            }
+            return false;
         }
 
         /**
