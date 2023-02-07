@@ -18,9 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -28,7 +26,6 @@ import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
-import java.util.ArrayList;
 
 public class UseSystemLineSeparator extends Recipe {
 
@@ -56,16 +53,30 @@ public class UseSystemLineSeparator extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-            final JavaTemplate template = JavaTemplate
-                    .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()")
-                    .build();
 
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx){
+            final JavaTemplate.Builder template = JavaTemplate
+                    .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()");
+
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J invocation = super.visitMethodInvocation(method, ctx);
-                if ("System.getProperty(\"line.separator\")".equalsIgnoreCase(invocation.toString())){
-                    return method.withTemplate(template,
+                if ("System.getProperty(\"line.separator\")".equalsIgnoreCase(invocation.toString())) {
+                    return method.withTemplate(template.build(),
                             method.getCoordinates().replace(),
                             method.getSelect());
+                } else if ("getProperty(\"line.separator\")".equalsIgnoreCase(invocation.toString()) &&
+                        method.getMethodType() != null && System.class.getName().equals(method.getMethodType().getDeclaringType().getFullyQualifiedName())) {
+
+                    maybeRemoveImport("java.lang.System.getProperty");
+
+                    final JavaTemplate template = JavaTemplate
+                            .builder(this::getCursor, "lineSeparator()")
+                            .staticImports("java.lang.System.lineSeparator")
+                            .build();
+
+                    return method.withTemplate(template,
+                            method.getCoordinates()
+                                    .replace());
+
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
