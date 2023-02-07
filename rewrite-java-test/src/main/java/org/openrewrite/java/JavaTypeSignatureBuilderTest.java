@@ -20,7 +20,7 @@ import org.openrewrite.Issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public interface JavaTypeSignatureBuilderTest {
+interface JavaTypeSignatureBuilderTest {
     String fieldSignature(String field);
 
     String methodSignature(String methodName);
@@ -114,7 +114,7 @@ public interface JavaTypeSignatureBuilderTest {
     @Test
     default void genericContravariant() {
         assertThat(signatureBuilder().signature(firstMethodParameter("genericContravariant")))
-            .isEqualTo("org.openrewrite.java.PT<Generic{? super org.openrewrite.java.C}>");
+                .isEqualTo("org.openrewrite.java.PT<Generic{? super org.openrewrite.java.C}>");
         assertThat(methodSignature("genericContravariant"))
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=genericContravariant,return=org.openrewrite.java.PT<Generic{? super org.openrewrite.java.C}>,parameters=[org.openrewrite.java.PT<Generic{? super org.openrewrite.java.C}>]}");
     }
@@ -136,7 +136,7 @@ public interface JavaTypeSignatureBuilderTest {
     @Test
     default void genericUnbounded() {
         assertThat(signatureBuilder().signature(firstMethodParameter("genericUnbounded")))
-            .isEqualTo("org.openrewrite.java.PT<Generic{U}>");
+                .isEqualTo("org.openrewrite.java.PT<Generic{U}>");
         assertThat(methodSignature("genericUnbounded"))
                 .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=genericUnbounded,return=org.openrewrite.java.PT<Generic{U}>,parameters=[org.openrewrite.java.PT<Generic{U}>]}");
     }

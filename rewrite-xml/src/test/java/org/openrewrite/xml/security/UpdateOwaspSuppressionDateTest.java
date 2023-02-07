@@ -27,7 +27,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class UpdateOwaspSuppressionDateTest implements RewriteTest {
+class UpdateOwaspSuppressionDateTest implements RewriteTest {
 
     @Test
     void noUpdateIfCveDoesNotExist() {
@@ -43,7 +43,7 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
                             <cve>CVE-2022-1234</cve>
                         </suppress>
                     </suppressions>""",
-                spec -> spec.path("suppressions.xml"))
+                        spec -> spec.path("suppressions.xml"))
         );
     }
 
@@ -70,7 +70,7 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
                             <cve>CVE-2022-1234</cve>
                         </suppress>
                     </suppressions>""",
-                spec -> spec.path("suppressions.xml"))
+                        spec -> spec.path("suppressions.xml"))
         );
     }
 
@@ -80,7 +80,7 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
         LocalDate thirtyDaysFromNow = today.plusDays(30);
         String thirtyDaysFromNowString = thirtyDaysFromNow + "Z";
         rewriteRun(
-                spec -> spec.recipe(new UpdateOwaspSuppressionDate(List.of("CVE-2022-1234","CVE-2022-5678"), null)),
+                spec -> spec.recipe(new UpdateOwaspSuppressionDate(List.of("CVE-2022-1234", "CVE-2022-5678"), null)),
                 xml("""
                     <?xml version="1.0" encoding="UTF-8" ?>
                     <suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
@@ -124,7 +124,7 @@ public class UpdateOwaspSuppressionDateTest implements RewriteTest {
                             <cve>CVE-2022-00011</cve>
                         </suppress>
                     </suppressions>""".formatted(thirtyDaysFromNowString, thirtyDaysFromNowString),
-                spec -> spec.path("suppressions.xml"))
+                        spec -> spec.path("suppressions.xml"))
         );
     }
 

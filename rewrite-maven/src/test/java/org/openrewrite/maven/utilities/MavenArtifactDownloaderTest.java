@@ -33,25 +33,25 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class MavenArtifactDownloaderTest {
+class MavenArtifactDownloaderTest {
 
     @Test
     void downloadDependencies(@TempDir Path tempDir) {
         ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
         MavenArtifactCache artifactCache = new LocalMavenArtifactCache(tempDir);
         MavenArtifactDownloader downloader = new MavenArtifactDownloader(
-          artifactCache, null, t -> ctx.getOnError().accept(t));
+                artifactCache, null, t -> ctx.getOnError().accept(t));
         ResolvedGroupArtifactVersion recipeGav = new ResolvedGroupArtifactVersion(
-          "https://repo1.maven.org/maven2",
-          "org.openrewrite.recipe",
-          "rewrite-testing-frameworks",
-          "1.6.0", null);
+                "https://repo1.maven.org/maven2",
+                "org.openrewrite.recipe",
+                "rewrite-testing-frameworks",
+                "1.6.0", null);
 
         MavenParser mavenParser = MavenParser.builder().build();
         Xml.Document parsed = mavenParser.parse(ctx,
-          String.format(
-            //language=xml
-            """
+                String.format(
+                        //language=xml
+                        """
               <project>
                   <groupId>org.openrewrite</groupId>
                   <artifactId>maven-downloader-test</artifactId>

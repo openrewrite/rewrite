@@ -22,13 +22,13 @@ import org.openrewrite.xml.tree.Xml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class CountLinesTest implements RewriteTest {
+class CountLinesTest implements RewriteTest {
 
     @Test
-    public void testLineCount() {
+    void testLineCount() {
         rewriteRun(
-          xml(
-            """
+                xml(
+                        """
               <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                        xmlns="http://maven.apache.org/POM/4.0.0"
                        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -61,8 +61,8 @@ public class CountLinesTest implements RewriteTest {
                   </build>
               </project>
               """,
-            spec -> spec.afterRecipe(xml -> assertThat(CountLinesVisitor.countLines(xml)).isEqualTo(28))
-          )
+                        spec -> spec.afterRecipe(xml -> assertThat(CountLinesVisitor.countLines(xml)).isEqualTo(28))
+                )
         );
     }
 }

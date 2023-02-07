@@ -25,7 +25,7 @@ import java.util.HashMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-public class RecipeBasicsTest {
+class RecipeBasicsTest {
 
     @Test
     void recipeDoNextWithItself() {
@@ -38,7 +38,11 @@ public class RecipeBasicsTest {
         ChangeText ct = new ChangeText("hi");
         ChangeText ct2 = (ChangeText) ct.clone();
         ObjectMapper mapper = new ObjectMapper();
-        mapper.updateValue(ct2, new HashMap<String, String>() {{ put("toText", "hello"); }});
+        mapper.updateValue(ct2, new HashMap<String, String>() {
+            {
+                put("toText", "hello");
+            }
+        });
 
         assertThat(ct2).isNotSameAs(ct);
         assertThat(ct.getToText()).isEqualTo("hi");

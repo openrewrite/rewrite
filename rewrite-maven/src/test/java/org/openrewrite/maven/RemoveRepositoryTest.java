@@ -20,17 +20,17 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class RemoveRepositoryTest implements RewriteTest {
+class RemoveRepositoryTest implements RewriteTest {
 
     @Test
     void removeSimpleRepoWithIdAndUrl() {
 
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
+                        null, null, null,
+                        null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -47,7 +47,7 @@ public class RemoveRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -56,7 +56,7 @@ public class RemoveRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 
@@ -64,11 +64,11 @@ public class RemoveRepositoryTest implements RewriteTest {
     void removeSimpleRepoWithUrlOnly() {
 
         rewriteRun(
-          spec -> spec.recipe(new RemoveRepository(null, "http://myrepo.maven.com/repo", null, null,
-            null, null, null,
-            null, null, null)),
-          pomXml(
-            """
+                spec -> spec.recipe(new RemoveRepository(null, "http://myrepo.maven.com/repo", null, null,
+                        null, null, null,
+                        null, null, null)),
+                pomXml(
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -81,7 +81,7 @@ public class RemoveRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """,
-            """
+                        """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -90,7 +90,7 @@ public class RemoveRepositoryTest implements RewriteTest {
                 </repositories>
               </project>
               """
-          )
+                )
         );
     }
 }

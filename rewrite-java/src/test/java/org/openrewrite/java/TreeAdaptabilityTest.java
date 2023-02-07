@@ -26,14 +26,17 @@ import org.openrewrite.text.PlainTextVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("unchecked")
-public class TreeAdaptabilityTest implements RewriteTest {
+class TreeAdaptabilityTest implements RewriteTest {
 
     @Test
     void adaptParameterizedPlainTextTreeVisitor() {
         //noinspection rawtypes
-        assertThat(new PlainTextVisitor() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
-        assertThat(new TreeVisitor<PlainText, Integer>() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
-        assertThat(new TreeVisitor<PlainText, Integer>() {}.isAdaptableTo(PlainTextVisitor.class)).isTrue();
+        assertThat(new PlainTextVisitor() {
+        }.isAdaptableTo(JavaVisitor.class)).isFalse();
+        assertThat(new TreeVisitor<PlainText, Integer>() {
+        }.isAdaptableTo(JavaVisitor.class)).isFalse();
+        assertThat(new TreeVisitor<PlainText, Integer>() {
+        }.isAdaptableTo(PlainTextVisitor.class)).isTrue();
     }
 
     public static class VisitLiteral<P> extends JavaIsoVisitor<P> {

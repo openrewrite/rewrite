@@ -23,25 +23,25 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class FindRecipesTest implements RewriteTest {
+class FindRecipesTest implements RewriteTest {
 
     @Test
     void findRecipes() {
         rewriteRun(
-          spec -> spec
-            .recipe(new FindRecipes())
-            .parser(JavaParser.fromJavaVersion()
-              .classpath(JavaParser.runtimeClasspath()))
-            .expectedCyclesThatMakeChanges(1)
-            .cycles(1)
-            .dataTable(RewriteRecipeSource.Row.class, rows -> {
-                assertThat(rows).hasSize(1);
-                RewriteRecipeSource.Row row = rows.get(0);
-                assertThat(row.getDisplayName()).isEqualTo("My recipe");
-                assertThat(row.getDescription()).isEqualTo("This is my recipe.");
-            }),
-          java(
-            """
+                spec -> spec
+                        .recipe(new FindRecipes())
+                        .parser(JavaParser.fromJavaVersion()
+                                .classpath(JavaParser.runtimeClasspath()))
+                        .expectedCyclesThatMakeChanges(1)
+                        .cycles(1)
+                        .dataTable(RewriteRecipeSource.Row.class, rows -> {
+                            assertThat(rows).hasSize(1);
+                            RewriteRecipeSource.Row row = rows.get(0);
+                            assertThat(row.getDisplayName()).isEqualTo("My recipe");
+                            assertThat(row.getDescription()).isEqualTo("This is my recipe.");
+                        }),
+                java(
+                        """
               import org.openrewrite.internal.lang.NonNullApi;
               import org.openrewrite.Recipe;
               
@@ -58,7 +58,7 @@ public class FindRecipesTest implements RewriteTest {
                 }
               }
               """,
-            """
+                        """
               import org.openrewrite.internal.lang.NonNullApi;
               import org.openrewrite.Recipe;
               
@@ -75,7 +75,7 @@ public class FindRecipesTest implements RewriteTest {
                 }
               }
               """
-          )
+                )
         );
     }
 }

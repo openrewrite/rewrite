@@ -25,7 +25,7 @@ import java.time.LocalDate;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
+class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
 
     @Test
     void addsUntilIfNotPresent() {

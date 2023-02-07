@@ -20,20 +20,20 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
+class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Test
     void changeManagedDependencyGroupIdAndArtifactId() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "2.1.0"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "2.1.0"
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -50,7 +50,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteT
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -67,22 +67,22 @@ public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteT
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeManagedDependencyWithDynamicVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "2.1.x"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeManagedDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "2.1.x"
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -99,7 +99,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteT
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -116,7 +116,7 @@ public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteT
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 }

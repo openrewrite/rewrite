@@ -20,21 +20,21 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangePackagingTest implements RewriteTest {
+class ChangePackagingTest implements RewriteTest {
 
     @Test
     void addPackaging() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
-          pomXml(
-"""
+                spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -42,16 +42,16 @@ public class ChangePackagingTest implements RewriteTest {
                   <packaging>pom</packaging>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void removePackaging() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackaging("*", "*", null)),
-          pomXml(
-"""
+                spec -> spec.recipe(new ChangePackaging("*", "*", null)),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -59,23 +59,23 @@ public class ChangePackagingTest implements RewriteTest {
                   <packaging>pom</packaging>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
                   <version>1.0</version>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changePackaging() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
-          pomXml(
-"""
+                spec -> spec.recipe(new ChangePackaging("*", "*", "pom")),
+                pomXml(
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -83,7 +83,7 @@ public class ChangePackagingTest implements RewriteTest {
                   <packaging>jar</packaging>
               </project>
               """,
-            """
+                        """
               <project>
                   <groupId>org.example</groupId>
                   <artifactId>foo</artifactId>
@@ -91,7 +91,7 @@ public class ChangePackagingTest implements RewriteTest {
                   <packaging>pom</packaging>
               </project>
               """
-          )
+                )
         );
     }
 }

@@ -29,7 +29,7 @@ import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
-public interface JavaTreeTest {
+interface JavaTreeTest {
     default ExecutionContext getExecutionContext() {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext(t -> fail("Failed to parse", t));
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
@@ -42,8 +42,9 @@ public interface JavaTreeTest {
     }
 
     default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, @Language("java") String code,
-                                            String... imports) {
-        @Language("java") String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
+                                             String... imports) {
+        @Language("java")
+        String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 
         switch (nestingLevel) {
             case Block:

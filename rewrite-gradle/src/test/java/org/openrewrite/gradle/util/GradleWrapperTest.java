@@ -20,7 +20,7 @@ import org.openrewrite.InMemoryExecutionContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class GradleWrapperTest {
+class GradleWrapperTest {
 
     @Test
     void wrapper() {

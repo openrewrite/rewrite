@@ -23,17 +23,17 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @MinimumJava17
-public class RecordTest implements RewriteTest {
+class RecordTest implements RewriteTest {
 
     @Test
     void javaRecord() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public record JavaRecord(String name, @Deprecated int age) {
               }
               """
-          )
+                )
         );
     }
 
@@ -41,15 +41,15 @@ public class RecordTest implements RewriteTest {
     @Test
     void compactConstructor() {
         rewriteRun(
-          java(
-            """
+                java(
+                        """
               public record JavaRecord(String name, @Deprecated int age) {
                   public JavaRecord {
                       java.util.Objects.requireNonNull(name);
                   }
               }
               """
-          )
+                )
         );
     }
 }

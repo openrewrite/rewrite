@@ -27,15 +27,15 @@ import org.openrewrite.test.RewriteTest;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RewriteTestTest implements RewriteTest {
+class RewriteTestTest implements RewriteTest {
 
     @Test
     void rejectRecipeWithNameOption() {
         assertThrows(AssertionError.class, () -> rewriteRun(
-          spec -> spec.recipe(new RecipeWithNameOption("test")),
-          text(
-            "hello world!"
-          )
+                spec -> spec.recipe(new RecipeWithNameOption("test")),
+                text(
+                        "hello world!"
+                )
         ));
     }
 

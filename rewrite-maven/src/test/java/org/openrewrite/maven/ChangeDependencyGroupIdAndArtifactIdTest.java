@@ -22,21 +22,21 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
+class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Test
     void changeDependencyGroupIdAndArtifactId() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -64,7 +64,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -92,24 +92,24 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void overrideManagedDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "1.2.2",
-            null,
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "1.2.2",
+                        null,
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -137,7 +137,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -166,24 +166,24 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void managedToUnmanaged() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "1.2.2",
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "1.2.2",
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -206,7 +206,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -230,24 +230,24 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void unmanagedToManaged() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "1.2.2",
-            null,
-            false
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "1.2.2",
+                        null,
+                        false
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -271,7 +271,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -294,24 +294,24 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void unmanagedToManagedWithOverrideManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "1.2.2",
-            null,
-            true
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "1.2.2",
+                        null,
+                        true
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -335,7 +335,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -359,24 +359,24 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void unmanagedToManagedWithOverrideManagedVersionNull() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "1.2.2",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "1.2.2",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -400,7 +400,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -423,23 +423,23 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeOnlyArtifactId() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "org.openrewrite",
-            "rewrite-java-8",
-            "org.openrewrite",
-            "rewrite-java-11",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "org.openrewrite",
+                        "rewrite-java-8",
+                        "org.openrewrite",
+                        "rewrite-java-11",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -454,7 +454,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -469,23 +469,23 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void doNotChangeUnlessBothGroupIdAndArtifactIdMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "org.openrewrite.recipe",
-            "rewrite-testing-frameworks",
-            "org.openrewrite.recipe",
-            "rewrite-migrate-java",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "org.openrewrite.recipe",
+                        "rewrite-testing-frameworks",
+                        "org.openrewrite.recipe",
+                        "rewrite-migrate-java",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -500,23 +500,23 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeDependencyGroupIdAndArtifactIdAndVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "javax.activation",
-            "javax.activation-api",
-            "jakarta.activation",
-            "jakarta.activation-api",
-            "2.1.0",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "javax.activation",
+                        "javax.activation-api",
+                        "jakarta.activation",
+                        "jakarta.activation-api",
+                        "2.1.0",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -531,7 +531,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -546,24 +546,24 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeDependencyGroupIdAndArtifactIdWithDeepHierarchy() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-              "io.quarkus",
-              "quarkus-core",
-              "io.quarkus",
-              "quarkus-arc",
-              null,
-              null
-            )
-          ),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "io.quarkus",
+                        "quarkus-core",
+                        "io.quarkus",
+                        "quarkus-arc",
+                        null,
+                        null
+                )
+                ),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>parent</artifactId>
@@ -573,10 +573,10 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </modules>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                 <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -591,10 +591,10 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                         </modules>
                     </project>
                 """
-            ),
-            mavenProject("subchild",
-              pomXml(
-                """
+                        ),
+                        mavenProject("subchild",
+                                pomXml(
+                                        """
                       <project>
                           <parent>
                               <groupId>com.mycompany.app</groupId>
@@ -613,7 +613,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           </dependencies>
                       </project>
                   """,
-                """
+                                        """
                       <project>
                           <parent>
                               <groupId>com.mycompany.app</groupId>
@@ -632,9 +632,9 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                           </dependencies>
                       </project>
                   """
-              )
-            )
-          )
+                                )
+                        )
+                )
         );
     }
 
@@ -642,16 +642,16 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1717")
     void changeDependencyGroupIdAndArtifactIdWithDependencyManagementScopeTest() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "io.quarkus",
-            "quarkus-core",
-            "io.quarkus",
-            "quarkus-arc",
-            null,
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "io.quarkus",
+                        "quarkus-core",
+                        "io.quarkus",
+                        "quarkus-arc",
+                        null,
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>parent</artifactId>
@@ -677,10 +677,10 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencyManagement>
               </project>
               """
-          ),
-          mavenProject("child",
-            pomXml(
-              """
+                ),
+                mavenProject("child",
+                        pomXml(
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -698,7 +698,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """,
-              """
+                                """
                     <project>
                         <parent>
                             <groupId>com.mycompany.app</groupId>
@@ -716,8 +716,8 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            )
-          )
+                        )
+                )
         );
     }
 
@@ -725,16 +725,16 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1751")
     void allowNewVersionToBeExpressedAsSemverSelector() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "com.google.guava",
-            "guava-gwt",
-            "com.google.guava",
-            "guava",
-            "30.1.x",
-            "-jre"
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "com.google.guava",
+                        "guava-gwt",
+                        "com.google.guava",
+                        "guava",
+                        "30.1.x",
+                        "-jre"
+                )),
+                pomXml(
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -749,7 +749,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>
@@ -764,23 +764,23 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                 </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 
     @Test
     void changeGroupIdOnWildcardArtifacts() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
-            "org.apache.commons",
-            "*",
-            "commons-io",
-            null,
-            "2.11.0",
-            null
-          )),
-          pomXml(
-            """
+                spec -> spec.recipe(new ChangeDependencyGroupIdAndArtifactId(
+                        "org.apache.commons",
+                        "*",
+                        "commons-io",
+                        null,
+                        "2.11.0",
+                        null
+                )),
+                pomXml(
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -795,7 +795,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+                        """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -810,7 +810,7 @@ public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
                   </dependencies>
               </project>
               """
-          )
+                )
         );
     }
 }

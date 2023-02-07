@@ -21,15 +21,15 @@ import java.io.ByteArrayInputStream;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class YamlResourceLoaderTest implements RewriteTest {
+class YamlResourceLoaderTest implements RewriteTest {
 
     @Test
     void singleSourceApplicability() {
         rewriteRun(
-          spec -> spec.recipe(
-            new ByteArrayInputStream(
-              //language=yml
-              """
+                spec -> spec.recipe(
+                        new ByteArrayInputStream(
+                                //language=yml
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.ChangeTextToHello
                 displayName: Change text to hello
@@ -41,28 +41,28 @@ public class YamlResourceLoaderTest implements RewriteTest {
                     - org.openrewrite.text.ChangeText:
                         toText: Hello!
                 """.getBytes()
-            ),
-            "test.ChangeTextToHello"
-          ),
-          text(
-            "Hello, world!",
-            "Hello!",
-            spec -> spec.path("hello.txt")
-          ),
-          text(
-            "Hello, world!",
-            spec -> spec.path("ignore.txt")
-          )
+                        ),
+                        "test.ChangeTextToHello"
+                ),
+                text(
+                        "Hello, world!",
+                        "Hello!",
+                        spec -> spec.path("hello.txt")
+                ),
+                text(
+                        "Hello, world!",
+                        spec -> spec.path("ignore.txt")
+                )
         );
     }
 
     @Test
     void anySourceApplicability() {
         rewriteRun(
-          spec -> spec.recipe(
-            new ByteArrayInputStream(
-              //language=yml
-              """
+                spec -> spec.recipe(
+                        new ByteArrayInputStream(
+                                //language=yml
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.ChangeTextToHello
                 displayName: Change text to hello
@@ -74,29 +74,29 @@ public class YamlResourceLoaderTest implements RewriteTest {
                     - org.openrewrite.text.ChangeText:
                         toText: Hello!
                 """.getBytes()
-            ),
-            "test.ChangeTextToHello"
-          ),
-          text(
-            "Hello, world!",
-            "Hello!",
-            spec -> spec.path("hello.txt")
-          ),
-          text(
-            "Hello, world!",
-            "Hello!",
-            spec -> spec.path("goodbye.txt")
-          )
+                        ),
+                        "test.ChangeTextToHello"
+                ),
+                text(
+                        "Hello, world!",
+                        "Hello!",
+                        spec -> spec.path("hello.txt")
+                ),
+                text(
+                        "Hello, world!",
+                        "Hello!",
+                        spec -> spec.path("goodbye.txt")
+                )
         );
     }
 
     @Test
     void bothAnySourceAndSingleSourceApplicability() {
         rewriteRun(
-          spec -> spec.recipe(
-            new ByteArrayInputStream(
-              //language=yml
-              """
+                spec -> spec.recipe(
+                        new ByteArrayInputStream(
+                                //language=yml
+                                """
                 type: specs.openrewrite.org/v1beta/recipe
                 name: test.ChangeTextToHello
                 displayName: Change text to hello
@@ -111,18 +111,18 @@ public class YamlResourceLoaderTest implements RewriteTest {
                     - org.openrewrite.text.ChangeText:
                         toText: Hello!
                 """.getBytes()
-            ),
-            "test.ChangeTextToHello"
-          ),
-          text(
-            "Good morning!",
-            spec -> spec.path("day.txt")
-          ),
-          text(
-            "Good night!",
-            "Hello!",
-            spec -> spec.path("night.txt")
-          )
+                        ),
+                        "test.ChangeTextToHello"
+                ),
+                text(
+                        "Good morning!",
+                        spec -> spec.path("day.txt")
+                ),
+                text(
+                        "Good night!",
+                        "Hello!",
+                        spec -> spec.path("night.txt")
+                )
         );
     }
 }

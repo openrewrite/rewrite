@@ -23,12 +23,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class AddManagedDependencyTest implements RewriteTest {
+class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void validation()  {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
-          "pom", null, null, null, "org.apache.logging:*", true);
+                "pom", null, null, null, "org.apache.logging:*", true);
         Validated validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
@@ -36,27 +36,27 @@ public class AddManagedDependencyTest implements RewriteTest {
     @Test
     void doNotAddIfTypeNotUsed() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
+                        "pom", null, null, null, "org.apache.logging.log4j:*", false)),
+                pomXml(
+                        """
             <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
                 <version>1</version>
             </project>
             """
-          )
+                )
         );
     }
 
     @Test
     void onlyAddedWhenUsing() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, "org.apache.logging.log4j:*", false)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
+                        "pom", null, null, null, "org.apache.logging.log4j:*", false)),
+                pomXml(
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -70,7 +70,7 @@ public class AddManagedDependencyTest implements RewriteTest {
               </dependencies>
             </project>
             """,
-            """
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
@@ -95,17 +95,17 @@ public class AddManagedDependencyTest implements RewriteTest {
               </dependencies>
             </project>
             """
-          )
+                )
         );
     }
 
     @Test
     void addedToRootPom() {
         rewriteRun(
-          spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
-            "pom", null,null, null, null, true)),
-          pomXml(
-            """
+                spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",
+                        "pom", null, null, null, null, true)),
+                pomXml(
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>project</artifactId>
@@ -116,7 +116,7 @@ public class AddManagedDependencyTest implements RewriteTest {
               </modules>
             </project>
             """,
-            """
+                        """
             <project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>project</artifactId>
@@ -138,10 +138,10 @@ public class AddManagedDependencyTest implements RewriteTest {
               </dependencyManagement>
             </project>
             """
-          ),
-          mavenProject("service",
-            pomXml(
-              """
+                ),
+                mavenProject("service",
+                        pomXml(
+                                """
                 <project>
                   <parent>
                     <groupId>com.mycompany.app</groupId>
@@ -153,18 +153,18 @@ public class AddManagedDependencyTest implements RewriteTest {
                   <version>1</version>
                 </project>
               """
-            )
-          ),
-          mavenProject("core",
-            pomXml(
-              """
+                        )
+                ),
+                mavenProject("core",
+                        pomXml(
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>core</artifactId>
                   <version>1</version>
                 </project>
               """,
-              """
+                                """
                 <project>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>core</artifactId>
@@ -182,8 +182,8 @@ public class AddManagedDependencyTest implements RewriteTest {
                   </dependencyManagement>
                 </project>
               """
-            )
-          )
+                        )
+                )
         );
     }
 }

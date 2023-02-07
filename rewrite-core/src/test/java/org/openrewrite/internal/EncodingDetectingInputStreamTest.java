@@ -27,7 +27,7 @@ import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class EncodingDetectingInputStreamTest {
+class EncodingDetectingInputStreamTest {
 
     private static final Charset WINDOWS_1252 = Charset.forName("Windows-1252");
 
@@ -71,7 +71,7 @@ public class EncodingDetectingInputStreamTest {
 
     @Test
     void utf8Characters() throws IOException {
-        for (int i = 192; i < 2048; i++) {
+        for (int i = 192;i < 2048;i++) {
             String c = Character.toString((char) i);
             try (EncodingDetectingInputStream is = read(c, UTF_8)) {
                 assertThat(is.getCharset()).isEqualTo(UTF_8);
@@ -92,7 +92,7 @@ public class EncodingDetectingInputStreamTest {
 
     @Test
     void iso88591() {
-        for (int i = 0; i < 255; i++) {
+        for (int i = 0;i < 255;i++) {
             // Skip control characters in ISO-8859-1
             if (!(i >= 128 && i <= 159)) {
                 String s = Character.toString((char) i);

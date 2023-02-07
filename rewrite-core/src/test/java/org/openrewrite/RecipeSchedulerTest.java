@@ -25,23 +25,23 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeSchedulerTest implements RewriteTest {
+class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void exceptionsCauseResult() {
         rewriteRun(
-          spec -> spec
-            .executionContext(new InMemoryExecutionContext())
-            .recipe(new BoomRecipe())
-            .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
-              .singleElement()
-              .satisfies(t -> assertThat(t.getMessage())
-                .matches("Exception while visiting project file 'file\\.txt', caused by: org\\.openrewrite\\.BoomException: boom, at org\\.openrewrite\\.BoomRecipe\\$1\\.visitText\\(RecipeSchedulerTest\\.java:\\d+\\)"))
-            ),
-          text(
-            "hello",
-            "~~(boom)~~>hello"
-          )
+                spec -> spec
+                        .executionContext(new InMemoryExecutionContext())
+                        .recipe(new BoomRecipe())
+                        .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
+                                        .singleElement()
+                                        .satisfies(t -> assertThat(t.getMessage())
+                                                .matches("Exception while visiting project file 'file\\.txt', caused by: org\\.openrewrite\\.BoomException: boom, at org\\.openrewrite\\.BoomRecipe\\$1\\.visitText\\(RecipeSchedulerTest\\.java:\\d+\\)"))
+                        ),
+                text(
+                        "hello",
+                        "~~(boom)~~>hello"
+                )
         );
     }
 }

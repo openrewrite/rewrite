@@ -23,13 +23,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-public class GradleParserTest implements RewriteTest {
+class GradleParserTest implements RewriteTest {
 
     @Test
     void buildGradleAndSettingsGradle() {
         rewriteRun(
-          settingsGradle(
-            """
+                settingsGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -45,15 +45,15 @@ public class GradleParserTest implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void allowImports() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               import org.gradle.api.Project
               
               plugins {
@@ -68,25 +68,25 @@ public class GradleParserTest implements RewriteTest {
                   implementation "org.openrewrite:rewrite-java:latest.release"
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements()).hasSize(4);
-                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Import.class);
-                J.Import i = (J.Import) cu.getStatements().get(0);
-                assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
-                assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);
-                assertThat(m.getMethodType()).isNotNull();
-                assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.getStatements()).hasSize(4);
+                            assertThat(cu.getStatements().get(0)).isInstanceOf(J.Import.class);
+                            J.Import i = (J.Import) cu.getStatements().get(0);
+                            assertThat(i.getTypeName()).isEqualTo("org.gradle.api.Project");
+                            assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodInvocation.class);
+                            J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(3);
+                            assertThat(m.getMethodType()).isNotNull();
+                            assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
+                        })
+                )
         );
     }
 
     @Test
     void allowMethodDeclaration() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -103,25 +103,25 @@ public class GradleParserTest implements RewriteTest {
                   return "Hello, world!"
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getStatements()).hasSize(4);
-                assertThat(cu.getStatements().get(2)).isInstanceOf(J.MethodInvocation.class);
-                J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(2);
-                assertThat(m.getMethodType()).isNotNull();
-                assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
-                assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
-                J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(3);
-                assertThat(d.getSimpleName()).isEqualTo("greet");
-            })
-          )
+                        spec -> spec.afterRecipe(cu -> {
+                            assertThat(cu.getStatements()).hasSize(4);
+                            assertThat(cu.getStatements().get(2)).isInstanceOf(J.MethodInvocation.class);
+                            J.MethodInvocation m = (J.MethodInvocation) cu.getStatements().get(2);
+                            assertThat(m.getMethodType()).isNotNull();
+                            assertThat(m.getMethodType().getDeclaringType().getFullyQualifiedName()).isNotNull();
+                            assertThat(cu.getStatements().get(3)).isInstanceOf(J.MethodDeclaration.class);
+                            J.MethodDeclaration d = (J.MethodDeclaration) cu.getStatements().get(3);
+                            assertThat(d.getSimpleName()).isEqualTo("greet");
+                        })
+                )
         );
     }
 
     @Test
     void dontDropLeadingComments() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               /*
                * LICENSE
                */
@@ -139,15 +139,15 @@ public class GradleParserTest implements RewriteTest {
                   testImplementation "junit:junit:4.13"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void dontClobberExistingComments() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               plugins {
                   id 'java-library'
               }
@@ -161,15 +161,15 @@ public class GradleParserTest implements RewriteTest {
                   testImplementation "junit:junit:4.13"
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void handleImportsThatArentTheFirstStatement() {
         rewriteRun(
-          buildGradle(
-            """
+                buildGradle(
+                        """
               import org.gradle.api.Project
               
               plugins {
@@ -184,7 +184,7 @@ public class GradleParserTest implements RewriteTest {
                   testImplementation "junit:junit:4.13"
               }
               """
-          )
+                )
         );
     }
 }

@@ -22,18 +22,18 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings("GroovyUnusedAssignment")
-public class LambdaTest implements RewriteTest {
+class LambdaTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2168")
     @Test
     void lambdaWithNoArguments() {
         rewriteRun(
-          groovy(
-            """
+                groovy(
+                        """
               def f1 = { -> 1 }
               def f2 = { 1 }
               """
-          )
+                )
         );
     }
 }

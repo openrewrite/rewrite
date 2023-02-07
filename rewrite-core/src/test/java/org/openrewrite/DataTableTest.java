@@ -25,33 +25,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class DataTableTest implements RewriteTest {
+class DataTableTest implements RewriteTest {
 
     @Test
     void dataTable() {
         rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(r -> new PlainTextVisitor<>() {
-                final WordTable wordTable = new WordTable(r);
+                spec -> spec
+                        .recipe(toRecipe(r -> new PlainTextVisitor<>() {
+                            final WordTable wordTable = new WordTable(r);
 
-                @Override
-                public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                    int i = 0;
-                    for (String s : text.getText().split(" ")) {
-                        wordTable.insertRow(ctx, new WordTable.Row(i++, s));
-                    }
-                    return text;
-                }
-            }))
-            .dataTableAsCsv(WordTable.class.getName(), """
+                            @Override
+                            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                                int i = 0;
+                                for (String s : text.getText().split(" ")) {
+                                    wordTable.insertRow(ctx, new WordTable.Row(i++, s));
+                                }
+                                return text;
+                            }
+                        }))
+                        .dataTableAsCsv(WordTable.class.getName(), """
               position,text
               0,hello
               1,world
               """
-            )
-            .dataTable(WordTable.Row.class, rows -> assertThat(rows.stream().map(WordTable.Row::getText))
-              .containsExactly("hello", "world")),
-          text("hello world")
+                        )
+                        .dataTable(WordTable.Row.class, rows -> assertThat(rows.stream().map(WordTable.Row::getText))
+                                .containsExactly("hello", "world")),
+                text("hello world")
         );
     }
 
@@ -68,7 +68,7 @@ public class DataTableTest implements RewriteTest {
     static class WordTable extends DataTable<WordTable.Row> {
         public WordTable(Recipe recipe) {
             super(recipe, Row.class, WordTable.class.getName(),
-              "Words", "Each word in the text.");
+                    "Words", "Each word in the text.");
         }
 
         static class Row {

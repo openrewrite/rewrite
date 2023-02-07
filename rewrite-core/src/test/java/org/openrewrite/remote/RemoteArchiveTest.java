@@ -31,7 +31,7 @@ import java.nio.file.Paths;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RemoteArchiveTest {
+class RemoteArchiveTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"7.4.2", "7.5-rc-1", "7.6"})
@@ -39,11 +39,11 @@ public class RemoteArchiveTest {
         URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-" + version + "-bin.zip"));
 
         RemoteArchive remoteArchive = Remote
-          .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
-            distributionUrl.toURI()
-          )
-          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+                .builder(
+                        Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+                        distributionUrl.toURI()
+                )
+                .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
         byte[] actual = readAll(remoteArchive.getInputStream(new MockHttpSender(distributionUrl::openStream)));
         assertThat(actual).hasSizeGreaterThan(50_000);

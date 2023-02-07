@@ -27,73 +27,73 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnusedAssignment"})
-public class JavaTemplateTest3Test implements RewriteTest {
+class JavaTemplateTest3Test implements RewriteTest {
 
     @Test
     void replacePackage() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "b").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "b").build();
 
-              @Override
-              public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
-                  if (pkg.getExpression().printTrimmed(getCursor()).equals("a")) {
-                      return pkg.withTemplate(t, pkg.getCoordinates().replace());
-                  }
-                  return super.visitPackage(pkg, p);
-              }
+                    @Override
+                    public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
+                        if (pkg.getExpression().printTrimmed(getCursor()).equals("a")) {
+                            return pkg.withTemplate(t, pkg.getCoordinates().replace());
+                        }
+                        return super.visitPackage(pkg, p);
+                    }
 
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
-                  var cd = super.visitClassDeclaration(classDecl, p);
-                  if (classDecl.getType().getPackageName().equals("a")) {
-                      cd = cd.withType(cd.getType().withFullyQualifiedName("b.${cd.getSimpleName()}"));
-                  }
-                  return cd;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
+                        var cd = super.visitClassDeclaration(classDecl, p);
+                        if (classDecl.getType().getPackageName().equals("a")) {
+                            cd = cd.withType(cd.getType().withFullyQualifiedName("b.${cd.getSimpleName()}"));
+                        }
+                        return cd;
+                    }
+                })),
+                java(
+                        """
               package a;
               class Test {
               }
               """,
-            """
+                        """
               package b;
               class Test {
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethod() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "int test2(int n) { return n; }").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "int test2(int n) { return n; }").build();
 
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("test")) {
-                      return method.withTemplate(t, method.getCoordinates().replace());
-                  }
-                  return super.visitMethodDeclaration(method, p);
-              }
-          })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getResults().get(0).getAfter();
-              var methodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
-              assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
-              assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);
-          }),
-          java(
-            """
+                    @Override
+                    public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("test")) {
+                            return method.withTemplate(t, method.getCoordinates().replace());
+                        }
+                        return super.visitMethodDeclaration(method, p);
+                    }
+                })).afterRecipe(run -> {
+                    J.CompilationUnit cu = (J.CompilationUnit) run.getResults().get(0).getAfter();
+                    var methodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                    assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
+                    assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);
+                }),
+                java(
+                        """
               class Test {
                   void test() {
                   }
               }
               """,
-            """
+                        """
               class Test {
                             
                   int test2(int n) {
@@ -101,7 +101,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -109,30 +109,30 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceLambdaWithMethodReference() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "Object::toString").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "Object::toString").build();
 
-              @Override
-              public J visitLambda(J.Lambda lambda, ExecutionContext p) {
-                  return lambda.withTemplate(t, lambda.getCoordinates().replace());
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitLambda(J.Lambda lambda, ExecutionContext p) {
+                        return lambda.withTemplate(t, lambda.getCoordinates().replace());
+                    }
+                })),
+                java(
+                        """
               import java.util.function.Function;
 
               class Test {
                   Function<Object, String> toString = it -> it.toString();
               }
               """,
-            """
+                        """
               import java.util.function.Function;
 
               class Test {
                   Function<Object, String> toString = Object::toString;
               }
               """
-          )
+                )
         );
     }
 
@@ -141,23 +141,23 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr"})
     void replaceStatementInLambdaBodySingleStatementBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "return n == 1;").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "return n == 1;").build();
 
-              @Override
-              public J visitReturn(J.Return retrn, ExecutionContext p) {
-                  if (retrn.getExpression() instanceof J.Binary) {
-                      J.Binary binary = (J.Binary) retrn.getExpression();
-                      if (binary.getRight() instanceof J.Literal &&
-                          ((J.Literal) binary.getRight()).getValue().equals(0)) {
-                          return retrn.withTemplate(t, retrn.getCoordinates().replace());
-                      }
-                  }
-                  return retrn;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitReturn(J.Return retrn, ExecutionContext p) {
+                        if (retrn.getExpression() instanceof J.Binary) {
+                            J.Binary binary = (J.Binary) retrn.getExpression();
+                            if (binary.getRight() instanceof J.Literal &&
+                                    ((J.Literal) binary.getRight()).getValue().equals(0)) {
+                                return retrn.withTemplate(t, retrn.getCoordinates().replace());
+                            }
+                        }
+                        return retrn;
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -170,7 +170,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -183,7 +183,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -192,22 +192,22 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @SuppressWarnings({"ResultOfMethodCallIgnored", "ConstantConditions"})
     void replaceStatementInLambdaBodyWithVariableDeclaredInBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "return n == 1;").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "return n == 1;").build();
 
-              @Override
-              public J visitReturn(J.Return retrn, ExecutionContext p) {
-                  if (retrn.getExpression() instanceof J.Binary) {
-                      J.Binary binary = (J.Binary) retrn.getExpression();
-                      if (binary.getRight() instanceof J.Literal && ((J.Literal) binary.getRight()).getValue().equals(0)) {
-                          return retrn.withTemplate(t, retrn.getCoordinates().replace());
-                      }
-                  }
-                  return retrn;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitReturn(J.Return retrn, ExecutionContext p) {
+                        if (retrn.getExpression() instanceof J.Binary) {
+                            J.Binary binary = (J.Binary) retrn.getExpression();
+                            if (binary.getRight() instanceof J.Literal && ((J.Literal) binary.getRight()).getValue().equals(0)) {
+                                return retrn.withTemplate(t, retrn.getCoordinates().replace());
+                            }
+                        }
+                        return retrn;
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -219,7 +219,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -231,7 +231,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -239,19 +239,19 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1120")
     void replaceStatementInLambdaBodyMultiStatementBlock() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any(java.lang.String)}.toUpperCase()").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any(java.lang.String)}.toUpperCase()").build();
 
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("toLowerCase")) {
-                      return method.withTemplate(t, method.getCoordinates().replace(), method.getSelect());
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("toLowerCase")) {
+                            return method.withTemplate(t, method.getCoordinates().replace(), method.getSelect());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -264,7 +264,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -277,7 +277,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -286,19 +286,19 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @SuppressWarnings({"ResultOfMethodCallIgnored", "SizeReplaceableByIsEmpty"})
     void replaceSingleExpressionInLambdaBody() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any(java.lang.String)}.toUpperCase()").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any(java.lang.String)}.toUpperCase()").build();
 
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("toLowerCase")) {
-                      return method.withTemplate(t, method.getCoordinates().replace(), method.getSelect());
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        if (method.getSimpleName().equals("toLowerCase")) {
+                            return method.withTemplate(t, method.getCoordinates().replace(), method.getSelect());
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -307,7 +307,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -316,7 +316,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -324,20 +324,20 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceSingleExpressionInLambdaBodyWithExpression() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final MethodMatcher enumEquals = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any()} == #{any()}").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final MethodMatcher enumEquals = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any()} == #{any()}").build();
 
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (enumEquals.matches(method)) {
-                      return method.withTemplate(t, method.getCoordinates().replace(), method.getSelect(), method.getArguments().get(0));
-                  }
-                  return super.visitMethodInvocation(method, p);
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        if (enumEquals.matches(method)) {
+                            return method.withTemplate(t, method.getCoordinates().replace(), method.getSelect(), method.getArguments().get(0));
+                        }
+                        return super.visitMethodInvocation(method, p);
+                    }
+                })),
+                java(
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -347,7 +347,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.stream.Stream;
 
               class Test {
@@ -357,7 +357,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -365,11 +365,11 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceMethodNameAndArgumentsSimultaneously() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "acceptString(#{any()}.toString())")
-                .javaParser(() -> JavaParser.fromJavaVersion()
-                  .dependsOn(
-                    """
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "acceptString(#{any()}.toString())")
+                            .javaParser(() -> JavaParser.fromJavaVersion()
+                                    .dependsOn(
+                                            """
                           package org.openrewrite;
                           public class A {
                               public A acceptInteger(Integer i) { return this; }
@@ -377,20 +377,20 @@ public class JavaTemplateTest3Test implements RewriteTest {
                               public A someOtherMethod() { return this; }
                           }
                       """
-                  )
-                  .build()).build();
+                                    )
+                                    .build()).build();
 
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  J.MethodInvocation m = super.visitMethodInvocation(method, p);
-                  if (m.getSimpleName().equals("acceptInteger")) {
-                      m = m.withTemplate(t, m.getCoordinates().replaceMethod(), m.getArguments().get(0));
-                  }
-                  return m;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                        if (m.getSimpleName().equals("acceptInteger")) {
+                            m = m.withTemplate(t, m.getCoordinates().replaceMethod(), m.getArguments().get(0));
+                        }
+                        return m;
+                    }
+                })),
+                java(
+                        """
               package org.openrewrite;
               public class A {
                   public A acceptInteger(Integer i) { return this; }
@@ -398,9 +398,9 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   public A someOtherMethod() { return this; }
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               package org.openrewrite;
                             
               public class Foo {
@@ -412,7 +412,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               package org.openrewrite;
                             
               public class Foo {
@@ -424,36 +424,36 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
     @Test
     void replaceMethodInvocationWithArray() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{anyArray(int)}").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{anyArray(int)}").build();
 
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  J.MethodInvocation m = super.visitMethodInvocation(method, p);
-                  if (m.getSimpleName().equals("method") && m.getArguments().size() == 2) {
-                      m = m.withTemplate(t, m.getCoordinates().replaceArguments(), m.getArguments().get(0));
-                  }
-                  return m;
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, p);
+                        if (m.getSimpleName().equals("method") && m.getArguments().size() == 2) {
+                            m = m.withTemplate(t, m.getCoordinates().replaceArguments(), m.getArguments().get(0));
+                        }
+                        return m;
+                    }
+                })),
+                java(
+                        """
               package org.openrewrite;
               public class Test {
                   public void method(int[] val) {}
                   public void method(int[] val1, String val2) {}
               }
               """
-          ),
-          java(
-            """
+                ),
+                java(
+                        """
               import org.openrewrite.Test;
               class A {
                   public void method() {
@@ -463,7 +463,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import org.openrewrite.Test;
               class A {
                   public void method() {
@@ -473,7 +473,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 
@@ -481,16 +481,16 @@ public class JavaTemplateTest3Test implements RewriteTest {
     @Test
     void replaceMethodInvocationWithMethodReference() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "Object::toString").build();
+                spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                    final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "Object::toString").build();
 
-              @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  return method.withTemplate(t, method.getCoordinates().replace());
-              }
-          })),
-          java(
-            """
+                    @Override
+                    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                        return method.withTemplate(t, method.getCoordinates().replace());
+                    }
+                })),
+                java(
+                        """
               import java.util.function.Function;
 
               class Test {
@@ -501,7 +501,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.function.Function;
 
               class Test {
@@ -512,7 +512,7 @@ public class JavaTemplateTest3Test implements RewriteTest {
                   }
               }
               """
-          )
+                )
         );
     }
 }

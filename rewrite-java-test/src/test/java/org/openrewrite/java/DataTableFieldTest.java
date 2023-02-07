@@ -24,23 +24,23 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class DataTableFieldTest implements RewriteTest {
+class DataTableFieldTest implements RewriteTest {
 
     @Test
     void extractField() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
-                  boolean isLocalVariable = getCursor().dropParentUntil(J.Block.class::isInstance).getParentTreeCursor().getValue() instanceof J.MethodDeclaration;
-                  if (isLocalVariable) {
-                      doAfterVisit(new ExtractField<>(multiVariable));
-                  }
-                  return multiVariable;
-              }
-          })),
-          java(
-            """
+                spec -> spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
+                    @Override
+                    public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                        boolean isLocalVariable = getCursor().dropParentUntil(J.Block.class::isInstance).getParentTreeCursor().getValue() instanceof J.MethodDeclaration;
+                        if (isLocalVariable) {
+                            doAfterVisit(new ExtractField<>(multiVariable));
+                        }
+                        return multiVariable;
+                    }
+                })),
+                java(
+                        """
               import java.util.Date;
               class Test {
                   public Test() {
@@ -48,7 +48,7 @@ public class DataTableFieldTest implements RewriteTest {
                   }
               }
               """,
-            """
+                        """
               import java.util.Date;
               class Test {
                   private Date today;
@@ -58,22 +58,22 @@ public class DataTableFieldTest implements RewriteTest {
                   }
               }
               """,
-            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
-                @Override
-                public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    assertThat(requireNonNull(variable.getVariableType()).toString()).isEqualTo(
-                      "Test{name=today,type=java.util.Date}");
-                    return variable;
-                }
+                        spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                            @Override
+                            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
+                                assertThat(requireNonNull(variable.getVariableType()).toString()).isEqualTo(
+                                        "Test{name=today,type=java.util.Date}");
+                                return variable;
+                            }
 
-                @Override
-                public J.Assignment visitAssignment(J.Assignment assignment, Object o) {
-                    assertThat(requireNonNull(assignment.getType()).toString()).isEqualTo(
-                      "java.util.Date");
-                    return super.visitAssignment(assignment, o);
-                }
-            }.visit(cu, 0))
-          )
+                            @Override
+                            public J.Assignment visitAssignment(J.Assignment assignment, Object o) {
+                                assertThat(requireNonNull(assignment.getType()).toString()).isEqualTo(
+                                        "java.util.Date");
+                                return super.visitAssignment(assignment, o);
+                            }
+                        }.visit(cu, 0))
+                )
         );
     }
 }

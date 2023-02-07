@@ -20,13 +20,13 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class LabelsTest implements RewriteTest {
+class LabelsTest implements RewriteTest {
 
     @Test
     void singleLabel() {
         rewriteRun(
-          //language=groovy
-          groovy("""
+                //language=groovy
+                groovy("""
             given: "hello"
             """)
         );
@@ -35,8 +35,8 @@ public class LabelsTest implements RewriteTest {
     @Test
     void multiLabel() {
         rewriteRun(
-          //language=groovy
-          groovy("""
+                //language=groovy
+                groovy("""
             def foo() {}
             label1:
             label2:
