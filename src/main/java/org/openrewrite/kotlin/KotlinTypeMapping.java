@@ -74,7 +74,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
     @SuppressWarnings("ConstantConditions")
     public JavaType type(@Nullable Object type, @Nullable FirBasedSymbol<?> ownerFallBack) {
-        if (type == null) {
+        if (type == null || type instanceof FirUserTypeRef) {
             return JavaType.Class.Unknown.getInstance();
         }
 

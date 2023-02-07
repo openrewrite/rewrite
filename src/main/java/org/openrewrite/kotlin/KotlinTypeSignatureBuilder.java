@@ -204,7 +204,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     /**
      *  Convert the ConeKotlinType to a {@link org.openrewrite.java.tree.JavaType} style FQN.
      */
-    public String typeRefClassSignature(ConeKotlinType type) {
+    private String typeRefClassSignature(ConeKotlinType type) {
         ClassId classId = ConeTypeUtilsKt.getClassId(type instanceof ConeFlexibleType ? ((ConeFlexibleType) type).getLowerBound() : type);
         return classId == null ? "{undefined}" : convertClassIdToFqn(classId);
     }
@@ -212,7 +212,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     /**
      *  Convert the ConeKotlinType to a {@link org.openrewrite.java.tree.JavaType} style FQN.
      */
-    public String parameterizedTypeRef(ConeKotlinType type) {
+    private String parameterizedTypeRef(ConeKotlinType type) {
         ClassId classId = ConeTypeUtilsKt.getClassId(type);
         String fq = classId == null ? "{undefined}" : convertClassIdToFqn(classId);
 
@@ -263,7 +263,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     /**
      *  Generate a ConeTypeProject signature.
      */
-    public String coneTypeProjectionSignature(ConeTypeProjection type) {
+    private String coneTypeProjectionSignature(ConeTypeProjection type) {
         String typeSignature;
         StringBuilder s = new StringBuilder();
         if (type instanceof ConeKotlinTypeProjectionIn) {

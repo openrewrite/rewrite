@@ -985,7 +985,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             if (source.startsWith("<", cursor) && !functionCall.getTypeArguments().isEmpty()) {
                 cursor(saveCursor);
-                name = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, name, mapTypeArguments(functionCall.getTypeArguments()));
+                name = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, name, mapTypeArguments(functionCall.getTypeArguments()), typeMapping.type(functionCall, getCurrentFile()));
             } else {
                 cursor(saveCursor);
             }
@@ -2095,7 +2095,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     prefix,
                     markers,
                     nameTree,
-                    JContainer.build(typeArgPrefix, parameters, Markers.EMPTY));
+                    JContainer.build(typeArgPrefix, parameters, Markers.EMPTY),
+                    typeMapping.type(userTypeRef));
         } else {
             if (userTypeRef.isMarkedNullable()) {
                 markers = markers.addIfAbsent(new IsNullable(randomId(), sourceBefore("?")));

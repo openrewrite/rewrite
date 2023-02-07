@@ -4,13 +4,11 @@ plugins {
 group = "org.openrewrite"
 description = "Rewrite Kotlin"
 
-// Temporary pin to latest.release to enable a release of kotlin without a release of rewrite.
-val latest = "latest.release"
-//val latest = if (project.hasProperty("releasing")) {
-//    "latest.release"
-//} else {
-//    "latest.integration"
-//}
+val latest = if (project.hasProperty("releasing")) {
+    "latest.release"
+} else {
+    "latest.integration"
+}
 
 val kotlinVersion = "1.8.0"
 
