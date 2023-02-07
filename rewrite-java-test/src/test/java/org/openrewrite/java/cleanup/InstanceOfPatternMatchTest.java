@@ -781,5 +781,30 @@ class InstanceOfPatternMatchTest implements RewriteTest {
               )
             );
         }
+        @Test
+        void nestedClasses() {
+            rewriteRun(
+              version(
+                java(
+                  """
+                    public class A {
+                        public static class FooBar {}
+                        String test(Object o) {
+                            return o instanceof FooBar ? ((FooBar) o).toString() : o.toString();
+                        }
+                    }
+                    """,
+                  """
+                    public class A {
+                        public static class FooBar {}
+                        String test(Object o) {
+                            return o instanceof FooBar fb ? fb.toString() : o.toString();
+                        }
+                    }
+                    """
+                ), 17
+              )
+            );
+        }
     }
 }

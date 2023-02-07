@@ -236,10 +236,10 @@ public class InstanceOfPatternMatch extends Recipe {
             if (root instanceof J.If) {
                 J.VariableDeclarations.NamedVariable variable = variablesToDelete.get(instanceOf);
                 strategy = variable != null
-                        ? VariableNameStrategy.exact(cursor, variable.getSimpleName())
-                        : VariableNameStrategy.normal(cursor, contextScopes.get(instanceOf));
+                        ? VariableNameStrategy.exact(variable.getSimpleName())
+                        : VariableNameStrategy.normal(contextScopes.get(instanceOf));
             } else {
-                strategy = VariableNameStrategy.short_(cursor);
+                strategy = VariableNameStrategy.short_();
             }
             String baseName = variableBaseName((TypeTree) instanceOf.getClazz(), strategy);
             return VariableNameUtils.generateVariableName(baseName, cursor, INCREMENT_NUMBER);
@@ -328,7 +328,6 @@ public class InstanceOfPatternMatch extends Recipe {
             return typeCast;
         }
 
-        @SuppressWarnings("NullableProblems")
         @Override
         @Nullable
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer integer) {
@@ -340,7 +339,6 @@ public class InstanceOfPatternMatch extends Recipe {
     private static class VariableNameStrategy {
         public static final Pattern NAME_SPLIT_PATTERN = Pattern.compile("[$._]*(?=\\p{Upper}+[\\p{Lower}\\p{Digit}]*)");
         private final Style style;
-        private final Cursor scope;
         @Nullable
         private final String name;
         private final Set<Cursor> contextScopes;
@@ -349,30 +347,31 @@ public class InstanceOfPatternMatch extends Recipe {
             SHORT, NORMAL, EXACT
         }
 
-        private VariableNameStrategy(Style style, Cursor scope, @Nullable String exactName, Set<Cursor> contextScopes) {
+        private VariableNameStrategy(Style style, @Nullable String exactName, Set<Cursor> contextScopes) {
             this.style = style;
-            this.scope = scope;
             this.name = exactName;
             this.contextScopes = contextScopes;
         }
 
-        static VariableNameStrategy short_(Cursor scope) {
-            return new VariableNameStrategy(Style.SHORT, scope, null, Collections.emptySet());
+        static VariableNameStrategy short_() {
+            return new VariableNameStrategy(Style.SHORT, null, Collections.emptySet());
         }
-        static VariableNameStrategy normal(Cursor scope, Set<Cursor> contextScopes) {
-            return new VariableNameStrategy(Style.NORMAL, scope, null, contextScopes);
+        static VariableNameStrategy normal(Set<Cursor> contextScopes) {
+            return new VariableNameStrategy(Style.NORMAL, null, contextScopes);
         }
-        static VariableNameStrategy exact(Cursor scope, String name) {
-            return new VariableNameStrategy(Style.EXACT, scope, name, Collections.emptySet());
+        static VariableNameStrategy exact(String name) {
+            return new VariableNameStrategy(Style.EXACT, name, Collections.emptySet());
         }
 
         public String variableName(@Nullable JavaType type) {
             // the instanceof operator only accepts classes (without generics) and arrays
             if (style == Style.EXACT) {
-                //noinspection DataFlowIssue
                 return name;
             } else if (type instanceof JavaType.FullyQualified) {
                 String className = ((JavaType.FullyQualified) type).getClassName();
+                if (className.indexOf('.') > 0) {
+                    className = className.substring(className.lastIndexOf('.'));
+                }
                 String baseName = null;
                 switch (style) {
                     case SHORT:
