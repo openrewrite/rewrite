@@ -31,3 +31,15 @@ recipeList:
         - 'java.util.Map keySet()'
         - 'java.util.Set contains(..)'
       newMethodName: containsKey
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.cleanup.ReplaceApacheCommonsLang3ValidateNotNullToObjectsRequireNonNull
+displayName: Replace `org.apache.commons.lang3.Validate#notNull` with `Objects#requireNonNull`
+description: 'Replace `org.apache.commons.lang3.Validate.notNull(T obj)` with `Objects.requireNonNull(T obj)` and replace `org.apache.commons.lang3.Validate.notNull(T obj, String message)` with `Objects.requireNonNull(T obj, String message)`'
+recipeList:
+  - org.openrewrite.java.ChangeMethodName:
+      methodPattern: org.apache.commons.lang3.Validate notNull(*)
+      newMethodName: Objects.requireNonNull
+  - org.openrewrite.java.ChangeMethodName:
+      methodPattern: org.apache.commons.lang3.Validate notNull(*, String)
+      newMethodName: Objects.requireNonNull
