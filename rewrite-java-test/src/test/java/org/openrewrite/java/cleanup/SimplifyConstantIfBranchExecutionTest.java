@@ -1,4 +1,4 @@
-package org.openrewrite.java.cleanup;/*
+/*
  * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +13,7 @@ package org.openrewrite.java.cleanup;/*
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
