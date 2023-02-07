@@ -49,4 +49,28 @@ class UseSystemLineSeparatorTest implements RewriteTest {
           )
         );
     }
+    
+    
+    @Issue("https://github.com/openrewrite/rewrite/issues/2363")
+    @Test
+    void useSystemLineSeparatorStaticImport() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  import static java.lang.System.getProperty;
+                  String s = getProperty("line.separator");
+                  var a = getProperty("line.separator");
+              }
+              """,
+            """
+              class A {
+                  import static java.lang.System.getProperty;
+                  String s = lineSeparator();
+                  var a = lineSeparator();
+              }
+              """
+          )
+        );
+    }
 }
