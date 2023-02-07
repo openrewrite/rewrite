@@ -24,9 +24,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.cleanup.RenameJavaDocParamNameVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.Stack;
 
 /**
@@ -47,7 +44,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        if (!JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
+        if (!VariableNameUtils.JavaKeywords.isReserved(toName) && !StringUtils.isBlank(toName) && variable.equals(this.variable)) {
             doAfterVisit(new RenameVariableVisitor(variable, toName));
             return variable;
         }
@@ -193,67 +190,4 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
         }
     }
 
-    private static final class JavaKeywords {
-        JavaKeywords() {
-        }
-
-        private static final String[] RESERVED_WORDS = new String[]{
-                "abstract",
-                "assert",
-                "boolean",
-                "break",
-                "byte",
-                "case",
-                "catch",
-                "char",
-                "class",
-                "const",
-                "continue",
-                "default",
-                "do",
-                "double",
-                "else",
-                "enum",
-                "extends",
-                "final",
-                "finally",
-                "float",
-                "for",
-                "goto",
-                "if",
-                "implements",
-                "import",
-                "instanceof",
-                "int",
-                "interface",
-                "long",
-                "native",
-                "new",
-                "package",
-                "private",
-                "protected",
-                "public",
-                "return",
-                "short",
-                "static",
-                "strictfp",
-                "super",
-                "switch",
-                "synchronized",
-                "this",
-                "throw",
-                "throws",
-                "transient",
-                "try",
-                "void",
-                "volatile",
-                "while",
-        };
-
-        private static final Set<String> RESERVED_WORDS_SET = new HashSet<>(Arrays.asList(RESERVED_WORDS));
-
-        public static boolean isReserved(String word) {
-            return RESERVED_WORDS_SET.contains(word);
-        }
-    }
 }

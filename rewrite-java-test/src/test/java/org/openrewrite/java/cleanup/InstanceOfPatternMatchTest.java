@@ -788,17 +788,23 @@ class InstanceOfPatternMatchTest implements RewriteTest {
                 java(
                   """
                     public class A {
-                        public static class FooBar {}
+                        public static class Else {}
                         String test(Object o) {
-                            return o instanceof FooBar ? ((FooBar) o).toString() : o.toString();
+                            if (o instanceof Else) {
+                                return ((Else) o).toString();
+                            }
+                            return o.toString();
                         }
                     }
                     """,
                   """
                     public class A {
-                        public static class FooBar {}
+                        public static class Else {}
                         String test(Object o) {
-                            return o instanceof FooBar fb ? fb.toString() : o.toString();
+                            if (o instanceof Else else1) {
+                                return else1.toString();
+                            }
+                            return o.toString();
                         }
                     }
                     """
