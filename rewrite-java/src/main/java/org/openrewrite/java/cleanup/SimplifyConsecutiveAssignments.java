@@ -73,7 +73,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
 
                         // is this a numeric variable assignment?
                         String name = numericVariableName(stat);
-                        if (name != null) {
+                        if (name != null && i < b2.getStatements().size() - 1) {
                             Statement nextStatement = b2.getStatements().get(i + 1);
                             Expression acc = numericVariableAccumulation(nextStatement, name);
                             String op = numericVariableOperator(nextStatement, name);

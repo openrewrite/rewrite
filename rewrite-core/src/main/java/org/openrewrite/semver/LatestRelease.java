@@ -132,7 +132,7 @@ public class LatestRelease implements VersionComparator {
             }
         } catch (IllegalStateException exception) {
             // Provide a better error message if an error is thrown while getting groups from the regular expression.
-            throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]");
+            throw new IllegalStateException("Illegal state while comparing versions : [" + nv1 + "] and [" + nv2 + "]. Metadata = [" + metadataPattern + "]", exception);
         }
 
         return normalized1.compareTo(normalized2);

@@ -61,6 +61,30 @@ public class AvoidBoxedBooleanExpressionsTest implements RewriteTest {
     }
 
     @Test
+    void unaryNotInIfCondition() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean test(Boolean b) {
+                      if (!b) return false;
+                      return true;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean test(Boolean b) {
+                      if (Boolean.FALSE.equals(b)) return false;
+                      return true;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void guardAgainstNpeUnaryExpressions() {
         rewriteRun(
           java(

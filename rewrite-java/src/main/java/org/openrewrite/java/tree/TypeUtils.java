@@ -19,8 +19,11 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 public class TypeUtils {
+    private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
+
     private TypeUtils() {
     }
 
@@ -156,16 +159,27 @@ public class TypeUtils {
             }
             if (to == from) {
                 return true;
+            } else if (to instanceof JavaType.Parameterized) {
+                JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
+                if (!(from instanceof JavaType.Parameterized)) {
+                    return toParameterized.getTypeParameters().stream().allMatch(p -> isAssignableTo(p, TYPE_OBJECT));
+                }
+                JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
+                List<JavaType> toParameters = toParameterized.getTypeParameters();
+                List<JavaType> fromParameters = fromParameterized.getTypeParameters();
+                int parameterCount = toParameters.size();
+                return parameterCount == fromParameters.size() &&
+                        isAssignableTo(toParameterized.getType(), fromParameterized.getType()) &&
+                        IntStream.range(0, parameterCount).allMatch(i -> isAssignableTo(toParameters.get(i), fromParameters.get(i)));
             } else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 return isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
-                for (JavaType bound : genericTo.getBounds()) {
-                    if (isAssignableTo(bound, from)) {
-                        return true;
-                    }
+                if (genericTo.getBounds().isEmpty()) {
+                    return genericTo.getName().equals("?");
                 }
+                return false;
             } else if (to instanceof JavaType.Variable) {
                 return isAssignableTo(((JavaType.Variable) to).getType(), from);
             } else if (to instanceof JavaType.Method) {

@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings("ConstantValue")
 class SimplifyConsecutiveAssignmentsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
@@ -63,6 +64,25 @@ class SimplifyConsecutiveAssignmentsTest implements RewriteTest {
                       int x = 1;
                       System.out.println("hi");
                       x++;
+                      return x;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void assignmentAsLastStatement() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int test() {
+                      int x = 1;
+                      if (true) {
+                          x = 2;
+                      }
                       return x;
                   }
               }

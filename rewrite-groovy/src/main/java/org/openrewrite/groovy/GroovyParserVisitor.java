@@ -1047,18 +1047,23 @@ public class GroovyParserVisitor {
                 jType = JavaType.Primitive.Char;
             } else if (type == ClassHelper.double_TYPE || "java.lang.Double".equals(type.getName())) {
                 jType = JavaType.Primitive.Double;
+                if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
+                    text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
+                }
             } else if (type == ClassHelper.float_TYPE || "java.lang.Float".equals(type.getName())) {
                 jType = JavaType.Primitive.Float;
+                if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
+                    text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
+                }
             } else if (type == ClassHelper.int_TYPE || "java.lang.Integer".equals(type.getName())) {
                 jType = JavaType.Primitive.Int;
                 if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                    String literalText = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                    // Groovy automatically converts numbers that start with 0 from base-n to an int.
-                    if (literalText.startsWith("0")) {
-                        text = literalText;
-                    }
+                    text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
                 }
             } else if (type == ClassHelper.long_TYPE || "java.lang.Long".equals(type.getName())) {
+                if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
+                    text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
+                }
                 jType = JavaType.Primitive.Long;
             } else if (type == ClassHelper.short_TYPE || "java.lang.Short".equals(type.getName())) {
                 jType = JavaType.Primitive.Short;
@@ -1090,13 +1095,6 @@ public class GroovyParserVisitor {
             }
             cursor += text.length();
 
-            if (cursor < source.length() && (jType == JavaType.Primitive.Double || jType == JavaType.Primitive.Float || jType == JavaType.Primitive.Long)) {
-                char c = Character.toLowerCase(source.charAt(cursor));
-                if (c == 'f' || c == 'd' || c == 'l') {
-                    text = text + source.charAt(cursor);
-                    cursor++;
-                }
-            }
             queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
                     null, jType));
         }
@@ -1741,7 +1739,7 @@ public class GroovyParserVisitor {
                     type, null);
             if (type instanceof JavaType.Parameterized) {
                 return new J.ParameterizedType(randomId(), prefix, Markers.EMPTY, ident, visitTypeParameterizations(
-                        staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()));
+                        staticType((org.codehaus.groovy.ast.expr.Expression) expression).getGenericsTypes()), type);
             }
             return ident.withPrefix(prefix);
         }
@@ -1929,7 +1927,7 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null && classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()));
+            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
         }
         return expr.withPrefix(prefix);
     }

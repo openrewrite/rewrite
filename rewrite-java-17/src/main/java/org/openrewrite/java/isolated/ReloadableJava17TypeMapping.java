@@ -39,9 +39,6 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @RequiredArgsConstructor
 class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
-    private static final int KIND_BITMASK_INTERFACE = 1 << 9;
-    private static final int KIND_BITMASK_ANNOTATION = 1 << 13;
-    private static final int KIND_BITMASK_ENUM = 1 << 14;
 
     private final ReloadableJava17TypeSignatureBuilder signatureBuilder = new ReloadableJava17TypeSignatureBuilder();
 
@@ -113,7 +110,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             bounds = null;
         }
 
-        gtv.unsafeSet(variance, bounds);
+        gtv.unsafeSet(gtv.getName(), variance, bounds);
         return gtv;
     }
 
@@ -142,7 +139,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        gtv.unsafeSet(bounds == null ? INVARIANT : COVARIANT, bounds);
+        gtv.unsafeSet(gtv.getName(), bounds == null ? INVARIANT : COVARIANT, bounds);
         return gtv;
     }
 
@@ -245,18 +242,19 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         return clazz;
     }
 
-    private JavaType.Class.Kind getKind(Symbol.ClassSymbol sym) {
-        JavaType.Class.Kind kind;
-        if ((sym.flags_field & KIND_BITMASK_ENUM) != 0) {
-            kind = JavaType.Class.Kind.Enum;
-        } else if ((sym.flags_field & KIND_BITMASK_ANNOTATION) != 0) {
-            kind = JavaType.Class.Kind.Annotation;
-        } else if ((sym.flags_field & KIND_BITMASK_INTERFACE) != 0) {
-            kind = JavaType.Class.Kind.Interface;
-        } else {
-            kind = JavaType.Class.Kind.Class;
+    private JavaType.FullyQualified.Kind getKind(Symbol.ClassSymbol sym) {
+        switch (sym.getKind()) {
+            case ENUM:
+                return JavaType.FullyQualified.Kind.Enum;
+            case ANNOTATION_TYPE:
+                return JavaType.FullyQualified.Kind.Annotation;
+            case INTERFACE:
+                return JavaType.FullyQualified.Kind.Interface;
+            case RECORD:
+                return JavaType.FullyQualified.Kind.Record;
+            default:
+                return JavaType.FullyQualified.Kind.Class;
         }
-        return kind;
     }
 
     @SuppressWarnings("ConstantConditions")

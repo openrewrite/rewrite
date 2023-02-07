@@ -66,6 +66,7 @@ class AddGradleWrapperTest implements RewriteTest {
               recipeList:
                 - org.openrewrite.gradle.AddGradleWrapper:
                     version: "7.4.2"
+                    distribution: bin
               """.getBytes()
           ),
           "org.openrewrite.test.AddGradleWrapper"
@@ -118,6 +119,7 @@ class AddGradleWrapperTest implements RewriteTest {
           }).expectedCyclesThatMakeChanges(1),
           other("", spec -> spec.path("gradlew")),
           other("", spec -> spec.path("gradlew.bat")),
+          other("", spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")),
           buildGradle("")
         );
     }

@@ -15,13 +15,16 @@
  */
 package org.openrewrite.text;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Supplier;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class AppendToTextFileTest implements RewriteTest {
@@ -153,6 +156,48 @@ class AppendToTextFileTest implements RewriteTest {
               content2
               """,
             spec -> spec.path("file2.txt").noTrim()
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2796")
+    @Test
+    void missingExpectedGeneratedFiles() {
+        assertThrows(AssertionError.class, () ->
+          rewriteRun(
+            spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
+              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+            text(
+              "existing2",
+              """
+                preamble2
+                content2
+                """,
+              spec -> spec.path("file2.txt").noTrim()
+            )
+          ));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2796")
+    @Test
+    void changeAndCreatedFilesIfNeeded() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
+            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+          text(
+            "existing2",
+            """
+              preamble2
+              content2
+              """,
+            spec -> spec.path("file2.txt").noTrim()
+          ),
+          text(
+            null,
+            """
+              preamble1
+              content1
+              """
           )
         );
     }

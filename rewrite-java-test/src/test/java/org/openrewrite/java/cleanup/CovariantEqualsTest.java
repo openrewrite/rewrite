@@ -287,4 +287,20 @@ class CovariantEqualsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2775")
+    @Test
+    void equalsInInterface() {
+        rewriteRun(
+          java(
+            """
+              public interface Test {
+                  String id;
+
+                  boolean equals(final Test other);
+              }
+              """
+          )
+        );
+    }
 }

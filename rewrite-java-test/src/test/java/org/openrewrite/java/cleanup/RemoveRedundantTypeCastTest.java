@@ -88,16 +88,15 @@ class RemoveRedundantTypeCastTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              import java.util.Collection;
-                            
+              import java.util.*;
+              
               class Test {
                   public <T extends Collection<String>> T test() {
-                                            T t = (T) get();
+                      T t = (T) get();
                       return t;
                   }
-
                   public List<String> get() {
-                      return singletonList("a", "b", "c");
+                      return List.of("a", "b", "c");
                   }
               }
               """

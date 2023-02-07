@@ -222,7 +222,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
         typeCache.put(signature, gtv);
 
         List<JavaType> bounds = genericBounds(typeParameter.getBounds());
-        gtv.unsafeSet(bounds == null ? INVARIANT : COVARIANT, bounds);
+        gtv.unsafeSet(gtv.getName(), bounds == null ? INVARIANT : COVARIANT, bounds);
         return gtv;
     }
 
@@ -246,7 +246,7 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             }
         }
 
-        gtv.unsafeSet(variance, bounds);
+        gtv.unsafeSet(gtv.getName(), variance, bounds);
         return gtv;
     }
 

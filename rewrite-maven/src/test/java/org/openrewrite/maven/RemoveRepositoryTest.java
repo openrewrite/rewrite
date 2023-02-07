@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
@@ -23,14 +24,13 @@ import static org.openrewrite.maven.Assertions.pomXml;
 class RemoveRepositoryTest implements RewriteTest {
 
     @Test
-    void removeSimpleRepoWithIdAndUrl() {
+    @DisplayName("It should only remove a repo when both the id and the urls are the same")
+    void removesRepoAndIdCombination() {
 
         rewriteRun(
-                spec -> spec.recipe(new RemoveRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
-                        null, null, null,
-                        null, null, null)),
-                pomXml(
-                        """
+          spec -> spec.recipe(new RemoveRepository("myRepo", "https://myrepo.maven.com/repo")),
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -38,37 +38,60 @@ class RemoveRepositoryTest implements RewriteTest {
                 <repositories>
                   <repository>
                     <id>myRepo</id>
-                    <url>http://myrepo.maven.com/repo</url>
+                    <url>https://myrepo.maven.com/repo</url>
                   </repository>
                   <repository>
-                    <id>identicalRepo</id>
-                    <url>http://myrepo.maven.com/repo</url>
+                    <id>same_repo_different_id</id>
+                    <url>https://myrepo.maven.com/repo</url>
                   </repository>
                 </repositories>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>myRepo</id>
+                    <url>https://someOtherUrl</url>
+                  </pluginRepository>
+                  <pluginRepository>
+                    <id>identicalRepo</id>
+                    <url>https://myrepo.maven.com/repo</url>
+                  </pluginRepository>
+                </pluginRepositories>
               </project>
               """,
-                        """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <repositories>
-                </repositories>
-              </project>
-              """
-                )
+            """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <repositories>
+                <repository>
+                  <id>same_repo_different_id</id>
+                  <url>https://myrepo.maven.com/repo</url>
+                </repository>
+              </repositories>
+              <pluginRepositories>
+                <pluginRepository>
+                  <id>myRepo</id>
+                  <url>https://someOtherUrl</url>
+                </pluginRepository>
+                <pluginRepository>
+                  <id>identicalRepo</id>
+                  <url>https://myrepo.maven.com/repo</url>
+                </pluginRepository>
+              </pluginRepositories>
+            </project>
+            """
+          )
         );
     }
 
     @Test
+    @DisplayName("If only the url is given, any repo matching that url should be removed")
     void removeSimpleRepoWithUrlOnly() {
 
         rewriteRun(
-                spec -> spec.recipe(new RemoveRepository(null, "http://myrepo.maven.com/repo", null, null,
-                        null, null, null,
-                        null, null, null)),
-                pomXml(
-                        """
+          spec -> spec.recipe(new RemoveRepository(null, "https://myrepo.maven.com/repo")),
+          pomXml(
+            """
               <project>
                 <groupId>com.mycompany.app</groupId>
                 <artifactId>my-app</artifactId>
@@ -76,21 +99,41 @@ class RemoveRepositoryTest implements RewriteTest {
                 <repositories>
                   <repository>
                     <id>myRepo</id>
-                    <url>http://myrepo.maven.com/repo</url>
+                    <url>https://myrepo.maven.com/repo</url>
+                  </repository>
+                  <repository>
+                    <id>same_repo_different_id</id>
+                    <url>https://myrepo.maven.com/repo</url>
                   </repository>
                 </repositories>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>myRepo</id>
+                    <url>https://someOtherUrl</url>
+                  </pluginRepository>
+                  <pluginRepository>
+                    <id>identicalRepo</id>
+                    <url>https://myrepo.maven.com/repo</url>
+                  </pluginRepository>
+                </pluginRepositories>
               </project>
               """,
-                        """
-              <project>
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                <repositories>
-                </repositories>
-              </project>
-              """
-                )
-        );
+            """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <repositories>
+              </repositories>
+              <pluginRepositories>
+                <pluginRepository>
+                  <id>myRepo</id>
+                  <url>https://someOtherUrl</url>
+                </pluginRepository>
+              </pluginRepositories>
+            </project>
+            """
+        ));
     }
+
 }

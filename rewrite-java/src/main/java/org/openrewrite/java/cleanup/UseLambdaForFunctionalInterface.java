@@ -66,7 +66,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                     n.getBody().getStatements().size() == 1 &&
                     n.getBody().getStatements().get(0) instanceof J.MethodDeclaration &&
                     n.getClazz() != null) {
-                    JavaType.Class type = TypeUtils.asClass(n.getClazz().getType());
+                    JavaType.@Nullable FullyQualified type = TypeUtils.asFullyQualified(n.getClazz().getType());
                     if (type != null && type.getKind().equals(JavaType.Class.Kind.Interface)) {
                         JavaType.Method sam = null;
                         for (JavaType.Method method : type.getMethods()) {
