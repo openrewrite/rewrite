@@ -337,6 +337,11 @@ public interface RecipeScheduler {
                         }
                     }
                 );
+
+                // todo, kunli, remove after listUtil.flatMap() reference equality issue fixed,
+                if (RecipeSchedulerUtils.isIdentical(afterWidened, afterSources)) {
+                    afterWidened = afterSources;
+                }
             }
 
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
@@ -474,6 +479,25 @@ class RecipeSchedulerUtils {
             && sourceIndex >= 0) {
             return singleSourceApplicableTestResult.get(sourceIndex);
         }
+        return true;
+    }
+
+    // todo, kunli, remove after listUtil.flatMap() reference equality issue fixed,
+    public static boolean isIdentical(List<SourceFile> before, List<SourceFile> after) {
+        if (before == after) {
+            return true;
+        }
+
+        if (before.size() != after.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < before.size(); i++) {
+            if (before.get(i) != after.get(i)) {
+                return false;
+            }
+        }
+
         return true;
     }
 }

@@ -137,7 +137,8 @@ class AppendToTextFileTest implements RewriteTest {
     void multipleFiles() {
         rewriteRun(
           spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
-            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace")))
+            .expectedCyclesThatMakeChanges(2),
           text(
             "existing1",
             """
@@ -164,7 +165,8 @@ class AppendToTextFileTest implements RewriteTest {
             new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
               .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))
               .doNext(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace"))
-              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace")))
+            .expectedCyclesThatMakeChanges(2),
           text(
             "existing1",
             """
