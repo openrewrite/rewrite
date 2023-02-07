@@ -19,6 +19,8 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.filter.RecipeApplicableTest;
+import org.openrewrite.filter.RecipeSingleSourceApplicableTest;
 import org.openrewrite.internal.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
@@ -192,6 +194,14 @@ public interface RecipeScheduler {
         }
 
         try {
+            for (RecipeApplicableTest test : ctx.getMessage(RecipeApplicableTest.class.getSimpleName(), Collections.<RecipeApplicableTest>emptySet())) {
+                recipe.addApplicableTest(test.getTest(recipe));
+            }
+
+            for (RecipeSingleSourceApplicableTest test : ctx.getMessage(RecipeSingleSourceApplicableTest.class.getSimpleName(), Collections.<RecipeSingleSourceApplicableTest>emptySet())) {
+                recipe.addSingleSourceApplicableTest(test.getTest(recipe));
+            }
+
             if (!recipe.getApplicableTests().isEmpty()) {
                 boolean anySourceMatch = false;
                 for (S s : before) {
