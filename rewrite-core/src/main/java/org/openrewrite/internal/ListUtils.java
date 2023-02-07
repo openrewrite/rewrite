@@ -146,65 +146,50 @@ public final class ListUtils {
             //noinspection ConstantConditions
             return ls;
         }
-
         List<T> newLs = ls;
-        boolean widened = false;
-        List<T> outputLs = new ArrayList<>();
-
-        for (int i = 0; i < ls.size(); i++) {
+        int j = 0;
+        for (int i = 0; i < ls.size(); i++, j++) {
             T tree = ls.get(i);
             Object newTreeOrTrees = flatMap.apply(i, tree);
-            if (newTreeOrTrees == tree) {
-                //noinspection unchecked
-                outputLs.add( (T) newTreeOrTrees);
-            } else {
+            if (newTreeOrTrees != tree) {
+                if (newLs == ls) {
+                    newLs = new ArrayList<>(ls);
+                }
+
                 if (newTreeOrTrees instanceof Iterable) {
+                    boolean addedTree = false;
                     //noinspection unchecked
-                    Iterable<T> it = (Iterable<T>) newTreeOrTrees;
-                    List<T> outLs = new ArrayList<>();
-                    for (T t : it) {
-                        outLs.add(t);
-                    }
-
-                    outputLs.addAll(outLs);
-
-                    if (!widened) {
-                        if (outLs.size() == 1) {
-                            T newTree = outLs.get(0);
-                            if (newTree != tree) {
-                                if (newLs == ls) {
-                                    newLs = new ArrayList<>(ls);
-                                }
-                                newLs.set(i, newTree);
-                            }
+                    for (T newTree : (Iterable<T>) newTreeOrTrees) {
+                        if (j >= newLs.size()) {
+                            newLs.add(newTree);
+                        } else if (!addedTree) {
+                            newLs.set(j, newTree);
                         } else {
-                            widened = true;
+                            newLs.add(j, newTree);
                         }
+                        addedTree = true;
+                        j++;
+                    }
+                    if (addedTree) {
+                        j--;
+                    } else {
+                        newLs.set(j, null);
                     }
                 } else {
-                    //noinspection unchecked
-                    outputLs.add((T) newTreeOrTrees);
-
-                    if (!widened) {
-                        if (newLs == ls) {
-                            newLs = new ArrayList<>(ls);
-                        }
+                    if (j >= newLs.size()) {
                         //noinspection unchecked
-                        newLs.set(i,  (T) newTreeOrTrees);
+                        newLs.add((T) newTreeOrTrees);
+                    } else {
+                        //noinspection unchecked
+                        newLs.set(j, (T) newTreeOrTrees);
                     }
                 }
             }
         }
 
-        if (widened) {
-            //noinspection StatementWithEmptyBody
-            while (outputLs.remove(null));
-            return outputLs;
-        }
-
         if (newLs != ls) {
             //noinspection StatementWithEmptyBody
-            while (newLs.remove(null));
+            while (newLs.remove(null)) ;
         }
 
         return newLs;
