@@ -114,7 +114,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             bounds = null;
         }
 
-        gtv.unsafeSet(variance, bounds);
+        gtv.unsafeSet(gtv.getName(), variance, bounds);
         return gtv;
     }
 
@@ -143,7 +143,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
             }
         }
 
-        gtv.unsafeSet(bounds == null ? INVARIANT : COVARIANT, bounds);
+        gtv.unsafeSet(gtv.getName(), bounds == null ? INVARIANT : COVARIANT, bounds);
         return gtv;
     }
 

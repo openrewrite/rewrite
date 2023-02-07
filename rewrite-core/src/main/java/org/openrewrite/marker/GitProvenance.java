@@ -89,7 +89,7 @@ public class GitProvenance implements Marker {
      * which accepts a "baseUrl" parameter should be used instead
      *
      */
-    @Deprecated()
+    @Deprecated
     @Nullable
     public String getOrganizationName() {
         if (origin == null) {

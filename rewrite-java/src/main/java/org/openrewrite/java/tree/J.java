@@ -5303,7 +5303,7 @@ public interface J extends Tree {
         @Override
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
+            return new CoordinateBuilder.Unary(this);
         }
 
         @Override

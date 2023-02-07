@@ -622,7 +622,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
               class A {
                   void foo() {
                       new ArrayList<List<Integer>>().stream()
-                              .map(it -> it.addAll(singletonList(1, 2, 3)));
+                              .map(it -> it.addAll(List.of(1, 2, 3)));
                   }
               }
               """

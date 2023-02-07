@@ -289,7 +289,8 @@ public interface JavaType {
             Class,
             Enum,
             Interface,
-            Annotation
+            Annotation,
+            Record
         }
     }
 
@@ -648,6 +649,7 @@ public interface JavaType {
         Integer managedReference;
 
         @With
+        @NonFinal
         @Getter
         String name;
 
@@ -685,6 +687,20 @@ public interface JavaType {
             return this;
         }
 
+        public GenericTypeVariable unsafeSet(String name, Variance variance, @Nullable List<JavaType> bounds) {
+            this.name = name;
+            this.variance = variance;
+            this.bounds = nullIfEmpty(bounds);
+            return this;
+        }
+
+        /**
+         * @param variance The new variance
+         * @param bounds The new bounds
+         * @return This instance, with modifications/
+         * @deprecated Use {@link #unsafeSet(String, Variance, List)} instead.
+         */
+        @Deprecated
         public GenericTypeVariable unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
             this.variance = variance;
             this.bounds = nullIfEmpty(bounds);

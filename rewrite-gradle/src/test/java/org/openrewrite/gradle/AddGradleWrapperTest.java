@@ -119,6 +119,7 @@ class AddGradleWrapperTest implements RewriteTest {
           }).expectedCyclesThatMakeChanges(1),
           other("", spec -> spec.path("gradlew")),
           other("", spec -> spec.path("gradlew.bat")),
+          other("", spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")),
           buildGradle("")
         );
     }

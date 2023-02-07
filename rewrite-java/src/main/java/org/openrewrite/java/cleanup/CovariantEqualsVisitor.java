@@ -34,7 +34,7 @@ public class CovariantEqualsVisitor<P> extends JavaIsoVisitor<P> {
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, p);
         Stream<J.MethodDeclaration> mds = cd.getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast);
-        if (mds.noneMatch(m -> OBJECT_EQUALS.matches(m, classDecl))) {
+        if (mds.noneMatch(m -> OBJECT_EQUALS.matches(m, classDecl)) && cd.getKind() != J.ClassDeclaration.Kind.Type.Interface) {
             cd = (J.ClassDeclaration) new ChangeCovariantEqualsMethodVisitor<>(cd).visit(cd, p, getCursor().getParentOrThrow());
             assert cd != null;
         }

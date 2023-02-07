@@ -717,8 +717,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
               class Test {
                   public static void main(String[] args) {
                       try (
-                              InputStream source = new GZIPInputStream(new FileInputStream(args.get(0)));
-                              OutputStream out = new FileOutputStream(args.get(1))
+                              InputStream source = new GZIPInputStream(new FileInputStream(args[0]));
+                              OutputStream out = new FileOutputStream(args[1])
                       ) {
                           System.out.println("side effect");
                       } catch (Exception e) {

@@ -16,11 +16,18 @@
 package org.openrewrite.marker.ci;
 
 import com.sun.jna.platform.win32.Kernel32Util;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.With;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -29,7 +36,7 @@ import static java.util.Collections.emptyList;
  * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/OperatingSystem.java</a>
  */
 @SuppressWarnings("StaticInitializerReferencesSubClass")
-public abstract class OperatingSystem {
+public abstract class OperatingSystem implements Marker {
     public static final Windows WINDOWS = new Windows();
     public static final MacOs MAC_OS = new MacOs();
     public static final Solaris SOLARIS = new Solaris();
@@ -148,6 +155,13 @@ public abstract class OperatingSystem {
 
     public abstract String getFamilyName();
 
+    public abstract LineEnding getLineEnding();
+
+    protected enum LineEnding {
+        CRLF,
+        LF
+    }
+
     /**
      * Locates the given executable in the system path. Returns null if not found.
      */
@@ -198,11 +212,23 @@ public abstract class OperatingSystem {
         return "PATH";
     }
 
+    @AllArgsConstructor
+    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
     static class Windows extends OperatingSystem {
-        private final String nativePrefix;
+        String nativePrefix;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
 
         Windows() {
             nativePrefix = resolveNativePrefix();
+            id = Tree.randomId();
+        }
+
+        @Override
+        public LineEnding getLineEnding() {
+            return LineEnding.CRLF;
         }
 
         @Override
@@ -277,13 +303,31 @@ public abstract class OperatingSystem {
         public String getPathVar() {
             return "Path";
         }
+
+        @Override
+        @NonNull
+        public UUID getId() {
+            return id;
+        }
     }
 
+    @AllArgsConstructor
+    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
     static class Unix extends OperatingSystem {
-        private final String nativePrefix;
+        String nativePrefix;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
 
         Unix() {
-            this.nativePrefix = resolveNativePrefix();
+            nativePrefix = resolveNativePrefix();
+            id = Tree.randomId();
+        }
+
+        @Override
+        public LineEnding getLineEnding() {
+            return LineEnding.LF;
         }
 
         @Override
@@ -386,6 +430,12 @@ public abstract class OperatingSystem {
                 osPrefix = osPrefix.substring(0, space);
             }
             return osPrefix;
+        }
+
+        @Override
+        @NonNull
+        public UUID getId() {
+            return id;
         }
     }
 

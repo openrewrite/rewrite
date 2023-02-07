@@ -49,6 +49,7 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
     @Override
     public JavaType visitGenericTypeVariable(JavaType.GenericTypeVariable generic, P p) {
         return generic.unsafeSet(
+                generic.getName(),
                 generic.getVariance(),
                 ListUtils.map(generic.getBounds(), b -> visit(b, p))
         );

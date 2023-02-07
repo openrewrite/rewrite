@@ -177,13 +177,9 @@ public class TypeUtils {
             } else if (to instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
                 if (genericTo.getBounds().isEmpty()) {
-                    return true;
+                    return genericTo.getName().equals("?");
                 }
-                for (JavaType bound : genericTo.getBounds()) {
-                    if (isAssignableTo(bound, from)) {
-                        return true;
-                    }
-                }
+                return false;
             } else if (to instanceof JavaType.Variable) {
                 return isAssignableTo(((JavaType.Variable) to).getType(), from);
             } else if (to instanceof JavaType.Method) {

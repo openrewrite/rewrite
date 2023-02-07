@@ -332,6 +332,8 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         Collection<SourceSpec<?>> expectedNewSources = Collections.newSetFromMap(new IdentityHashMap<>());
+        Collection<Result> expectedNewResults = Collections.newSetFromMap(new IdentityHashMap<>());
+
         for (SourceSpec<?> sourceSpec : sourceSpecs) {
             if (sourceSpec.before == null) {
                 expectedNewSources.add(sourceSpec);
@@ -352,6 +354,7 @@ public interface RewriteTest extends SourceSpecs {
 
                     if (result.getAfter() != null && sourceSpec.getSourcePath().equals(result.getAfter().getSourcePath())) {
                         expectedNewSources.remove(sourceSpec);
+                        expectedNewResults.add(result);
                         assertThat(result.getBefore())
                                 .as("Expected a new file for the source path but there was an existing file already present: " +
                                     sourceSpec.getSourcePath())
@@ -376,6 +379,7 @@ public interface RewriteTest extends SourceSpecs {
                     String expected = trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
                     if (actual.equals(expected)) {
                         expectedNewSources.remove(sourceSpec);
+                        expectedNewResults.add(result);
                         //noinspection unchecked
                         ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
                         if (sourceSpec.sourcePath != null) {
@@ -450,10 +454,17 @@ public interface RewriteTest extends SourceSpecs {
                         }
                     }
 
-
                     //noinspection unchecked
                     ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
                     continue nextSourceFile;
+                } else if (result.getBefore() == null
+                    && !(result.getAfter() instanceof Remote)
+                    && !expectedNewResults.contains(result)
+                    && testMethodSpec.afterRecipes.isEmpty()
+                ) {
+                    // falsely added files detected.
+                    fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
+                        + "\" that was not expected.");
                 }
             }
 

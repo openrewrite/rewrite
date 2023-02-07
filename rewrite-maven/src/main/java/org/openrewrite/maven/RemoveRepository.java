@@ -17,19 +17,16 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.apache.commons.lang3.StringUtils;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.AddToTagVisitor;
-import org.openrewrite.xml.ChangeTagValueVisitor;
-import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Objects;
-import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -37,44 +34,15 @@ public class RemoveRepository extends Recipe {
 
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories/repository");
 
+    private static final XPathMatcher PLUGIN_REPOS_MATCHER = new XPathMatcher("/project/pluginRepositories/pluginRepository");
+
     @Option(required = false, description = "Repository id")
     @Nullable
-    private String id;
+    String id;
 
     @Option(description = "Repository URL")
-    private String url;
-
-    @Option(required = false, description = "Repository name")
     @Nullable
-    private String repoName;
-
-    @Option(required = false, description = "Repository layout")
-    @Nullable
-    private String layout;
-
-    @Option(required = false, description = "Snapshots from the repository are available")
-    @Nullable
-    private Boolean snapshotsEnabled;
-
-    @Option(required = false, description = "Snapshots checksum policy")
-    @Nullable
-    private String snapshotsChecksumPolicy;
-
-    @Option(required = false, description = "Snapshots update policy policy")
-    @Nullable
-    private String snapshotsUpdatePolicy;
-
-    @Option(required = false, description = "Releases from the repository are available")
-    @Nullable
-    private Boolean releasesEnabled;
-
-    @Option(required = false, description = "Releases checksum policy")
-    @Nullable
-    private String releasesChecksumPolicy;
-
-    @Option(required = false, description = "Releases update policy")
-    @Nullable
-    private String releasesUpdatePolicy;
+    String url;
 
     @Override
     public String getDisplayName() {
@@ -93,12 +61,8 @@ public class RemoveRepository extends Recipe {
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag repo = super.visitTag(tag, ctx);
 
-                if (REPOS_MATCHER.matches(getCursor())) {
-                    if (id == null && (isReleasesEqual(repo) && isSnapshotsEqual(repo)) &&
-                                        url.equals(repo.getChildValue("url").orElse(null))) {
-                        return null;
-                    } else if (id != null && (id.equals(repo.getChildValue("id").orElse(null)) || (isReleasesEqual(repo) && isSnapshotsEqual(repo))) &&
-                                url.equals(repo.getChildValue("url").orElse(null))) {
+                if (REPOS_MATCHER.matches(getCursor()) || PLUGIN_REPOS_MATCHER.matches(getCursor())) {
+                    if (isSameUrlAndID(repo)) {
                         return null;
                     }
                 }
@@ -107,34 +71,12 @@ public class RemoveRepository extends Recipe {
         };
     }
 
-    private boolean isReleasesEqual(Xml.Tag repo) {
-        Xml.Tag releases = repo.getChild("releases").orElse(null);
-        if (releases == null) {
-            return isNoReleases();
-        } else {
-            return Objects.equals(releasesEnabled == null ? null : String.valueOf(releasesEnabled.booleanValue()), releases.getChildValue("enabled").orElse(null))
-                    && Objects.equals(releasesUpdatePolicy, releases.getChildValue("updatePolicy").orElse(null))
-                    && Objects.equals(releasesChecksumPolicy, releases.getChildValue("checksumPolicy").orElse(null));
-        }
+    private boolean isSameUrlAndID(Xml.Tag repo) {
+        boolean sameURL = StringUtils.isBlank(this.url) || StringUtils.equals(this.url,repo.getChildValue("url").orElse(null));
+        boolean sameID = StringUtils.isBlank(this.id) || StringUtils.equals(this.id,repo.getChildValue("id").orElse(null));
+
+        return sameURL && sameID;
     }
 
-    private boolean isNoReleases() {
-        return releasesEnabled == null && releasesUpdatePolicy == null && releasesChecksumPolicy == null;
-    }
-
-    private boolean isSnapshotsEqual(Xml.Tag repo) {
-        Xml.Tag snapshots = repo.getChild("snapshots").orElse(null);
-        if (snapshots == null) {
-            return isNoSnapshots();
-        } else {
-            return Objects.equals(snapshotsEnabled == null ? null : String.valueOf(snapshotsEnabled.booleanValue()), snapshots.getChildValue("enabled").orElse(null))
-                    && Objects.equals(snapshotsUpdatePolicy, snapshots.getChildValue("updatePolicy").orElse(null))
-                    && Objects.equals(snapshotsChecksumPolicy, snapshots.getChildValue("checksumPolicy").orElse(null));
-        }
-    }
-
-    private boolean isNoSnapshots() {
-        return snapshotsEnabled == null && snapshotsUpdatePolicy == null && snapshotsChecksumPolicy == null;
-    }
 
 }
