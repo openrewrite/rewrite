@@ -31,7 +31,7 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
  * Based on type attribution mappings of [JavaTypeGoat].
  */
 @SuppressWarnings("ConstantConditions")
-interface JavaTypeMappingTest {
+public interface JavaTypeMappingTest {
     JavaType.FullyQualified classType(String fqn);
 
     default JavaType.Parameterized goatType() {
