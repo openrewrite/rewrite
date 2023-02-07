@@ -4634,6 +4634,7 @@ class SpacesTest implements RewriteTest {
             """
               public class A {
                   {
+                      int i = 0, j = 0;
                       for (; i < j; i++, j--) { }
                   }
               }
@@ -4786,6 +4787,7 @@ class SpacesTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.List;
               @Deprecated("version" /* some comment */)
               class Test {
                   void foo() {

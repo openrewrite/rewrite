@@ -134,14 +134,15 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class B {
+                  package p;
+                  public class B {
                       public static int _staticImport_ = 0;
                   }
               """
           ),
           java(
             """
-                  import static B._staticImport_;
+                  import static p.B._staticImport_;
 
                   class Test {
                       private int member = _staticImport_;
