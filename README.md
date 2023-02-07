@@ -1,7 +1,7 @@
 ![Logo](https://github.com/openrewrite/rewrite/raw/main/doc/logo-oss.png)
 # Automate software refactoring.
 
-### More tech. Less debt.
+## More tech. Less debt.
 
 [![ci](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml/badge.svg)](https://github.com/openrewrite/rewrite/actions/workflows/ci.yml)
 [![Apache 2.0](https://img.shields.io/github/license/openrewrite/rewrite.svg)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -16,7 +16,7 @@ Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invit
 
 See this [doc page](https://docs.openrewrite.org/reference/building-openrewrite-from-source) for more on building this repository from source.
   
-## Refactoring at Scale
+## Refactoring at scale with Moderne
 
 OpenRewrite's refactoring engine and recipes will always be open source. Build tool plugins like [OpenRewrite Gradle Plugin](https://docs.openrewrite.org/reference/gradle-plugin-configuration) and [OpenRewrite Maven Plugin](https://docs.openrewrite.org/reference/rewrite-maven-plugin) help you run these recipes on one repository at a time. Moderne is a complementary product that executes OpenRewrite recipes at scale on hundreds of millions of lines of code and enables mass committing of results. Moderne freely runs a [public service](https://public.moderne.io) for the benefit of thousands of open source projects.
 
