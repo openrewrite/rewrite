@@ -164,7 +164,7 @@ public interface RecipeScheduler {
     default <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats,
                                                          Stack<Recipe> recipeStack,
                                                          List<S> before,
-                                                         @Nullable List<Boolean> singleSourceApplicableTestResult,
+                                                         @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
                                                          ExecutionContext ctx,
                                                          Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile) {
         runStats.calls.incrementAndGet();
@@ -201,7 +201,7 @@ public interface RecipeScheduler {
             if (!recipe.getSingleSourceApplicableTests().isEmpty()) {
                 if (singleSourceApplicableTestResult == null || singleSourceApplicableTestResult.isEmpty()) {
                     if (singleSourceApplicableTestResult == null) {
-                        singleSourceApplicableTestResult = new ArrayList<>(before.size());
+                        singleSourceApplicableTestResult = new HashMap<>(before.size());
                     }
 
                     for (S s : before) {
@@ -212,7 +212,7 @@ public interface RecipeScheduler {
                                 break;
                             }
                         }
-                        singleSourceApplicableTestResult.add(allMatch);
+                        singleSourceApplicableTestResult.put(s.getId(), allMatch);
                     }
                 }
             }
@@ -223,7 +223,7 @@ public interface RecipeScheduler {
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after;
-        final List<Boolean> singleSourceApplicableTestResultRef = singleSourceApplicableTestResult;
+        final Map<UUID, Boolean> singleSourceApplicableTestResultRef = singleSourceApplicableTestResult;
         boolean hasSingleSourceApplicableTest = singleSourceApplicableTestResult != null
                 && !singleSourceApplicableTestResult.isEmpty();
 
@@ -237,7 +237,7 @@ public interface RecipeScheduler {
 
                 S afterFile = s;
                 try {
-                    if (hasSingleSourceApplicableTest && !singleSourceApplicableTestResultRef.get(index)) {
+                    if (hasSingleSourceApplicableTest && !singleSourceApplicableTestResultRef.get(s.getId())) {
                         return s;
                     }
 
@@ -308,16 +308,14 @@ public interface RecipeScheduler {
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
         List<SourceFile> afterWidened;
-        final List<Boolean> lastSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
-        final List<Boolean> newSingleSourceApplicableTestResult = lastSingleSourceApplicableTestResult;
+        final Map<UUID, Boolean> lastSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final Map<UUID, Boolean> newSingleSourceApplicableTestResult = new HashMap<>();
         try {
             long ownVisitStartTime = System.nanoTime();
 
-            // If any single source in the set matches single source applicability test, we need to run all files
-            // together, but just keep the results generated from the files which passed the single source applicability test.
             if (hasSingleSourceApplicableTest) {
                 boolean anyFilePassedSingleApplicableTest = false;
-                for (Boolean b : singleSourceApplicableTestResult) {
+                for (Boolean b : singleSourceApplicableTestResult.values()) {
                     if (b) {
                         anyFilePassedSingleApplicableTest = true;
                         break;
@@ -330,18 +328,27 @@ public interface RecipeScheduler {
 
             //noinspection unchecked
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
-            final List<SourceFile> afterWidenedRef = afterWidened;
 
-            // update/re-mapping single source applicability test results
             if (hasSingleSourceApplicableTest) {
-                if (afterWidened.size() == after.size()) {
-                    // 'afterWidened' and 'after' are 1-to-1 mapping, reflects single source applicability test results.
-                    //noinspection unchecked
-                    afterWidened = ListUtils.map((List<SourceFile>) after, (i, s) ->
-                            lastSingleSourceApplicableTestResult.get(i) ? afterWidenedRef.get(i) : s);
-                } else if (afterWidened.size() > after.size()) {
-                    newSingleSourceApplicableTestResult.addAll(Collections.nCopies(afterWidened.size() - after.size(), true));
+                // update single source applicability test results
+                Map<UUID, SourceFile> originalMap = new HashMap<>(after.size());
+                for (SourceFile file : after) {
+                    originalMap.put(file.getId(), file);
                 }
+
+                afterWidened = ListUtils.map(afterWidened, s -> {
+                    Boolean singleSourceTestResult = lastSingleSourceApplicableTestResult.get(s.getId());
+                    if (singleSourceTestResult != null) {
+                        newSingleSourceApplicableTestResult.put(s.getId(), singleSourceTestResult);
+                        if (!singleSourceTestResult) {
+                            return originalMap.get(s.getId());
+                        }
+                    } else {
+                        // It's a newly generated file
+                        newSingleSourceApplicableTestResult.put(s.getId(), true);
+                    }
+                    return s;
+                });
             }
 
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
