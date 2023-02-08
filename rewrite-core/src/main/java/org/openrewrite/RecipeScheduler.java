@@ -330,15 +330,15 @@ public interface RecipeScheduler {
 
             //noinspection unchecked
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
-            final List<SourceFile> afterWidenedTmp = afterWidened;
+            final List<SourceFile> afterWidenedRef = afterWidened;
 
             // update/re-mapping single source applicability test results
             if (hasSingleSourceApplicableTest) {
                 if (afterWidened.size() == after.size()) {
-                    // afterWidened and after are 1-to-1 mapping, reflects single source applicability test results.
+                    // 'afterWidened' and 'after' are 1-to-1 mapping, reflects single source applicability test results.
                     //noinspection unchecked
                     afterWidened = ListUtils.map((List<SourceFile>) after, (i, s) ->
-                            lastSingleSourceApplicableTestResult.get(i) ? afterWidenedTmp.get(i) : s);
+                            lastSingleSourceApplicableTestResult.get(i) ? afterWidenedRef.get(i) : s);
                 } else if (afterWidened.size() > after.size()) {
                     newSingleSourceApplicableTestResult.addAll(Collections.nCopies(afterWidened.size() - after.size(), true));
                 }
