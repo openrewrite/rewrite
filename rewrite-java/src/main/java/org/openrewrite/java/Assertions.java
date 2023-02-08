@@ -66,7 +66,8 @@ public class Assertions {
     }
 
     public static void assertValidTypes(TypeValidation typeValidation, J sf) {
-        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()) {
+        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()
+                || typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
@@ -75,6 +76,8 @@ public class Assertions {
                         } else if (typeValidation.classDeclarations() && missingType.getJ() instanceof J.ClassDeclaration) {
                             return true;
                         } else if (typeValidation.methodInvocations() && missingType.getJ() instanceof J.MethodInvocation) {
+                            return true;
+                        } else if (typeValidation.constructorInvocations() && missingType.getJ() instanceof J.NewClass) {
                             return true;
                         } else
                             return typeValidation.methodDeclarations() && missingType.getJ() instanceof J.MethodDeclaration;

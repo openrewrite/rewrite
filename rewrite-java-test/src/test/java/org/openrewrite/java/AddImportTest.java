@@ -872,7 +872,7 @@ class AddImportTest implements RewriteTest {
                   Map<String, String> map = new HashMap<>();
                   Set<String> set = new HashSet<>();
                   List<String> test = Collections.singletonList("test");
-                  List<String> test2 = new ArrayList<>();
+                  List<String> test2 = new java.util.ArrayList<>();
               }
               """,
             """
@@ -887,7 +887,7 @@ class AddImportTest implements RewriteTest {
                   Map<String, String> map = new HashMap<>();
                   Set<String> set = new HashSet<>();
                   List<String> test = Collections.singletonList("test");
-                  List<String> test2 = new ArrayList<>();
+                  List<String> test2 = new java.util.ArrayList<>();
               }
               """
           )
