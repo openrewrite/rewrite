@@ -8,7 +8,7 @@
 [![Maven Central](https://img.shields.io/maven-central/v/org.openrewrite/rewrite-java.svg)](https://mvnrepository.com/artifact/org.openrewrite/rewrite-java)
 [![Revved up by Gradle Enterprise](https://img.shields.io/badge/Revved%20up%20by-Gradle%20Enterprise-06A0CE?logo=Gradle&labelColor=02303A)](https://ge.openrewrite.org/scans)
 
-The OpenRewrite project is a mass source code refactoring ecosystem. Reduce 1000s of hours of static code analysis fixes to minutes. Turn a four month migration project into four hours of work. Patch security vulnerabilities across 100s of repositories at once. OpenRewrite automates code refactoring and remediation tasks for you, enabling developers to deliver more businesshttps://youtu.be/Mq6bKAeGCz0.
+The OpenRewrite project is a mass source code refactoring ecosystem. Reduce 1000s of hours of static code analysis fixes to minutes. Turn a four month migration project into four hours of work. Patch security vulnerabilities across 100s of repositories at once. OpenRewrite automates code refactoring and remediation tasks for you, enabling developers to deliver more business.
 
 Start with our [quickstart guide](https://docs.openrewrite.org/getting-started/getting-started) and let OpenRewrite start handling the boring parts of software development for you. Full documentation available at [docs.openrewrite.org](https://docs.openrewrite.org/).
 
