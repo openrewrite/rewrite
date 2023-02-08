@@ -30,8 +30,9 @@ public class TypeValidation {
     private boolean identifiers = true;
     private boolean methodDeclarations = true;
     private boolean methodInvocations = true;
+    private boolean constructorInvocations = true;
 
     public static TypeValidation none() {
-        return new TypeValidation(false,false,false,false);
+        return new TypeValidation(false,false,false,false,false);
     }
 }

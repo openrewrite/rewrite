@@ -365,14 +365,14 @@ class ChangeTypeTest implements RewriteTest {
               import a.A1;
                             
               public class B {
-                 A1[] a = new A1.get(0);
+                 A1[] a = new A1[0];
               }
               """,
             """
               import a.A2;
                             
               public class B {
-                 A2[] a = new A2.get(0);
+                 A2[] a = new A2[0];
               }
               """
           )
