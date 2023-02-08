@@ -35,7 +35,7 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.cleanup.ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNull
 displayName: Replace `org.apache.commons.lang3.Validate#notNull` with `Objects#requireNonNull`
-description: 'Replace `org.apache.commons.lang3.Validate.notNull(T obj)` with `Objects.requireNonNull(T obj)` and replace `org.apache.commons.lang3.Validate.notNull(T obj, String message)` with `Objects.requireNonNull(T obj, String message)`.'
+description: 'Replace `org.apache.commons.lang3.Validate.notNull(..)` with `Objects.requireNonNull(..)`.'
 recipeList:
   - org.openrewrite.java.ChangeMethodName:
       methodPattern: org.apache.commons.lang3.Validate notNull(..)
