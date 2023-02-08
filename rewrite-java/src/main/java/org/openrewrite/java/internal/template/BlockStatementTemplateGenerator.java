@@ -250,8 +250,14 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, "assert ");
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
-            before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
-            after.append("\n}");
+            if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+                before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
+                after.append("\n}");
+            } else {
+                // same as `Expression` case
+                before.insert(0, "__M__.any(");
+                after.append(");");
+            }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
             String newClassString;
@@ -406,16 +412,17 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
+        } else if (j instanceof Expression && j == prior) {
+            before.insert(0, "__M__.any(");
+            after.append(");");
         }
         template(next(cursor), j, before, after, templated);
     }
 
     private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {
-        if (!(body instanceof J.Block)) {
-            before.insert(0, "{");
-        }
         insertion.run();
         if (!(body instanceof J.Block)) {
+            before.insert(0, "{");
             after.append("}");
         }
     }
