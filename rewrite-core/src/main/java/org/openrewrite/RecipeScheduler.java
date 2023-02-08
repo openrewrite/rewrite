@@ -223,7 +223,9 @@ public interface RecipeScheduler {
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after;
-        final List<Boolean> newSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final List<Boolean> singleSourceApplicableTestResultRef = singleSourceApplicableTestResult;
+        boolean hasSingleSourceApplicableTest = singleSourceApplicableTestResult != null
+                && !singleSourceApplicableTestResult.isEmpty();
 
         if (!recipe.validate(ctx).isValid()) {
             after = before;
@@ -235,10 +237,8 @@ public interface RecipeScheduler {
 
                 S afterFile = s;
                 try {
-                    if (newSingleSourceApplicableTestResult != null && !newSingleSourceApplicableTestResult.isEmpty()) {
-                        if (!newSingleSourceApplicableTestResult.get(index)) {
-                            return s;
-                        }
+                    if (hasSingleSourceApplicableTest && !singleSourceApplicableTestResultRef.get(index)) {
+                        return s;
                     }
 
                     Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
@@ -308,10 +308,42 @@ public interface RecipeScheduler {
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
         List<SourceFile> afterWidened;
+        final List<Boolean> lastSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final List<Boolean> newSingleSourceApplicableTestResult = lastSingleSourceApplicableTestResult;
         try {
             long ownVisitStartTime = System.nanoTime();
+
+            // If any single source in the set matches single source applicability test, we need to run all files
+            // together, but just keep the results generated from the files which passed the single source applicability test.
+            if (hasSingleSourceApplicableTest) {
+                boolean anyFilePassedSingleApplicableTest = false;
+                for (Boolean b : singleSourceApplicableTestResult) {
+                    if (b) {
+                        anyFilePassedSingleApplicableTest = true;
+                        break;
+                    }
+                }
+                if (!anyFilePassedSingleApplicableTest) {
+                    return after;
+                }
+            }
+
             //noinspection unchecked
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+            final List<SourceFile> afterWidenedTmp = afterWidened;
+
+            // update/re-mapping single source applicability test results
+            if (hasSingleSourceApplicableTest) {
+                if (afterWidened.size() == after.size()) {
+                    // afterWidened and after are 1-to-1 mapping, reflects single source applicability test results.
+                    //noinspection unchecked
+                    afterWidened = ListUtils.map((List<SourceFile>) after, (i, s) ->
+                            lastSingleSourceApplicableTestResult.get(i) ? afterWidenedTmp.get(i) : s);
+                } else if (afterWidened.size() > after.size()) {
+                    newSingleSourceApplicableTestResult.addAll(Collections.nCopies(afterWidened.size() - after.size(), true));
+                }
+            }
+
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
@@ -375,7 +407,7 @@ public interface RecipeScheduler {
             afterWidened = scheduleVisit(requireNonNull(nextStats),
                 nextStack,
                 afterWidened,
-                singleSourceApplicableTestResult,
+                newSingleSourceApplicableTestResult,
                 ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
