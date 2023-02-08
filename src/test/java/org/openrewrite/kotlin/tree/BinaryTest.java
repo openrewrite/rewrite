@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -169,6 +170,21 @@ public class BinaryTest implements RewriteTest {
             """
                 fun method ( ) {
                   val a = 0 !== 0
+                }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/8")
+    @Test
+    void parenthesized() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( ) {
+                  val n = 0
+                  val b = n == ( 1 - 1 )
                 }
             """
           )

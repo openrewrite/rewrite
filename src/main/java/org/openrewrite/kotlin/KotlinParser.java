@@ -311,7 +311,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7, ApiVersion.KOTLIN_1_7));
 
         compilerConfiguration.put(USE_FIR,  true);
-        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT, false);
+        compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT, true);
         compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS,  true);
         compilerConfiguration.put(INCREMENTAL_COMPILATION,  true);
 

@@ -1307,6 +1307,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private J mapBinaryOperation(FirFunctionCall functionCall) {
         Space prefix = whitespace();
+        Space binaryPrefix;
+
+        boolean isParenthesized = false;
+        if (!(functionCall.getDispatchReceiver() instanceof FirFunctionCall) && source.startsWith("(", cursor)) {
+            isParenthesized = true;
+            skip("(");
+            // The next whitespace is prefix of the binary operation.
+            binaryPrefix = whitespace();
+        } else {
+            binaryPrefix = prefix;
+        }
 
         Expression left = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
 
@@ -1336,14 +1347,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
 
-        return new J.Binary(
+        J.Binary binary = new J.Binary(
                 randomId(),
-                prefix,
+                binaryPrefix,
                 Markers.EMPTY,
                 left,
                 padLeft(opPrefix, javaBinaryType),
                 right,
                 typeMapping.type(functionCall));
+        return !isParenthesized ? binary : new J.Parentheses<Expression>(randomId(), prefix, Markers.EMPTY, padRight(binary, sourceBefore(")")));
     }
 
     @Override
