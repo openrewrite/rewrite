@@ -16,6 +16,7 @@
 package org.openrewrite.test;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
@@ -24,12 +25,22 @@ import lombok.experimental.Accessors;
 @NoArgsConstructor
 @AllArgsConstructor
 @Accessors(fluent = true)
+@Builder
 public class TypeValidation {
 
+    @Builder.Default
     private boolean classDeclarations = true;
+
+    @Builder.Default
     private boolean identifiers = true;
+
+    @Builder.Default
     private boolean methodDeclarations = true;
+
+    @Builder.Default
     private boolean methodInvocations = true;
+
+    @Builder.Default
     private boolean constructorInvocations = true;
 
     public static TypeValidation none() {
