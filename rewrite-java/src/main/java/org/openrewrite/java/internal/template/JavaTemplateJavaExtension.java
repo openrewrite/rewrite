@@ -224,7 +224,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitExpression(Expression expression, Integer p) {
                 if (loc.equals(EXPRESSION_PREFIX) && expression.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
+                                    new Cursor(getCursor(), insertionPoint),
+                                    substitutedTemplate,
+                                    loc))
                             .withPrefix(expression.getPrefix()), p);
                 }
                 return expression;
@@ -233,7 +236,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
+                                    new Cursor(getCursor(), insertionPoint),
+                                    substitutedTemplate,
+                                    loc))
                             .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);
@@ -243,7 +249,10 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitIdentifier(J.Identifier ident, Integer p) {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
-                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(substitutedTemplate))
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
+                                    new Cursor(getCursor(), insertionPoint),
+                                    substitutedTemplate,
+                                    loc))
                             .withPrefix(ident.getPrefix()), p);
                 }
                 return super.visitIdentifier(ident, p);
