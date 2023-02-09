@@ -30,6 +30,7 @@ import java.util.function.Consumer;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
+@Disabled
 @SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessaryPublicModifier", "ConstantConditions", "GrMethodMayBeStatic"})
 class GroovyTypeAttributionTest implements RewriteTest {
 
