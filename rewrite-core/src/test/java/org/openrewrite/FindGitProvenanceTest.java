@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.GitProvenance;
+import org.openrewrite.marker.Provenance;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -41,7 +42,9 @@ class FindGitProvenanceTest implements RewriteTest {
                   changeset: 1234567
                   autocrlf: False
                   eol: Native)~~>Hello, World!""",
-            spec -> spec.markers(new GitProvenance(Tree.randomId(), "https://github.com/openrewrite/rewrite", "main", "1234567", False, Native))
+            spec -> spec.markers(Provenance.builder()
+              .gitProvenance(new GitProvenance("https://github.com/openrewrite/rewrite", "main", "1234567", False, Native))
+              .build())
           )
         );
     }

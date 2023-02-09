@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.GitProvenance;
+import org.openrewrite.marker.Provenance;
 import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Paths;
@@ -52,11 +53,11 @@ public class PotentiallyDeadCode extends Recipe {
         Set<JavaType.Method> declared = new HashSet<>();
         Set<JavaType.Method> used = new HashSet<>();
 
-        GitProvenance gitProvenance = null;
+        Provenance provenance = null;
 
         for (SourceFile sourceFile : before) {
             if (sourceFile instanceof JavaSourceFile) {
-                gitProvenance = sourceFile.getMarkers().findFirst(GitProvenance.class).orElse(gitProvenance);
+                provenance = sourceFile.getMarkers().findFirst(Provenance.class).orElse(null);
 
                 JavaSourceFile cu = (JavaSourceFile) sourceFile;
                 declared.addAll(cu.getTypesInUse().getDeclaredMethods()
@@ -82,10 +83,10 @@ public class PotentiallyDeadCode extends Recipe {
 
         declared.retainAll(used);
 
-        String sourcePath = "" +
-                "methods" +
-                (gitProvenance == null ? "" : "-" + gitProvenance.getRepositoryName()) +
-                ".csv";
+        String sourcePath = String.format("methods%s.csv",
+                provenance == null || provenance.getGitProvenance() == null
+                        ? ""
+                        : "-" + provenance.getGitProvenance().getRepositoryName());
 
         return ListUtils.concatAll(
                 ListUtils.concatAll(before,

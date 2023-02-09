@@ -61,14 +61,14 @@ class GitProvenanceTest {
     @ParameterizedTest
     @MethodSource("remotes")
     void getOrganizationName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getOrganizationName())
+        assertThat(new GitProvenance(remote, "main", "123", null, null).getOrganizationName())
           .isEqualTo("openrewrite");
     }
 
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getRepositoryName())
+        assertThat(new GitProvenance(remote, "main", "123", null, null).getRepositoryName())
           .isEqualTo("rewrite");
     }
 
@@ -82,7 +82,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void nonGitNoStacktrace(@TempDir Path projectDir) throws GitAPIException {
+    void nonGitNoStacktrace(@TempDir Path projectDir) {
         PrintStream standardErr = System.err;
         ByteArrayOutputStream captor = new ByteArrayOutputStream();
         try {
@@ -183,7 +183,7 @@ class GitProvenanceTest {
     @ParameterizedTest
     @MethodSource("baseUrls")
     void multiplePathSegments(String baseUrl) {
-        GitProvenance provenance = new GitProvenance(randomId(),
+        GitProvenance provenance = new GitProvenance(
           "http://gitlab.com/group/subgroup1/subgroup2/repo.git",
           "master",
           "1234567890abcdef1234567890abcdef12345678",

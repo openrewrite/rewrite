@@ -39,8 +39,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @With
-public class GitProvenance implements Marker {
-    UUID id;
+public class GitProvenance {
 
     @Nullable
     String origin;
@@ -179,8 +178,7 @@ public class GitProvenance implements Marker {
                 }
             }
 
-            return new GitProvenance(randomId(), getOrigin(repository), branch, changeset,
-                    getAutocrlf(repository), getEOF(repository));
+            return new GitProvenance(getOrigin(repository), branch, changeset, getAutocrlf(repository), getEOF(repository));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (IllegalArgumentException | GitAPIException e) {

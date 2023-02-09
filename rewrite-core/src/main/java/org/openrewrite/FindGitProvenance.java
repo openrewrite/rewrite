@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.Provenance;
 import org.openrewrite.table.DistinctGitProvenance;
 
 import java.util.HashSet;
@@ -48,16 +49,17 @@ public class FindGitProvenance extends Recipe {
         UUID dontConsiderIdInHashCode = UUID.randomUUID();
 
         return ListUtils.map(before, sourceFile -> {
-            GitProvenance provenance = sourceFile.getMarkers().findFirst(GitProvenance.class).orElse(null);
-            if (provenance == null || !provenances.add(provenance.withId(dontConsiderIdInHashCode))) {
+            Provenance provenance = sourceFile.getMarkers().findFirst(Provenance.class).orElse(null);
+            if (provenance == null || provenance.getGitProvenance() == null || !provenances.add(provenance.withId(dontConsiderIdInHashCode).getGitProvenance())) {
                 return sourceFile;
             }
+            GitProvenance gitProvenance = provenance.getGitProvenance();
             distinct.insertRow(ctx, new DistinctGitProvenance.Row(
-                    provenance.getOrigin(),
-                    provenance.getBranch(),
-                    provenance.getChange(),
-                    provenance.getAutocrlf(),
-                    provenance.getEol())
+                    gitProvenance.getOrigin(),
+                    gitProvenance.getBranch(),
+                    gitProvenance.getChange(),
+                    gitProvenance.getAutocrlf(),
+                    gitProvenance.getEol())
             );
             return Markup.info(sourceFile, String.format("GitProvenance:\n" +
                                                          "    origin: %s\n" +
@@ -65,11 +67,11 @@ public class FindGitProvenance extends Recipe {
                                                          "    changeset: %s\n" +
                                                          "    autocrlf: %s\n" +
                                                          "    eol: %s",
-                    provenance.getOrigin(),
-                    provenance.getBranch(),
-                    provenance.getChange(),
-                    provenance.getAutocrlf() != null ? provenance.getAutocrlf().toString() : "null",
-                    provenance.getEol() != null ? provenance.getEol().toString() : "null"));
+                    gitProvenance.getOrigin(),
+                    gitProvenance.getBranch(),
+                    gitProvenance.getChange(),
+                    gitProvenance.getAutocrlf() != null ? gitProvenance.getAutocrlf().toString() : "null",
+                    gitProvenance.getEol() != null ? gitProvenance.getEol().toString() : "null"));
         });
     }
 }

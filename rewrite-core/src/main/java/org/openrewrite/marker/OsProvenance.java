@@ -16,18 +16,13 @@
 package org.openrewrite.marker;
 
 import com.sun.jna.platform.win32.Kernel32Util;
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.With;
-import org.openrewrite.Tree;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.POSIXUtil;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -36,7 +31,7 @@ import static java.util.Collections.emptyList;
  * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/OsProvenance.java</a>
  */
 @SuppressWarnings("StaticInitializerReferencesSubClass")
-public abstract class OsProvenance implements Marker {
+public abstract class OsProvenance {
     public static final Windows WINDOWS = new Windows();
     public static final MacOs MAC_OS = new MacOs();
     public static final Solaris SOLARIS = new Solaris();
@@ -155,13 +150,6 @@ public abstract class OsProvenance implements Marker {
 
     public abstract String getFamilyName();
 
-    public abstract LineEnding getLineEnding();
-
-    protected enum LineEnding {
-        CRLF,
-        LF
-    }
-
     /**
      * Locates the given executable in the system path. Returns null if not found.
      */
@@ -212,23 +200,12 @@ public abstract class OsProvenance implements Marker {
         return "PATH";
     }
 
-    @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
     static class Windows extends OsProvenance {
         String nativePrefix;
 
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
         Windows() {
             nativePrefix = resolveNativePrefix();
-            id = Tree.randomId();
-        }
-
-        @Override
-        public LineEnding getLineEnding() {
-            return LineEnding.CRLF;
         }
 
         @Override
@@ -303,31 +280,14 @@ public abstract class OsProvenance implements Marker {
         public String getPathVar() {
             return "Path";
         }
-
-        @Override
-        @NonNull
-        public UUID getId() {
-            return id;
-        }
     }
 
-    @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
     static class Unix extends OsProvenance {
         String nativePrefix;
 
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
         Unix() {
             nativePrefix = resolveNativePrefix();
-            id = Tree.randomId();
-        }
-
-        @Override
-        public LineEnding getLineEnding() {
-            return LineEnding.LF;
         }
 
         @Override
@@ -430,12 +390,6 @@ public abstract class OsProvenance implements Marker {
                 osPrefix = osPrefix.substring(0, space);
             }
             return osPrefix;
-        }
-
-        @Override
-        @NonNull
-        public UUID getId() {
-            return id;
         }
     }
 
