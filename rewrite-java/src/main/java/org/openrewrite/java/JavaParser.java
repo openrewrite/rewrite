@@ -58,14 +58,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.java.skipSourceSetTypeGeneration";
 
-    /**
-     * @deprecated Won't work in isolated classloaders.
-     */
-    @Deprecated
-    List<Path> runtimeClasspath = Collections.unmodifiableList(Arrays.stream(System.getProperty("java.class.path").split("\\Q" + System.getProperty("path.separator") + "\\E"))
-            .map(cpEntry -> new File(cpEntry).toPath())
-            .collect(toList()));
-
     static List<Path> runtimeClasspath() {
         return new ClassGraph()
                 .disableNestedJarScanning()
