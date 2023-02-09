@@ -237,7 +237,8 @@ public interface RecipeScheduler {
 
                 S afterFile = s;
                 try {
-                    if (hasSingleSourceApplicableTest && !singleSourceApplicableTestResultRef.get(s.getId())) {
+                    if (hasSingleSourceApplicableTest && singleSourceApplicableTestResultRef.containsKey(s.getId())
+                            && !singleSourceApplicableTestResultRef.get(s.getId())) {
                         return s;
                     }
 
