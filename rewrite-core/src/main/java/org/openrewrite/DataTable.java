@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 
@@ -62,6 +63,11 @@ public class DataTable<Row> {
         this.displayName = displayName;
         this.description = description;
         recipe.addDataTable(this);
+    }
+
+    public TypeReference<List<Row>> getRowsTypeReference() {
+        return new TypeReference<List<Row>>() {
+        };
     }
 
     public void setEnabled(boolean enabled) {
