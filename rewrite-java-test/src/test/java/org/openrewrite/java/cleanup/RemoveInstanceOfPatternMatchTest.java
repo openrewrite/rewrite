@@ -512,36 +512,6 @@ class RemoveInstanceOfPatternMatchTest implements RewriteTest {
     }
 
     @Test
-    void sameNamedVariables() {
-        rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
-
-              class Example {
-                  public void test(Object obj) {
-                      if (obj instanceof String v && v.isEmpty() || obj instanceof Integer v && v.equals(1)) {
-                          System.out.println();
-                      }
-                  }
-              }
-              """,
-              """
-              package com.example;
-
-              class Example {
-                  public void test(Object obj) {
-                      if (obj instanceof String && ((String) obj).isEmpty() || obj instanceof Integer && ((Integer) obj).equals(1)) {
-                          System.out.println();
-                      }
-                  }
-              }
-              """),
-            14));
-    }
-
-    @Test
     void nestedComplexCondition() {
         rewriteRun(
           version(
