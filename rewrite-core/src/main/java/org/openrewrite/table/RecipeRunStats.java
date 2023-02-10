@@ -18,6 +18,7 @@ package org.openrewrite.table;
 import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 
 public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
@@ -26,6 +27,17 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         super(recipe,
                 "Recipe performance",
                 "Statistics used in analyzing the performance of recipes.");
+    }
+
+    public void record(ExecutionContext ctx, Recipe recipe, org.openrewrite.RecipeRunStats runStats) {
+        insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
+                recipe.getName(),
+                runStats.getCalls(),
+                runStats.getCumulative().toNanos(),
+                runStats.getMax().toNanos(),
+                runStats.getOwnGetVisitor().toNanos(),
+                runStats.getOwnVisit().toNanos()
+        ));
     }
 
     @Value

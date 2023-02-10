@@ -66,6 +66,7 @@ public interface RecipeScheduler {
                                   ExecutionContext ctx,
                                   int maxCycles,
                                   int minCycles) {
+        org.openrewrite.table.RecipeRunStats runStatsTable = new org.openrewrite.table.RecipeRunStats(Recipe.noop());
         RecipeRunStats runStats = new RecipeRunStats(recipe);
         RecipeRun recipeRun = new RecipeRun(runStats, emptyList(), emptyMap());
 
@@ -106,6 +107,16 @@ public interface RecipeScheduler {
         }
 
         if (after == before) {
+            runStatsTable.insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
+                    recipe.getName(),
+                    runStats.getCalls(),
+                    runStats.getCumulative().toNanos(),
+                    runStats.getMax().toNanos(),
+                    runStats.getOwnGetVisitor().toNanos(),
+                    runStats.getOwnVisit().toNanos()
+            ));
+
+            runStatsTable.record(ctx, recipe, runStats);
             return recipeRun.withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
         }
 
@@ -157,16 +168,7 @@ public interface RecipeScheduler {
             }
         }
 
-        org.openrewrite.table.RecipeRunStats stats = new org.openrewrite.table.RecipeRunStats(Recipe.noop());
-        stats.insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
-                recipe.getName(),
-                runStats.getCalls(),
-                runStats.getCumulative().toNanos(),
-                runStats.getMax().toNanos(),
-                runStats.getOwnGetVisitor().toNanos(),
-                runStats.getOwnVisit().toNanos()
-        ));
-
+        runStatsTable.record(ctx, recipe, runStats);
         return recipeRun
                 .withResults(results)
                 .withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
