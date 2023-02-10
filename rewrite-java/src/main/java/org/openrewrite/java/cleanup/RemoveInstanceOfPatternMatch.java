@@ -65,18 +65,18 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         private VariableUsage variableUsage;
 
         @Override
-        public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+        public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             // Analyze variable usage in the whole compilation unit and
             // run the compilation unit transformation.
             // Maybe it's better to use messages instead of the private field
             variableUsage = VariableUsageAnalyzer.analyze(cu);
-            J.CompilationUnit result = (J.CompilationUnit) super.visitCompilationUnit(cu, executionContext);
+            J.CompilationUnit result = (J.CompilationUnit) super.visitCompilationUnit(cu, ctx);
             variableUsage = null;
             return result;
         }
 
         @Override
-        public J visitInstanceOf(J.InstanceOf instanceOf, ExecutionContext executionContext) {
+        public J visitInstanceOf(J.InstanceOf instanceOf, ExecutionContext ctx) {
             // Remove pattern variables from instanceof.
             // And continue analyzes, because expressions in LHS of instanceof
             // can contain variables, that should be replaced by their definitions
@@ -84,11 +84,11 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
             // if (obj instanceof String str)
             // is replaced by:
             // if (obj instanceof String)
-            return super.visitInstanceOf(instanceOf.withPattern(null), executionContext);
+            return super.visitInstanceOf(instanceOf.withPattern(null), ctx);
         }
 
         @Override
-        public J visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
+        public J visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
             // If the identifier is a usage of a variable declared in an instanceof
             // expression, then replace it by an LHS of the instanceof cast to
             // a specified type.
@@ -100,7 +100,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
             if (instanceOf != null) {
                 J result = autoFormat(
                         typeCast((TypeTree) instanceOf.getClazz(), instanceOf.getExpression()),
-                        executionContext);
+                        ctx);
                 // If a parent expression is a method invocation, enclose type cast in parentheses
                 Object parent = getCursor().getParentTreeCursor().getValue();
                 if (parent instanceof J.MethodInvocation) {
@@ -112,8 +112,8 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         }
 
         @Override
-        public J.If visitIf(J.If iff, ExecutionContext executionContext) {
-            J.If result = (J.If) super.visitIf(iff, executionContext);
+        public J.If visitIf(J.If iff, ExecutionContext ctx) {
+            J.If result = (J.If) super.visitIf(iff, ctx);
 
             // If the "then" part of the "if" statement uses variables declared in
             // an "instanceof" expression, then add a variable declaration at
@@ -123,12 +123,12 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                 // Replace a single statement by a block
                 if (!(result.getThenPart() instanceof J.Block)) {
                     result = autoFormat(result.withThenPart(J.Block.createEmptyBlock()
-                            .withStatements(Collections.singletonList(result.getThenPart()))), executionContext);
+                            .withStatements(Collections.singletonList(result.getThenPart()))), ctx);
                 }
                 // Add variable declarations
                 while (!thenInstanceOfs.isEmpty()) {
                     result = result.withThenPart(addVariableDeclaration(
-                            (J.Block) result.getThenPart(), thenInstanceOfs.removeLast(), executionContext));
+                            (J.Block) result.getThenPart(), thenInstanceOfs.removeLast(), ctx));
                 }
             }
 
@@ -143,14 +143,14 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                     result = autoFormat(result.withElsePart(elsePart.withBody(
                                     J.Block.createEmptyBlock().withStatements(
                                             Collections.singletonList(elsePart.getBody())))),
-                            executionContext);
+                            ctx);
                     elsePart = result.getElsePart();
                 }
                 // Add variable declarations
                 while (!elseInstanceOfs.isEmpty()) {
                     result = result.withElsePart(elsePart.withBody(
                             addVariableDeclaration(
-                                    (J.Block) elsePart.getBody(), elseInstanceOfs.removeLast(), executionContext)));
+                                    (J.Block) elsePart.getBody(), elseInstanceOfs.removeLast(), ctx)));
                 }
             }
             return result;
@@ -163,11 +163,10 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
          *
          * @param block the statement block
          * @param instanceOf the instanceof expression
-         * @param executionContext the execution context
+         * @param ctx the execution context
          * @return the updated block
          */
-        private J.Block addVariableDeclaration(J.Block block, J.InstanceOf instanceOf,
-                                               ExecutionContext executionContext) {
+        private J.Block addVariableDeclaration(J.Block block, J.InstanceOf instanceOf, ExecutionContext ctx) {
             JavaTemplate template = JavaTemplate
                     .builder(() -> new Cursor(getCursor(), block), "#{} #{} = (#{}) #{any()};")
                     .build();
@@ -176,7 +175,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                     instanceOf.getClazz().toString(),
                     ((J.Identifier) Objects.requireNonNull(instanceOf.getPattern())).getSimpleName(),
                     instanceOf.getClazz().toString(),
-                    visit(instanceOf.getExpression(), executionContext));
+                    visit(instanceOf.getExpression(), ctx));
         }
 
         /**

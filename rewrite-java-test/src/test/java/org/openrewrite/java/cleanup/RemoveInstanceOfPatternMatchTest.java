@@ -478,6 +478,40 @@ class RemoveInstanceOfPatternMatchTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("Not supported")
+    void negationWithoutElse() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (!(obj instanceof String str)) {
+                          throw new IllegalArgumentException();
+                      }
+                      System.out.println(str.length());
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (!(obj instanceof String)) {
+                          throw new IllegalArgumentException();
+                      }
+                      String str = (String) obj;
+                      System.out.println(str);
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
     void sameNamedVariables() {
         rewriteRun(
           version(
