@@ -57,7 +57,7 @@ public class RecipeRunStats {
     AtomicInteger calls = new AtomicInteger();
 
     /**
-     * The number of times the recipe was ran over all cycles.
+     * The number of times the recipe ran over all cycles.
      */
     public int getCalls() {
         return calls.get();

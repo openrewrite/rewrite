@@ -66,7 +66,8 @@ public interface RecipeScheduler {
                                   ExecutionContext ctx,
                                   int maxCycles,
                                   int minCycles) {
-        RecipeRun recipeRun = new RecipeRun(new RecipeRunStats(recipe), emptyList(), emptyMap());
+        RecipeRunStats runStats = new RecipeRunStats(recipe);
+        RecipeRun recipeRun = new RecipeRun(runStats, emptyList(), emptyMap());
 
         Set<UUID> sourceFileIds = new HashSet<>();
         before = ListUtils.map(before, sourceFile -> {
@@ -96,7 +97,7 @@ public interface RecipeScheduler {
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
-            after = scheduleVisit(recipeRun.getStats(), recipeStack, acc, null, ctxWithWatch, recipeThatAddedOrDeletedSourceFile);
+            after = scheduleVisit(runStats, recipeStack, acc, null, ctxWithWatch, recipeThatAddedOrDeletedSourceFile);
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
@@ -155,6 +156,16 @@ public interface RecipeScheduler {
                         recipeThatMadeChange.getName()));
             }
         }
+
+        org.openrewrite.table.RecipeRunStats stats = new org.openrewrite.table.RecipeRunStats(Recipe.noop());
+        stats.insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
+                recipe.getName(),
+                runStats.getCalls(),
+                runStats.getCumulative().toNanos(),
+                runStats.getMax().toNanos(),
+                runStats.getOwnGetVisitor().toNanos(),
+                runStats.getOwnVisit().toNanos()
+        ));
 
         return recipeRun
                 .withResults(results)
