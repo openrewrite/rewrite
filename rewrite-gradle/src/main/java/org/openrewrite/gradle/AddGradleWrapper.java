@@ -58,7 +58,7 @@ public class AddGradleWrapper extends Recipe {
     }
 
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number. It defaults to the latest RELEASE",
+            description = "An exact version number or [dependency version selector](https://docs.openrewrite.org/reference/dependency-version-selectors). Defaults to the latest release version.",
             example = "7.x",
             required = false
     )
