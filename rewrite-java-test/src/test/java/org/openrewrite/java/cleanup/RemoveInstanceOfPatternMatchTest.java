@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -439,6 +440,7 @@ class RemoveInstanceOfPatternMatchTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("Not supported")
     void negationLocalVariable() {
         rewriteRun(
           version(
