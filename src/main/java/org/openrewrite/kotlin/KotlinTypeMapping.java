@@ -126,6 +126,8 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 return type(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerFallBack);
             } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
                 return type(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType(), ownerFallBack);
+            } else if (resolvedSymbol instanceof FirFieldSymbol) {
+                return type(((FirFieldSymbol) resolvedSymbol).getResolvedReturnType(), ownerFallBack);
             } else {
                 throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
             }
@@ -507,7 +509,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             resolvedOwner = JavaType.Unknown.getInstance();
         }
 
-        FirTypeRef typeRef = symbol.getFir() instanceof FirJavaField ? symbol.getFir().getReturnTypeRef() :
+        FirTypeRef typeRef = symbol.getFir() instanceof FirJavaField || symbol.getFir() instanceof FirEnumEntry ? symbol.getFir().getReturnTypeRef() :
                 symbol.getResolvedReturnTypeRef();
                 variable.unsafeSet(resolvedOwner, type(typeRef), annotations);
 

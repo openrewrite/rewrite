@@ -110,6 +110,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 return signature(((FirPropertySymbol) resolvedSymbol).getResolvedReturnTypeRef(), ownerSymbol);
             } else if (resolvedSymbol instanceof FirValueParameterSymbol) {
                 return signature(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType(), ownerSymbol);
+            } else if (resolvedSymbol instanceof FirFieldSymbol) {
+                return signature(((FirFieldSymbol) resolvedSymbol).getResolvedReturnType(), ownerSymbol);
             } else {
                 throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
             }
@@ -343,7 +345,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             owner = classSignature(ownerSymbol.getFir());
         }
 
-        String typeSig = symbol.getFir() instanceof FirJavaField ? signature(symbol.getFir().getReturnTypeRef()) :
+        String typeSig = symbol.getFir() instanceof FirJavaField || symbol.getFir() instanceof FirEnumEntry ? signature(symbol.getFir().getReturnTypeRef()) :
+
                 signature(symbol.getResolvedReturnTypeRef());
         return owner + "{name=" + symbol.getName().asString() + ",type=" + typeSig + '}';
     }
