@@ -155,9 +155,9 @@ public abstract class OsProvenance implements Marker {
 
     public abstract String getFamilyName();
 
-    public abstract LineEnding getLineEnding();
+    public abstract EOL getEOL();
 
-    protected enum LineEnding {
+    protected enum EOL {
         CRLF,
         LF
     }
@@ -227,8 +227,8 @@ public abstract class OsProvenance implements Marker {
         }
 
         @Override
-        public LineEnding getLineEnding() {
-            return LineEnding.CRLF;
+        public EOL getEOL() {
+            return EOL.CRLF;
         }
 
         @Override
@@ -326,8 +326,8 @@ public abstract class OsProvenance implements Marker {
         }
 
         @Override
-        public LineEnding getLineEnding() {
-            return LineEnding.LF;
+        public EOL getEOL() {
+            return EOL.LF;
         }
 
         @Override
