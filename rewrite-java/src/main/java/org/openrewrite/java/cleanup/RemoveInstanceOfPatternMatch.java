@@ -110,7 +110,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                 return autoFormat(
                         parentheses(typeCast(
                                 (TypeTree) instanceOf.getClazz(),
-                                instanceOf.getExpression())),
+                                instanceOf.getExpression())).withPrefix(identifier.getPrefix()),
                         p);
             }
             return identifier;
