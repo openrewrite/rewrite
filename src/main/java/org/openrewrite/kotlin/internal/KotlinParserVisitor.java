@@ -2937,7 +2937,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private int endPos(FirElement t) {
-        if (t.getSource() == null) {
+        if (t instanceof FirThisReceiverExpression) {
+            return 0;
+        } else if (t.getSource() == null) {
             throw new IllegalStateException("Unexpected null source ... fix me.");
         }
         return t.getSource().getEndOffset();
