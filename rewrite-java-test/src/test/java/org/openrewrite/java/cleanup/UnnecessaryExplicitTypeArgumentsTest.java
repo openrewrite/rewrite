@@ -130,7 +130,7 @@ class UnnecessaryExplicitTypeArgumentsTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite/issues/1211")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2818')
     @Test
     void assignedToVar() {
         rewriteRun(
