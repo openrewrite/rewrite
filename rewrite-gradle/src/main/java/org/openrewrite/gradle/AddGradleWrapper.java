@@ -41,6 +41,7 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.internal.StringUtils.isBlank;
 
 @Value
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -79,7 +80,12 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(GradleWrapper.validate(ctx, org.openrewrite.internal.StringUtils.isBlank(version) ? "latest.release" : version, distribution, gradleWrapper));
+        return super.validate(ctx).and(
+                GradleWrapper.validate(ctx,
+                        isBlank(version) ? "latest.release" : version,
+                        distribution,
+                        gradleWrapper,
+                        null));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.

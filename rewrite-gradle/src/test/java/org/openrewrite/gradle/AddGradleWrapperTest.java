@@ -16,7 +16,6 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -98,7 +97,6 @@ class AddGradleWrapperTest implements RewriteTest {
         );
     }
 
-
     @ParameterizedTest
     @ValueSource(strings = {"","  "})
     @NullSource
@@ -143,7 +141,6 @@ class AddGradleWrapperTest implements RewriteTest {
           ));
     }
 
-    @NotNull
     private static String createWrapperPropertyFile(String filename, String hash) {
         return """
               distributionBase=GRADLE_USER_HOME
