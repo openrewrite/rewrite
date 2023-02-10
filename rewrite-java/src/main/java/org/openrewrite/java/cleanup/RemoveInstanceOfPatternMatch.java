@@ -15,28 +15,16 @@
  */
 package org.openrewrite.java.cleanup;
 
-import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesJavaVersion;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TypeTree;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+
+import java.time.Duration;
+import java.util.*;
 
 /**
  * The recipe that replaces `instanceof` pattern matching by a simple variable
@@ -156,6 +144,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                                     J.Block.createEmptyBlock().withStatements(
                                             Collections.singletonList(elsePart.getBody())))),
                             executionContext);
+                    elsePart = result.getElsePart();
                 }
                 // Add variable declarations
                 while (!elseInstanceOfs.isEmpty()) {
@@ -180,7 +169,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         private J.Block addVariableDeclaration(J.Block block, J.InstanceOf instanceOf,
                                                ExecutionContext executionContext) {
             JavaTemplate template = JavaTemplate
-                    .builder(this::getCursor, "#{} #{} = (#{}) #{any()}")
+                    .builder(() -> new Cursor(getCursor(), block), "#{} #{} = (#{}) #{any()};")
                     .build();
             return block.withTemplate(template,
                     block.getCoordinates().firstStatement(),
