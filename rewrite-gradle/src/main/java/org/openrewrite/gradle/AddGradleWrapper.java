@@ -63,6 +63,7 @@ public class AddGradleWrapper extends Recipe {
             example = "7.x",
             required = false
     )
+    @Nullable
     String version;
 
     @Option(displayName = "Distribution type",
@@ -92,16 +93,11 @@ public class AddGradleWrapper extends Recipe {
     //      See https://github.com/projectlombok/lombok/issues/2372
     @LoathingOfOthers("JavaDoc")
     @JsonCreator
-    public AddGradleWrapper(String version, String distribution) {
+    public AddGradleWrapper(@Nullable String version, @Nullable String distribution) {
         this.version = version;
         this.distribution = distribution;
     }
 
-    @LoathingOfOthers("JavaDoc")
-    @JsonCreator
-    public AddGradleWrapper() {
-       this(RELEASE, null);
-    }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
