@@ -129,4 +129,24 @@ class UnnecessaryExplicitTypeArgumentsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2818")
+    @Test
+    void assignedToVar() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              public class Test {
+              
+                  List<String> test() {
+                      var l = List.<String> of("x");
+                      return l;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
