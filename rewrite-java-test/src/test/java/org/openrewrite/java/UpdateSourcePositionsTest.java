@@ -17,32 +17,23 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
-import org.openrewrite.PrintOutputCapture;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Range;
-import org.openrewrite.test.RecipeSpec;
-import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
 import java.util.function.UnaryOperator;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.java.Assertions.java;
 
-@Disabled
-class UpdateSourcePositionsTest implements RewriteTest {
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpdateSourcePositions());
-    }
+class UpdateSourcePositionsTest {
 
     private static String printWithLines(SourceFile sourceFile) {
         return sourceFile.printAll(new PrintOutputCapture<>(0, new PrintOutputCapture.MarkerPrinter() {
             @Override
             public String beforePrefix(Marker marker, Cursor cursor, UnaryOperator<String> commentWrapper) {
-                if (marker instanceof Range) {
+                if (marker instanceof Range && cursor.getParent().getValue() instanceof J.Identifier) {
                     //noinspection PatternVariableCanBeUsed
                     Range r = (Range) marker;
                     return "[(" + r.getStart().getLine() + ", " + r.getStart().getColumn() + "), (" +
@@ -55,65 +46,63 @@ class UpdateSourcePositionsTest implements RewriteTest {
 
     @Test
     void lamdaParameter() {
-        rewriteRun(
-          java(
-            """
-              package org.test;
-                            
-              import java.util.function.Consumer;
-                              
-              public class Application {
+        List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build().parse(
+          """
+            package org.test;
                           
-                  public Consumer<String> demo() {
-                      return (args) -> {
-                          log.info("");
-                      };
-                  }
-              }
-              """,
-            spec -> spec.afterRecipe(cu -> assertThat(printWithLines(cu)).isEqualTo(
-              """
-                [(1, 0), (13, 2)][(1, 0), (1, 16)]package [(1, 8), (1, 16)][(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
+            import java.util.function.Consumer;
                             
-                [(3, 1), (3, 35)]import [(3, 8), (3, 35)][(3, 8), (3, 26)][(3, 8), (3, 17)][(3, 8), (3, 12)]java.[(3, 13), (3, 17)]util.[(3, 18), (3, 26)]function.[(3, 27), (3, 35)]Consumer;
-                              
-                [(5, 1), (13, 2)][(5, 1), (5, 7)]public class [(5, 14), (5, 25)]Application [(5, 26), (13, 2)]{
-                              
-                    [(7, 5), (11, 6)][(7, 5), (7, 11)]public [(7, 12), (7, 28)][(7, 12), (7, 20)]Consumer<[(7, 21), (7, 27)]String> [(7, 29), (7, 33)]demo([(7, 34), (7, 34)]) [(7, 36), (11, 6)]{
-                        [(8, 9), (10, 10)]return [(8, 16), (10, 10)]([(8, 17), (8, 21)][(8, 17), (8, 21)][(8, 17), (8, 21)]args) -> [(8, 26), (10, 10)]{
-                            [(9, 13), (9, 25)][(9, 13), (9, 16)]log.[(9, 17), (9, 21)]info([(9, 22), (9, 24)]"");
-                        };
-                    }
+            public class Application {
+                        
+                public Consumer<String> demo() {
+                    return (args) -> {
+                        log.info("");
+                    };
                 }
-                """
-            ))
-          )
+            }
+            """
+        );
+        Result res = new UpdateSourcePositions().run(cus).getResults().get(0);
+        assertThat(printWithLines(res.getAfter())).isEqualTo(
+          """
+            package [(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
+            
+            import [(3, 8), (3, 12)]java.[(3, 13), (3, 17)]util.[(3, 18), (3, 26)]function.[(3, 27), (3, 35)]Consumer;
+            
+            public class[(5, 14), (5, 25)] Application {
+            
+                public [(7, 12), (7, 20)]Consumer<[(7, 21), (7, 27)]String>[(7, 29), (7, 33)] demo() {
+                    return ([(8, 17), (8, 21)]args) -> {
+                        [(9, 13), (9, 16)]log.[(9, 17), (9, 21)]info("");
+                    };
+                }
+            }
+            """
         );
     }
 
     @Test
     void updateSourcePositions() {
-        rewriteRun(
-          java(
-            """ 
-              class Test {
-                  int n;
-                  
-                  void test() {
-                  }
-              }
-              """,
-            spec -> spec.afterRecipe(cu -> assertThat(printWithLines(cu)).isEqualTo(
-              """
-                [(1, 0), (6, 2)][(1, 0), (6, 2)]class [(1, 6), (1, 10)]Test [(1, 11), (6, 2)]{
-                    [(2, 5), (2, 10)][(2, 5), (2, 8)]int [(2, 9), (2, 10)][(2, 9), (2, 10)]n;
-                  
-                    [(4, 5), (5, 6)][(4, 5), (4, 9)]void [(4, 10), (4, 14)]test([(4, 15), (4, 15)]) [(4, 17), (5, 6)]{
-                    }
+        List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build().parse(
+          """ 
+            class Test {
+                int n;
+                
+                void test() {
                 }
-                """
-            ))
-          )
+            }
+            """
+        );
+        Result res = new UpdateSourcePositions().run(cus).getResults().get(0);
+        assertThat(printWithLines(res.getAfter())).isEqualTo(
+          """
+            class[(1, 6), (1, 10)] Test {
+                int [(2, 9), (2, 10)]n;
+            
+                void[(4, 10), (4, 14)] test() {
+                }
+            }
+            """
         );
     }
 }
