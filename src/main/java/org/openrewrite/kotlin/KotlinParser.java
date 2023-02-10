@@ -163,7 +163,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 cus.add(kcu);
                 parsingListener.parsed(compiled.getInput(), kcu);
             } catch (Throwable t) {
-                pctx.parseFailure(compiled.getInput(), compiled.getInput().getRelativePath(relativeTo), KotlinParser.builder().build(), t);
+                pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
                 ctx.getOnError().accept(t);
             }
         }
