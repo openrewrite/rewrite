@@ -16,7 +16,12 @@
 package org.openrewrite.java.cleanup;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -72,53 +77,55 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         private VariableUsage variableUsage;
 
         @Override
-        public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext p) {
+        public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             // Analyze variable usage in the whole compilation unit and
             // run the compilation unit transformation.
             // Maybe it's better to use messages instead of the private field
             variableUsage = VariableUsageAnalyzer.analyze(cu);
-            J.CompilationUnit result = (J.CompilationUnit) super.visitCompilationUnit(cu, p);
+            J.CompilationUnit result = (J.CompilationUnit) super.visitCompilationUnit(cu, executionContext);
             variableUsage = null;
             return result;
         }
 
         @Override
-        public J visitInstanceOf(J.InstanceOf instanceOf, ExecutionContext p) {
-            // Remove pattern variables from instanceof and continue analyzes,
-            // because expressions in LHS of instanceof can contain variables,
-            // that should be replaced by their definitions
-            // For instance
+        public J visitInstanceOf(J.InstanceOf instanceOf, ExecutionContext executionContext) {
+            // Remove pattern variables from instanceof.
+            // And continue analyzes, because expressions in LHS of instanceof
+            // can contain variables, that should be replaced by their definitions
+            // For example the following code:
             // if (obj instanceof String str)
-            // is replaced by the following:
+            // is replaced by:
             // if (obj instanceof String)
-            return super.visitInstanceOf(instanceOf.withPattern(null), p);
+            return super.visitInstanceOf(instanceOf.withPattern(null), executionContext);
         }
 
         @Override
-        public J visitIdentifier(J.Identifier identifier, ExecutionContext p) {
+        public J visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
             // If the identifier is a usage of a variable declared in an instanceof
             // expression, then replace it by an LHS of the instanceof cast to
             // a specified type.
-            // The resulting type cast expression is always enclosed in parentheses,
-            // but it would be good to remove parentheses  when they aren't required
-            // For instance
+            // For example the following code
             // if (obj instanceof String str && str.isEmpty())
-            // is replaced by the following:
+            // is replaced by:
             // if (obj instanceof String str && ((String) obj).isEmpty())
             J.InstanceOf instanceOf = variableUsage.conditions.get(identifier);
             if (instanceOf != null) {
-                return autoFormat(
-                        parentheses(typeCast(
-                                (TypeTree) instanceOf.getClazz(),
-                                instanceOf.getExpression())).withPrefix(identifier.getPrefix()),
-                        p);
+                J result = autoFormat(
+                        typeCast((TypeTree) instanceOf.getClazz(), instanceOf.getExpression()),
+                        executionContext);
+                // If a parent expression is a method invocation, enclose type cast in parentheses
+                Object parent = getCursor().getParentTreeCursor().getValue();
+                if (parent instanceof J.MethodInvocation) {
+                    result = parentheses(result);
+                }
+                return result.withPrefix(identifier.getPrefix());
             }
             return identifier;
         }
 
         @Override
-        public J.If visitIf(J.If iff, ExecutionContext p) {
-            J.If result = (J.If) super.visitIf(iff, p);
+        public J.If visitIf(J.If iff, ExecutionContext executionContext) {
+            J.If result = (J.If) super.visitIf(iff, executionContext);
 
             // If the "then" part of the "if" statement uses variables declared in
             // an "instanceof" expression, then add a variable declaration at
@@ -128,12 +135,12 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                 // Replace a single statement by a block
                 if (!(result.getThenPart() instanceof J.Block)) {
                     result = autoFormat(result.withThenPart(J.Block.createEmptyBlock()
-                            .withStatements(Collections.singletonList(result.getThenPart()))), p);
+                            .withStatements(Collections.singletonList(result.getThenPart()))), executionContext);
                 }
                 // Add variable declarations
                 while (!thenInstanceOfs.isEmpty()) {
                     result = result.withThenPart(addVariableDeclaration(
-                            (J.Block) result.getThenPart(), thenInstanceOfs.removeLast(), p));
+                            (J.Block) result.getThenPart(), thenInstanceOfs.removeLast(), executionContext));
                 }
             }
 
@@ -146,15 +153,15 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                 // Replace a single statement by a block
                 if (!(elsePart.getBody() instanceof J.Block)) {
                     result = autoFormat(result.withElsePart(elsePart.withBody(
-                            J.Block.createEmptyBlock().withStatements(
-                                    Collections.singletonList(elsePart.getBody())))),
-                            p);
+                                    J.Block.createEmptyBlock().withStatements(
+                                            Collections.singletonList(elsePart.getBody())))),
+                            executionContext);
                 }
                 // Add variable declarations
                 while (!elseInstanceOfs.isEmpty()) {
                     result = result.withElsePart(elsePart.withBody(
                             addVariableDeclaration(
-                                    (J.Block) elsePart.getBody(), elseInstanceOfs.removeLast(), p)));
+                                    (J.Block) elsePart.getBody(), elseInstanceOfs.removeLast(), executionContext)));
                 }
             }
             return result;
@@ -167,10 +174,11 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
          *
          * @param block the statement block
          * @param instanceOf the instanceof expression
-         * @param p the execution context
+         * @param executionContext the execution context
          * @return the updated block
          */
-        private J.Block addVariableDeclaration(J.Block block, J.InstanceOf instanceOf, ExecutionContext p) {
+        private J.Block addVariableDeclaration(J.Block block, J.InstanceOf instanceOf,
+                                               ExecutionContext executionContext) {
             JavaTemplate template = JavaTemplate
                     .builder(this::getCursor, "#{} #{} = (#{}) #{any()}")
                     .build();
@@ -179,7 +187,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                     instanceOf.getClazz().toString(),
                     ((J.Identifier) Objects.requireNonNull(instanceOf.getPattern())).getSimpleName(),
                     instanceOf.getClazz().toString(),
-                    visit(instanceOf.getExpression(), p));
+                    visit(instanceOf.getExpression(), executionContext));
         }
 
         /**
@@ -227,7 +235,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
     }
 
     /**
-     * Variable analyzes context.
+     * Variable analysis context.
      */
     private enum ContextKind {
         NONE,
@@ -259,14 +267,14 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
     }
 
     /**
-     * Analyzes information on variable usage. Only variables declared using
-     * instanceof pattern matching are considered.
+     * Analyzes variable usage. Only variables declared using instanceof
+     * pattern matching are considered.
      */
     private static class VariableUsageAnalyzer extends JavaIsoVisitor<ContextKind> {
 
         /**
          * Names of variables in the current scope mapped to instanceof expressions
-         * declaring them
+         * declaring them.
          */
         private final Map<String, J.InstanceOf> currentScope = new HashMap<>();
 
@@ -289,66 +297,66 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         }
 
         @Override
-        public J.If visitIf(J.If iff, ContextKind p) {
+        public J.If visitIf(J.If iff, ContextKind contextKind) {
             return iff.withIfCondition(visitAndCast(iff.getIfCondition(), ContextKind.CONDITION))
-                    .withThenPart(visitAndCast(iff.getThenPart(), ContextKind.THEN_PART))
+                    .withThenPart(Objects.requireNonNull(visitAndCast(iff.getThenPart(), ContextKind.THEN_PART)))
                     .withElsePart(visitAndCast(iff.getElsePart(), ContextKind.ELSE_PART));
         }
 
         @Override
-        public J.Ternary visitTernary(J.Ternary ternary, ContextKind p) {
+        public J.Ternary visitTernary(J.Ternary ternary, ContextKind contextKind) {
             return super.visitTernary(ternary, ContextKind.CONDITION);
         }
 
         @Override
-        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, ContextKind p) {
+        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, ContextKind contextKind) {
             // If the instanceof has a pattern variable, then add it to the current variable scope
             if (instanceOf.getPattern() instanceof J.Identifier) {
                 String variableName = ((J.Identifier) instanceOf.getPattern()).getSimpleName();
                 currentScope.put(variableName, instanceOf);
             }
             // An expression in the LHS of the instanceof can contain variables, so analyze it
-            visit(instanceOf.getExpression(), p);
+            visit(instanceOf.getExpression(), contextKind);
             return instanceOf;
         }
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(
-                J.VariableDeclarations.NamedVariable variable, ContextKind p) {
+                J.VariableDeclarations.NamedVariable variable, ContextKind contextKind) {
             // Only pattern variables from instanceof should be in the current scope.
             // If there is a same-named explicit variable declaration, then remove it from the scope
             currentScope.remove(variable.getSimpleName());
             // Variable initialization expressions can contain variables, so analyze it
-            visit(variable.getInitializer(), p);
+            visit(variable.getInitializer(), contextKind);
             return variable;
         }
 
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, ContextKind p) {
+        public J.Identifier visitIdentifier(J.Identifier identifier, ContextKind contextKind) {
             // If the identifier is a variable declared using an instanceof statement,
             // then add it to the variable usage according to the current context
             J.InstanceOf instanceOf = currentScope.get(identifier.getSimpleName());
             if (instanceOf != null) {
-                switch (p) {
-                case NONE:
-                    break;
-                case CONDITION:
-                    variableUsage.conditions.put(identifier, instanceOf);
-                    break;
-                case THEN_PART:
-                    variableUsage.thenParts
-                            .computeIfAbsent(
-                                    getCursor().firstEnclosingOrThrow(J.If.class),
-                                    k -> new ArrayDeque<>())
-                            .add(instanceOf);
-                    break;
-                case ELSE_PART:
-                    variableUsage.elseParts
-                            .computeIfAbsent(
-                                    getCursor().firstEnclosingOrThrow(J.If.Else.class),
-                                    k -> new ArrayDeque<>())
-                            .add(instanceOf);
-                    break;
+                switch (contextKind) {
+                    case NONE:
+                        break;
+                    case CONDITION:
+                        variableUsage.conditions.put(identifier, instanceOf);
+                        break;
+                    case THEN_PART:
+                        variableUsage.thenParts
+                                .computeIfAbsent(
+                                        getCursor().firstEnclosingOrThrow(J.If.class),
+                                        k -> new ArrayDeque<>())
+                                .add(instanceOf);
+                        break;
+                    case ELSE_PART:
+                        variableUsage.elseParts
+                                .computeIfAbsent(
+                                        getCursor().firstEnclosingOrThrow(J.If.Else.class),
+                                        k -> new ArrayDeque<>())
+                                .add(instanceOf);
+                        break;
                 }
             }
             return identifier;
