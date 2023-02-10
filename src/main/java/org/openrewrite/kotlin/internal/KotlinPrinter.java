@@ -595,6 +595,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitWildcard(J.Wildcard wildcard, PrintOutputCapture<P> p) {
+            beforeSyntax(wildcard, Space.Location.WILDCARD_PREFIX, p);
+            p.append('*');
+            afterSyntax(wildcard, p);
+            return wildcard;
+        }
+
+        @Override
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);

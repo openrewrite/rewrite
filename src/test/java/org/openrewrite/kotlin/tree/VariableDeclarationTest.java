@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -166,6 +167,18 @@ public class VariableDeclarationTest implements RewriteTest {
           kotlin("""
               val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
           """)
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/13")
+    @Test
+    void wildcard() {
+        rewriteRun(
+          kotlin("""
+                import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+                val a: KotlinCompilation<*> = null
+            """
+          )
         );
     }
 }
