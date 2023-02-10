@@ -33,21 +33,17 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 @SuppressWarnings("ConstantConditions")
 public class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
-
-    public JavaType.Parameterized goatType() {
-        //noinspection ConstantConditions
-        return requireNonNull(TypeUtils.asParameterized(KotlinParser.builder()
-          .logCompilationWarningsAndErrors(true)
-          .build()
-          .parse(new InMemoryExecutionContext(), goat)
-          .get(0)
-          .getClasses()
-          .get(0)
-          .getType()));
-    }
+    private static JavaType.Parameterized goatType = requireNonNull(TypeUtils.asParameterized(KotlinParser.builder()
+      .logCompilationWarningsAndErrors(true)
+      .build()
+      .parse(new InMemoryExecutionContext(), goat)
+      .get(0)
+      .getClasses()
+      .get(0)
+      .getType()));
 
     public JavaType.Method methodType(String methodName) {
-        JavaType.Method type = goatType().getMethods().stream()
+        JavaType.Method type = goatType.getMethods().stream()
           .filter(m -> m.getName().equals(methodName))
           .findFirst()
           .orElseThrow(() -> new IllegalStateException("Expected to find matching method named " + methodName));
@@ -61,12 +57,12 @@ public class KotlinTypeMappingTest {
 
     @Test
     void extendsKotlinAny() {
-        assertThat(goatType().getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
+        assertThat(goatType.getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
     }
 
     @Test
     void kotlinAnyHasNoSuperType() {
-        assertThat(goatType().getSupertype().getSupertype()).isNull();
+        assertThat(goatType.getSupertype().getSupertype()).isNull();
     }
 
     @Test
@@ -122,7 +118,7 @@ public class KotlinTypeMappingTest {
     @Disabled("Requires parsing intersection types")
     @Test
     public void genericMultipleBounds() {
-        List<JavaType> typeParameters = goatType().getTypeParameters();
+        List<JavaType> typeParameters = goatType.getTypeParameters();
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParameters.get(typeParameters.size() - 1);
         assertThat(generic.getName()).isEqualTo("S");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
@@ -210,7 +206,7 @@ public class KotlinTypeMappingTest {
 
     @Test
     public void ignoreSourceRetentionAnnotations() {
-        JavaType.Parameterized goat = goatType();
+        JavaType.Parameterized goat = goatType;
         assertThat(goat.getAnnotations().size()).isEqualTo(1);
         assertThat(goat.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
 

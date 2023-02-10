@@ -15,8 +15,12 @@
  */
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
+import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
@@ -37,13 +41,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class KotlinTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
-    private static final Map<FirSession, List<CompiledKotlinSource>> cu = KotlinParser.builder()
-            .logCompilationWarningsAndErrors(true)
-            .build()
-            .parseInputsToCompilerAst(
-                    singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
-                    null,
-                    new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
+    private static Disposable disposable = Disposer.newDisposable();
+    private static Map<FirSession, List<CompiledKotlinSource>> cu = null;
+
+    @BeforeAll
+    public static void beforeAll() {
+        disposable = Disposer.newDisposable();
+        cu = KotlinParser.builder()
+          .logCompilationWarningsAndErrors(true)
+          .build()
+          .parseInputsToCompilerAst(
+            disposable,
+            singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
+            null,
+            new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
+    }
+
+    @AfterAll
+    public static void afterAll() {
+        Disposer.dispose(disposable);
+    }
 
     public KotlinTypeSignatureBuilder signatureBuilder() {
         return new KotlinTypeSignatureBuilder(cu.keySet().iterator().next());

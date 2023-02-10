@@ -121,7 +121,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                             String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
                             String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                                       .orElse(Long.toString(System.nanoTime())) + ".kt";
+                                    .orElse(Long.toString(System.nanoTime())) + ".kt";
 
                             Path path = Paths.get(pkg + className);
                             return new Input(
@@ -140,7 +140,10 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     public List<K.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
-        Map<FirSession, List<CompiledKotlinSource>> firSessionToCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
+
+        Disposable disposable = Disposer.newDisposable();
+        Map<FirSession, List<CompiledKotlinSource>> firSessionToCus = parseInputsToCompilerAst(disposable, sources, relativeTo, pctx);
+
         FirSession firSession = (FirSession) firSessionToCus.keySet().toArray()[0];
         List<CompiledKotlinSource> compilerCus = firSessionToCus.get(firSession);
         List<K.CompilationUnit> cus = new ArrayList<>(firSessionToCus.get(firSession).size());
@@ -165,10 +168,19 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             }
         }
 
+        Disposer.dispose(disposable);
+
         return cus;
     }
 
-    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
+    /**
+     * @param disposable disposable to use for the compiler environment. THIS MUST BE DISPOSED BY THE CALLER.
+     * @param sources input sources to parse.
+     * @param relativeTo path to relativize input paths against.
+     * @param ctx Execution context to use for collecting parsing failures.
+     * @return FirSession associated to type attributing the CompiledKotlinSources.
+     */
+    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Disposable disposable, Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
 
         File buildFile = null;
@@ -193,109 +205,104 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         configureSourceRoots(compilerConfiguration, chunk, buildFile);
         configureJdkClasspathRoots(compilerConfiguration);
 
-        Disposable disposable = Disposer.newDisposable();
         Map<FirSession, List<CompiledKotlinSource>> sessionToCus = new HashMap<>();
-        try {
-            KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
-                    disposable,
-                    compilerConfiguration,
-                    EnvironmentConfigFiles.JVM_CONFIG_FILES);
+        KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
+                disposable,
+                compilerConfiguration,
+                EnvironmentConfigFiles.JVM_CONFIG_FILES);
 
-            Project project = environment.getProject();
-            VirtualFileSystem fileSystem = VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL);
-            GlobalSearchScope globalScope = GlobalSearchScope.allScope(project);
-            JvmPackagePartProvider packagePartProvider = environment.createPackagePartProvider(globalScope);
-            Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
-            VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
-                    project,
-                    fileSystem,
-                    packagePartProviderFunction::apply);
+        Project project = environment.getProject();
+        VirtualFileSystem fileSystem = VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL);
+        GlobalSearchScope globalScope = GlobalSearchScope.allScope(project);
+        JvmPackagePartProvider packagePartProvider = environment.createPackagePartProvider(globalScope);
+        Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
+        VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
+                project,
+                fileSystem,
+                packagePartProviderFunction::apply);
 
-            if (chunk.size() > 1) {
-                throw new IllegalStateException("Implement me. Expects chunk size of 1, but was " + chunk.size());
-            }
-
-            Module module = chunk.get(0);
-            CompilerConfiguration moduleConfiguration = applyModuleProperties(compilerConfiguration, module, buildFile);
-            moduleConfiguration.put(FRIEND_PATHS, module.getFriendPaths());
-
-            Set<KtSourceFile> platformSources = new LinkedHashSet<>();
-            Set<KtSourceFile> commonSources = new LinkedHashSet<>();
-
-            List<ContentRoot> contentRoots = compilerConfiguration.get(CONTENT_ROOTS);
-            List<KotlinSourceRoot> roots = contentRoots == null ? emptyList() : contentRoots.stream()
-                    .filter(it -> it instanceof KotlinSourceRoot)
-                    .map(it -> (KotlinSourceRoot) it).collect(toList());
-
-            Function2<VirtualFile, Boolean, Unit> sortFiles = (virtualFile, isCommon) -> {
-                KtVirtualFileSourceFile file = new KtVirtualFileSourceFile(virtualFile);
-                if (isCommon) {
-                    commonSources.add(file);
-                } else {
-                    platformSources.add(file);
-                }
-                return Unit.INSTANCE;
-            };
-
-            forAllFiles(roots, compilerConfiguration, project, null, sortFiles);
-
-            /*
-                Create a `LightVirtualFile` for each `Input` and add the virtual files as platform sources.
-                A platform source will result in an IR FirFile.
-
-                A `KtVirtualFileSourceFile` will have a different PSI than a file that is resolvable on disk.
-                For actual source files, the input may be resolved by `forAllFiles` using `ContentRootsKt#addKotlinSourceRoots(Path, false)`.
-
-                The benefit of `addKotlinSourceRoots` is a higher quality PSI element that backs the IR FirFile.
-                `LightVirtualFile` are created to support tests and in the future, Kotlin template.
-                We might want to extract the generation of `platformSources` later on.
-             */
-            int i = 0;
-            for (Input source : sources) {
-                String fileName = "openRewriteFile.kt".equals(source.getPath().toString()) ? "openRewriteFile.kt" + i : source.getPath().toString();
-                VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
-                platformSources.add(new KtVirtualFileSourceFile(vFile));
-            }
-
-            BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
-            ModuleCompilerInput compilerInput = new ModuleCompilerInput(
-                    new TargetId(module.getModuleName(), module.getModuleType()),
-                    CommonPlatforms.INSTANCE.getDefaultCommonPlatform(),
-                    commonSources,
-                    JvmPlatforms.INSTANCE.getUnspecifiedJvmPlatform(),
-                    platformSources,
-                    moduleConfiguration,
-                    emptyList()
-            );
-
-            ModuleCompilerEnvironment compilerEnvironment = new ModuleCompilerEnvironment(projectEnvironment, diagnosticsReporter);
-            CommonCompilerPerformanceManager performanceManager = compilerConfiguration.get(PERF_MANAGER);
-            ModuleCompilerAnalyzedOutput output = compileModuleToAnalyzedFir(
-                    compilerInput,
-                    compilerEnvironment,
-                    emptyList(),
-                    null,
-                    diagnosticsReporter,
-                    performanceManager
-            );
-            convertAnalyzedFirToIr(compilerInput, output, compilerEnvironment);
-
-            List<FirFile> firFiles = output.getFir();
-            List<Input> inputs = new ArrayList<>(firFiles.size());
-            sources.iterator().forEachRemaining(inputs::add);
-            assert firFiles.size() == inputs.size();
-
-            List<CompiledKotlinSource> cus = new ArrayList<>();
-            for (int j = 0; j < inputs.size(); j++) {
-                Input input = inputs.get(j);
-                FirFile firFile = firFiles.get(j);
-                cus.add(new CompiledKotlinSource(input, firFile));
-            }
-
-            sessionToCus.put(output.getSession(), cus);
-        } finally {
-            Disposer.dispose(disposable);
+        if (chunk.size() > 1) {
+            throw new IllegalStateException("Implement me. Expects chunk size of 1, but was " + chunk.size());
         }
+
+        Module module = chunk.get(0);
+        CompilerConfiguration moduleConfiguration = applyModuleProperties(compilerConfiguration, module, buildFile);
+        moduleConfiguration.put(FRIEND_PATHS, module.getFriendPaths());
+
+        Set<KtSourceFile> platformSources = new LinkedHashSet<>();
+        Set<KtSourceFile> commonSources = new LinkedHashSet<>();
+
+        List<ContentRoot> contentRoots = compilerConfiguration.get(CONTENT_ROOTS);
+        List<KotlinSourceRoot> roots = contentRoots == null ? emptyList() : contentRoots.stream()
+                .filter(it -> it instanceof KotlinSourceRoot)
+                .map(it -> (KotlinSourceRoot) it).collect(toList());
+
+        Function2<VirtualFile, Boolean, Unit> sortFiles = (virtualFile, isCommon) -> {
+            KtVirtualFileSourceFile file = new KtVirtualFileSourceFile(virtualFile);
+            if (isCommon) {
+                commonSources.add(file);
+            } else {
+                platformSources.add(file);
+            }
+            return Unit.INSTANCE;
+        };
+
+        forAllFiles(roots, compilerConfiguration, project, null, sortFiles);
+
+        /*
+            Create a `LightVirtualFile` for each `Input` and add the virtual files as platform sources.
+            A platform source will result in an IR FirFile.
+
+            A `KtVirtualFileSourceFile` will have a different PSI than a file that is resolvable on disk.
+            For actual source files, the input may be resolved by `forAllFiles` using `ContentRootsKt#addKotlinSourceRoots(Path, false)`.
+
+            The benefit of `addKotlinSourceRoots` is a higher quality PSI element that backs the IR FirFile.
+            `LightVirtualFile` are created to support tests and in the future, Kotlin template.
+            We might want to extract the generation of `platformSources` later on.
+         */
+        int i = 0;
+        for (Input source : sources) {
+            String fileName = "openRewriteFile.kt".equals(source.getPath().toString()) ? "openRewriteFile.kt" + i : source.getPath().toString();
+            VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
+            platformSources.add(new KtVirtualFileSourceFile(vFile));
+        }
+
+        BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
+        ModuleCompilerInput compilerInput = new ModuleCompilerInput(
+                new TargetId(module.getModuleName(), module.getModuleType()),
+                CommonPlatforms.INSTANCE.getDefaultCommonPlatform(),
+                commonSources,
+                JvmPlatforms.INSTANCE.getUnspecifiedJvmPlatform(),
+                platformSources,
+                moduleConfiguration,
+                emptyList()
+        );
+
+        ModuleCompilerEnvironment compilerEnvironment = new ModuleCompilerEnvironment(projectEnvironment, diagnosticsReporter);
+        CommonCompilerPerformanceManager performanceManager = compilerConfiguration.get(PERF_MANAGER);
+        ModuleCompilerAnalyzedOutput output = compileModuleToAnalyzedFir(
+                compilerInput,
+                compilerEnvironment,
+                emptyList(),
+                null,
+                diagnosticsReporter,
+                performanceManager
+        );
+        convertAnalyzedFirToIr(compilerInput, output, compilerEnvironment);
+
+        List<FirFile> firFiles = output.getFir();
+        List<Input> inputs = new ArrayList<>(firFiles.size());
+        sources.iterator().forEachRemaining(inputs::add);
+        assert firFiles.size() == inputs.size();
+
+        List<CompiledKotlinSource> cus = new ArrayList<>();
+        for (int j = 0; j < inputs.size(); j++) {
+            Input input = inputs.get(j);
+            FirFile firFile = firFiles.get(j);
+            cus.add(new CompiledKotlinSource(input, firFile));
+        }
+
+        sessionToCus.put(output.getSession(), cus);
 
         return sessionToCus;
     }
@@ -310,10 +317,10 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7, ApiVersion.KOTLIN_1_7));
 
-        compilerConfiguration.put(USE_FIR,  true);
+        compilerConfiguration.put(USE_FIR, true);
         compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT, true);
-        compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS,  true);
-        compilerConfiguration.put(INCREMENTAL_COMPILATION,  true);
+        compilerConfiguration.put(ALLOW_ANY_SCRIPTS_IN_SOURCE_ROOTS, true);
+        compilerConfiguration.put(INCREMENTAL_COMPILATION, true);
 
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
