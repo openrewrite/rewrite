@@ -140,35 +140,6 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     public List<K.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
-        Map<FirSession, List<CompiledKotlinSource>> firSessionToCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
-        FirSession firSession = (FirSession) firSessionToCus.keySet().toArray()[0];
-        List<CompiledKotlinSource> compilerCus = firSessionToCus.get(firSession);
-        List<K.CompilationUnit> cus = new ArrayList<>(firSessionToCus.get(firSession).size());
-
-        for (CompiledKotlinSource compiled : compilerCus) {
-            try {
-                KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
-                        compiled.getInput().getRelativePath(relativeTo),
-                        compiled.getInput().getFileAttributes(),
-                        compiled.getInput().getSource(ctx),
-                        typeCache,
-                        firSession,
-                        ctx
-                );
-
-                K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
-                cus.add(kcu);
-                parsingListener.parsed(compiled.getInput(), kcu);
-            } catch (Throwable t) {
-                pctx.parseFailure(compiled.getInput(), compiled.getInput().getRelativePath(relativeTo), KotlinParser.builder().build(), t);
-                ctx.getOnError().accept(t);
-            }
-        }
-
-        return cus;
-    }
-
-    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
 
         File buildFile = null;
@@ -195,6 +166,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         Disposable disposable = Disposer.newDisposable();
         Map<FirSession, List<CompiledKotlinSource>> sessionToCus = new HashMap<>();
+        List<K.CompilationUnit> cus;
         try {
             KotlinCoreEnvironment environment = KotlinCoreEnvironment.createForProduction(
                     disposable,
@@ -285,19 +257,43 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             sources.iterator().forEachRemaining(inputs::add);
             assert firFiles.size() == inputs.size();
 
-            List<CompiledKotlinSource> cus = new ArrayList<>();
+            List<CompiledKotlinSource> compiledKotlinSources = new ArrayList<>();
             for (int j = 0; j < inputs.size(); j++) {
                 Input input = inputs.get(j);
                 FirFile firFile = firFiles.get(j);
-                cus.add(new CompiledKotlinSource(input, firFile));
+                compiledKotlinSources.add(new CompiledKotlinSource(input, firFile));
             }
 
-            sessionToCus.put(output.getSession(), cus);
+            sessionToCus.put(output.getSession(), compiledKotlinSources);
+
+            FirSession firSession = (FirSession) sessionToCus.keySet().toArray()[0];
+            List<CompiledKotlinSource> compilerCus = sessionToCus.get(firSession);
+            cus = new ArrayList<>(sessionToCus.get(firSession).size());
+
+            for (CompiledKotlinSource compiled : compilerCus) {
+                try {
+                    KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
+                            compiled.getInput().getRelativePath(relativeTo),
+                            compiled.getInput().getFileAttributes(),
+                            compiled.getInput().getSource(ctx),
+                            typeCache,
+                            firSession,
+                            ctx
+                    );
+
+                    K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
+                    cus.add(kcu);
+                    parsingListener.parsed(compiled.getInput(), kcu);
+                } catch (Throwable t) {
+                    pctx.parseFailure(compiled.getInput(), compiled.getInput().getRelativePath(relativeTo), KotlinParser.builder().build(), t);
+                    ctx.getOnError().accept(t);
+                }
+            }
         } finally {
             Disposer.dispose(disposable);
         }
 
-        return sessionToCus;
+        return cus;
     }
 
     private CompilerConfiguration compilerConfiguration() {
