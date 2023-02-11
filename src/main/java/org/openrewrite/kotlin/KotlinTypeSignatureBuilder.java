@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import org.jetbrains.kotlin.fir.ClassMembersKt;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
+import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod;
@@ -132,6 +133,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirValueParameterSymbol) type).getResolvedReturnType(), ownerSymbol);
         } else if (type instanceof FirVariableAssignment) {
             return signature(((FirVariableAssignment) type).getCalleeReference(), ownerSymbol);
+        } else if (type instanceof FirOuterClassTypeParameterRef) {
+            return signature(((FirOuterClassTypeParameterRef) type).getSymbol());
         }
 
         throw new UnsupportedOperationException("Unexpected type " + type.getClass().getName());
