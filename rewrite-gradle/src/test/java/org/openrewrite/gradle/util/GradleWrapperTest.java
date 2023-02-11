@@ -37,6 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class GradleWrapperTest {
 
+    public static void mockGradleServices(Consumer<MockWebServer> block) {
+        mockGradleServices(List.of("7.5.1", "7.6", "7.6-milestone-1", "7.6-rc-1"), block);
+    }
+
     public static void mockGradleServices(Collection<String> gradleVersions, Consumer<MockWebServer> block) {
         try (MockWebServer mockRepo = new MockWebServer()) {
             List<GradleWrapper.GradleVersion> versions = gradleVersions.stream()
@@ -91,7 +95,7 @@ public class GradleWrapperTest {
 
     @Test
     void validateDistributionTypeBin() {
-        mockGradleServices(List.of("7.5.1", "7.6", "7.6-milestone-1", "7.6-rc-1"), mockWebServer -> {
+        mockGradleServices(mockWebServer -> {
             Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", null, "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
             GradleWrapper gw = validated.getValue();
             assertThat(validated.isValid()).isTrue();
@@ -102,7 +106,7 @@ public class GradleWrapperTest {
 
     @Test
     void validateWithDistributionNull() {
-        mockGradleServices(List.of("7.5.1", "7.6", "7.6-milestone-1", "7.6-rc-1"), mockWebServer -> {
+        mockGradleServices(mockWebServer -> {
             Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "latest.release", null, null, "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
             GradleWrapper gw = validated.getValue();
             assertThat(validated.isValid()).isTrue();

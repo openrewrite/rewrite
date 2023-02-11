@@ -76,6 +76,14 @@ public class AddGradleWrapper extends Recipe {
     @Nullable
     String distribution;
 
+    @Option(displayName = "Repository URL",
+            description = "The URL of the repository to download the Gradle distribution from. Currently only supports " +
+                    "repositories like services.gradle.org, not arbitrary maven or ivy repositories. " +
+                    "Defaults to `https://services.gradle.org/versions/all`.",
+            example = "https://services.gradle.org/versions/all")
+    @Nullable
+    String repositoryUrl;
+
     @NonFinal
     Validated gradleWrapper;
 
@@ -86,7 +94,7 @@ public class AddGradleWrapper extends Recipe {
                         isBlank(version) ? "latest.release" : version,
                         distribution,
                         gradleWrapper,
-                        null));
+                        repositoryUrl));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
@@ -96,6 +104,7 @@ public class AddGradleWrapper extends Recipe {
     public AddGradleWrapper(@Nullable String version, @Nullable String distribution) {
         this.version = version;
         this.distribution = distribution;
+        this.repositoryUrl = null;
     }
 
 
