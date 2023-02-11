@@ -17,36 +17,31 @@ package org.openrewrite.java;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaPackage;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.core.importer.ImportOption;
+import com.tngtech.archunit.junit.AnalyzeClasses;
+import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.*;
-import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.lang.NonNullApi;
 
 import static com.tngtech.archunit.base.DescribedPredicate.doNot;
 import static com.tngtech.archunit.core.domain.properties.HasName.Predicates.name;
-import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.all;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noCodeUnits;
 
+@AnalyzeClasses(packages = "org.openrewrite.java", importOptions = ImportOption.DoNotIncludeTests.class)
 public class OpenRewriteArchitectureTest {
-    JavaClasses importedClasses = new ClassFileImporter()
-      .withImportOption(new ImportOption.DoNotIncludeTests())
-      .importPackages("org.openrewrite.java");
 
-    @Test
-    void packageInfo() {
+    @ArchTest
+    public static final ArchRule packageInfo =
         all(packages("org.openrewrite.java"))
           .that(doNot(name("org.openrewrite.java.internal.grammar")))
-          .should(containAnAnnotatedPackageInfo())
-          .check(importedClasses);
-    }
+          .should(containAnAnnotatedPackageInfo());
 
-    @Test
-    void nullness() {
+    @ArchTest
+    public static final ArchRule nullness =
         noCodeUnits()
           .should().beAnnotatedWith("org.jetbrains.annotations.NotNull")
-          .orShould().beAnnotatedWith("org.jetbrains.annotations.Nullable")
-          .check(importedClasses);
-    }
+          .orShould().beAnnotatedWith("org.jetbrains.annotations.Nullable");
 
     private static ClassesTransformer<JavaPackage> packages(String basePackage) {
         return new AbstractClassesTransformer<>("packages") {

@@ -47,6 +47,7 @@ dependencies {
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
 
     // For use in ClassGraphTypeMappingTest
     testRuntimeOnly("org.eclipse.persistence:org.eclipse.persistence.core:3.0.2")
