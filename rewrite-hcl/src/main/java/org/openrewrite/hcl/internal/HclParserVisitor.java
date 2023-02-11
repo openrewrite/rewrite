@@ -19,11 +19,11 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.internal.grammar.HCLParserBaseVisitor;
 import org.openrewrite.hcl.tree.*;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -373,7 +373,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         });
     }
 
-    @NotNull
+    @NonNull
     private List<Expression> visitHeredocTemplateExpressions(List<HCLParser.HeredocTemplatePartContext> ctx) {
         List<Expression> expressions = new ArrayList<>(ctx.size());
         for (HCLParser.HeredocTemplatePartContext part : ctx) {
@@ -584,7 +584,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         return quotedTemplate;
     }
 
-    @NotNull
+    @NonNull
     private List<Expression> visitTemplateExpressions(List<HCLParser.QuotedTemplatePartContext> ctx) {
         List<Expression> expressions = new ArrayList<>(ctx.size());
         for (HCLParser.QuotedTemplatePartContext part : ctx) {
@@ -660,7 +660,7 @@ public class HclParserVisitor extends HCLParserBaseVisitor<Hcl> {
         });
     }
 
-    @NotNull
+    @NonNull
     private Hcl.Identifier visitIdentifier(TerminalNode identifier) {
         Hcl.Identifier ident = new Hcl.Identifier(randomId(), Space.format(prefix(identifier)),
                 Markers.EMPTY, identifier.getText());
