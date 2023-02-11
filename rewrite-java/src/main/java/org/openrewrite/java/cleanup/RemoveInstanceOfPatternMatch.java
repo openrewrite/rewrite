@@ -58,7 +58,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
     }
 
     /**
-     * The implementation `instanceof` pattern match replacement.
+     * The implementation of "instanceof" pattern match replacement.
      */
     private static class RemoveInstanceOfPatternMatchVisitor extends JavaVisitor<ExecutionContext> {
 
@@ -118,24 +118,28 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
             // If the "then" part of the "if" statement uses variables declared in
             // an "instanceof" expression, then add a variable declaration at
             // the beginning of the block
-            Deque<J.InstanceOf> thenInstanceOfs = variableUsage.thenParts.get(iff);
+            Set<J.InstanceOf> thenInstanceOfs = variableUsage.thenParts.get(iff);
             if (thenInstanceOfs != null) {
                 // Replace a single statement by a block
                 if (!(result.getThenPart() instanceof J.Block)) {
                     result = autoFormat(result.withThenPart(J.Block.createEmptyBlock()
                             .withStatements(Collections.singletonList(result.getThenPart()))), ctx);
                 }
-                // Add variable declarations
-                while (!thenInstanceOfs.isEmpty()) {
-                    result = result.withThenPart(addVariableDeclaration(
-                            (J.Block) result.getThenPart(), thenInstanceOfs.removeLast(), ctx));
+                // Add variable declarations in the order of "instanceof" expressions
+                Iterator<J.InstanceOf> iter = variableUsage.declarations.get(iff).descendingIterator();
+                while (iter.hasNext()) {
+                    J.InstanceOf instanceOf = iter.next();
+                    if (thenInstanceOfs.contains(instanceOf)) {
+                        result = result.withThenPart(addVariableDeclaration(
+                                (J.Block) result.getThenPart(), instanceOf, ctx));
+                    }
                 }
             }
 
             // If the "else" part of the "if" statement uses variables declared in
             // an "instanceof" expression, then add a variable declaration at
             // the beginning of the block
-            Deque<J.InstanceOf> elseInstanceOfs = variableUsage.elseParts.get(iff.getElsePart());
+            Set<J.InstanceOf> elseInstanceOfs = variableUsage.elseParts.get(iff.getElsePart());
             J.If.Else elsePart = result.getElsePart();
             if (elsePart != null && elseInstanceOfs != null) {
                 // Replace a single statement by a block
@@ -146,11 +150,15 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                             ctx);
                     elsePart = result.getElsePart();
                 }
-                // Add variable declarations
-                while (!elseInstanceOfs.isEmpty()) {
-                    result = result.withElsePart(elsePart.withBody(
-                            addVariableDeclaration(
-                                    (J.Block) elsePart.getBody(), elseInstanceOfs.removeLast(), ctx)));
+                // Add variable declarations in the order of "instanceof" expressions
+                Iterator<J.InstanceOf> iter = variableUsage.declarations.get(iff).descendingIterator();
+                while (iter.hasNext()) {
+                    J.InstanceOf instanceOf = iter.next();
+                    if (elseInstanceOfs.contains(instanceOf)) {
+                        result = result.withElsePart(elsePart.withBody(
+                                addVariableDeclaration(
+                                        (J.Block) elsePart.getBody(), instanceOf, ctx)));
+                    }
                 }
             }
             return result;
@@ -223,9 +231,9 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
     }
 
     /**
-     * Variable analysis context.
+     * Variable usage context.
      */
-    private enum ContextKind {
+    private enum UsageContext {
         NONE,
         CONDITION,
         THEN_PART,
@@ -238,6 +246,11 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
     private static class VariableUsage {
 
         /**
+         * Variables declared in "if" statements using "instanceof" expressions.
+         */
+        public Map<J.If, Deque<J.InstanceOf>> declarations = new HashMap<>();
+
+        /**
          * Variables used in conditions of "if" statements or in ternary operators.
          */
         public Map<J.Identifier, J.InstanceOf> conditions = new HashMap<>();
@@ -245,12 +258,12 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         /**
          * Variables used in "then" parts of "if" statements.
          */
-        public Map<J.If, Deque<J.InstanceOf>> thenParts = new HashMap<>();
+        public Map<J.If, Set<J.InstanceOf>> thenParts = new HashMap<>();
 
         /**
          * Variables used in "else" parts of "if" statements.
          */
-        public Map<J.If.Else, Deque<J.InstanceOf>> elseParts = new HashMap<>();
+        public Map<J.If.Else, Set<J.InstanceOf>> elseParts = new HashMap<>();
 
     }
 
@@ -258,14 +271,23 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
      * Analyzes variable usage. Only variables declared using instanceof
      * pattern matching are considered.
      */
-    private static class VariableUsageAnalyzer extends JavaIsoVisitor<ContextKind> {
+    private static class VariableUsageAnalyzer extends JavaIsoVisitor<J> {
 
         /**
-         * Names of variables in the current scope mapped to instanceof expressions
+         * Names of variables in the current scope mapped to "instanceof" expressions
          * declaring them.
          */
         private final Map<String, J.InstanceOf> currentScope = new HashMap<>();
 
+        /**
+         * Mapping of "instanceof" expressions to their parent trees (either "if"
+         * statement or ternary operators).
+         */
+        private final Map<J.InstanceOf, J> parentTrees = new HashMap<>();
+
+        /**
+         * Results of variable usage analyzes.
+         */
         private final VariableUsage variableUsage = new VariableUsage();
 
         private VariableUsageAnalyzer() {
@@ -279,53 +301,72 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
          */
         public static VariableUsage analyze(J tree) {
             VariableUsageAnalyzer collector = new VariableUsageAnalyzer();
-            collector.visit(tree, ContextKind.NONE);
+            collector.visit(tree, tree);
             collector.currentScope.clear();
             return collector.variableUsage;
         }
 
         @Override
-        public J.If visitIf(J.If iff, ContextKind contextKind) {
-            return iff.withIfCondition(visitAndCast(iff.getIfCondition(), ContextKind.CONDITION))
-                    .withThenPart(Objects.requireNonNull(visitAndCast(iff.getThenPart(), ContextKind.THEN_PART)))
-                    .withElsePart(visitAndCast(iff.getElsePart(), ContextKind.ELSE_PART));
+        public J.If visitIf(J.If iff, J contextTree) {
+            // Set the context to a current "if" statement, so all
+            // nested "instanceof" expressions are related to it
+            return iff.withIfCondition(visitAndCast(iff.getIfCondition(), iff))
+                    .withThenPart(Objects.requireNonNull(visitAndCast(iff.getThenPart(), iff)))
+                    .withElsePart(visitAndCast(iff.getElsePart(), iff));
         }
 
         @Override
-        public J.Ternary visitTernary(J.Ternary ternary, ContextKind contextKind) {
-            return super.visitTernary(ternary, ContextKind.CONDITION);
+        public J.Ternary visitTernary(J.Ternary ternary, J contextTree) {
+            // Set the context to a current ternary operator, so all
+            // nested "instanceof" expressions are related to it
+            return super.visitTernary(ternary, ternary);
         }
 
         @Override
-        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, ContextKind contextKind) {
-            // If the instanceof has a pattern variable, then add it to the current variable scope
+        public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, J contextTree) {
+            // If the "instanceof" has a pattern variable,
+            // then add it to the current variable scope
             if (instanceOf.getPattern() instanceof J.Identifier) {
                 String variableName = ((J.Identifier) instanceOf.getPattern()).getSimpleName();
                 currentScope.put(variableName, instanceOf);
+                // Associate "instanceof" with either its parent "if" statement
+                // or its parent ternary operator
+                parentTrees.put(instanceOf, contextTree);
+                // If the "instanceof" is used in the condition of an "if" statement,
+                // then add it to a list of variable declarations associated with
+                // the "if" statement, so later they can be converted to a simple
+                // variable declarations
+                if (contextTree instanceof J.If) {
+                    variableUsage.declarations
+                            .computeIfAbsent((J.If) contextTree, k -> new LinkedList<>())
+                            .add(instanceOf);
+                }
             }
-            // An expression in the LHS of the instanceof can contain variables, so analyze it
-            visit(instanceOf.getExpression(), contextKind);
+            // An expression in the LHS of the "instanceof" can contain variables, so analyze it
+            visit(instanceOf.getExpression(), contextTree);
             return instanceOf;
         }
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(
-                J.VariableDeclarations.NamedVariable variable, ContextKind contextKind) {
-            // Only pattern variables from instanceof should be in the current scope.
-            // If there is a same-named explicit variable declaration, then remove it from the scope
+                J.VariableDeclarations.NamedVariable variable, J contextTree) {
+            // Only pattern variables from "instanceof" should be in the current scope.
+            // If there is a same-named explicit variable declaration,
+            // then remove it from the scope
             currentScope.remove(variable.getSimpleName());
             // Variable initialization expressions can contain variables, so analyze it
-            visit(variable.getInitializer(), contextKind);
+            visit(variable.getInitializer(), contextTree);
             return variable;
         }
 
         @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, ContextKind contextKind) {
-            // If the identifier is a variable declared using an instanceof statement,
+        public J.Identifier visitIdentifier(J.Identifier identifier, J contextTree) {
+            // If the identifier is a variable declared using an "instanceof" statement,
             // then add it to the variable usage according to the current context
             J.InstanceOf instanceOf = currentScope.get(identifier.getSimpleName());
             if (instanceOf != null) {
-                switch (contextKind) {
+                J parentTree = parentTrees.get(instanceOf);
+                switch (getUsageContext(parentTree)) {
                     case NONE:
                         break;
                     case CONDITION:
@@ -334,20 +375,48 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                     case THEN_PART:
                         variableUsage.thenParts
                                 .computeIfAbsent(
-                                        getCursor().firstEnclosingOrThrow(J.If.class),
-                                        k -> new ArrayDeque<>())
+                                        (J.If) parentTree,
+                                        k -> new HashSet<>())
                                 .add(instanceOf);
                         break;
                     case ELSE_PART:
+                        currentScope.get(identifier.getSimpleName());
                         variableUsage.elseParts
                                 .computeIfAbsent(
-                                        getCursor().firstEnclosingOrThrow(J.If.Else.class),
-                                        k -> new ArrayDeque<>())
+                                        ((J.If) parentTree).getElsePart(),
+                                        k -> new HashSet<>())
                                 .add(instanceOf);
                         break;
                 }
             }
             return identifier;
+        }
+
+        /**
+         * Determines a usage context of the variable. a condition, "then" part or
+         * "else" part.
+         *
+         * @param parentTree either "if" statement or ternary operator
+         * @return the usage context
+         */
+        private UsageContext getUsageContext(J parentTree) {
+            if (parentTree instanceof J.If) {
+                J.If iff = (J.If) parentTree;
+                Iterator<Object> iter = getCursor().getPath();
+                while (iter.hasNext()) {
+                    Object tree = iter.next();
+                    if (tree.equals(iff.getIfCondition())) {
+                        return UsageContext.CONDITION;
+                    } else if (tree.equals(iff.getThenPart())) {
+                        return UsageContext.THEN_PART;
+                    } else if (tree.equals(iff.getElsePart())) {
+                        return UsageContext.ELSE_PART;
+                    }
+                }
+            } else if (parentTree instanceof J.Ternary) {
+                return UsageContext.CONDITION;
+            }
+            return UsageContext.NONE;
         }
 
     }

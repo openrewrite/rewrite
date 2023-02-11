@@ -15,13 +15,13 @@
  */
 package org.openrewrite.java.cleanup;
 
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.version;
-
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
 class RemoveInstanceOfPatternMatchTest implements RewriteTest {
 
@@ -252,6 +252,37 @@ class RemoveInstanceOfPatternMatchTest implements RewriteTest {
     }
 
     @Test
+    void multipleVariableUsage() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (obj instanceof String str) {
+                          System.out.println(str + str);
+                      }
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (obj instanceof String) {
+                          String str = (String) obj;
+                          System.out.println(str + str);
+                      }
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
     void multipleInstanceOf() {
         rewriteRun(
           version(
@@ -278,6 +309,40 @@ class RemoveInstanceOfPatternMatchTest implements RewriteTest {
                           Integer num = (Integer) obj;
                           System.out.println(str);
                           System.out.println(num);
+                      }
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void multipleInstanceOfWithOppositeOrder() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (obj instanceof String str && obj instanceof Integer num) {
+                          System.out.println(num);
+                          System.out.println(str);
+                      }
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (obj instanceof String && obj instanceof Integer) {
+                          String str = (String) obj;
+                          Integer num = (Integer) obj;
+                          System.out.println(num);
+                          System.out.println(str);
                       }
                   }
               }
@@ -619,13 +684,58 @@ class RemoveInstanceOfPatternMatchTest implements RewriteTest {
               """
               package com.example;
 
+              import java.time.LocalDate;
+              import java.time.temporal.Temporal;
+
               class Example {
                   public void test(Object obj) {
-                      if (obj instanceof String v) {
-                          System.out.println(v);
-                          if (obj instanceof Integer v2) {
-                              System.out.println(v2);
+                      if (obj instanceof Temporal t) {
+                          if (t instanceof LocalDate d) {
+                              System.out.println(d);
                           }
+                      }
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.time.LocalDate;
+              import java.time.temporal.Temporal;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (obj instanceof Temporal) {
+                          Temporal t = (Temporal) obj;
+                          if (t instanceof LocalDate) {
+                              LocalDate d = (LocalDate) t;
+                              System.out.println(d);
+                          }
+                      }
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void declaredInThenUsedInElse() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              class Example {
+                  public void test(Object obj) {
+                      if (obj instanceof String str) {
+                          if (1 == 2) {
+                              System.out.println();
+                          } else {
+                              System.out.println(str);
+                          }
+                      } else {
+                          System.out.println();
                       }
                   }
               }
@@ -636,12 +746,14 @@ class RemoveInstanceOfPatternMatchTest implements RewriteTest {
               class Example {
                   public void test(Object obj) {
                       if (obj instanceof String) {
-                          String v = (String) obj;
-                          System.out.println(v);
-                          if (obj instanceof Integer) {
-                              Integer v2 = (Integer) obj;
-                              System.out.println(v2);
+                          String str = (String) obj;
+                          if (1 == 2) {
+                              System.out.println();
+                          } else {
+                              System.out.println(str);
                           }
+                      } else {
+                          System.out.println();
                       }
                   }
               }
