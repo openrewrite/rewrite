@@ -89,6 +89,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         K.KReturn r = kReturn;
         r = r.withPrefix(visitSpace(r.getPrefix(), KSpace.Location.KRETURN_PREFIX, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        r = r.withExpression(visitAndCast(r.getExpression(), p));
+        r = r.withLabel(visitAndCast(r.getLabel(), p));
         return r;
     }
 
