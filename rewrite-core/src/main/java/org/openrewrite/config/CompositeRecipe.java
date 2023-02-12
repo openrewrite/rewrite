@@ -64,12 +64,16 @@ public class CompositeRecipe extends Recipe {
     public List<DataTableDescriptor> getDataTableDescriptors() {
         List<DataTableDescriptor> dataTableDescriptors = null;
         for (Recipe recipe : getRecipeList()) {
-            List<DataTableDescriptor> dtd = recipe.getDataTableDescriptors();
-            if (!dtd.isEmpty()) {
+            List<DataTableDescriptor> dtds = recipe.getDataTableDescriptors();
+            if (!dtds.isEmpty()) {
                 if (dataTableDescriptors == null) {
                     dataTableDescriptors = new ArrayList<>();
                 }
-                dataTableDescriptors.addAll(dtd);
+                for (DataTableDescriptor dtd : dtds) {
+                    if (!dataTableDescriptors.contains(dtd)) {
+                        dataTableDescriptors.add(dtd);
+                    }
+                }
             }
         }
         return dataTableDescriptors == null ? super.getDataTableDescriptors() : dataTableDescriptors;
