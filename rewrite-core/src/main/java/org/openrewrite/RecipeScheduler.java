@@ -108,7 +108,7 @@ public interface RecipeScheduler {
 
         if (after == before) {
             runStatsTable.insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
-                    recipe.getName(),
+                    runStats.getRecipe().getName(),
                     runStats.getCalls(),
                     runStats.getCumulative().toNanos(),
                     runStats.getMax().toNanos(),

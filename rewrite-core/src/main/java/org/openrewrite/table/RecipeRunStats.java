@@ -31,13 +31,16 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
 
     public void record(ExecutionContext ctx, Recipe recipe, org.openrewrite.RecipeRunStats runStats) {
         insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
-                recipe.getName(),
+                runStats.getRecipe().getName(),
                 runStats.getCalls(),
                 runStats.getCumulative().toNanos(),
                 runStats.getMax().toNanos(),
                 runStats.getOwnGetVisitor().toNanos(),
                 runStats.getOwnVisit().toNanos()
         ));
+        for (org.openrewrite.RecipeRunStats called : runStats.getCalled()) {
+            record(ctx, recipe, called);
+        }
     }
 
     @Value
