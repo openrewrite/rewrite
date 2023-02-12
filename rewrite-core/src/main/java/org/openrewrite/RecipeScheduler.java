@@ -107,15 +107,6 @@ public interface RecipeScheduler {
         }
 
         if (after == before) {
-            runStatsTable.insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
-                    runStats.getRecipe().getName(),
-                    runStats.getCalls(),
-                    runStats.getCumulative().toNanos(),
-                    runStats.getMax().toNanos(),
-                    runStats.getOwnGetVisitor().toNanos(),
-                    runStats.getOwnVisit().toNanos()
-            ));
-
             runStatsTable.record(ctx, recipe, runStats);
             return recipeRun.withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
         }
