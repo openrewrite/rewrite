@@ -15,6 +15,7 @@ val kotlinVersion = "1.8.0"
 dependencies {
     annotationProcessor("org.projectlombok:lombok:latest.release")
 
+    compileOnly("org.openrewrite:rewrite-core")
     compileOnly("org.openrewrite:rewrite-test")
     compileOnly("org.projectlombok:lombok:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")

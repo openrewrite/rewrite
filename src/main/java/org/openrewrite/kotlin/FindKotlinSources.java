@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.kotlin.table.KotlinSourceFile;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
 
@@ -53,6 +54,7 @@ public class FindKotlinSources extends Recipe {
                         sourceFileType = KotlinSourceFile.SourceFileType.PlainText;
                     }
                     kotlinSourceFile.insertRow(ctx, new KotlinSourceFile.Row(sourceFile.getSourcePath().toString(), sourceFileType));
+                    return SearchResult.found(sourceFile);
                 }
                 return sourceFile;
             }
