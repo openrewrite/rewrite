@@ -179,60 +179,60 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
-    public static PatternBuilder compile(String name, F0 f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F0 f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F1<?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F1<?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F2<?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F2<?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F3<?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F3<?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F4<?, ?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F4<?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F5<?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F5<?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F6<?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F6<?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F7<?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F7<?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F8<?, ?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F8<?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F9<?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F9<?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
-    public static PatternBuilder compile(String name, F10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
-        return new PatternBuilder(name);
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
     }
 
     @Value
     @SuppressWarnings("unused")
-    public static class PatternBuilder {
+    static class PatternBuilder {
         String name;
 
-        public JavaTemplate build(JavaVisitor<?> owner) {
+        public JavaTemplate.Builder build(JavaVisitor<?> owner) {
             try {
                 Class<?> templateClass = Class.forName(owner.getClass().getName() + "_" + name);
                 Method getTemplate = templateClass.getDeclaredMethod("getTemplate", JavaVisitor.class);
-                return (JavaTemplate) getTemplate.invoke(null, owner);
+                return (JavaTemplate.Builder) getTemplate.invoke(null, owner);
             } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException |
                      IllegalAccessException e) {
                 throw new RuntimeException(e);
