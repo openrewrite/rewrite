@@ -27,7 +27,7 @@ import org.openrewrite.text.PlainText;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindKotlinSources extends Recipe {
-    KotlinSourceFile kotlinSourceFile = new KotlinSourceFile(this);
+    transient KotlinSourceFile kotlinSourceFile = new KotlinSourceFile(this);
 
     @Override
     public String getDisplayName() {

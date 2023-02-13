@@ -41,6 +41,23 @@ public class ParserAssertions {
         return kotlin;
     }
 
+    public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after) {
+        return kotlin(before, after, s -> {
+        });
+    }
+
+    public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after,
+                                     Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> kotlin =
+          new SourceSpec<>(K.CompilationUnit.class,
+            null,
+            KotlinParser.builder(),
+            before,
+            s -> after);
+        spec.accept(kotlin);
+        return kotlin;
+    }
+
     public static Consumer<SourceSpec<K.CompilationUnit>> isFullyParsed() {
         return spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
             @Override
