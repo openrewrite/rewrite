@@ -347,6 +347,10 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                     nextVariableName = ((J.Identifier) variable).getSimpleName();
                     break;
                 }
+            } else if (ancestor instanceof J.InstanceOf && ((J.InstanceOf) ancestor).getPattern() instanceof J.Identifier) {
+                J.Identifier variable = (J.Identifier) ((J.InstanceOf) ancestor).getPattern();
+                nextVariableName = variable.getSimpleName();
+                break;
             }
         }
         return new VariableNameToFlowGraph(nextVariableName, nextFlowGraph, ancestorCursor);

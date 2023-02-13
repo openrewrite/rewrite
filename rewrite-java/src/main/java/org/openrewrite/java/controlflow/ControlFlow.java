@@ -460,6 +460,7 @@ public final class ControlFlow {
         @Override
         public J.InstanceOf visitInstanceOf(J.InstanceOf instanceOf, P p) {
             visit(instanceOf.getExpression(), p); // First the expression is invoked
+            visit(instanceOf.getPattern(), p);
             addCursorToBasicBlock(); // Then the instanceof node
             return instanceOf;
         }

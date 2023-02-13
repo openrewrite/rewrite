@@ -21,8 +21,9 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
-@SuppressWarnings({"UnnecessaryLocalVariable", "FunctionName"})
+@SuppressWarnings({"FunctionName", "ConstantValue", "HttpUrlsUsage", "UnusedAssignment", "ConstantConditionalExpression", "StringOperationCanBeSimplified", "UnnecessaryLocalVariable"})
 class UriCreatedWithHttpSchemeTest implements RewriteTest {
 
     @Override
@@ -204,6 +205,36 @@ class UriCreatedWithHttpSchemeTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void dataflowThroughInstanceOfPatternVariable() {
+        rewriteRun(
+          version(java(
+            """
+              import java.net.URI;
+              class Test {
+                  void test() {
+                      Object s = "http://test";
+                      if (s instanceof String t) {
+                          System.out.println(URI.create(t));
+                      }
+                  }
+              }
+              """,
+            """
+                  import java.net.URI;
+                  class Test {
+                      void test() {
+                          Object s = "https://test";
+                          if (s instanceof String t) {
+                              System.out.println(URI.create(t));
+                          }
+                      }
+                  }
+              """
+          ), 17)
         );
     }
 
