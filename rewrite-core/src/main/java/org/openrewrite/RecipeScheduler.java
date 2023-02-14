@@ -179,7 +179,7 @@ public interface RecipeScheduler {
     default <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats,
                                                          Stack<Recipe> recipeStack,
                                                          List<S> before,
-                                                         @Nullable List<Boolean> singleSourceApplicableTestResult,
+                                                         @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
                                                          ExecutionContext ctx,
                                                          Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile) {
         runStats.calls.incrementAndGet();
@@ -216,7 +216,7 @@ public interface RecipeScheduler {
             if (!recipe.getSingleSourceApplicableTests().isEmpty()) {
                 if (singleSourceApplicableTestResult == null || singleSourceApplicableTestResult.isEmpty()) {
                     if (singleSourceApplicableTestResult == null) {
-                        singleSourceApplicableTestResult = new ArrayList<>(before.size());
+                        singleSourceApplicableTestResult = new HashMap<>(before.size());
                     }
 
                     for (S s : before) {
@@ -227,7 +227,7 @@ public interface RecipeScheduler {
                                 break;
                             }
                         }
-                        singleSourceApplicableTestResult.add(allMatch);
+                        singleSourceApplicableTestResult.put(s.getId(), allMatch);
                     }
                 }
             }
@@ -238,7 +238,9 @@ public interface RecipeScheduler {
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after;
-        final List<Boolean> newSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final Map<UUID, Boolean> singleSourceApplicableTestResultRef = singleSourceApplicableTestResult;
+        boolean hasSingleSourceApplicableTest = singleSourceApplicableTestResult != null
+                && !singleSourceApplicableTestResult.isEmpty();
 
         if (!recipe.validate(ctx).isValid()) {
             after = before;
@@ -250,10 +252,9 @@ public interface RecipeScheduler {
 
                 S afterFile = s;
                 try {
-                    if (newSingleSourceApplicableTestResult != null && !newSingleSourceApplicableTestResult.isEmpty()) {
-                        if (!newSingleSourceApplicableTestResult.get(index)) {
-                            return s;
-                        }
+                    if (hasSingleSourceApplicableTest && singleSourceApplicableTestResultRef.containsKey(s.getId())
+                            && !singleSourceApplicableTestResultRef.get(s.getId())) {
+                        return s;
                     }
 
                     Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
@@ -323,10 +324,49 @@ public interface RecipeScheduler {
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
         List<SourceFile> afterWidened;
+        final Map<UUID, Boolean> lastSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final Map<UUID, Boolean> newSingleSourceApplicableTestResult = new HashMap<>();
         try {
             long ownVisitStartTime = System.nanoTime();
+
+            if (hasSingleSourceApplicableTest) {
+                boolean anyFilePassedSingleApplicableTest = false;
+                for (Boolean b : singleSourceApplicableTestResult.values()) {
+                    if (b) {
+                        anyFilePassedSingleApplicableTest = true;
+                        break;
+                    }
+                }
+                if (!anyFilePassedSingleApplicableTest) {
+                    return after;
+                }
+            }
+
             //noinspection unchecked
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+
+            if (hasSingleSourceApplicableTest) {
+                // update single source applicability test results
+                Map<UUID, SourceFile> originalMap = new HashMap<>(after.size());
+                for (SourceFile file : after) {
+                    originalMap.put(file.getId(), file);
+                }
+
+                afterWidened = ListUtils.map(afterWidened, s -> {
+                    Boolean singleSourceTestResult = lastSingleSourceApplicableTestResult.get(s.getId());
+                    if (singleSourceTestResult != null) {
+                        newSingleSourceApplicableTestResult.put(s.getId(), singleSourceTestResult);
+                        if (!singleSourceTestResult) {
+                            return originalMap.get(s.getId());
+                        }
+                    } else {
+                        // It's a newly generated file
+                        newSingleSourceApplicableTestResult.put(s.getId(), true);
+                    }
+                    return s;
+                });
+            }
+
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
@@ -387,11 +427,12 @@ public interface RecipeScheduler {
                 runStats.getCalled().add(nextStats);
             }
 
+            Map<UUID, Boolean> newMap = new HashMap<>(newSingleSourceApplicableTestResult);
             afterWidened = scheduleVisit(requireNonNull(nextStats),
-                    nextStack,
-                    afterWidened,
-                    singleSourceApplicableTestResult,
-                    ctx, recipeThatAddedOrDeletedSourceFile);
+                nextStack,
+                afterWidened,
+                newMap,
+                ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
         long totalTime = System.nanoTime() - startTime;
