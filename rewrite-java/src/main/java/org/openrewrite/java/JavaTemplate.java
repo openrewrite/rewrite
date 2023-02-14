@@ -28,10 +28,10 @@ import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.template.SourceTemplate;
 
-import java.util.HashSet;
-import java.util.Set;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;

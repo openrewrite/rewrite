@@ -151,11 +151,22 @@ public interface RecipeScheduler {
 
         for (Result result : results) {
             SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
-            for (RecipeDescriptor recipeThatMadeChange : result.getRecipeDescriptorsThatMadeChanges()) {
+            Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
+
+            for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
+                recipeStack.push(new RecipeDescriptor[]{null, rd});
+            }
+
+            while (!recipeStack.isEmpty()) {
+                RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
                 resultsTable.insertRow(ctx, new SourcesFileResults.Row(
                         result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
-                        recipeThatMadeChange.getName()));
+                        recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
+                        recipeThatMadeChange[1].getName()));
+                for (RecipeDescriptor rd : recipeThatMadeChange[1].getRecipeList()) {
+                    recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
+                }
             }
         }
 
@@ -377,10 +388,10 @@ public interface RecipeScheduler {
             }
 
             afterWidened = scheduleVisit(requireNonNull(nextStats),
-                nextStack,
-                afterWidened,
-                singleSourceApplicableTestResult,
-                ctx, recipeThatAddedOrDeletedSourceFile);
+                    nextStack,
+                    afterWidened,
+                    singleSourceApplicableTestResult,
+                    ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
         long totalTime = System.nanoTime() - startTime;
