@@ -33,10 +33,10 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 
 /**
- * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/OsProvenance.java</a>
+ * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/c.java</a>
  */
 @SuppressWarnings("StaticInitializerReferencesSubClass")
-public abstract class OsProvenance implements Marker {
+public abstract class OperatingSystemProvenance implements Marker {
     public static final Windows WINDOWS = new Windows();
     public static final MacOs MAC_OS = new MacOs();
     public static final Solaris SOLARIS = new Solaris();
@@ -44,19 +44,19 @@ public abstract class OsProvenance implements Marker {
     public static final FreeBSD FREE_BSD = new FreeBSD();
     public static final Unix UNIX = new Unix();
 
-    private static OsProvenance currentOs;
+    private static OperatingSystemProvenance currentOs;
     private final String toStringValue;
     private final String osName;
     private final String osVersion;
 
-    OsProvenance() {
+    OperatingSystemProvenance() {
         osName = System.getProperty("os.name");
         osVersion = System.getProperty("os.version");
         toStringValue = getName() + " " + getVersion() + " " + System.getProperty("os.arch");
     }
 
     public static String hostname() {
-        OsProvenance currentOs = current();
+        OperatingSystemProvenance currentOs = current();
         if (currentOs.isWindows()) {
             try {
                 return Kernel32Util.getComputerName();
@@ -74,7 +74,7 @@ public abstract class OsProvenance implements Marker {
         return "localhost";
     }
 
-    public static OsProvenance current() {
+    public static OperatingSystemProvenance current() {
         if (currentOs == null) {
             currentOs = forName(System.getProperty("os.name"));
         }
@@ -86,7 +86,7 @@ public abstract class OsProvenance implements Marker {
         currentOs = null;
     }
 
-    public static OsProvenance forName(String os) {
+    public static OperatingSystemProvenance forName(String os) {
         String osName = os.toLowerCase();
         if (osName.contains("windows")) {
             return WINDOWS;
@@ -214,7 +214,7 @@ public abstract class OsProvenance implements Marker {
 
     @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
-    static class Windows extends OsProvenance {
+    static class Windows extends OperatingSystemProvenance {
         String nativePrefix;
 
         @With
@@ -313,7 +313,7 @@ public abstract class OsProvenance implements Marker {
 
     @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
-    static class Unix extends OsProvenance {
+    static class Unix extends OperatingSystemProvenance {
         String nativePrefix;
 
         @With
