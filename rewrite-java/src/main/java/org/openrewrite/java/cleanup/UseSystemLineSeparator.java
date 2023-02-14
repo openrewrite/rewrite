@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -67,6 +68,7 @@ public class UseSystemLineSeparator extends Recipe {
                         method.getMethodType() != null && System.class.getName().equals(method.getMethodType().getDeclaringType().getFullyQualifiedName())) {
 
                     maybeRemoveImport("java.lang.System.getProperty");
+                    maybeAddImport("java.lang.System","lineSeparator");
 
                     final JavaTemplate template = JavaTemplate
                             .builder(this::getCursor, "lineSeparator()")
