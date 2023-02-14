@@ -17,44 +17,50 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.HasSourcePath;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindAndReplace extends Recipe {
+
     @Option(displayName = "Find",
             description = "The text to find (and replace).",
             example = "blacklist")
     String find;
+
     @Option(displayName = "Replace",
             description = "The replacement text for `find`.",
             example = "denylist")
     String replace;
+
     @Option(displayName = "Regex",
             description = "Default false. If true, `find` will be interpreted as a Regular Expression, and capture group contents will be available in `replace`.",
             required = false)
     @Nullable
     Boolean regex;
+
+    /**
+     * @deprecated Use {@link Recipe#addSingleSourceApplicableTest(TreeVisitor)} instead.
+     */
+    @SuppressWarnings("DeprecatedIsStillUsed")
     @Option(displayName = "Optional file Matcher",
             description = "Matching files will be modified. This is a glob expression.",
             example = "foo/bar/baz.txt",
             required = false)
     @Nullable
+    @Deprecated
     String fileMatcher;
 
     @Override
     public String getDisplayName() {
-        return "Find and Replace";
+        return "Find and replace";
     }
 
     @Override
     public String getDescription() {
-        return "Replaces content inside a plaintext file. Will not affect files which are parsed as a more-specific type (eg .yml, .java).";
+        return "Simple text find and replace. When the original source file is a language-specific Lossless Semantic Tree, this operation " +
+               "irreversibly converts the source file to a plain text file. Subsequent recipes will not be able to operate on language-specific type.";
     }
 
     @Override
@@ -64,12 +70,13 @@ public class FindAndReplace extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PlainTextVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
-                String newText = Boolean.TRUE.equals(regex)
-                        ? text.getText().replaceAll(find, replace)
-                        : text.getText().replace(find, replace);
+            public @Nullable Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+                PlainText text = PlainTextParser.convert(sourceFile);
+                String newText = Boolean.TRUE.equals(regex) ?
+                        text.getText().replaceAll(find, replace) :
+                        text.getText().replace(find, replace);
                 return text.getText().equals(newText) ? text : text.withText(newText);
             }
         };

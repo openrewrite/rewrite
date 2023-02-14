@@ -17,6 +17,7 @@ package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -30,6 +31,30 @@ import java.util.List;
 import static org.openrewrite.Tree.randomId;
 
 public class PlainTextParser implements Parser<PlainText> {
+
+    /**
+     * Downcast a {@link SourceFile} to a {@link PlainText} if it isn't already one.
+     *
+     * @param sourceFile A source file which may be a {@link PlainText} or not.
+     * @return The same {@link PlainText} reference if the source file is already a {@link PlainText}.
+     * Otherwise, a new {@link PlainText} instance with the same contents as the source file.
+     */
+    public static PlainText convert(SourceFile sourceFile) {
+        if (sourceFile instanceof PlainText) {
+            return (PlainText) sourceFile;
+        }
+        PlainText text = PlainTextParser.builder().build()
+                .parse(sourceFile.printAll()).get(0)
+                .withSourcePath(sourceFile.getSourcePath())
+                .withFileAttributes(sourceFile.getFileAttributes())
+                .withCharsetBomMarked(sourceFile.isCharsetBomMarked())
+                .withId(sourceFile.getId());
+        if (sourceFile.getCharset() != null) {
+            text = (PlainText) text.withCharset(sourceFile.getCharset());
+        }
+        return text;
+    }
+
     @Override
     public List<PlainText> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                        ExecutionContext ctx) {
