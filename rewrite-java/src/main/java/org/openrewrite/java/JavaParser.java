@@ -266,6 +266,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     JavaParser reset();
 
+    JavaParser reset(Collection<URI> uris);
+
     /**
      * Changes the classpath on the parser. Intended for use in multiple pass parsing, where we want to keep the
      * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
