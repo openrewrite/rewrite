@@ -15,13 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-
-import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -35,16 +28,22 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.time.Duration;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 public class ReplaceRecordWithClass extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replaces record with a class";
+        return "Replace record with a class";
     }
 
     @Override
     public String getDescription() {
-        return "Replaces Java 14 record with a class.";
+        return "Replace Java 14 record with a class.";
     }
 
     @Override
@@ -54,7 +53,7 @@ public class ReplaceRecordWithClass extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.and(new UsesJavaVersion<>(14));
+        return new UsesJavaVersion<>(14);
     }
 
     @Override
