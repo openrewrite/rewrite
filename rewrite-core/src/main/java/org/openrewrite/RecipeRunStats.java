@@ -57,7 +57,7 @@ public class RecipeRunStats {
     AtomicInteger calls = new AtomicInteger();
 
     /**
-     * The number of times the recipe was ran over all cycles.
+     * The number of times the recipe ran over all cycles.
      */
     public int getCalls() {
         return calls.get();
@@ -112,8 +112,6 @@ public class RecipeRunStats {
         return gantt.toString();
     }
 
-    // no ability to render milliseconds until this is fixed:
-    // https://github.com/mermaid-js/mermaid/issues/3028
     private void printAsMermaidGanttRecursive(StringBuilder gantt, @Nullable RecipeRunStats after,
                                               RecipeRunStats stats,
                                               Map<RecipeRunStats, Integer> seen,
@@ -134,8 +132,8 @@ public class RecipeRunStats {
             gantt.append(", 0");
         }
 
-        long scaled = (long) (time.toNanos() / (1e9 / scale));
-        gantt.append(", ").append(scaled).append("s");
+        long scaled = (long) (time.toNanos() / (1e6 / scale));
+        gantt.append(", ").append(scaled).append("ms");
 
         gantt.append("\n");
 

@@ -534,12 +534,12 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               public class B {
-                 org.openrewrite.Test[] a = new org.openrewrite.Test.get(0);
+                 org.openrewrite.Test[] a = new org.openrewrite.Test[0];
               }
               """,
             """
               public class B {
-                 org.openrewrite.test.Test[] a = new org.openrewrite.test.Test.get(0);
+                 org.openrewrite.test.Test[] a = new org.openrewrite.test.Test[0];
               }
               """,
             spec -> spec.afterRecipe(cu -> {

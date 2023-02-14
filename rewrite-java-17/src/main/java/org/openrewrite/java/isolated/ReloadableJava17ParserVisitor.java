@@ -770,7 +770,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 convert(node.getType()),
                 node.getPattern() instanceof JCBindingPattern b ?
                         new J.Identifier(randomId(), sourceBefore(b.getVariable().getName().toString()), Markers.EMPTY, b.getVariable().getName().toString(),
-                                type, null) : null,
+                                type, typeMapping.variableType(b.var.sym)) : null,
                 type);
     }
 

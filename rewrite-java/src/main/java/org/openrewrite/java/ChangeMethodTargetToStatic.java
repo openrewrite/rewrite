@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -33,7 +32,6 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 
 @Value
-@AllArgsConstructor(onConstructor_ = @JsonCreator)
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToStatic extends Recipe {
 
@@ -75,6 +73,15 @@ public class ChangeMethodTargetToStatic extends Recipe {
     public ChangeMethodTargetToStatic(String methodPattern, String fullyQualifiedTargetTypeName,
             @Nullable String returnType, @Nullable Boolean matchOverrides) {
         this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false);
+    }
+
+    @JsonCreator
+    public ChangeMethodTargetToStatic(String methodPattern, String fullyQualifiedTargetTypeName, @Nullable String returnType, @Nullable Boolean matchOverrides, @Nullable Boolean matchUnknownTypes) {
+        this.methodPattern = methodPattern;
+        this.fullyQualifiedTargetTypeName = fullyQualifiedTargetTypeName;
+        this.returnType = returnType;
+        this.matchOverrides = matchOverrides;
+        this.matchUnknownTypes = matchUnknownTypes;
     }
 
     @Override

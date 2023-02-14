@@ -154,6 +154,8 @@ class EmptyBlockTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.io.File;
+              import java.io.FileInputStream;
               import java.nio.file.*;
 
               public class A {
@@ -167,6 +169,8 @@ class EmptyBlockTest implements RewriteTest {
               }
               """,
             """
+              import java.io.File;
+              import java.io.FileInputStream;
               import java.nio.file.*;
 
               public class A {

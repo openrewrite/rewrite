@@ -15,9 +15,9 @@
  */
 package org.openrewrite.config;
 
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 
 import java.net.URI;
 import java.util.Collection;
@@ -110,7 +110,7 @@ public class CategoryTreeTest {
         assertThat(categoryTree.getRecipe("org.openrewrite.MyRecipe")).isNotNull();
     }
 
-    @NotNull
+    @NonNull
     private static RecipeDescriptor recipeDescriptor(String packageName) {
         return new RecipeDescriptor(packageName + ".MyRecipe",
           "My recipe", "", emptySet(), null, emptyList(),

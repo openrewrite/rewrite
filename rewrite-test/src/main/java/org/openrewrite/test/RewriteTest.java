@@ -16,13 +16,13 @@
 package org.openrewrite.test;
 
 import org.assertj.core.api.SoftAssertions;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SourceSet;
 import org.openrewrite.quark.Quark;
@@ -506,7 +506,7 @@ public interface RewriteTest extends SourceSpecs {
         return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
     }
 
-    @NotNull
+    @NonNull
     @Override
     default Iterator<SourceSpec<?>> iterator() {
         return new Iterator<SourceSpec<?>>() {

@@ -15,15 +15,12 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -79,8 +76,8 @@ public class IsEmptyCallOnCollections extends Recipe {
                             if (COLLECTION_SIZE.matches(maybeSizeCallMethod)) {
                                 String op = binary.getOperator() == J.Binary.Type.Equal ? "" : "!";
                                 return (maybeSizeCallMethod.getSelect() == null ?
-                                        maybeSizeCallMethod.withTemplate(isEmptyNoReceiver, maybeSizeCallMethod.getCoordinates().replace(), op) :
-                                        maybeSizeCallMethod.withTemplate(isEmpty, maybeSizeCallMethod.getCoordinates().replace(), op, maybeSizeCallMethod.getSelect())
+                                        binary.withTemplate(isEmptyNoReceiver, binary.getCoordinates().replace(), op) :
+                                        binary.withTemplate(isEmpty, binary.getCoordinates().replace(), op, maybeSizeCallMethod.getSelect())
                                 ).withPrefix(binary.getPrefix());
                             }
                         }

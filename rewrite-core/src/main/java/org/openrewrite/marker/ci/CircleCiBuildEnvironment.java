@@ -23,7 +23,7 @@ import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.marker.ci.OperatingSystem.hostname;
+import static org.openrewrite.marker.OsProvenance.hostname;
 
 @Value
 @EqualsAndHashCode(callSuper = false)

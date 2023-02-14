@@ -48,6 +48,7 @@ dependencies {
         exclude("ch.qos.logback", "logback-classic")
     }
     testImplementation(project(":rewrite-maven"))
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly("org.gradle:gradle-core-api:latest.release")

@@ -26,6 +26,7 @@ import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.scheduling.ForkJoinScheduler;
+import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
 import org.slf4j.Logger;
@@ -150,8 +151,9 @@ public abstract class Recipe implements Cloneable {
     }
 
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(
-            dataTableDescriptorFromDataTable(new SourcesFileResults(org.openrewrite.Recipe.noop())),
-            dataTableDescriptorFromDataTable(new SourcesFileErrors(org.openrewrite.Recipe.noop()))
+            dataTableDescriptorFromDataTable(new SourcesFileResults(Recipe.noop())),
+            dataTableDescriptorFromDataTable(new SourcesFileErrors(Recipe.noop())),
+            dataTableDescriptorFromDataTable(new RecipeRunStats(Recipe.noop()))
     );
 
     public List<DataTableDescriptor> getDataTableDescriptors() {

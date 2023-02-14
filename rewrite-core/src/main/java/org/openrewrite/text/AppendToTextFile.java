@@ -17,13 +17,9 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jetbrains.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Paths;
 import java.util.ArrayList;

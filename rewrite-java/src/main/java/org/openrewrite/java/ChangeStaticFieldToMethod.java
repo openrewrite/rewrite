@@ -19,8 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.apache.commons.lang3.StringUtils;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.tree.*;
@@ -107,7 +107,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 return ident;
             }
 
-            @NotNull
+            @NonNull
             private J useNewMethod(TypeTree tree) {
                 String newClass = newClassName == null ? oldClassName : newClassName;
 
@@ -128,7 +128,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                         method.withMethodType(method.getMethodType().withReturnType(tree.getType()));
             }
 
-            @NotNull
+            @NonNull
             private JavaTemplate makeNewMethod(String newClass, Cursor statementCursor) {
 
                 String packageName = StringUtils.substringBeforeLast(newClass, ".");

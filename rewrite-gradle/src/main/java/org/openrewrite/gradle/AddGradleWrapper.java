@@ -41,6 +41,7 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.internal.StringUtils.isBlank;
 
 @Value
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -58,8 +59,11 @@ public class AddGradleWrapper extends Recipe {
     }
 
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "7.x")
+            description = "An exact version number or [dependency version selector](https://docs.openrewrite.org/reference/dependency-version-selectors). Defaults to the latest release version.",
+            example = "7.x",
+            required = false
+    )
+    @Nullable
     String version;
 
     @Option(displayName = "Distribution type",
@@ -72,22 +76,37 @@ public class AddGradleWrapper extends Recipe {
     @Nullable
     String distribution;
 
+    @Option(displayName = "Repository URL",
+            description = "The URL of the repository to download the Gradle distribution from. Currently only supports " +
+                    "repositories like services.gradle.org, not arbitrary maven or ivy repositories. " +
+                    "Defaults to `https://services.gradle.org/versions/all`.",
+            example = "https://services.gradle.org/versions/all")
+    @Nullable
+    String repositoryUrl;
+
     @NonFinal
     Validated gradleWrapper;
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(GradleWrapper.validate(ctx, version, distribution, gradleWrapper));
+        return super.validate(ctx).and(
+                GradleWrapper.validate(ctx,
+                        isBlank(version) ? "latest.release" : version,
+                        distribution,
+                        gradleWrapper,
+                        repositoryUrl));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
     //      See https://github.com/projectlombok/lombok/issues/2372
     @LoathingOfOthers("JavaDoc")
     @JsonCreator
-    public AddGradleWrapper(String version, String distribution) {
+    public AddGradleWrapper(@Nullable String version, @Nullable String distribution) {
         this.version = version;
         this.distribution = distribution;
+        this.repositoryUrl = null;
     }
+
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getApplicableTest() {

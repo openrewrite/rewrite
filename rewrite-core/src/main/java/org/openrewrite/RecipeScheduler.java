@@ -66,7 +66,9 @@ public interface RecipeScheduler {
                                   ExecutionContext ctx,
                                   int maxCycles,
                                   int minCycles) {
-        RecipeRun recipeRun = new RecipeRun(new RecipeRunStats(recipe), emptyList(), emptyMap());
+        org.openrewrite.table.RecipeRunStats runStatsTable = new org.openrewrite.table.RecipeRunStats(Recipe.noop());
+        RecipeRunStats runStats = new RecipeRunStats(recipe);
+        RecipeRun recipeRun = new RecipeRun(runStats, emptyList(), emptyMap());
 
         Set<UUID> sourceFileIds = new HashSet<>();
         before = ListUtils.map(before, sourceFile -> {
@@ -96,7 +98,7 @@ public interface RecipeScheduler {
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
-            after = scheduleVisit(recipeRun.getStats(), recipeStack, acc, null, ctxWithWatch, recipeThatAddedOrDeletedSourceFile);
+            after = scheduleVisit(runStats, recipeStack, acc, null, ctxWithWatch, recipeThatAddedOrDeletedSourceFile);
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
@@ -105,6 +107,7 @@ public interface RecipeScheduler {
         }
 
         if (after == before) {
+            runStatsTable.record(ctx, recipe, runStats);
             return recipeRun.withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
         }
 
@@ -148,14 +151,26 @@ public interface RecipeScheduler {
 
         for (Result result : results) {
             SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
-            for (RecipeDescriptor recipeThatMadeChange : result.getRecipeDescriptorsThatMadeChanges()) {
+            Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
+
+            for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
+                recipeStack.push(new RecipeDescriptor[]{null, rd});
+            }
+
+            while (!recipeStack.isEmpty()) {
+                RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
                 resultsTable.insertRow(ctx, new SourcesFileResults.Row(
                         result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
-                        recipeThatMadeChange.getName()));
+                        recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
+                        recipeThatMadeChange[1].getName()));
+                for (RecipeDescriptor rd : recipeThatMadeChange[1].getRecipeList()) {
+                    recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
+                }
             }
         }
 
+        runStatsTable.record(ctx, recipe, runStats);
         return recipeRun
                 .withResults(results)
                 .withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));

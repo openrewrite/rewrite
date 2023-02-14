@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,6 +27,22 @@ class ExplicitInitializationTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ExplicitInitialization());
+    }
+
+    @Test
+    void ignoreLombokDefaultBuilder() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("lombok")),
+          java(
+            """
+              import lombok.Builder;
+              class Test {
+                  @Builder.Default
+                  private boolean b = false;
+              }
+              """
+          )
+        );
     }
 
     @Test

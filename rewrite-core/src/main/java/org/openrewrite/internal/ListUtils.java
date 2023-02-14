@@ -18,6 +18,7 @@ package org.openrewrite.internal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -117,7 +118,9 @@ public final class ListUtils {
             //noinspection ConstantConditions
             return ls;
         }
+
         List<T> newLs = ls;
+        boolean nullEncountered = false;
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
             T newTree = map.apply(i, tree);
@@ -127,9 +130,10 @@ public final class ListUtils {
                 }
                 newLs.set(i, newTree);
             }
+            nullEncountered |= newTree == null;
         }
 
-        if (newLs != ls) {
+        if (newLs != ls && nullEncountered) {
             //noinspection StatementWithEmptyBody
             while (newLs.remove(null)) ;
         }
@@ -188,8 +192,17 @@ public final class ListUtils {
         }
 
         if (newLs != ls) {
-            //noinspection StatementWithEmptyBody
-            while (newLs.remove(null)) ;
+            boolean identical = newLs.size() == ls.size();
+            for (int i = newLs.size() - 1; i >= 0; i--) {
+                T newElem = newLs.get(i);
+                identical = identical && newElem == ls.get(i);
+                if (newElem == null) {
+                    newLs.remove(i);
+                }
+            }
+            if (identical) {
+                newLs = ls;
+            }
         }
 
         return newLs;
