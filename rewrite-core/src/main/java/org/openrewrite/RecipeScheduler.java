@@ -427,10 +427,11 @@ public interface RecipeScheduler {
                 runStats.getCalled().add(nextStats);
             }
 
+            Map<UUID, Boolean> newMap = new HashMap<>(newSingleSourceApplicableTestResult);
             afterWidened = scheduleVisit(requireNonNull(nextStats),
                 nextStack,
                 afterWidened,
-                newSingleSourceApplicableTestResult,
+                newMap,
                 ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
