@@ -24,6 +24,8 @@ import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
+import java.util.Optional;
+
 public class TypecastParenPad extends Recipe {
     @Override
     public String getDisplayName() {
@@ -48,8 +50,8 @@ public class TypecastParenPad extends Recipe {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
             SourceFile cu = (SourceFile)javaSourceFile;
-            spacesStyle = cu.getStyle(SpacesStyle.class, IntelliJ.spaces());
-            typecastParenPadStyle = cu.getStyle(TypecastParenPadStyle.class, Checkstyle.typecastParenPadStyle()) ;
+            spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
+            typecastParenPadStyle = Optional.ofNullable(cu.getStyle(TypecastParenPadStyle.class)).orElse(Checkstyle.typecastParenPadStyle());
 
             spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
             return super.visitJavaSourceFile((JavaSourceFile)cu, ctx);
