@@ -29,7 +29,7 @@ class ControlFlowTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ControlFlowVisualization(false, false))
+        spec.recipe(new ControlFlowVisualization(false, true))
           .expectedCyclesThatMakeChanges(1).cycles(1);
     }
 
@@ -170,7 +170,7 @@ class ControlFlowTest implements RewriteTest {
     }
 
     @Test
-    void nestedBranchAndstatementsAfterwards() {
+    void nestedBranchAndStatementsAfterwards() {
         rewriteRun(
           java(
             """
@@ -413,7 +413,7 @@ class ControlFlowTest implements RewriteTest {
 
     @SuppressWarnings({"ConditionCoveredByFurtherCondition", "ExcessiveRangeCheck"})
     @Test
-    void ifStatementWithmultipleAndOperatorInControl() {
+    void ifStatementWithMultipleAndOperatorInControl() {
         rewriteRun(
           java(
             """
@@ -2421,7 +2421,6 @@ class ControlFlowTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2128")
-    @Disabled("This test is broken")
     void ternaryWithinTheIteratorForAForEachLoop() {
         rewriteRun(
           java(
@@ -2433,6 +2432,75 @@ class ControlFlowTest implements RewriteTest {
                       for (String s : condition ? array() : new String[] { "Hello!" }) {
                           System.out.println(s);
                       }
+                  }
+              }
+              """,
+            """
+              abstract class Test {
+                  abstract String[] array();
+              
+                  void test(boolean condition) /*~~(BB: 5 CN: 2 EX: 1 | 1L)~~>*/{
+                      for (String s : /*~~(1C)~~>*/condition ? /*~~(2L)~~>*/array() : new /*~~(3L)~~>*/String[] { "Hello!" }) /*~~(4L)~~>*/{
+                          System.out.println(s);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternary() {
+        rewriteRun(
+          java(
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  void test(boolean condition) {
+                      int x = condition ? start1() : start2();
+                      x++;
+                  }
+              }
+              """,
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  void test(boolean condition) /*~~(BB: 4 CN: 1 EX: 1 | 1L)~~>*/{
+                      int /*~~(2L)~~>*/x = /*~~(1C)~~>*/condition ? /*~~(3L)~~>*/start1() : /*~~(4L)~~>*/start2();
+                      x++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternaryWithinMethodCall() {
+        rewriteRun(
+          java(
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  abstract int identity(int value);
+                  void test(boolean condition) {
+                      int x = identity(condition ? start1() : start2());
+                      x++;
+                  }
+              }
+              """,
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  abstract int identity(int value);
+                  void test(boolean condition) /*~~(BB: 4 CN: 1 EX: 1 | 1L)~~>*/{
+                      int x = /*~~(2L)~~>*/identity(/*~~(1C)~~>*/condition ? /*~~(3L)~~>*/start1() : /*~~(4L)~~>*/start2());
+                      x++;
                   }
               }
               """
