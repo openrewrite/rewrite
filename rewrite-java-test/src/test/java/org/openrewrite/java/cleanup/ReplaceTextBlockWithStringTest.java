@@ -199,8 +199,8 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               public class Test {
                   String str =
                           \"\"\"
-        
-        
+
+
                           line1
                           \"\"\";
               }
@@ -230,8 +230,8 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
                   String str =
                           \"\"\"
                           line1
-        
-        
+
+
                           \"\"\";
               }
               """,
@@ -260,8 +260,8 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
                   String str =
                           \"\"\"
                           line1
-        
-        
+
+
                           line2
                           \"\"\";
               }
@@ -299,7 +299,70 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               package com.example;
 
               public class Test {
+                  String str = "line1\\n" +
+                          "line2\\n";
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void singleLineComment() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              public class Test {
                   String str =
+                          // Comment
+                          \"\"\"
+                          line1
+                          line2
+                          \"\"\";
+              }
+              """,
+              """
+              package com.example;
+
+              public class Test {
+                  String str =
+                          // Comment
+                          "line1\\n" +
+                          "line2\\n";
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void multiLineComment() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              public class Test {
+                  String str =
+                          /* Comment
+                           * Next line
+                           */
+                          \"\"\"
+                          line1
+                          line2
+                          \"\"\";
+              }
+              """,
+              """
+              package com.example;
+
+              public class Test {
+                  String str =
+                          /* Comment
+                           * Next line
+                           */
                           "line1\\n" +
                           "line2\\n";
               }
