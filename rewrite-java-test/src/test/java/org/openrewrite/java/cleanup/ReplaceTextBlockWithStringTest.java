@@ -38,7 +38,7 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               package com.example;
 
               public class Test {
-                  private String str =
+                  String str =
                           \"\"\"
                           \"\"\";
               }
@@ -47,7 +47,7 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               package com.example;
 
               public class Test {
-                  private String str =
+                  String str =
                           "\\n";
               }
               """),
@@ -63,7 +63,7 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               package com.example;
 
               public class Test {
-                  private String str =
+                  String str =
                           \"\"\"
                           line1
                           \"\"\";
@@ -73,7 +73,7 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               package com.example;
 
               public class Test {
-                  private String str =
+                  String str =
                           "line1\\n";
               }
               """),
@@ -89,7 +89,7 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               package com.example;
 
               public class Test {
-                  private String str =
+                  String str =
                           \"\"\"
                           line1\"\"\";
               }
@@ -98,7 +98,7 @@ class ReplaceTextBlockWithStringTest implements RewriteTest {
               package com.example;
 
               public class Test {
-                  private String str =
+                  String str =
                           "line1";
               }
               """),
