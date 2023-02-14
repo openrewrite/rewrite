@@ -23,6 +23,8 @@ import org.openrewrite.groovy.style.OmitParenthesesStyle;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 
+import java.util.Optional;
+
 public class OmitParenthesesFormat extends Recipe {
     @Override
     public String getDisplayName() {
@@ -42,10 +44,7 @@ public class OmitParenthesesFormat extends Recipe {
     private static class OmitParenthesesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            OmitParenthesesStyle style = ((SourceFile) cu).getStyle(OmitParenthesesStyle.class);
-            if (style == null) {
-                style = OmitParenthesesStyle.DEFAULT;
-            }
+            OmitParenthesesStyle style = Optional.ofNullable(((SourceFile) cu).getStyle(OmitParenthesesStyle.class)).orElse(OmitParenthesesStyle.DEFAULT);
             if(style.getLastArgumentLambda()) {
                 doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
             }
