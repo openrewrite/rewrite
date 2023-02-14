@@ -48,8 +48,8 @@ public class TypecastParenPad extends Recipe {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
             SourceFile cu = (SourceFile)javaSourceFile;
-            spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
-            typecastParenPadStyle = cu.getStyle(TypecastParenPadStyle.class) == null ? Checkstyle.typecastParenPadStyle() : cu.getStyle(TypecastParenPadStyle.class);
+            spacesStyle = cu.getStyle(SpacesStyle.class, IntelliJ.spaces());
+            typecastParenPadStyle = cu.getStyle(TypecastParenPadStyle.class, Checkstyle.typecastParenPadStyle()) ;
 
             spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
             return super.visitJavaSourceFile((JavaSourceFile)cu, ctx);
@@ -58,7 +58,8 @@ public class TypecastParenPad extends Recipe {
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast tc = super.visitTypeCast(typeCast, ctx);
-            tc = (J.TypeCast) new SpacesVisitor<>(spacesStyle, null, null, tc).visitNonNull(tc, ctx);
+            tc = (J.TypeCast) new SpacesVisitor<>(spacesStyle, null, null, tc)
+                    .visitNonNull(tc, ctx, getCursor().getParentTreeCursor().fork());
             return tc;
         }
     }

@@ -58,6 +58,11 @@ public interface SourceFile extends Tree {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
     }
 
+    default <S extends Style> S getStyle(Class<S> style, S defaultStyle) {
+        S s = getStyle(style);
+        return s == null ? defaultStyle : s;
+    }
+
     default <P> byte[] printAllAsBytes(P p) {
         return printAll(p).getBytes(getCharset() == null ? StandardCharsets.UTF_8 : getCharset());
     }
