@@ -1655,33 +1655,28 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private Space statementDelim(@Nullable Tree t) {
-        if (t instanceof JCAssert ||
-            t instanceof JCAssign ||
-            t instanceof JCAssignOp ||
-            t instanceof JCBreak ||
-            t instanceof JCContinue ||
-            t instanceof JCDoWhileLoop ||
-            t instanceof JCMethodInvocation ||
-            t instanceof JCNewClass ||
-            t instanceof JCReturn ||
-            t instanceof JCThrow ||
-            t instanceof JCUnary ||
-            t instanceof JCExpressionStatement ||
-            t instanceof JCVariableDecl ||
-            t instanceof JCYield) {
-            return sourceBefore(";");
+        switch (t.getKind()) {
+            case ASSERT:
+            case ASSIGNMENT:
+            case BREAK:
+            case CONTINUE:
+            case DO_WHILE_LOOP:
+            case METHOD_INVOCATION:
+            case NEW_CLASS:
+            case RETURN:
+            case THROW:
+            case EXPRESSION_STATEMENT:
+            case VARIABLE:
+            case YIELD:
+                return sourceBefore(";");
+            case LABELED_STATEMENT:
+                return statementDelim(((JCLabeledStatement) t).getStatement());
+            case METHOD:
+                JCMethodDecl m = (JCMethodDecl) t;
+                return sourceBefore(m.body == null || m.defaultValue != null ? ";" : "");
+            default:
+                return t instanceof JCAssignOp || t instanceof JCUnary ? sourceBefore(";") : EMPTY;
         }
-
-        if (t instanceof JCLabeledStatement) {
-            return statementDelim(((JCLabeledStatement) t).getStatement());
-        }
-
-        if (t instanceof JCMethodDecl) {
-            JCMethodDecl m = (JCMethodDecl) t;
-            return sourceBefore(m.body == null || m.defaultValue != null ? ";" : "");
-        }
-
-        return EMPTY;
     }
 
     private List<JRightPadded<Statement>> convertStatements(@Nullable List<? extends Tree> trees) {
