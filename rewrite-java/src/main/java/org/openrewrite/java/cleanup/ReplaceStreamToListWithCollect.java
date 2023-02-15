@@ -65,9 +65,12 @@ public class ReplaceStreamToListWithCollect extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation result = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (STREAM_TO_LIST.matches(method)) {
+                    J.MethodInvocation newMethod = result
+                            .withTemplate(template, result.getCoordinates().replace(), result.getSelect());
                     result = result
-                            .withTemplate(template, result.getCoordinates().replace(), result.getSelect())
-                            .withPrefix(result.getPrefix());
+                            .withName(newMethod.getName())
+                            .withMethodType(newMethod.getMethodType())
+                            .withArguments(newMethod.getArguments());
                     maybeAddImport("java.util.stream.Collectors");
                 }
                 return result;

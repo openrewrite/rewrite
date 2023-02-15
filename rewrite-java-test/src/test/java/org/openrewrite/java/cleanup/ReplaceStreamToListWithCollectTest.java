@@ -61,7 +61,7 @@ class ReplaceStreamToListWithCollectTest implements RewriteTest {
     }
 
     @Test
-    void preservesFormatting() {
+    void formatting() {
         rewriteRun(
           version(
             java(
@@ -86,6 +86,41 @@ class ReplaceStreamToListWithCollectTest implements RewriteTest {
               class Example {
                   public void test() {
                       Stream.of()
+                          .collect(Collectors.toList());
+                  }
+              }
+              """),
+            16));
+    }
+
+    @Test
+    void comment() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              import java.util.stream.Stream;
+
+              class Example {
+                  public void test() {
+                      Stream.of()
+                          // Convert to list
+                          .toList();
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.stream.Collectors;
+              import java.util.stream.Stream;
+
+              class Example {
+                  public void test() {
+                      Stream.of()
+                          // Convert to list
                           .collect(Collectors.toList());
                   }
               }
