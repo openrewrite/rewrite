@@ -454,17 +454,22 @@ public interface RewriteTest extends SourceSpecs {
                         }
                     }
 
-                    //noinspection unchecked
-                    ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                    try {
+                        //noinspection unchecked
+                        ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                    } catch (ClassCastException ignored) {
+                        // the source file instance type changed, e.g. in FindAndReplace.
+                    }
+
                     continue nextSourceFile;
                 } else if (result.getBefore() == null
-                    && !(result.getAfter() instanceof Remote)
-                    && !expectedNewResults.contains(result)
-                    && testMethodSpec.afterRecipes.isEmpty()
+                           && !(result.getAfter() instanceof Remote)
+                           && !expectedNewResults.contains(result)
+                           && testMethodSpec.afterRecipes.isEmpty()
                 ) {
                     // falsely added files detected.
                     fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
-                        + "\" that was not expected.");
+                         + "\" that was not expected.");
                 }
             }
 

@@ -101,7 +101,7 @@ public class InstanceOfPatternMatch extends Recipe {
                         // TODO this could be improved (the pattern variable may be applicable in the else case
                         // or even in subsequent statements (due to the flow scope semantics)
                         flowScopeBreakEncountered = true;
-                    } else if (value instanceof Statement) {
+                    } else if (value instanceof Statement || value instanceof J.Ternary) {
                         maybeReplacementRoot = next;
                         break;
                     }
@@ -328,6 +328,7 @@ public class InstanceOfPatternMatch extends Recipe {
             return typeCast;
         }
 
+        @SuppressWarnings("NullableProblems")
         @Override
         @Nullable
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer integer) {
@@ -366,6 +367,7 @@ public class InstanceOfPatternMatch extends Recipe {
         public String variableName(@Nullable JavaType type) {
             // the instanceof operator only accepts classes (without generics) and arrays
             if (style == Style.EXACT) {
+                //noinspection DataFlowIssue
                 return name;
             } else if (type instanceof JavaType.FullyQualified) {
                 String className = ((JavaType.FullyQualified) type).getClassName();

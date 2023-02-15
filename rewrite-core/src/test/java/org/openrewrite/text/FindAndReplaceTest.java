@@ -23,14 +23,33 @@ import static org.openrewrite.test.SourceSpecs.text;
 class FindAndReplaceTest implements RewriteTest {
 
     @Test
+    void nonTxtExtension() {
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace(".", "G", null, null)),
+          text(
+            """
+              This is text.
+              """,
+            """
+              This is textG
+              """,
+            spec -> spec.path("test.yml")
+          )
+        );
+    }
+
+    @Test
     void defaultNonRegex() {
         rewriteRun(
           spec -> spec.recipe(new FindAndReplace(".", "G", null, null)),
-          text("""
-          This is text.
-          """, """
-          This is textG
-          """)
+          text(
+            """
+              This is text.
+              """,
+            """
+              This is textG
+              """
+          )
         );
     }
 
@@ -38,11 +57,14 @@ class FindAndReplaceTest implements RewriteTest {
     void regexReplace() {
         rewriteRun(
           spec -> spec.recipe(new FindAndReplace(".", "G", true, null)),
-          text("""
-          This is text.
-          """, """
-          GGGGGGGGGGGGG
-          """)
+          text(
+            """
+              This is text.
+              """,
+            """
+              GGGGGGGGGGGGG
+              """
+          )
         );
     }
 
@@ -50,11 +72,14 @@ class FindAndReplaceTest implements RewriteTest {
     void captureGroups() {
         rewriteRun(
           spec -> spec.recipe(new FindAndReplace("This is ([^.]+).", "I like $1.", true, null)),
-          text("""
-          This is text.
-          """, """
-          I like text.
-          """)
+          text(
+            """
+              This is text.
+              """,
+            """
+              I like text.
+              """
+          )
         );
     }
 }

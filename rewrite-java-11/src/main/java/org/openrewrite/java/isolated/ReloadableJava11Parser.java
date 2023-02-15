@@ -285,6 +285,19 @@ public class ReloadableJava11Parser implements JavaParser {
         return this;
     }
 
+    @Override
+    public JavaParser reset(Collection<URI> uris) {
+        if (!uris.isEmpty()) {
+            compilerLog.reset(uris);
+        }
+        pfm.flush();
+        Check.instance(context).newRound();
+        Annotate.instance(context).newRound();
+        Enter.instance(context).newRound();
+        Modules.instance(context).newRound();
+        return this;
+    }
+
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
     }
@@ -345,6 +358,15 @@ public class ReloadableJava11Parser implements JavaParser {
 
         public void reset() {
             sourceMap.clear();
+        }
+
+        public void reset(Collection<URI> uris) {
+            for (Iterator<JavaFileObject> itr = sourceMap.keySet().iterator(); itr.hasNext();) {
+                JavaFileObject f = itr.next();
+                if (uris.contains(f.toUri())) {
+                    itr.remove();
+                }
+            }
         }
     }
 

@@ -20,6 +20,7 @@ import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.DiagnosticSource;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
@@ -285,6 +286,19 @@ public class ReloadableJava17Parser implements JavaParser {
         return this;
     }
 
+    @Override
+    public JavaParser reset(Collection<URI> uris) {
+        if (!uris.isEmpty()) {
+            compilerLog.reset(uris);
+        }
+        pfm.flush();
+        Check.instance(context).newRound();
+        Annotate.instance(context).newRound();
+        Enter.instance(context).newRound();
+        Modules.instance(context).newRound();
+        return this;
+    }
+
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
     }
@@ -345,6 +359,15 @@ public class ReloadableJava17Parser implements JavaParser {
 
         public void reset() {
             sourceMap.clear();
+        }
+
+        public void reset(Collection<URI> uris) {
+            for (Iterator<JavaFileObject> itr = sourceMap.keySet().iterator(); itr.hasNext();) {
+                JavaFileObject f = itr.next();
+                if (uris.contains(f.toUri())) {
+                    itr.remove();
+                }
+            }
         }
     }
 

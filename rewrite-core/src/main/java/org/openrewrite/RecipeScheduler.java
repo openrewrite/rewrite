@@ -179,7 +179,7 @@ public interface RecipeScheduler {
     default <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats,
                                                          Stack<Recipe> recipeStack,
                                                          List<S> before,
-                                                         @Nullable List<Boolean> singleSourceApplicableTestResult,
+                                                         @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
                                                          ExecutionContext ctx,
                                                          Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile) {
         runStats.calls.incrementAndGet();
@@ -195,14 +195,7 @@ public interface RecipeScheduler {
             if (!recipe.getApplicableTests().isEmpty()) {
                 boolean anySourceMatch = false;
                 for (S s : before) {
-                    boolean allMatch = true;
-                    for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
-                        if (applicableTest.visit(s, ctx) == s) {
-                            allMatch = false;
-                            break;
-                        }
-                    }
-                    if (allMatch) {
+                    if (RecipeSchedulerUtils.applicableListTests(s, recipe.getApplicableTests(), ctx)) {
                         anySourceMatch = true;
                         break;
                     }
@@ -216,18 +209,12 @@ public interface RecipeScheduler {
             if (!recipe.getSingleSourceApplicableTests().isEmpty()) {
                 if (singleSourceApplicableTestResult == null || singleSourceApplicableTestResult.isEmpty()) {
                     if (singleSourceApplicableTestResult == null) {
-                        singleSourceApplicableTestResult = new ArrayList<>(before.size());
+                        singleSourceApplicableTestResult = new HashMap<>(before.size());
                     }
 
                     for (S s : before) {
-                        boolean allMatch = true;
-                        for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
-                            if (singleSourceApplicableTest.visit(s, ctx) == s) {
-                                allMatch = false;
-                                break;
-                            }
-                        }
-                        singleSourceApplicableTestResult.add(allMatch);
+                        singleSourceApplicableTestResult.put(s.getId(),
+                            RecipeSchedulerUtils.applicableListTests(s, recipe.getSingleSourceApplicableTests(), ctx));
                     }
                 }
             }
@@ -238,7 +225,9 @@ public interface RecipeScheduler {
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after;
-        final List<Boolean> newSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final Map<UUID, Boolean> singleSourceApplicableTestResultRef = singleSourceApplicableTestResult;
+        boolean hasSingleSourceApplicableTest = singleSourceApplicableTestResult != null
+                && !singleSourceApplicableTestResult.isEmpty();
 
         if (!recipe.validate(ctx).isValid()) {
             after = before;
@@ -250,10 +239,9 @@ public interface RecipeScheduler {
 
                 S afterFile = s;
                 try {
-                    if (newSingleSourceApplicableTestResult != null && !newSingleSourceApplicableTestResult.isEmpty()) {
-                        if (!newSingleSourceApplicableTestResult.get(index)) {
-                            return s;
-                        }
+                    if (hasSingleSourceApplicableTest && singleSourceApplicableTestResultRef.containsKey(s.getId())
+                            && !singleSourceApplicableTestResultRef.get(s.getId())) {
+                        return s;
                     }
 
                     Duration duration = Duration.ofNanos(System.nanoTime() - startTime);
@@ -323,10 +311,49 @@ public interface RecipeScheduler {
         // of a type that is in the original set of source files (e.g. only XML files are given, and the
         // recipe generates Java code).
         List<SourceFile> afterWidened;
+        final Map<UUID, Boolean> lastSingleSourceApplicableTestResult = singleSourceApplicableTestResult;
+        final Map<UUID, Boolean> newSingleSourceApplicableTestResult = new HashMap<>();
         try {
             long ownVisitStartTime = System.nanoTime();
+
+            if (hasSingleSourceApplicableTest) {
+                boolean anyFilePassedSingleApplicableTest = false;
+                for (Boolean b : singleSourceApplicableTestResult.values()) {
+                    if (b) {
+                        anyFilePassedSingleApplicableTest = true;
+                        break;
+                    }
+                }
+                if (!anyFilePassedSingleApplicableTest) {
+                    return after;
+                }
+            }
+
             //noinspection unchecked
             afterWidened = recipe.visit((List<SourceFile>) after, ctx);
+
+            if (hasSingleSourceApplicableTest) {
+                // update single source applicability test results
+                Map<UUID, SourceFile> originalMap = new HashMap<>(after.size());
+                for (SourceFile file : after) {
+                    originalMap.put(file.getId(), file);
+                }
+
+                afterWidened = ListUtils.map(afterWidened, s -> {
+                    Boolean singleSourceTestResult = lastSingleSourceApplicableTestResult.get(s.getId());
+                    if (singleSourceTestResult != null) {
+                        newSingleSourceApplicableTestResult.put(s.getId(), singleSourceTestResult);
+                        if (!singleSourceTestResult) {
+                            return originalMap.get(s.getId());
+                        }
+                    } else {
+                        // It's a newly generated file
+                        newSingleSourceApplicableTestResult.put(s.getId(), true);
+                    }
+                    return s;
+                });
+            }
+
             runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
@@ -387,11 +414,12 @@ public interface RecipeScheduler {
                 runStats.getCalled().add(nextStats);
             }
 
+            Map<UUID, Boolean> newMap = new HashMap<>(newSingleSourceApplicableTestResult);
             afterWidened = scheduleVisit(requireNonNull(nextStats),
-                    nextStack,
-                    afterWidened,
-                    singleSourceApplicableTestResult,
-                    ctx, recipeThatAddedOrDeletedSourceFile);
+                nextStack,
+                afterWidened,
+                newMap,
+                ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
         long totalTime = System.nanoTime() - startTime;
@@ -452,5 +480,23 @@ class RecipeSchedulerUtils {
         exception = Markup.error(exception, t);
         recipeThatAddedOrDeletedSourceFile.put(exception.getId(), recipeStack);
         return ListUtils.concat(before, exception);
+    }
+
+    /**
+     * @return true if the file qualified (file changed) for all applicable tests.
+     */
+    public static <S extends SourceFile> boolean applicableListTests(S s,
+        List<TreeVisitor<?, ExecutionContext>> applicableTests,
+        ExecutionContext ctx) {
+        boolean allMatch = true;
+        for (TreeVisitor<?, ExecutionContext> applicableTest : applicableTests) {
+            boolean noChange = applicableTest.visitSourceFile(s, ctx) == s
+                && applicableTest.visit(s, ctx) == s;
+            if (noChange) {
+                allMatch = false;
+                break;
+            }
+        }
+        return allMatch;
     }
 }

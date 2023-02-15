@@ -21,17 +21,20 @@ import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.VariableNameUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.*;
+import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.exceptionMessageBuilder;
 
 @Incubating(since = "7.25.0")
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -128,7 +131,6 @@ public final class ControlFlow {
             if (current.isEmpty()) {
                 throw new ControlFlowIllegalStateException(exceptionMessageBuilder("No current node!").addCursor(getCursor()));
             }
-            assert !current.isEmpty() : "No current node!";
             if (current.size() == 1 && current.iterator().next() instanceof ControlFlowNode.BasicBlock) {
                 return (ControlFlowNode.BasicBlock) current.iterator().next();
             } else {
@@ -582,26 +584,58 @@ public final class ControlFlow {
             );
         }
 
+        /**
+         * Generate the control flow graph for {@link J.ForEachLoop}.
+         * </p>
+         * Unlike normal graph generation, because {@link J.ForEachLoop} are heavy syntactic sugar, "fake" AST nodes need to be generated.
+         * These "fake" AST nodes allows us to preserve some fundamental assumptions about the ControlFlowNode graph,
+         * in particular that a given {@link ControlFlowNode.BasicBlock} only has one successor.
+         *
+         * @implNote Creates a fake initialization of an {@link Iterator} before the for-each loop, and assigns that to a fake variable.
+         * Then the looping {@link ControlFlowNode.ConditionNode} is a fake call to {@link Iterator#hasNext()} on that iterator.
+         */
         @Override
+        @SelfLoathing(name = "Jonathan Leitschuh")
         public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, P p) {
-            // We treat the for each loop as if there is a fake conditional call to
-            // `#{any(java.lang.Iterable)}.iterator().hasNext()` before every loop.
-            // This "fake" allows us to preserve some fundamental assumptions about the ControlFlowNode graph,
-            // in particular that a given BasicBlock only has one successor
+            String iteratorVariableNumber =
+                    VariableNameUtils.generateVariableName(
+                            forLoop.getControl().getVariable().getVariables().get(0).getSimpleName() + "Iterator",
+                            this.getCursor(),
+                            VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER
+                    );
+
+            JavaType controlLoopType = forLoop.getControl().getVariable().getVariables().get(0).getType();
+            if (controlLoopType == null) {
+                throw new ControlFlowIllegalStateException(
+                        exceptionMessageBuilder("No type for for loop control variable")
+                                .addCursor(getCursor())
+                );
+            }
+            J.VariableDeclarations fakeIteratorAssignment = createFakeIteratorVariableDeclarations(
+                    iteratorVariableNumber,
+                    controlLoopType,
+                    forLoop
+            );
+            visit(fakeIteratorAssignment, p, getCursor());
+
             addCursorToBasicBlock();
-            visit(forLoop.getControl(), p);
+
+            // NOTE: Don't move this line into the `visitForEachControl`, it will break. The cursor at this scope is important.
+            J.MethodInvocation fakeConditionalMethod = createFakeConditionalMethod(
+                    fakeIteratorAssignment.getVariables().get(0).getName(),
+                    forLoop.getControl().getIterable()
+            );
+
             ControlFlowAnalysis<P> controlAnalysis = new ControlFlowAnalysis<P>(current, graphType) {
                 @Override
                 public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
-                    visit(control.getIterable(), p);
+                    addCursorToBasicBlock();
                     visit(control.getVariable(), p);
-                    addBasicBlockToCurrent();
+                    visit(fakeConditionalMethod, p);
                     return control;
                 }
             };
-
-            J.MethodInvocation fakeConditionalMethod = createFakeConditionalMethod(forLoop.getControl().getIterable());
-            visit(fakeConditionalMethod, p);
+            controlAnalysis.visit(forLoop.getControl(), p, getCursor());
 
             ControlFlowNode.ConditionNode conditionalEntry = controlAnalysis.currentAsBasicBlock().addConditionNodeTruthFirst();
             ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringExit(Collections.singleton(conditionalEntry), forLoop.getBody(), p);
@@ -613,14 +647,88 @@ public final class ControlFlow {
             return forLoop;
         }
 
-        private J.MethodInvocation createFakeConditionalMethod(Expression iterable) {
-            JavaTemplate fakeConditionalTemplate = iterable.getType() instanceof JavaType.Array ?
-                    JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any()}).iterator().hasNext()")
-                            .imports("java.util.Arrays")
-                            .build() :
-                    JavaTemplate.builder(this::getCursor, "#{any(java.lang.Iterable)}.iterator().hasNext()").build();
+        /**
+         * Part of the de-sugaring process to create a cleaner control flow graph for {@link J.ForEachLoop}.
+         * </p>
+         * Generates a fake iterable assigned to a variable from the {@link J.ForEachLoop}'s iterable.
+         * </p>
+         * Example 1:
+         * <pre>{@code
+         * for (String s : new String[] {"Hello", "Goodbye"}) {
+         *     System.out.println(s);
+         * }
+         * }</pre>
+         * Will become:
+         * <pre>{@code
+         * final Iterator<String> sIterator = Arrays.stream(new String[] {"Hello", "Goodbye"}).iterator();
+         * for (String s : ...) {
+         *      System.out.println(s);
+         * }
+         * }</pre>
+         * </p>
+         * Example 2:
+         * <pre>{@code
+         * for (String s : Collections.singletonList("Hello")) {
+         *     System.out.println(s);
+         * }
+         * }</pre>
+         * Will become:
+         * <pre>{@code
+         * final Iterator<String> sIterator = Collections.singletonList("Hello").iterator();
+         * for (String s : ...) {
+         *      System.out.println(s);
+         * }
+         * }</pre>
+         */
+        @SelfLoathing(name = "Jonathan Leitschuh")
+        private J.VariableDeclarations createFakeIteratorVariableDeclarations(String variableName, JavaType iteratorType, J.ForEachLoop forLoop) {
+            Expression iterable = forLoop.getControl().getIterable();
+            String type = iteratorType instanceof JavaType.Primitive ? ((JavaType.Primitive) iteratorType).getClassName() : iteratorType.toString();
+            Supplier<Cursor> cursorSupplier = () -> getCursor().dropParentUntil(J.Block.class::isInstance);
+            JavaTemplate fakeIterableVariableTemplate = iterable.getType() instanceof JavaType.Array ?
+                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = Arrays.stream(#{anyArray()}).iterator()").imports("java.util.Arrays").build() :
+                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = #{any(java.lang.Iterable)}.iterator()").build();
+            // Unfortunately, because J.NewArray isn't a statement, we have to find a place in the AST where a statement could be placed. This way a statement will always be generated.
+            // Find the closes outer block to place our statement.
+            J.Block block = getCursor().firstEnclosing(J.Block.class);
+            if (block == null) {
+                throw new ControlFlowIllegalStateException(
+                        exceptionMessageBuilder("Unable to create new J.VariableDeclarations, couldn't find an outer J.Block")
+                                .addCursor(getCursor())
+                );
+            }
+            // If the for loop is within a label, then get the coordinates for it instead.
+            // TODO: Support labeled labels 🤦‍
+            J.Label maybeParentLabel = getCursor().firstEnclosing(J.Label.class);
+            JavaCoordinates coordinates;
+            if (maybeParentLabel != null && maybeParentLabel.getStatement() == forLoop) {
+                coordinates = maybeParentLabel.getCoordinates().before();
+            } else {
+                coordinates = forLoop.getCoordinates().before();
+            }
+            // Use the template within the scope of the parent block
+            J.Block newFakeBlock = block.withTemplate(fakeIterableVariableTemplate, coordinates, iterable);
+            // Find the newly generated statement within the block
+            for (Statement statement : newFakeBlock.getStatements()) {
+                if (!(statement instanceof J.VariableDeclarations)) {
+                    continue;
+                }
+                J.VariableDeclarations maybeNewDeclaration = (J.VariableDeclarations) statement;
+                if (maybeNewDeclaration.getVariables().stream().map(J.VariableDeclarations.NamedVariable::getSimpleName).anyMatch(name -> name.equals(variableName))) {
+                    return maybeNewDeclaration;
+                }
+            }
+            throw new ControlFlowIllegalStateException(
+                    exceptionMessageBuilder("Unable to create new J.VariableDeclarations with name `" + variableName + "`")
+                            .addCursor(getCursor())
+            );
+        }
+
+        @SelfLoathing(name = "Jonathan Leitschuh")
+        protected J.MethodInvocation createFakeConditionalMethod(J.Identifier iteratorIdentifier, Expression iterable) {
+            JavaTemplate fakeConditionalTemplate = JavaTemplate.builder(this::getCursor, "#{any(java.util.Iterator)}.hasNext()").build();
             JavaCoordinates coordinates = iterable.getCoordinates().replace();
-            J.MethodInvocation fakeConditional = iterable.withTemplate(fakeConditionalTemplate, coordinates, iterable);
+            J.MethodInvocation fakeConditional = iterable.withTemplate(fakeConditionalTemplate, coordinates, iteratorIdentifier);
             if (iterable == fakeConditional) {
                 throw new IllegalStateException("Failed to create a fake conditional!");
             }
