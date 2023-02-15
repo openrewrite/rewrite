@@ -37,13 +37,17 @@ class UseSystemLineSeparatorTest implements RewriteTest {
             """
               class A {
                   String s = System.getProperty("line.separator");
-                  var a = System.getProperty("line.separator");
+                  void method1() {
+                      var a = System.getProperty("line.separator");
+                  }
               }
               """,
             """
               class A {
                   String s = System.lineSeparator();
-                  var a = System.lineSeparator();
+                  void method1() {
+                      var a = System.lineSeparator();
+                  }
               }
               """
           )
@@ -60,7 +64,9 @@ class UseSystemLineSeparatorTest implements RewriteTest {
               
               class A {
                   String s = getProperty("line.separator");
-                  var a = getProperty("line.separator");
+                  void method1() {
+                      var a = getProperty("line.separator");
+                  }
               }
               """,
             """
@@ -68,7 +74,9 @@ class UseSystemLineSeparatorTest implements RewriteTest {
               
               class A {
                   String s = lineSeparator();
-                  var a = lineSeparator();
+                  void method1() {
+                      var a = lineSeparator();
+                  }
               }
               """
           )

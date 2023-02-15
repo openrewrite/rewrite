@@ -19,7 +19,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -55,32 +54,36 @@ public class UseSystemLineSeparator extends Recipe {
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
 
-            final JavaTemplate.Builder template = JavaTemplate
-                    .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()");
 
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J invocation = super.visitMethodInvocation(method, ctx);
-                if ("System.getProperty(\"line.separator\")".equalsIgnoreCase(invocation.toString())) {
-                    return method.withTemplate(template.build(),
+
+                if (GET_PROPERTY.matches(method)) {
+                    if (method.getSelect() != null) {
+                        final JavaTemplate template = JavaTemplate
+                            .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()")
+                            .build();
+
+                        return method.withTemplate(template,
                             method.getCoordinates().replace(),
                             method.getSelect());
-                } else if ("getProperty(\"line.separator\")".equalsIgnoreCase(invocation.toString()) &&
-                        method.getMethodType() != null && System.class.getName().equals(method.getMethodType().getDeclaringType().getFullyQualifiedName())) {
+                    } else {
+                        // static import scenario
+                        maybeRemoveImport("java.lang.System.getProperty");
+                        maybeAddImport("java.lang.System","lineSeparator");
 
-                    maybeRemoveImport("java.lang.System.getProperty");
-                    maybeAddImport("java.lang.System","lineSeparator");
-
-                    final JavaTemplate template = JavaTemplate
+                        final JavaTemplate template = JavaTemplate
                             .builder(this::getCursor, "lineSeparator()")
                             .staticImports("java.lang.System.lineSeparator")
                             .build();
 
-                    return method.withTemplate(template,
+                        return method.withTemplate(template,
                             method.getCoordinates()
-                                    .replace());
-
+                                .replace());
+                    }
                 }
-                return super.visitMethodInvocation(method, ctx);
+
+                return invocation;
             }
         };
     }
