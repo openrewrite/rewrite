@@ -152,7 +152,6 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
             || tree instanceof J.ClassDeclaration
             || tree instanceof J.Block
             || tree instanceof J.Empty
-            || tree instanceof J.Literal
             || tree instanceof J.Try
             || tree instanceof J.Try.Catch
             || tree instanceof J.ForLoop
@@ -162,6 +161,10 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
             || tree instanceof J.Lambda.Parameters
         ) {
             return "";
+        }
+
+        if (tree instanceof J.Literal) {
+            return ((J.Literal) tree).getValue().toString();
         }
 
         String[] lines = tree.toString().split("\n");
