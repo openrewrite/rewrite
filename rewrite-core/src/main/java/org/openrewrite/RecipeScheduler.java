@@ -491,7 +491,6 @@ class RecipeSchedulerUtils {
         boolean allMatch = true;
         for (TreeVisitor<?, ExecutionContext> applicableTest : applicableTests) {
             boolean noChange = applicableTest.visitSourceFile(s, ctx) == s
-                && applicableTest.isAcceptable(s, ctx)
                 && applicableTest.visit(s, ctx) == s;
             if (noChange) {
                 allMatch = false;
