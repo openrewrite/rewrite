@@ -195,14 +195,7 @@ public interface RecipeScheduler {
             if (!recipe.getApplicableTests().isEmpty()) {
                 boolean anySourceMatch = false;
                 for (S s : before) {
-                    boolean allMatch = true;
-                    for (TreeVisitor<?, ExecutionContext> applicableTest : recipe.getApplicableTests()) {
-                        if (applicableTest.visit(s, ctx) == s) {
-                            allMatch = false;
-                            break;
-                        }
-                    }
-                    if (allMatch) {
+                    if (RecipeSchedulerUtils.applicableListTests(s, recipe.getApplicableTests(), ctx)) {
                         anySourceMatch = true;
                         break;
                     }
@@ -220,14 +213,8 @@ public interface RecipeScheduler {
                     }
 
                     for (S s : before) {
-                        boolean allMatch = true;
-                        for (TreeVisitor<?, ExecutionContext> singleSourceApplicableTest : recipe.getSingleSourceApplicableTests()) {
-                            if (singleSourceApplicableTest.visit(s, ctx) == s) {
-                                allMatch = false;
-                                break;
-                            }
-                        }
-                        singleSourceApplicableTestResult.put(s.getId(), allMatch);
+                        singleSourceApplicableTestResult.put(s.getId(),
+                            RecipeSchedulerUtils.applicableListTests(s, recipe.getSingleSourceApplicableTests(), ctx));
                     }
                 }
             }
@@ -493,5 +480,23 @@ class RecipeSchedulerUtils {
         exception = Markup.error(exception, t);
         recipeThatAddedOrDeletedSourceFile.put(exception.getId(), recipeStack);
         return ListUtils.concat(before, exception);
+    }
+
+    /**
+     * @return true if the file qualified (file changed) for all applicable tests.
+     */
+    public static <S extends SourceFile> boolean applicableListTests(S s,
+        List<TreeVisitor<?, ExecutionContext>> applicableTests,
+        ExecutionContext ctx) {
+        boolean allMatch = true;
+        for (TreeVisitor<?, ExecutionContext> applicableTest : applicableTests) {
+            boolean noChange = applicableTest.visitSourceFile(s, ctx) == s
+                && applicableTest.visit(s, ctx) == s;
+            if (noChange) {
+                allMatch = false;
+                break;
+            }
+        }
+        return allMatch;
     }
 }
