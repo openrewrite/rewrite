@@ -551,7 +551,7 @@ public interface RewriteTest extends SourceSpecs {
 class RewriteTestUtils {
     static boolean groupSourceSpecsByParser(List<Parser.Builder> parserBuilders, Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser, SourceSpec<?> sourceSpec) {
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> entry : sourceSpecsByParser.entrySet()) {
-            if (entry.getKey().getSourceFileType().equals(sourceSpec.sourceFileType)) {
+            if (entry.getKey().getSourceFileType().equals(sourceSpec.sourceFileType) && sourceSpec.getParser().getClass().isAssignableFrom(entry.getKey().getClass())) {
                 entry.getValue().add(sourceSpec);
                 return true;
             }
