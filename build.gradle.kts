@@ -20,7 +20,7 @@ dependencies {
     compileOnly("org.projectlombok:lombok:latest.release")
     compileOnly("com.google.code.findbugs:jsr305:latest.release")
 
-    implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:${latest}"))
+    implementation(platform("org.openrewrite:rewrite-bom:${latest}"))
     implementation("org.openrewrite:rewrite-java")
 
     implementation(platform(kotlin("bom", kotlinVersion)))
