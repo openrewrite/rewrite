@@ -231,10 +231,10 @@ public abstract class Recipe implements Cloneable {
      * on all conditions being met, that is, a logical 'AND' relationship.
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
-     * that the applicability test visitor makes on the tree will not included in the results.
+     * that the applicability test visitor makes on the tree will not be included in the results.
      * <p>
      *
-     * @return A tree visitor that performs an applicability test.
+     * @return This recipe.
      */
     @SuppressWarnings("unused")
     public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
@@ -262,7 +262,7 @@ public abstract class Recipe implements Cloneable {
      * particular source file.
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark it at any level. Any mutation
-     * that the applicability test visitor makes on the tree will not included in the results.
+     * that the applicability test visitor makes on the tree will not be included in the results.
      *
      * @return A tree visitor that performs an applicability test.
      */
@@ -277,9 +277,9 @@ public abstract class Recipe implements Cloneable {
      * on all conditions being met, that is, a logical 'AND' relationship.
      * <p>
      * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
-     * that the applicability test visitor makes on the tree will not included in the results.
+     * that the applicability test visitor makes on the tree will not be included in the results.
      *
-     * @return A tree visitor that performs an applicability test.
+     * @return This recipe.
      */
     public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
         if (singleSourceApplicableTests == null) {
