@@ -18,7 +18,10 @@ package org.openrewrite.text;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.remote.Remote;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -73,6 +76,9 @@ public class FindAndReplace extends Recipe {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public @Nullable Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+                if(sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
+                    return sourceFile;
+                }
                 PlainText text = PlainTextParser.convert(sourceFile);
                 String newText = Boolean.TRUE.equals(regex) ?
                         text.getText().replaceAll(find, replace) :
