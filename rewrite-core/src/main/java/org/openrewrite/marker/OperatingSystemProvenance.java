@@ -13,23 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marker.ci;
+package org.openrewrite.marker;
 
 import com.sun.jna.platform.win32.Kernel32Util;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.With;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.ci.POSIXUtil;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 
 /**
- * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/OperatingSystem.java</a>
+ * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/c.java</a>
  */
 @SuppressWarnings("StaticInitializerReferencesSubClass")
-public abstract class OperatingSystem {
+public abstract class OperatingSystemProvenance implements Marker {
     public static final Windows WINDOWS = new Windows();
     public static final MacOs MAC_OS = new MacOs();
     public static final Solaris SOLARIS = new Solaris();
@@ -37,19 +44,19 @@ public abstract class OperatingSystem {
     public static final FreeBSD FREE_BSD = new FreeBSD();
     public static final Unix UNIX = new Unix();
 
-    private static OperatingSystem currentOs;
+    private static OperatingSystemProvenance currentOs;
     private final String toStringValue;
     private final String osName;
     private final String osVersion;
 
-    OperatingSystem() {
+    OperatingSystemProvenance() {
         osName = System.getProperty("os.name");
         osVersion = System.getProperty("os.version");
         toStringValue = getName() + " " + getVersion() + " " + System.getProperty("os.arch");
     }
 
     public static String hostname() {
-        OperatingSystem currentOs = current();
+        OperatingSystemProvenance currentOs = current();
         if (currentOs.isWindows()) {
             try {
                 return Kernel32Util.getComputerName();
@@ -67,7 +74,7 @@ public abstract class OperatingSystem {
         return "localhost";
     }
 
-    public static OperatingSystem current() {
+    public static OperatingSystemProvenance current() {
         if (currentOs == null) {
             currentOs = forName(System.getProperty("os.name"));
         }
@@ -79,7 +86,7 @@ public abstract class OperatingSystem {
         currentOs = null;
     }
 
-    public static OperatingSystem forName(String os) {
+    public static OperatingSystemProvenance forName(String os) {
         String osName = os.toLowerCase();
         if (osName.contains("windows")) {
             return WINDOWS;
@@ -148,6 +155,13 @@ public abstract class OperatingSystem {
 
     public abstract String getFamilyName();
 
+    public abstract EOL getEOL();
+
+    protected enum EOL {
+        CRLF,
+        LF
+    }
+
     /**
      * Locates the given executable in the system path. Returns null if not found.
      */
@@ -198,11 +212,23 @@ public abstract class OperatingSystem {
         return "PATH";
     }
 
-    static class Windows extends OperatingSystem {
-        private final String nativePrefix;
+    @AllArgsConstructor
+    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    static class Windows extends OperatingSystemProvenance {
+        String nativePrefix;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
 
         Windows() {
             nativePrefix = resolveNativePrefix();
+            id = Tree.randomId();
+        }
+
+        @Override
+        public EOL getEOL() {
+            return EOL.CRLF;
         }
 
         @Override
@@ -277,13 +303,31 @@ public abstract class OperatingSystem {
         public String getPathVar() {
             return "Path";
         }
+
+        @Override
+        @NonNull
+        public UUID getId() {
+            return id;
+        }
     }
 
-    static class Unix extends OperatingSystem {
-        private final String nativePrefix;
+    @AllArgsConstructor
+    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    static class Unix extends OperatingSystemProvenance {
+        String nativePrefix;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
 
         Unix() {
-            this.nativePrefix = resolveNativePrefix();
+            nativePrefix = resolveNativePrefix();
+            id = Tree.randomId();
+        }
+
+        @Override
+        public EOL getEOL() {
+            return EOL.LF;
         }
 
         @Override
@@ -386,6 +430,12 @@ public abstract class OperatingSystem {
                 osPrefix = osPrefix.substring(0, space);
             }
             return osPrefix;
+        }
+
+        @Override
+        @NonNull
+        public UUID getId() {
+            return id;
         }
     }
 

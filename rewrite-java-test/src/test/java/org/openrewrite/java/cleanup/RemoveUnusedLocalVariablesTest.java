@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.UUID;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
 @SuppressWarnings({
   "ConstantConditions",
@@ -937,14 +938,7 @@ class RemoveUnusedLocalVariablesTest implements RewriteTest {
     @Test
     void recordCompactConstructor() {
         rewriteRun(
-          spec -> spec.beforeRecipe(cu -> {
-              var javaRuntimeVersion = System.getProperty("java.runtime.version");
-              var javaVendor = System.getProperty("java.vm.vendor");
-              if (new JavaVersion(UUID.randomUUID(), javaRuntimeVersion, javaVendor, javaRuntimeVersion, javaRuntimeVersion).getMajorVersion() != 17) {
-                  spec.recipe(Recipe.noop());
-              }
-          }),
-          java(
+          version(java(
             """
               public record MyRecord(
                  boolean bar,
@@ -957,7 +951,7 @@ class RemoveUnusedLocalVariablesTest implements RewriteTest {
                 }
               }
               """
-          )
+          ), 17)
         );
     }
 }

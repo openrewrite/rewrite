@@ -68,11 +68,40 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void method1() {
                   }
+                  void method2()    {
+                  }
+                  void method3()	{
+                  }
               }
               """,
             """
               class Test {
                   void method1 () {
+                  }
+                  void method2 () {
+                  }
+                  void method3 () {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforeParensMethodDeclarationTrueWithComment() {
+        rewriteRun(
+          spaces(style -> style.withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))),
+          java(
+            """
+              class Test {
+                  void method1    /*comment*/() {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method1    /*comment*/ () {
                   }
               }
               """
@@ -106,11 +135,56 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void method1 () {
                   }
+                  void method2    () {
+                  }
+                  void method3  	() {
+                  }
               }
               """,
             """
               class Test {
                   void method1() {
+                  }
+                  void method2() {
+                  }
+                  void method3() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforeParensMethodDeclarationFalseWithComment() {
+        rewriteRun(
+          spaces(style -> style.withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(false))),
+          java(
+            """
+              class Test {
+                  void method1    /*comment*/    () {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void method1    /*comment*/() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void beforeParensMethodDeclarationFalseWithLineBreakIgnored() {
+        rewriteRun(
+          spaces(style -> style.withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(false))),
+          java(
+            """
+              class Test {
+                  void method1 
+                  () {
                   }
               }
               """
@@ -2365,11 +2439,84 @@ class SpacesTest implements RewriteTest {
               class Test {
                   public void foo(int x) {
                   }
+                  public void bar(    int y    ) {
+                  }
               }
               """,
             """
               class Test {
                   public void foo( int x ) {
+                  }
+                  public void bar( int y ) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void compositeMethodDeclarationParentheses() {
+        rewriteRun(
+          spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))
+              .withBeforeParentheses(style.getBeforeParentheses().withMethodDeclaration(true))
+          ),
+          java(
+            """
+              class Test {
+                  void  /*c1*/   foo  /*c2*/   (  /*c3*/   int x, int y  /*c4*/   ) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void  /*c1*/   foo  /*c2*/ (  /*c3*/   int x, int y  /*c4*/ ) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withinMethodDeclarationParenthesesTrueWithComment() {
+        rewriteRun(
+          spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))),
+          java(
+            """
+              class Test {
+                  void foo(    /*c1*/    int x    ) {
+                  }
+                  void bar(    int y    /*c2*/    ) {
+                  }
+                  void baz(    /*c3*/    int z    /*c4*/    ) {
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void foo(    /*c1*/    int x ) {
+                  }
+                  void bar( int y    /*c2*/ ) {
+                  }
+                  void baz(    /*c3*/    int z    /*c4*/ ) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withinMethodDeclarationParenthesesTrueWithLineBreakIgnored() {
+        rewriteRun(
+          spaces(style -> style.withWithin(style.getWithin().withMethodDeclarationParentheses(true))),
+          java(
+            """
+              class Test {
+                  void foo(
+                      int x
+                  ) {
                   }
               }
               """
@@ -3317,9 +3464,9 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       Map<String,String> m = new HashMap<String,String>();
-                      Test.<String,Integer>bar();
+                      Test.<String,Integer>bar(1,2);
                   }
-                  static <A, B> void bar() {
+                  static <A,B> void bar(int x,int y) {
                   }
               }
               """,
@@ -3330,9 +3477,9 @@ class SpacesTest implements RewriteTest {
               class Test {
                   void foo() {
                       Map<String, String> m = new HashMap<String, String>();
-                      Test.<String, Integer>bar();
+                      Test.<String, Integer>bar(1, 2);
                   }
-                  static <A, B> void bar() {
+                  static <A, B> void bar(int x, int y) {
                   }
               }
               """
@@ -4487,6 +4634,7 @@ class SpacesTest implements RewriteTest {
             """
               public class A {
                   {
+                      int i = 0, j = 0;
                       for (; i < j; i++, j--) { }
                   }
               }
@@ -4639,6 +4787,7 @@ class SpacesTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.List;
               @Deprecated("version" /* some comment */)
               class Test {
                   void foo() {

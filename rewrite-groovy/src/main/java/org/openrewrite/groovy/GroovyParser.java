@@ -143,7 +143,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             }
 
             ErrorCollector errorCollector = new ErrorCollector(configuration);
-            GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader());
+            GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true);
             SourceUnit unit = new SourceUnit(
                     "doesntmatter",
                     new InputStreamReaderSource(input.getSource(ctx), configuration),

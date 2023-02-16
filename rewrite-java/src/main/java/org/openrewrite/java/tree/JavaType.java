@@ -289,7 +289,8 @@ public interface JavaType {
             Class,
             Enum,
             Interface,
-            Annotation
+            Annotation,
+            Record
         }
     }
 

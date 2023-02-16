@@ -47,10 +47,12 @@ public class GradleWrapper {
     String version;
     DistributionInfos distributionInfos;
 
-    public static Validated validate(ExecutionContext ctx,
-                                     String version,
-                                     @Nullable String distribution,
-                                     @Nullable Validated cachedValidation) {
+    public static Validated validate(
+            ExecutionContext ctx,
+            String version,
+            @Nullable String distribution,
+            @Nullable Validated cachedValidation,
+            @Nullable String repositoryUrl) {
         if (cachedValidation != null) {
             return cachedValidation;
         }
@@ -95,7 +97,7 @@ public class GradleWrapper {
                         .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
                 VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
 
-                String gradleVersionsUrl = "https://services.gradle.org/versions/all";
+                String gradleVersionsUrl = (repositoryUrl == null) ?  "https://services.gradle.org/versions/all" : repositoryUrl;
                 try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
                     if (resp.isSuccessful()) {
                         List<GradleVersion> allVersions = new ObjectMapper()

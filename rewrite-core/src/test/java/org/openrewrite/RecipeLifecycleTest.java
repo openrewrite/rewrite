@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
@@ -274,7 +273,6 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2754")
-    @Disabled
     @Test
     void yamlApplicabilityFalseWithRecipesHaveVisitMethodOverridden() {
         //language=yaml

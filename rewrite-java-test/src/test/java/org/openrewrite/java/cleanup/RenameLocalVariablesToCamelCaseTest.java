@@ -42,8 +42,8 @@ class RenameLocalVariablesToCamelCaseTest implements RewriteTest {
             """
               class A {
                   void m()  {
-                      boolean secure = _secure > 0;
                       final int _secure = 0;
+                      boolean secure = _secure > 0;
                       
                       int _notSecure = 0;
                       boolean notSecure = _notSecure < 1;
@@ -141,14 +141,15 @@ class RenameLocalVariablesToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              class B {
+              package p;
+              public class B {
                   public static int _staticImport_ = 0;
               }
               """
           ),
           java(
             """
-              import static B._staticImport_;
+              import static p.B._staticImport_;
 
               class Test {
                   public int addTen(int testValue) {

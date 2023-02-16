@@ -195,6 +195,24 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2809")
+    @Test
+    void staticImportsFromJavaLangShouldWork() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.System", "lineSeparator", false))),
+          java(
+            """
+              class A {}
+              """,
+            """
+              import static java.lang.System.lineSeparator;
+
+              class A {}
+              """
+          )
+        );
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1156")
     void dontImportJavaLangWhenUsingDefaultPackage() {
@@ -872,7 +890,7 @@ class AddImportTest implements RewriteTest {
                   Map<String, String> map = new HashMap<>();
                   Set<String> set = new HashSet<>();
                   List<String> test = Collections.singletonList("test");
-                  List<String> test2 = new ArrayList<>();
+                  List<String> test2 = new java.util.ArrayList<>();
               }
               """,
             """
@@ -887,7 +905,7 @@ class AddImportTest implements RewriteTest {
                   Map<String, String> map = new HashMap<>();
                   Set<String> set = new HashSet<>();
                   List<String> test = Collections.singletonList("test");
-                  List<String> test2 = new ArrayList<>();
+                  List<String> test2 = new java.util.ArrayList<>();
               }
               """
           )

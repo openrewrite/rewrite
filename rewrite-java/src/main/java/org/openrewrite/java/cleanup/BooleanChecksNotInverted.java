@@ -33,7 +33,8 @@ public class BooleanChecksNotInverted extends Recipe {
 
     @Override
     public String getDescription() {
-        return "It is needlessly complex to invert the result of a boolean comparison. The opposite comparison should be made instead.";
+        return "It is needlessly complex to invert the result of a boolean comparison. The opposite comparison should be made instead. "
+                + "Also double negation of boolean expressions should be avoided. This recipes takes care of that.";
     }
 
     @Override
@@ -70,6 +71,11 @@ public class BooleanChecksNotInverted extends Recipe {
                                 return super.visit(binary.withOperator(J.Binary.Type.NotEqual), ctx).withPrefix(unary.getPrefix());
                             case NotEqual:
                                 return super.visit(binary.withOperator(J.Binary.Type.Equal), ctx).withPrefix(unary.getPrefix());
+                        }
+                    } else if (expr.getTree() instanceof J.Unary) {
+                        J.Unary nestedUnary = (J.Unary) expr.getTree();
+                        if (nestedUnary.getOperator() == J.Unary.Type.Not) {
+                            return super.visit(nestedUnary.getExpression(), ctx).withPrefix(unary.getPrefix());
                         }
                     }
                 }

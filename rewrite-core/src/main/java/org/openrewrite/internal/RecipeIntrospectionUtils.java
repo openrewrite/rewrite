@@ -15,9 +15,9 @@
  */
 package org.openrewrite.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.*;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.annotation.Annotation;
@@ -100,7 +100,7 @@ public class RecipeIntrospectionUtils {
         //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
                 recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                emptyList(), recipe.getLanguages(), recipeList, emptyList(), source);
+                emptyList(), recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), source);
     }
 
     public static Constructor<?> getPrimaryConstructor(Class<?> recipeClass) {
@@ -191,7 +191,7 @@ public class RecipeIntrospectionUtils {
         }
     }
 
-    @NotNull
+    @NonNull
     private static RecipeIntrospectionException getRecipeIntrospectionException(Class<?> recipeClass, ReflectiveOperationException e) {
         return new RecipeIntrospectionException("Unable to call primary constructor for Recipe " + recipeClass, e);
     }

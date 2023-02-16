@@ -2821,7 +2821,6 @@ public interface J extends Tree {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
         }
-
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -5303,7 +5302,7 @@ public interface J extends Tree {
         @Override
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
+            return new CoordinateBuilder.Unary(this);
         }
 
         @Override

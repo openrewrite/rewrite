@@ -79,7 +79,7 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     public Validated validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(GradleWrapper.validate(ctx, version, distribution, gradleWrapper));
+        return super.validate(ctx).and(GradleWrapper.validate(ctx, version, distribution, gradleWrapper, null));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.

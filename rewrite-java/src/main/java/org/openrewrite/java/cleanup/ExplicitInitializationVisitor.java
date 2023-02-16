@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.style.ExplicitInitializationStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -59,6 +60,9 @@ public class ExplicitInitializationVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         J.VariableDeclarations variableDecls = (J.VariableDeclarations) tree;
+        if(!FindAnnotations.find(variableDecls, "@lombok.Builder.Default").isEmpty()) {
+            return v;
+        }
 
         J.Literal literalInit = variable.getInitializer() instanceof J.Literal ? (J.Literal) variable.getInitializer() : null;
 

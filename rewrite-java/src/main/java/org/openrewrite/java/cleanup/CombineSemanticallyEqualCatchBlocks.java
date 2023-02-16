@@ -70,7 +70,7 @@ public class CombineSemanticallyEqualCatchBlocks extends Recipe {
                 J.Try.Catch from = catches.get(i);
                 for (int j = i + 1; j < catches.size(); j++) {
                     J.Try.Catch to = catches.get(j);
-                    if (SemanticallyEqual.areSemanticallyEqual(from.getBody(), to.getBody()) &&
+                    if (SemanticallyEqual.areEqual(from.getBody(), to.getBody()) &&
                             containSameComments(from.getBody(), to.getBody())) {
                         List<J.Try.Catch> semanticallyEqualCatch = semanticallyEqualCatchesMap.computeIfAbsent(from, k -> new ArrayList<>());
                         semanticallyEqualCatch.add(to);

@@ -367,6 +367,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public boolean isAdaptableTo(@SuppressWarnings("rawtypes") Class<? extends TreeVisitor> adaptTo) {
+        if (adaptTo.isAssignableFrom(getClass())) {
+            return true;
+        }
         Class<? extends Tree> mine = visitorTreeType(getClass());
         Class<? extends Tree> theirs = visitorTreeType(adaptTo);
         return mine.isAssignableFrom(theirs);

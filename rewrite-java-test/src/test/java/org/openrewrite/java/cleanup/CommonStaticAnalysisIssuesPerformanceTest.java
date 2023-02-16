@@ -16,21 +16,24 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Recipe;
+import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.sourceSet;
 
 public class CommonStaticAnalysisIssuesPerformanceTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(RewriteTest.fromRuntimeClasspath("org.openrewrite.java.cleanup.CommonStaticAnalysis"))
-          .afterRecipe(run -> {
-              System.out.println(run.getStats().printAsMermaidGantt(1e6));
-              System.out.println("\n");
-              System.out.println(run.getStats().printAsCsv());
-          });
+        spec.recipe(RewriteTest.fromRuntimeClasspath("org.openrewrite.java.cleanup.CommonStaticAnalysis"));
+//          .afterRecipe(run -> {
+//              System.out.println(run.getStats().printAsMermaidGantt(1e6));
+//              System.out.println("\n");
+//              System.out.println(run.getStats().printAsCsv());
+//          });
     }
 
     @Test

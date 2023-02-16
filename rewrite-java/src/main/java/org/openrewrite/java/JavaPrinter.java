@@ -33,9 +33,6 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
         for (int i = 0; i < nodes.size(); i++) {
             JRightPadded<? extends J> node = nodes.get(i);
-            if (node == null) {
-                System.out.println("here");
-            }
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), location.getAfterLocation(), p);
             visitMarkers(node.getMarkers(), p);

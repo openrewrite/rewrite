@@ -24,7 +24,6 @@ import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -32,6 +31,7 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
@@ -1835,7 +1835,7 @@ public class GroovyParserVisitor {
         int column;
 
         @Override
-        public int compareTo(@NotNull GroovyParserVisitor.LineColumn lc) {
+        public int compareTo(@NonNull GroovyParserVisitor.LineColumn lc) {
             return line != lc.line ? line - lc.line : column - lc.column;
         }
     }

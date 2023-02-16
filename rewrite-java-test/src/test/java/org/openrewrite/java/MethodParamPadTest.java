@@ -308,6 +308,22 @@ class MethodParamPadTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void bodyNotFormatted() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void test() {
+                      for  (int i=0;i<10;i++) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
     private static Consumer<SourceSpec<J.CompilationUnit>> autoFormatIsIdempotent() {
         return spec -> spec.afterRecipe(cu ->
           assertThat(new AutoFormatVisitor<>().visit(cu, 0)).isEqualTo(cu));

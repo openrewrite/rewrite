@@ -59,7 +59,7 @@ public class VariableNameUtils {
 
             baseName = baseName.substring(0, baseName.length() - postFix.length());
             int count = postFix.length() == 0 ? 0 : Integer.parseInt(postFix.reverse().toString());
-            while (namesInScope.contains(newName)) {
+            while (namesInScope.contains(newName) || JavaKeywords.isReserved(newName)) {
                 newName = baseName + (count += 1);
             }
         }
@@ -259,6 +259,70 @@ public class VariableNameUtils {
         private boolean isValidImportName(@Nullable JavaType targetType, String name) {
             // Consider the id a valid field if the type is null since it is indistinguishable from a method name or class name.
             return targetType == null || (targetType instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) targetType).getMembers().stream().anyMatch(o -> o.getName().equals(name)));
+        }
+    }
+
+    static final class JavaKeywords {
+        JavaKeywords() {
+        }
+
+        private static final String[] RESERVED_WORDS = new String[]{
+                "abstract",
+                "assert",
+                "boolean",
+                "break",
+                "byte",
+                "case",
+                "catch",
+                "char",
+                "class",
+                "const",
+                "continue",
+                "default",
+                "do",
+                "double",
+                "else",
+                "enum",
+                "extends",
+                "final",
+                "finally",
+                "float",
+                "for",
+                "goto",
+                "if",
+                "implements",
+                "import",
+                "instanceof",
+                "int",
+                "interface",
+                "long",
+                "native",
+                "new",
+                "package",
+                "private",
+                "protected",
+                "public",
+                "return",
+                "short",
+                "static",
+                "strictfp",
+                "super",
+                "switch",
+                "synchronized",
+                "this",
+                "throw",
+                "throws",
+                "transient",
+                "try",
+                "void",
+                "volatile",
+                "while",
+        };
+
+        private static final Set<String> RESERVED_WORDS_SET = new HashSet<>(Arrays.asList(RESERVED_WORDS));
+
+        public static boolean isReserved(String word) {
+            return RESERVED_WORDS_SET.contains(word);
         }
     }
 }

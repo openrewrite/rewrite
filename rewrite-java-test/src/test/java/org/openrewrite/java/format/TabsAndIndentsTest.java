@@ -384,6 +384,7 @@ class TabsAndIndentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
+                  import java.util.Collection;
                   class Test {
                       Test withData(Object... arg0) {
                           return this;
@@ -409,6 +410,7 @@ class TabsAndIndentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.*;
               class Test {
                   Test withData(Object... arg0) {
                       return this;
@@ -466,6 +468,8 @@ class TabsAndIndentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.*;
+              import java.util.stream.Collectors;
               class Test {
                   void method(Collection<List<String>> c) {
                       c.stream().map(x -> x.stream().max((r1, r2) -> {
@@ -486,6 +490,8 @@ class TabsAndIndentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.*;
+              import java.util.stream.Collectors;
               class Test {
                   void method(Collection<List<String>> c) {
                       c.stream().map(x -> x.stream().max((r1, r2) ->
@@ -932,11 +938,12 @@ class TabsAndIndentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import lombok.EqualsAndHashCode;
+              import java.util.UUID;
               class Test {
-                  @Incubating(
-                          since = "7.0.0"
+                  @SuppressWarnings(
+                          value = "unchecked"
                   )
-                  @SuppressWarnings("unchecked")
                   @EqualsAndHashCode.Include
                   UUID id;
               }
@@ -1184,7 +1191,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               class Test {
-                  @Bean int method() {
+                  @Deprecated int method() {
                       return 1;
                   }
               }
@@ -1600,7 +1607,7 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               public class Test {
                   @Deprecated
-                  final Scope scope;
+                  final String scope;
                             
                   @Deprecated
                   String classifier;

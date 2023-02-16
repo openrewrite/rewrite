@@ -45,7 +45,7 @@ public class DependencyResolutions extends DataTable<DependencyResolutions.Row> 
                 description = "The resolved version.")
         String version;
 
-        @Option(displayName = "Repository URI",
+        @Column(displayName = "Repository URI",
                 description = "The artifact repository that this dependency attempted to resolve from.")
         String repositoryUri;
 

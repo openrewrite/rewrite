@@ -13,25 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marker;
+@NonNullApi
+package org.openrewrite.gradle.util;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import lombok.With;
-
-import java.util.UUID;
-
-@Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@With
-public class OperatingSystem implements Marker {
-    @EqualsAndHashCode.Include
-    UUID id;
-
-    Type type;
-
-    public enum Type {
-        Unix,
-        Windows
-    }
-}
+import org.openrewrite.internal.lang.NonNullApi;

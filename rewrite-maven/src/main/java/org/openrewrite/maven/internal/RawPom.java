@@ -23,7 +23,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
-import org.jetbrains.annotations.NotNull;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
 
@@ -396,7 +396,7 @@ public class RawPom {
         return profiles;
     }
 
-    @NotNull
+    @NonNull
     private List<MavenRepository> mapRepositories(@Nullable RawRepositories rawRepositories) {
         List<MavenRepository> pomRepositories = emptyList();
         if (rawRepositories != null) {

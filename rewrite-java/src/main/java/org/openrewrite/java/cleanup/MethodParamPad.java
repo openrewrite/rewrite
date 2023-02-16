@@ -18,12 +18,13 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+
+import java.util.Optional;
 
 public class MethodParamPad extends Recipe {
     @Override
@@ -46,19 +47,11 @@ public class MethodParamPad extends Recipe {
         SpacesStyle spacesStyle;
         MethodParamPadStyle methodParamPadStyle;
 
-        @Nullable
-        EmptyForInitializerPadStyle emptyForInitializerPadStyle;
-
-        @Nullable
-        EmptyForIteratorPadStyle emptyForIteratorPadStyle;
-
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
             SourceFile cu = (SourceFile)javaSourceFile;
-            spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
-            methodParamPadStyle = cu.getStyle(MethodParamPadStyle.class) == null ? Checkstyle.methodParamPadStyle() : cu.getStyle(MethodParamPadStyle.class);
-            emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
-            emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
+            spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
+            methodParamPadStyle = Optional.ofNullable(cu.getStyle(MethodParamPadStyle.class)).orElse(Checkstyle.methodParamPadStyle());
 
             spacesStyle = spacesStyle.withBeforeParentheses(
                     spacesStyle.getBeforeParentheses()
@@ -78,7 +71,8 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            md = (J.MethodDeclaration)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, md).visitNonNull(md, ctx);
+            md = (J.MethodDeclaration)new SpacesVisitor<>(spacesStyle, null, null, md.getParameters().get(0))
+                    .visitNonNull(md, ctx, getCursor().getParentTreeCursor().fork());
             return md;
         }
 
@@ -92,7 +86,8 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            mi = (J.MethodInvocation)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, mi).visitNonNull(mi, ctx);
+            mi = (J.MethodInvocation)new SpacesVisitor<>(spacesStyle, null, null, mi)
+                    .visitNonNull(mi, ctx, getCursor().getParentTreeCursor().fork());
             return mi;
         }
 
@@ -106,7 +101,8 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            nc = (J.NewClass)new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, nc).visitNonNull(nc, ctx);
+            nc = (J.NewClass)new SpacesVisitor<>(spacesStyle, null, null, nc)
+                    .visitNonNull(nc, ctx, getCursor().getParentTreeCursor().fork());
             return nc;
         }
     }

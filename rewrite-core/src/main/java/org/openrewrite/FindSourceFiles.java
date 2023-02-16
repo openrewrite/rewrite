@@ -20,11 +20,13 @@ import lombok.Value;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.table.SourcesFiles;
 
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindSourceFiles extends Recipe {
+    transient SourcesFiles results = new SourcesFiles(this);
 
     @Option(displayName = "File pattern",
             description = "A glob expression representing a file path to search for (relative to the project root).",
@@ -46,12 +48,13 @@ public class FindSourceFiles extends Recipe {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Nullable
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     String sourcePath = sourceFile.getSourcePath().toString();
                     if (StringUtils.matchesGlob(sourcePath.matches("^\\.?[/\\\\]") ? sourcePath :
                             "./" + sourcePath, filePattern)) {
+                        results.insertRow(ctx, new SourcesFiles.Row(sourcePath));
                         return SearchResult.found(sourceFile);
                     }
                 }

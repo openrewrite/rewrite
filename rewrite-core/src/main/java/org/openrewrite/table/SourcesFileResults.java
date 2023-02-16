@@ -37,6 +37,11 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
                 description = "A recipe may modify the source path. This is the path after the run.")
         String afterSourcePath;
 
+        @Column(displayName = "Parent of the recipe that made changes",
+                description = "In a hierarchical recipe, the parent of the recipe that made a change. Empty if" +
+                              "this is the root of a hierarchy or if the recipe is not hierarchical at all.")
+        String parentRecipe;
+
         @Column(displayName = "Recipe that made changes",
                 description = "The specific recipe that made a change.")
         String recipe;
