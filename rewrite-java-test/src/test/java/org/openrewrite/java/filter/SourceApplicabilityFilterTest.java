@@ -18,13 +18,25 @@ package org.openrewrite.java.filter;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.java.search.FindMethods;
+import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.test.SourceSpecs.dir;
+import java.io.ByteArrayInputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+import java.util.Properties;
+
+import static org.openrewrite.java.Assertions.*;
 
 public class SourceApplicabilityFilterTest {
     @Language("java")
@@ -63,66 +75,128 @@ public class SourceApplicabilityFilterTest {
       }
       """;
 
+    private static FindMethods createFindMethods() {
+        return new FindMethods("java.io.PrintStream println(..)", true, "none");
+    }
+
     @Nested
     class AllSourceTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(new CompositeRecipe()
               .doNext(new SourceApplicabilityFilter(SourceApplicabilityFilter.Target.ALL_SOURCE))
-              .doNext(new FindMethods("java.io.PrintStream println(..)", true, "none")));
+              .doNext(createFindMethods()));
         }
 
         @Test
         void justProduction() {
             rewriteRun(
-              dir("src/main/java/org/openrewrite/java/", java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT))
+              srcMainJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT))
             );
         }
 
         @Test
         void justTest() {
             rewriteRun(
-              dir("src/test/java/org/openrewrite/java/", java(TEST_INITIAL, TEST_SEARCH_RESULT))
+              srcTestJava(java(TEST_INITIAL, TEST_SEARCH_RESULT))
             );
         }
 
         @Test
         void productionAndTest() {
             rewriteRun(
-              dir("src/main/java/org/openrewrite/java/", java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
-              dir("src/test/java/org/openrewrite/java/", java(TEST_INITIAL, TEST_SEARCH_RESULT))
+              srcMainJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
+              srcTestJava(java(TEST_INITIAL, TEST_SEARCH_RESULT))
             );
         }
     }
 
     @Nested
     class AllSourceIfDetectedInNonTestTest implements RewriteTest {
+
+        private static CompositeRecipe createMainRecipe() {
+            return (CompositeRecipe) new CompositeRecipe()
+              .addApplicableTest(new HasSourceSet("main").getVisitor())
+              .addApplicableTest(createFindMethods().getVisitor())
+              .doNext(createFindMethods());
+        }
+
+        private static CompositeRecipe createTestRecipe() {
+            return (CompositeRecipe) new CompositeRecipe()
+              .addSingleSourceApplicableTest(new HasSourceSet("test").getVisitor())
+              .addSingleSourceApplicableTest(createFindMethods().getVisitor())
+              .doNext(createFindMethods());
+        }
+
+//        @Override
+//        public void defaults(RecipeSpec spec) {
+//            spec.recipe(new CompositeRecipe()
+//              .addApplicableTest(getVisitor(createMainRecipe()))
+//              .addApplicableTest(getVisitor(createTestRecipe()))
+//              .doNext(createMainRecipe())
+//              .doNext(createTestRecipe()));
+//        }
+
+
         @Override
         public void defaults(RecipeSpec spec) {
-            spec.recipe(new CompositeRecipe()
-              .doNext(new SourceApplicabilityFilter(SourceApplicabilityFilter.Target.ALL_SOURCE_IF_DETECTED_IN_NON_TEST))
-              .doNext(new FindMethods("java.io.PrintStream println(..)", true, "none")));
+            String yamlRecipe = """
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: com.example.SecurityModifyRecipe
+displayName: Do all the things for both
+description: Do all the things for both.
+applicability:
+  anySource:
+  - org.openrewrite.java.search.HasSourceSet:
+      sourceSet: "main"
+  - org.openrewrite.java.search.FindMethods:
+      methodPattern: "java.io.PrintStream println(..)"
+recipeList:
+  - org.openrewrite.java.search.FindMethods:
+      methodPattern: "java.io.PrintStream println(..)"
+""";
+            spec.recipe(Environment.builder()
+              .scanRuntimeClasspath()
+              .load(
+                new YamlResourceLoader(
+                  new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
+                  Paths.get("applicability.yml").toUri(),
+                  new Properties()))
+              .build()
+              .activateRecipes("com.example.SecurityModifyRecipe"));
+        }
+
+        private static TreeVisitor<?, ExecutionContext> getVisitor(Recipe recipe) {
+            try {
+                Method getVisitor = Recipe.class.getDeclaredMethod("getVisitor");
+                getVisitor.setAccessible(true);
+                //noinspection unchecked
+                return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
+            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         @Test
         void justProduction() {
             rewriteRun(
-              dir("src/main/java/org/openrewrite/java/", java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT))
+              srcMainJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT))
             );
         }
 
         @Test
         void justTest() {
             rewriteRun(
-              dir("src/test/java/org/openrewrite/java/", java(TEST_INITIAL))
+              srcTestJava(java(TEST_INITIAL))
             );
         }
 
         @Test
         void productionAndTest() {
             rewriteRun(
-              dir("src/main/java/org/openrewrite/java/", java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
-              dir("src/test/java/org/openrewrite/java/", java(TEST_INITIAL, TEST_SEARCH_RESULT))
+              srcMainJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
+              srcTestJava(java(TEST_INITIAL, TEST_SEARCH_RESULT))
             );
         }
     }
@@ -133,28 +207,28 @@ public class SourceApplicabilityFilterTest {
         public void defaults(RecipeSpec spec) {
             spec.recipe(new CompositeRecipe()
               .doNext(new SourceApplicabilityFilter(SourceApplicabilityFilter.Target.NON_TEST_SOURCE))
-              .doNext(new FindMethods("java.io.PrintStream println(..)", true, "none")));
+              .doNext(createFindMethods()));
         }
 
         @Test
         void justProduction() {
             rewriteRun(
-              dir("src/main/java/org/openrewrite/java/", java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT))
+              srcMainJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT))
             );
         }
 
         @Test
         void justTest() {
             rewriteRun(
-              dir("src/test/java/org/openrewrite/java/", java(TEST_INITIAL))
+              srcTestJava(java(TEST_INITIAL))
             );
         }
 
         @Test
         void productionAndTest() {
             rewriteRun(
-              dir("src/main/java/org/openrewrite/java/", java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
-              dir("src/test/java/org/openrewrite/java/", java(TEST_INITIAL))
+              srcMainJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
+              srcTestJava(java(TEST_INITIAL))
             );
         }
     }

@@ -131,7 +131,7 @@ public class DeclarativeRecipe extends CompositeRecipe {
 
     private TreeVisitor<?, ExecutionContext> getVisitor(Recipe recipe) {
         try {
-            Method getVisitor = recipe.getClass().getDeclaredMethod("getVisitor");
+            Method getVisitor = Recipe.class.getDeclaredMethod("getVisitor");
             getVisitor.setAccessible(true);
             //noinspection unchecked
             return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
