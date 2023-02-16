@@ -7,10 +7,14 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest implements RewriteTest {
+class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(Environment.builder()
+        spec
+          .parser(JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .classpath("commons-lang3"))
+          .recipe(Environment.builder()
           .scanRuntimeClasspath("org.openrewrite.java")
           .build()
           .activateRecipes("org.openrewrite.java.cleanup.ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNull"));
