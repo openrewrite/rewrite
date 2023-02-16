@@ -19,19 +19,20 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.QuarkParser;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.StringWriter;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -101,15 +102,27 @@ public class RecipeSpec {
         return this;
     }
 
-    public RecipeSpec recipe(InputStream yaml, String... recipes) {
+    public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
         return recipe(Environment.builder()
                 .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
                 .build()
-                .activateRecipes(recipes));
+                .activateRecipes(activeRecipes));
     }
 
-    public RecipeSpec recipe(String yamlResource, String... recipes) {
-        return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), recipes);
+    public RecipeSpec recipeFromYaml(@Language("yaml") String yaml, String... activeRecipes) {
+        return recipe(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes);
+    }
+
+    /**
+     * @deprecated Use {@link #recipeFromResource(String, String...)} instead.
+     */
+    @Deprecated
+    public RecipeSpec recipe(String yamlResource, String... activeRecipes) {
+        return recipeFromResource(yamlResource, activeRecipes);
+    }
+
+    public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
+        return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes);
     }
 
     /**
