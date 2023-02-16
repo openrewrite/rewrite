@@ -86,7 +86,6 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                   public String toString() {
                       return "Vehicle[model=" + model + ", power=" + power + "]";
                   }
-
               }
               """),
             14));
@@ -142,6 +141,62 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                   @Override
                   public String toString() {
                       return "Vehicle[models=" + models + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void genericRecord() {
+        rewriteRun(
+          version(
+            java(
+              """
+              package com.example;
+
+              public record Vehicle<T>(T data) {
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public final class Vehicle<T> {
+                  private final T data;
+
+                  public Vehicle(T data) {
+                      this.data = data;
+                  }
+
+                  public T data() {
+                      return data;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null) {
+                          return false;
+                      }
+                      if (getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle<T> other = (Vehicle<T>) obj;
+                      return Objects.equals(data, other.data);
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(data);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[data=" + data + "]";
                   }
               }
               """),
@@ -207,7 +262,6 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                   public String toString() {
                       return "Vehicle[model=" + model + "]";
                   }
-
               }
               """),
             14));

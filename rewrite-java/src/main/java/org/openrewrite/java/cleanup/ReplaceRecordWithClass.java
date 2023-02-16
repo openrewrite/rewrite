@@ -43,7 +43,7 @@ public class ReplaceRecordWithClass extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace Java 14 record with a class.";
+        return "Replace record with a class.";
     }
 
     @Override
@@ -67,10 +67,7 @@ public class ReplaceRecordWithClass extends Recipe {
                 .builder(this::getCursor, "private static final #{} #{};").build();
 
         private final JavaTemplate constructorTemplate = JavaTemplate
-                .builder(this::getCursor, "public #{}() { }").build();
-
-        private final JavaTemplate assignmentTemplate = JavaTemplate
-                .builder(this::getCursor, "this.#{} = #{};").build();
+                .builder(this::getCursor, "public #{}(#{}) { #{} }").build();
 
         private final JavaTemplate getterTemplate = JavaTemplate
                 .builder(this::getCursor, "public #{} #{}() { return #{}; }").build();
@@ -85,6 +82,7 @@ public class ReplaceRecordWithClass extends Recipe {
                         "    #{} other = (#{}) obj;\n" +
                         "    return #{};\n" +
                         "}\n")
+                .imports("java.util.Objects")
                 .build();
 
         private final JavaTemplate hashCodeTemplate = JavaTemplate
@@ -121,8 +119,12 @@ public class ReplaceRecordWithClass extends Recipe {
                     .map(J.VariableDeclarations.class::cast)
                     .collect(Collectors.toList());
 
-            // Change kind from record to class
+            // Change a kind from record to class
             result = result.withKind(J.ClassDeclaration.Kind.Type.Class);
+            if (result.getType() instanceof JavaType.Class) {
+                result = result.withType(((JavaType.Class) result.getType())
+                        .withKind(JavaType.FullyQualified.Kind.Class));
+            }
 
             // Remove record parameters
             result = result.withPrimaryConstructor(null);
@@ -132,7 +134,6 @@ public class ReplaceRecordWithClass extends Recipe {
                     Tree.randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final, Collections.emptyList())));
 
             // Add fields
-            // TODO Remove static from fields
             for (J.VariableDeclarations field : fields) {
                 result = result.withBody(result.getBody()
                         .withTemplate(fieldTemplate,
@@ -141,12 +142,27 @@ public class ReplaceRecordWithClass extends Recipe {
                                 field.getVariables().get(0).getSimpleName()));
             }
 
+            // Remove static modifiers from fields.
+            // Something is broken in template for non-static fields,
+            // so we have to add static fields first and then remove static modifiers
+            result = result.withBody(result.getBody().withStatements(result.getBody().getStatements().stream()
+                    .map(J.VariableDeclarations.class::cast)
+                    .map(fieldDeclaration -> fieldDeclaration.withModifiers(
+                            ListUtils.map(fieldDeclaration.getModifiers(),
+                                    m -> m.getType() != J.Modifier.Type.Static ? m : null)))
+                    .collect(Collectors.toList())));
+
             // Add a constructor
-            // TODO Add fields initialization
             result = result.withBody(result.getBody()
                     .withTemplate(constructorTemplate,
                             result.getBody().getCoordinates().lastStatement(),
-                            result.getSimpleName()));
+                            result.getSimpleName(),
+                            fields.stream()
+                                    .map(this::createConstructorParameter)
+                                    .collect(Collectors.joining(", ")),
+                            fields.stream()
+                                    .map(this::createFieldAssignment)
+                                    .collect(Collectors.joining("\n"))));
 
             // Add getters
             for (J.VariableDeclarations field : fields) {
@@ -157,8 +173,6 @@ public class ReplaceRecordWithClass extends Recipe {
                                 field.getVariables().get(0).getSimpleName(),
                                 field.getVariables().get(0).getSimpleName()));
             }
-
-            maybeAddImport("java.util.Objects");
 
             // Add equals() method
             result = result.withBody(result.getBody()
@@ -187,7 +201,20 @@ public class ReplaceRecordWithClass extends Recipe {
                                     .map(this::createFieldPrinting)
                                     .collect(Collectors.joining(", "))));
 
+            maybeAddImport("java.util.Objects");
+
             return autoFormat(result, ctx);
+        }
+
+        private String createConstructorParameter(J.VariableDeclarations field) {
+            String fieldType = Objects.requireNonNull(field.getTypeExpression()).toString();
+            String fieldName = field.getVariables().get(0).getSimpleName();
+            return String.format("%s %s", fieldType, fieldName);
+        }
+
+        private String createFieldAssignment(J.VariableDeclarations field) {
+            String fieldName = field.getVariables().get(0).getSimpleName();
+            return String.format("this.%s = %s", fieldName, fieldName);
         }
 
         private String createFieldComparison(J.VariableDeclarations field) {
