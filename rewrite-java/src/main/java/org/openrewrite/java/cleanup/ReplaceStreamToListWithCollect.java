@@ -24,7 +24,9 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesJavaVersion;
 import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 
 import java.time.Duration;
 
@@ -62,15 +64,13 @@ public class ReplaceStreamToListWithCollect extends Recipe {
                     .imports("java.util.stream.Collectors")
                     .build();
 
+            @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation result = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (STREAM_TO_LIST.matches(method)) {
-                    J.MethodInvocation newMethod = result
-                            .withTemplate(template, result.getCoordinates().replace(), result.getSelect());
-                    result = result
-                            .withName(newMethod.getName())
-                            .withMethodType(newMethod.getMethodType())
-                            .withArguments(newMethod.getArguments());
+                    JRightPadded<Expression> select = result.getPadding().getSelect();
+                    result = result.withTemplate(template, result.getCoordinates().replace(), result.getSelect());
+                    result = result.getPadding().withSelect(select);
                     maybeAddImport("java.util.stream.Collectors");
                 }
                 return result;
