@@ -38,9 +38,9 @@ public class RecipeRunStats {
     public RecipeRunStats(Recipe recipe) {
         this.recipe = recipe;
         if (recipe.getRecipeList().isEmpty()) {
-            this.called = new ArrayList<>();
+            called = new ArrayList<>();
         } else {
-            this.called = new ArrayList<>(recipe.getRecipeList().size());
+            called = new ArrayList<>(recipe.getRecipeList().size());
             for (Recipe callee : recipe.getRecipeList()) {
                 addCalledRecipe(callee);
             }

@@ -35,7 +35,7 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
@@ -49,7 +49,7 @@ import static org.openrewrite.RecipeSchedulerUtils.handleUncaughtException;
  * reporting a {@link RecipeRun} result.
  */
 public interface RecipeScheduler {
-    default <T> List<T> mapAsync(List<T> input, Function<T, T> mapFn) {
+    default <T> List<T> mapAsync(List<T> input, UnaryOperator<T> mapFn) {
         @SuppressWarnings("unchecked") CompletableFuture<T>[] futures =
                 new CompletableFuture[input.size()];
 
@@ -162,11 +162,11 @@ public interface RecipeScheduler {
                     results.add(new Result(
                             original,
                             s,
-                            s
-                                    .getMarkers()
-                                    .findFirst(RecipesThatMadeChanges.class)
-                                    .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change"))
-                                    .getRecipes()
+                            s.getMarkers()
+                                .findFirst(RecipesThatMadeChanges.class)
+                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe " +
+                                    "reported making a change"))
+                                .getRecipes()
                     ));
                 }
             }
