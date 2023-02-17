@@ -23,9 +23,9 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesJavaVersion;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JavaType.Primitive;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.utils.ExpressionUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -87,7 +87,7 @@ public class ReplaceTextBlockWithString extends Recipe {
                     literals[i] = toLiteral(lines[i]).withPrefix(Space.build("\n", Collections.emptyList()));
                 }
                 // Format the resulting expression
-                return autoFormat(Arrays.stream(literals).reduce(ExpressionUtils::additiveExpression).get(), ctx);
+                return autoFormat(Arrays.stream(literals).reduce(this::concatLiterals).get(), ctx);
             }
             return literal;
         }
@@ -106,5 +106,22 @@ public class ReplaceTextBlockWithString extends Recipe {
         private String quote(String str) {
             return "\"" + str.replace("\"", "\\\"") + "\"";
         }
+
+        private Expression concatLiterals(Expression left, Expression right) {
+            return new J.Binary(
+                    Tree.randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    left,
+                    padLeft(Space.build(" ", Collections.emptyList()), J.Binary.Type.Addition),
+                    right,
+                    left.getType());
+        }
+
+        private <T> JLeftPadded<T> padLeft(Space left, T tree) {
+            return new JLeftPadded<>(left, tree, Markers.EMPTY);
+        }
+
     }
+
 }
