@@ -109,14 +109,14 @@ public class ChainStringBuilderAppendCalls extends Recipe {
     }
 
     private static J.MethodInvocation buildAppendMethodInvocation(
-        Expression select,
+        @Nullable Expression select,
         Expression param
     ) {
         return new J.MethodInvocation(
             Tree.randomId(),
             Space.EMPTY,
             Markers.EMPTY,
-            new JRightPadded<>(select, Space.EMPTY, Markers.EMPTY),
+            select != null ? new JRightPadded<>(select, Space.EMPTY, Markers.EMPTY) : null,
             null,
             new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, APPEND_METHOD_NAME,
                 JavaType.Primitive.Boolean, null),
