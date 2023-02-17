@@ -24,8 +24,10 @@ import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.HasSourceSet;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.test.SourceSpecs.dir;
 
 public class JavaRecipeLifecycleTest {
     @Issue("https://github.com/openrewrite/rewrite/discussions/2849")
@@ -67,7 +69,7 @@ public class JavaRecipeLifecycleTest {
           """;
 
         @Test
-        default void justProduction() {
+        default void justMain() {
             rewriteRun(
               srcMainJava(java(MAIN_INITIAL, MAIN_SEARCH_RESULT))
             );
@@ -81,7 +83,7 @@ public class JavaRecipeLifecycleTest {
         }
 
         @Test
-        default void productionAndTest() {
+        default void mainAndTest() {
             rewriteRun(
               srcMainJava(java(MAIN_INITIAL, MAIN_SEARCH_RESULT)),
               srcTestJava(java(TEST_INITIAL, TEST_SEARCH_RESULT))
@@ -90,15 +92,15 @@ public class JavaRecipeLifecycleTest {
     }
 
     @Nested
-    class FromYamlSourceSetFilteringTest implements SourceSetFilteringTest {
+    class FromYamlUsingHasSourceSetSourceSetFilteringTest implements SourceSetFilteringTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipeFromYaml("""
                 ---
                 type: specs.openrewrite.org/v1beta/recipe
-                name: com.example.SecurityModifyRecipe
-                displayName: Do all the things for both
-                description: Do all the things for both.
+                name: com.example.FilteringByMainTestSources
+                displayName: Filtering Test By `main` Sources Test
+                description: Only apply a `FindMethods` recipe to all sources when `main` sources are modified.
                 applicability:
                   anySource:
                   - org.openrewrite.java.search.HasSourceSet:
@@ -109,7 +111,7 @@ public class JavaRecipeLifecycleTest {
                   - org.openrewrite.java.search.FindMethods:
                       methodPattern: "java.io.PrintStream println(..)"
                 """,
-              "com.example.SecurityModifyRecipe"
+              "com.example.FilteringByMainTestSources"
             );
         }
     }
@@ -128,6 +130,73 @@ public class JavaRecipeLifecycleTest {
                 .addApplicableTest(new HasSourceSet("main").getVisitor())
                 .addApplicableTest(createFindMethods().getVisitor())
                 .doNext(createFindMethods())
+            );
+        }
+    }
+
+
+    @Nested
+    class FromYamlUsingIsNotTestSourceSourceSetFilteringTest implements SourceSetFilteringTest {
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipeFromYaml("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: com.example.FilteringTestSources
+                displayName: Filtering Test Sources Test
+                description: Only apply a `FindMethods` recipe to all sources when non-test sources are modified.
+                applicability:
+                  anySource:
+                  - org.openrewrite.java.search.IsLikelyNotTest
+                  - org.openrewrite.java.search.FindMethods:
+                      methodPattern: "java.io.PrintStream println(..)"
+                recipeList:
+                  - org.openrewrite.java.search.FindMethods:
+                      methodPattern: "java.io.PrintStream println(..)"
+                """,
+              "com.example.FilteringTestSources"
+            );
+        }
+
+        @Language("java")
+        String PRODUCTION_INITIAL = """
+          class Production {
+            Production() {
+              System.out.println("Hello World Production!");
+            }
+          }
+          """;
+
+        @Language("java")
+        String PRODUCTION_SEARCH_RESULT = """
+          class Production {
+            Production() {
+              /*~~>*/System.out.println("Hello World Production!");
+            }
+          }
+          """;
+
+        /**
+         * A source set that isn't `main` or `test`, but is a source set likely used for production code.
+         */
+        private SourceSpecs srcProductionJava(SourceSpecs... javaSources) {
+            return dir("src/production/java", spec -> sourceSet(spec, "production"), javaSources);
+        }
+
+        @Test
+        void mainAndProductionAndTest() {
+            rewriteRun(
+              srcMainJava(java(MAIN_INITIAL, MAIN_SEARCH_RESULT)),
+              srcProductionJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
+              srcTestJava(java(TEST_INITIAL, TEST_SEARCH_RESULT))
+            );
+        }
+
+        @Test
+        void productionAndTest() {
+            rewriteRun(
+              srcProductionJava(java(PRODUCTION_INITIAL, PRODUCTION_SEARCH_RESULT)),
+              srcTestJava(java(TEST_INITIAL, TEST_SEARCH_RESULT))
             );
         }
     }

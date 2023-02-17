@@ -510,7 +510,7 @@ public class StringUtils {
     }
 
     /**
-     * See https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns
+     * See <a href="https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns">https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns</a>
      * <p>
      * An embedded * in an identifier matches any sequence of characters, but
      * does not match the package (or inner-type) separator ".".
