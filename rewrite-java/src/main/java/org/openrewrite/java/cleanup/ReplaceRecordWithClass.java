@@ -114,6 +114,11 @@ public class ReplaceRecordWithClass extends Recipe {
                 return result;
             }
 
+            // Generic records not supported yet
+            if (result.getTypeParameters() != null && !result.getTypeParameters().isEmpty()) {
+                return result;
+            }
+
             // Get record fields
             List<J.VariableDeclarations> fields = Objects.requireNonNull(result.getPrimaryConstructor()).stream()
                     .map(J.VariableDeclarations.class::cast)

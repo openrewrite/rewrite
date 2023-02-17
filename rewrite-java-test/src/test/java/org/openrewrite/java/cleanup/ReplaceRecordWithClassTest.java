@@ -155,49 +155,9 @@ class ReplaceRecordWithClassTest implements RewriteTest {
               """
               package com.example;
 
-              public record Vehicle<T>(T data) {
-              }
-              """,
-              """
-              package com.example;
+              import java.util.List;
 
-              import java.util.Objects;
-
-              public final class Vehicle<T> {
-                  private final T data;
-
-                  public Vehicle(T data) {
-                      this.data = data;
-                  }
-
-                  public T data() {
-                      return data;
-                  }
-
-                  @Override
-                  public boolean equals(Object obj) {
-                      if (this == obj) {
-                          return true;
-                      }
-                      if (obj == null) {
-                          return false;
-                      }
-                      if (getClass() != obj.getClass()) {
-                          return false;
-                      }
-                      Vehicle<T> other = (Vehicle<T>) obj;
-                      return Objects.equals(data, other.data);
-                  }
-
-                  @Override
-                  public int hashCode() {
-                      return Objects.hash(data);
-                  }
-
-                  @Override
-                  public String toString() {
-                      return "Vehicle[data=" + data + "]";
-                  }
+              public record Vehicle<T>(T data, List<T> contents) {
               }
               """),
             14));
