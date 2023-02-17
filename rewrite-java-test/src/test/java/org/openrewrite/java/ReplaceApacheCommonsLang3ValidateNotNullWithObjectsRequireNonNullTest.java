@@ -34,6 +34,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
               """,
             """
               import java.util.Objects;
+
               class Test {
                   void test(Object obj) {
                         Objects.requireNonNull(obj);
@@ -45,7 +46,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
     }
 
     @Test
-    void replaceMethodsWithTwoArg(){
+    void DoNothingOnMethodsWithTwoArg(){
         rewriteRun(
           java(
             """
@@ -55,16 +56,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
                                Validate.notNull(obj,"Object should not be null");
                          }
                      }
-                  """,
-            """
-                    import java.util.Objects;
-                    class Test {
-                        void test(Object obj) {
-                              Objects.requireNonNull(obj,"Object should not be null");
-                        }
-                    }
-                 """
-
+                  """
           )
         );
     }
