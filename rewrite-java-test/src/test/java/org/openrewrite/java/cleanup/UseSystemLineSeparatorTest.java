@@ -82,4 +82,22 @@ class UseSystemLineSeparatorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotChangeIfNotGetLineSeparator() {
+        rewriteRun(
+          java(
+            """
+              import static java.lang.System.getProperty;
+              class A {
+                  String s1 = System.getProperty("unknown");
+                  String s2 = getProperty("unknown");
+                  void method1() {
+                      var s3 = System.getProperty("unknown");
+                  }
+              }
+              """
+          )
+        );
+    }
 }
