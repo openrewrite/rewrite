@@ -30,6 +30,7 @@ import java.time.Duration;
 public class UseSystemLineSeparator extends Recipe {
 
     private static final MethodMatcher GET_PROPERTY = new MethodMatcher("java.lang.System getProperty(..)");
+    private static final String LINE_SEPARATOR = "line.separator";
 
     @Override
     public String getDisplayName() {
@@ -53,12 +54,18 @@ public class UseSystemLineSeparator extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-
-
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J invocation = super.visitMethodInvocation(method, ctx);
+                J.MethodInvocation invocation = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (GET_PROPERTY.matches(method)) {
+                    String param = "";
+                    if (method.getArguments().size() == 1 && method.getArguments().get(0) instanceof J.Literal) {
+                        param = ((J.Literal) method.getArguments().get(0)).getValue().toString();
+                    }
+                    if (!LINE_SEPARATOR.equals(param)) {
+                        return invocation;
+                    }
+
                     if (method.getSelect() != null) {
                         final JavaTemplate template = JavaTemplate
                             .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()")
@@ -70,7 +77,7 @@ public class UseSystemLineSeparator extends Recipe {
                     } else {
                         // static import scenario
                         maybeRemoveImport("java.lang.System.getProperty");
-                        maybeAddImport("java.lang.System","lineSeparator");
+                        maybeAddImport("java.lang.System", "lineSeparator");
 
                         final JavaTemplate template = JavaTemplate
                             .builder(this::getCursor, "lineSeparator()")

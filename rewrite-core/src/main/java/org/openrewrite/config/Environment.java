@@ -15,7 +15,6 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.style.NamedStyles;
