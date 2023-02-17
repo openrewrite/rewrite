@@ -42,7 +42,7 @@ public class RecipeRunStats {
         } else {
             this.called = new ArrayList<>(recipe.getRecipeList().size());
             for (Recipe callee : recipe.getRecipeList()) {
-                called.add(new RecipeRunStats(callee));
+                addCalledRecipe(callee);
             }
         }
     }
@@ -54,7 +54,17 @@ public class RecipeRunStats {
     @Getter
     List<RecipeRunStats> called;
 
-    AtomicInteger calls = new AtomicInteger();
+    RecipeRunStats addCalledRecipe(Recipe recipe) {
+        RecipeRunStats stats = new RecipeRunStats(recipe);
+        called.add(stats);
+        return stats;
+    }
+
+    private AtomicInteger calls = new AtomicInteger();
+
+    void markCall() {
+        calls.incrementAndGet();
+    }
 
     /**
      * The number of times the recipe ran over all cycles.
@@ -63,7 +73,7 @@ public class RecipeRunStats {
         return calls.get();
     }
 
-    final AtomicLong cumulative = new AtomicLong();
+    private final AtomicLong cumulative = new AtomicLong();
 
     /**
      * The total time spent across all executions of this recipe.
@@ -72,7 +82,7 @@ public class RecipeRunStats {
         return Duration.ofNanos(cumulative.get());
     }
 
-    final AtomicLong max = new AtomicLong();
+    private final AtomicLong max = new AtomicLong();
 
     /**
      * The max time spent in any one execution of this recipe.
@@ -81,7 +91,16 @@ public class RecipeRunStats {
         return Duration.ofNanos(max.get());
     }
 
-    AtomicLong ownGetVisitor = new AtomicLong();
+    /**
+     * Called when the recipe being visited is completed.
+     */
+    void recipeVisitCompleted(long startTime) {
+        long totalTime = System.nanoTime() - startTime;
+        max.compareAndSet(Math.min(max.get(), totalTime), totalTime);
+        cumulative.addAndGet(totalTime);
+    }
+
+    private AtomicLong ownGetVisitor = new AtomicLong();
 
     /**
      * The total time spent in running the visitor returned by {@link Recipe#getVisitor()}
@@ -91,7 +110,11 @@ public class RecipeRunStats {
         return Duration.ofNanos(ownGetVisitor.get());
     }
 
-    AtomicLong ownVisit = new AtomicLong();
+    void ownGetVisitorCompleted(long ownGetVisitorStartTime) {
+        ownGetVisitor.addAndGet(System.nanoTime() - ownGetVisitorStartTime);
+    }
+
+    private AtomicLong ownVisit = new AtomicLong();
 
     /**
      * The total time spent in running the visitor returned by {@link Recipe#visit(List, ExecutionContext)}()}
@@ -99,6 +122,10 @@ public class RecipeRunStats {
      */
     public Duration getOwnVisit() {
         return Duration.ofNanos(ownVisit.get());
+    }
+
+    void ownVisitCompleted(long ownVisitStartTime) {
+        ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
     }
 
     @Incubating(since = "7.29.0")
