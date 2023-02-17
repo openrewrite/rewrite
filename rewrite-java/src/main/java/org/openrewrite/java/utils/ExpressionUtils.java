@@ -28,9 +28,9 @@ public final class ExpressionUtils {
     private ExpressionUtils() {}
 
     /**
-     * Concat two literals to an expression with '+'.
+     * Concat two literals to an expression with '+' and surrounded with single space.
      */
-    public static J.Binary concatBinary(Expression left, Expression right) {
+    public static J.Binary concatAdditionBinary(Expression left, Expression right) {
         JLeftPadded<Type> leftPadded = new JLeftPadded<>(Space.SINGLE_SPACE,
                 Type.Addition,
                 Markers.EMPTY);
@@ -53,7 +53,7 @@ public final class ExpressionUtils {
 
         for (Expression element : expressions) {
             if (element != null) {
-                expression = (expression == null) ? element : concatBinary(expression, element);
+                expression = (expression == null) ? element : concatAdditionBinary(expression, element);
             }
         }
         return expression;

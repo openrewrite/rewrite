@@ -37,6 +37,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                       StringBuilder sb = new StringBuilder();
                       String op = "+";
                       sb.append("A" + op + "B");
+                      sb.append(1 + op + 2);
                   }
               }
               """,
@@ -46,6 +47,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                       StringBuilder sb = new StringBuilder();
                       String op = "+";
                       sb.append("A").append(op).append("B");
+                      sb.append(1).append(op).append(2);
                   }
               }
               """
