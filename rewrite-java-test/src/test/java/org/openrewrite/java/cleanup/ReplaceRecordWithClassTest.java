@@ -175,6 +175,9 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                   String model();
               }
 
+              /**
+                * A DTO implementing an interface.
+                */
               public record Vehicle(String model) implements Product {
               }
               """,
@@ -187,6 +190,9 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                   String model();
               }
 
+              /**
+                * A DTO implementing an interface.
+                */
               public final class Vehicle implements Product {
                   private final String model;
 
