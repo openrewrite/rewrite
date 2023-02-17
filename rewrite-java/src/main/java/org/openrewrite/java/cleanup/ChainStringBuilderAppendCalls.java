@@ -7,7 +7,6 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.TreeVisitingPrinter;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.utils.ExpressionUtils;
@@ -19,14 +18,13 @@ import java.util.List;
 import static java.util.Collections.singletonList;
 
 public class ChainStringBuilderAppendCalls extends Recipe {
-    private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append" +
-        "(String)");
+    private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
     private static final JavaType STRING_BUILDER_TYPE = JavaType.buildType("java.lang.StringBuilder");
     private static final String APPEND_METHOD_NAME = "append";
 
     @Override
     public String getDisplayName() {
-        return "Replace with chained 'StringBuilder.append()` Calls";
+        return "Replace with chained 'StringBuilder.append()` calls";
     }
 
     @Override
@@ -42,12 +40,6 @@ public class ChainStringBuilderAppendCalls extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                System.out.println(TreeVisitingPrinter.printTree(getCursor()));
-                return super.visitCompilationUnit(cu, ctx);
-            }
-
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (STRING_BUILDER_APPEND.matches(method)) {
@@ -100,7 +92,6 @@ public class ChainStringBuilderAppendCalls extends Recipe {
             group.clear();
         }
     }
-
 
     private static J.MethodInvocation buildAppendMethodInvocation(
         Expression select,
