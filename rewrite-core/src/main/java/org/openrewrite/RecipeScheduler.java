@@ -35,27 +35,25 @@ import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.UnaryOperator;
-import java.util.stream.Collectors;
+import java.util.function.BiFunction;
 
 import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Recipe.PANIC;
 import static org.openrewrite.RecipeSchedulerUtils.addRecipesThatMadeChanges;
 import static org.openrewrite.RecipeSchedulerUtils.handleUncaughtException;
+import static org.openrewrite.Tree.randomId;
 
-/**
- * The scheduler is responsible for executing a {@link Recipe} full lifecycle and
- * reporting a {@link RecipeRun} result.
- */
 public interface RecipeScheduler {
-    default <T> List<T> mapAsync(List<T> input, UnaryOperator<T> mapFn) {
+    default <T> List<T> mapAsync(List<T> input, BiFunction<T, Integer, T> mapFn) {
         @SuppressWarnings("unchecked") CompletableFuture<T>[] futures =
                 new CompletableFuture[input.size()];
 
         int k = 0;
-        for (T before : input) {
-            Callable<T> updateTreeFn = () -> mapFn.apply(before);
+        for (int i = 0; i < input.size(); i++) {
+            T before = input.get(i);
+            final int index = i;
+            Callable<T> updateTreeFn = () -> mapFn.apply(before, index);
             futures[k++] = schedule(updateTreeFn);
         }
 
@@ -63,18 +61,15 @@ public interface RecipeScheduler {
         return ListUtils.map(input, (j, in) -> futures[j].join());
     }
 
-    default RecipeRun scheduleRun(
-            Recipe recipe,
-            List<? extends SourceFile> before,
-            ExecutionContext ctx,
-            int maxCycles,
-            int minCycles
-    ) {
+    default RecipeRun scheduleRun(Recipe recipe,
+                                  List<? extends SourceFile> before,
+                                  ExecutionContext ctx,
+                                  int maxCycles,
+                                  int minCycles) {
         org.openrewrite.table.RecipeRunStats runStatsTable = new org.openrewrite.table.RecipeRunStats(Recipe.noop());
         RecipeRunStats runStats = new RecipeRunStats(recipe);
         RecipeRun recipeRun = new RecipeRun(runStats, emptyList(), emptyMap());
 
-        // Guards against recipes that run on source files with the same ID
         Set<UUID> sourceFileIds = new HashSet<>();
         before = ListUtils.map(before, sourceFile -> {
             if (!sourceFileIds.add(sourceFile.getId())) {
@@ -103,14 +98,7 @@ public interface RecipeScheduler {
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
-            after = scheduleVisit(
-                    runStats,
-                    recipeStack,
-                    acc,
-                    ctxWithWatch,
-                    null,
-                    recipeThatAddedOrDeletedSourceFile
-            );
+            after = scheduleVisit(runStats, recipeStack, acc, null, ctxWithWatch, recipeThatAddedOrDeletedSourceFile);
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
             }
@@ -123,29 +111,11 @@ public interface RecipeScheduler {
             return recipeRun.withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
         }
 
-        List<Result> results = createAndProcessResults(
-                before,
-                after,
-                ctx,
-                recipeThatAddedOrDeletedSourceFile
-        );
-
-        runStatsTable.record(ctx, recipe, runStats);
-        return recipeRun
-                .withResults(results)
-                .withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
-    }
-
-    static List<Result> createAndProcessResults(
-            List<? extends SourceFile> before,
-            List<? extends SourceFile> after,
-            ExecutionContext ctx,
-            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile
-    ) {
         Map<UUID, SourceFile> sourceFileIdentities = new HashMap<>();
         for (SourceFile sourceFile : before) {
             sourceFileIdentities.put(sourceFile.getId(), sourceFile);
         }
+
         List<Result> results = new ArrayList<>();
 
         // added or changed files
@@ -159,20 +129,18 @@ public interface RecipeScheduler {
                         continue;
                     }
 
-                    results.add(new Result(
-                            original,
-                            s,
-                            s.getMarkers()
-                                .findFirst(RecipesThatMadeChanges.class)
-                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe " +
-                                    "reported making a change"))
-                                .getRecipes()
-                    ));
+                    results.add(new Result(original, s, s.getMarkers()
+                            .findFirst(RecipesThatMadeChanges.class)
+                            .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change"))
+                            .getRecipes()));
                 }
             }
         }
 
-        Set<UUID> afterIds = after.stream().map(SourceFile::getId).collect(Collectors.toSet());
+        Set<UUID> afterIds = new HashSet<>();
+        for (SourceFile sourceFile : after) {
+            afterIds.add(sourceFile.getId());
+        }
 
         // removed files
         for (SourceFile s : before) {
@@ -181,7 +149,6 @@ public interface RecipeScheduler {
             }
         }
 
-        // Process the Result and add to the results table
         for (Result result : results) {
             SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
             Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
@@ -196,28 +163,28 @@ public interface RecipeScheduler {
                         result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
                         recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
-                        recipeThatMadeChange[1].getName()
-                ));
+                        recipeThatMadeChange[1].getName()));
                 for (RecipeDescriptor rd : recipeThatMadeChange[1].getRecipeList()) {
                     recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
                 }
             }
         }
-        return results;
+
+        runStatsTable.record(ctx, recipe, runStats);
+        return recipeRun
+                .withResults(results)
+                .withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
     }
 
-    default <S extends SourceFile> List<S> scheduleVisit(
-            RecipeRunStats runStats,
-            Stack<Recipe> recipeStack,
-            List<S> before,
-            ExecutionContext ctx,
-            @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
-            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile
-    ) {
-        runStats.markCall();
+    default <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats,
+                                                         Stack<Recipe> recipeStack,
+                                                         List<S> before,
+                                                         @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
+                                                         ExecutionContext ctx,
+                                                         Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile) {
+        runStats.calls.incrementAndGet();
         long startTime = System.nanoTime();
         Recipe recipe = recipeStack.peek();
-        assert recipe == runStats.getRecipe() : "Recipe stack should always contain the recipe being run";
 
         ctx.putCurrentRecipe(recipe);
         if (ctx instanceof WatchableExecutionContext) {
@@ -246,10 +213,8 @@ public interface RecipeScheduler {
                     }
 
                     for (S s : before) {
-                        singleSourceApplicableTestResult.put(
-                                s.getId(),
-                                RecipeSchedulerUtils.applicableListTests(s, recipe.getSingleSourceApplicableTests(), ctx)
-                        );
+                        singleSourceApplicableTestResult.put(s.getId(),
+                            RecipeSchedulerUtils.applicableListTests(s, recipe.getSingleSourceApplicableTests(), ctx));
                     }
                 }
             }
@@ -261,23 +226,21 @@ public interface RecipeScheduler {
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean(false);
         List<S> after;
         final Map<UUID, Boolean> singleSourceApplicableTestResultRef = singleSourceApplicableTestResult;
-        boolean hasSingleSourceApplicableTest =
-                singleSourceApplicableTestResult != null &&
-                        !singleSourceApplicableTestResult.isEmpty();
+        boolean hasSingleSourceApplicableTest = singleSourceApplicableTestResult != null
+                && !singleSourceApplicableTestResult.isEmpty();
 
         if (!recipe.validate(ctx).isValid()) {
             after = before;
         } else {
             long getVisitorStartTime = System.nanoTime();
-            after = mapAsync(before, s -> {
+            after = mapAsync(before, (s, index) -> {
                 Timer.Builder timer = Timer.builder("rewrite.recipe.visit").tag("recipe", recipe.getDisplayName());
                 Timer.Sample sample = Timer.start();
 
                 S afterFile = s;
                 try {
-                    if (hasSingleSourceApplicableTest &&
-                            singleSourceApplicableTestResultRef.containsKey(s.getId()) &&
-                            !singleSourceApplicableTestResultRef.get(s.getId())) {
+                    if (hasSingleSourceApplicableTest && singleSourceApplicableTestResultRef.containsKey(s.getId())
+                            && !singleSourceApplicableTestResultRef.get(s.getId())) {
                         return s;
                     }
 
@@ -302,7 +265,7 @@ public interface RecipeScheduler {
                     //noinspection unchecked
                     afterFile = (S) visitor.visitSourceFile(s, ctx);
 
-                    if (afterFile != null && visitor.isAcceptable(afterFile, ctx)) {
+                    if (visitor.isAcceptable(s, ctx)) {
                         //noinspection unchecked
                         afterFile = (S) visitor.visit(afterFile, ctx);
                     }
@@ -314,18 +277,13 @@ public interface RecipeScheduler {
                         RecipeRunException vt = (RecipeRunException) t;
 
                         //noinspection unchecked
-                        afterFile = (S) new FindRecipeRunException(vt).visitNonNull(
-                                requireNonNull(afterFile, "afterFile is null"),
-                                0
-                        );
+                        afterFile = (S) new FindRecipeRunException(vt).visitNonNull(requireNonNull(afterFile), 0);
                     } else if (afterFile != null) {
                         // The applicable test threw an exception, but it was not in a visitor. It cannot be associated to any specific line of code,
                         // and instead we add a marker to the top of the source file to record the exception message.
                         afterFile = Markup.error(afterFile, t);
                     }
 
-                    // Use the original source file to record the error, not the one that may have been modified by the visitor.
-                    // This is so the error is associated with the original source file, and it's original source path.
                     if (s != null) {
                         errorsTable.insertRow(ctx, new SourcesFileErrors.Row(
                                 s.getSourcePath().toString(),
@@ -346,7 +304,7 @@ public interface RecipeScheduler {
                 }
                 return afterFile;
             });
-            runStats.ownGetVisitorCompleted(getVisitorStartTime);
+            runStats.ownGetVisitor.addAndGet(System.nanoTime() - getVisitorStartTime);
         }
 
         // The type of the list is widened at this point, since a source file type may be generated that isn't
@@ -359,8 +317,14 @@ public interface RecipeScheduler {
             long ownVisitStartTime = System.nanoTime();
 
             if (hasSingleSourceApplicableTest) {
-                // If no files passed the single source applicable test, skip the recipe
-                if (singleSourceApplicableTestResult.values().stream().noneMatch(b -> b)) {
+                boolean anyFilePassedSingleApplicableTest = false;
+                for (Boolean b : singleSourceApplicableTestResult.values()) {
+                    if (b) {
+                        anyFilePassedSingleApplicableTest = true;
+                        break;
+                    }
+                }
+                if (!anyFilePassedSingleApplicableTest) {
                     return after;
                 }
             }
@@ -390,7 +354,7 @@ public interface RecipeScheduler {
                 });
             }
 
-            runStats.ownVisitCompleted(ownVisitStartTime);
+            runStats.ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
         } catch (Throwable t) {
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
         }
@@ -406,10 +370,14 @@ public interface RecipeScheduler {
                     // a new source file generated
                     recipeThatAddedOrDeletedSourceFile.put(s.getId(), recipeStack);
                 } else if (s != original) {
-                    return RecipeSchedulerUtils.addRecipesThatMadeChanges(
-                            recipeStack,
-                            s
-                    );
+                    List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+                    recipeStackList.add(recipeStack);
+                    return s.withMarkers(s.getMarkers().computeByType(
+                            new RecipesThatMadeChanges(randomId(), recipeStackList),
+                            (r1, r2) -> {
+                                r1.getRecipes().addAll(r2.getRecipes());
+                                return r1;
+                            }));
                 }
                 return s;
             });
@@ -442,21 +410,21 @@ public interface RecipeScheduler {
 
             // when doNext is called conditionally inside a recipe visitor
             if (nextStats == null) {
-                nextStats = runStats.addCalledRecipe(r);
+                nextStats = new RecipeRunStats(r);
+                runStats.getCalled().add(nextStats);
             }
 
             Map<UUID, Boolean> newMap = new HashMap<>(newSingleSourceApplicableTestResult);
-            afterWidened = scheduleVisit(
-                    nextStats,
-                    nextStack,
-                    afterWidened,
-                    ctx,
-                    newMap,
-                    recipeThatAddedOrDeletedSourceFile
-            );
+            afterWidened = scheduleVisit(requireNonNull(nextStats),
+                nextStack,
+                afterWidened,
+                newMap,
+                ctx, recipeThatAddedOrDeletedSourceFile);
         }
 
-        runStats.recipeVisitCompleted(startTime);
+        long totalTime = System.nanoTime() - startTime;
+        runStats.max.compareAndSet(Math.min(runStats.max.get(), totalTime), totalTime);
+        runStats.cumulative.addAndGet(totalTime);
 
         //noinspection unchecked
         return (List<S>) afterWidened;
@@ -466,26 +434,24 @@ public interface RecipeScheduler {
 }
 
 class RecipeSchedulerUtils {
-    public static <S extends SourceFile> S addRecipesThatMadeChanges(
-            Stack<Recipe> recipeStack,
-            S afterFile
-    ) {
-        return afterFile.withMarkers(afterFile.getMarkers().computeByType(
-                RecipesThatMadeChanges.create(recipeStack),
+    public static <S extends SourceFile> S addRecipesThatMadeChanges(Stack<Recipe> recipeStack, S afterFile) {
+        List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+        recipeStackList.add(recipeStack);
+        afterFile = afterFile.withMarkers(afterFile.getMarkers().computeByType(
+                new RecipesThatMadeChanges(randomId(), recipeStackList),
                 (r1, r2) -> {
                     r1.getRecipes().addAll(r2.getRecipes());
                     return r1;
                 }));
+        return afterFile;
     }
 
-    public static <S extends SourceFile> List<S> handleUncaughtException(
-            Stack<Recipe> recipeStack,
-            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile,
-            List<S> before,
-            ExecutionContext ctx,
-            Recipe recipe,
-            Throwable t
-    ) {
+    public static <S extends SourceFile> List<S> handleUncaughtException(Stack<Recipe> recipeStack,
+                                                                         Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile,
+                                                                         List<S> before,
+                                                                         ExecutionContext ctx,
+                                                                         Recipe recipe,
+                                                                         Throwable t) {
         ctx.getOnError().accept(t);
         ctx.putMessage(PANIC, true);
 
@@ -519,16 +485,13 @@ class RecipeSchedulerUtils {
     /**
      * @return true if the file qualified (file changed) for all applicable tests.
      */
-    public static <S extends SourceFile> boolean applicableListTests(
-            S s,
-            List<TreeVisitor<?, ExecutionContext>> applicableTests,
-            ExecutionContext ctx
-    ) {
+    public static <S extends SourceFile> boolean applicableListTests(S s,
+        List<TreeVisitor<?, ExecutionContext>> applicableTests,
+        ExecutionContext ctx) {
         boolean allMatch = true;
         for (TreeVisitor<?, ExecutionContext> applicableTest : applicableTests) {
-            boolean noChange =
-                    applicableTest.visitSourceFile(s, ctx) == s
-                            && applicableTest.visit(s, ctx) == s;
+            boolean noChange = applicableTest.visitSourceFile(s, ctx) == s
+                && applicableTest.visit(s, ctx) == s;
             if (noChange) {
                 allMatch = false;
                 break;
