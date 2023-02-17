@@ -21,6 +21,8 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
@@ -61,7 +63,7 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Test
-    void notApplicableRecipe() {
+    void notApplicableVisitor() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
               @Override
@@ -70,6 +72,51 @@ class RecipeLifecycleTest implements RewriteTest {
               }
           }).addApplicableTest(NOOP)),
           text("hello")
+        );
+    }
+
+    @Test
+    void notApplicableRecipe() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                  return text.withText("goodbye");
+              }
+          }).addApplicableTest(toRecipe())),
+          text("hello")
+        );
+    }
+
+    static class ReplaceWithGoodbyeVisitor<P> extends PlainTextVisitor<P> {
+        @Override
+        public PlainText visitText(PlainText text, P p) {
+            return text.withText("goodbye");
+        }
+    }
+
+    static class FindEverythingVisitor<P> extends PlainTextVisitor<P> {
+        @Override
+        public PlainText visitText(PlainText tree, P p) {
+            return SearchResult.found(tree);
+        }
+    }
+
+    @Test
+    void recipeApplicabilityWithFindNothingApplicability() {
+        // Given:
+        // A recipe `ReplaceWithGoodbyeVisitor`
+        // And:
+        // That has another recipe as an applicability test `ReplaceWithGoodbyeVisitor`
+        // And that second recipe has a `FindEverythingVisitor` as `getSingleSourceApplicableTest`
+        // Then:
+        // The recipe should make a change
+        AdHocRecipe applicableTest = toRecipe()
+          .withGetSingleSourceApplicableTest(FindEverythingVisitor::new)
+          .withGetVisitor(ReplaceWithGoodbyeVisitor::new);
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(ReplaceWithGoodbyeVisitor::new).addApplicableTest(applicableTest)),
+          text("hello", "goodbye")
         );
     }
 

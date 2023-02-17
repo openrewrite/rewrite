@@ -127,8 +127,8 @@ public class JavaRecipeLifecycleTest {
         public void defaults(RecipeSpec spec) {
             spec.recipe(
               Recipe.noop()
-                .addApplicableTest(new HasSourceSet("main").getVisitor())
-                .addApplicableTest(createFindMethods().getVisitor())
+                .addApplicableTest(new HasSourceSet("main"))
+                .addApplicableTest(createFindMethods())
                 .doNext(createFindMethods())
             );
         }
