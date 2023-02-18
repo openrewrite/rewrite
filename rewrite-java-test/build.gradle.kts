@@ -16,6 +16,7 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+    testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
 }
 
 tasks.withType<Javadoc> {
