@@ -43,8 +43,7 @@ import static java.util.Collections.newSetFromMap;
 public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
     private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
-    static final String EXPR_STATEMENT_PARAM = "" +
-                                               "class __P__ {" +
+    static final String EXPR_STATEMENT_PARAM = "class __P__ {" +
                                                "  static native <T> T p();" +
                                                "  static native <T> T[] arrp();" +
                                                "  static native boolean booleanp();" +
@@ -56,8 +55,7 @@ public class BlockStatementTemplateGenerator {
                                                "  static native short shortp();" +
                                                "  static native float floatp();" +
                                                "}";
-    private static final String METHOD_INVOCATION_STUBS = "" +
-                                                          "class __M__ {" +
+    private static final String METHOD_INVOCATION_STUBS = "class __M__ {" +
                                                           "  static native Object any(Object o);" +
                                                           "  static native <T> Object anyT();" +
                                                           "}";
@@ -81,7 +79,7 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
-                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()));
+                    template(next(cursor), cursor.getValue(), before, after, newSetFromMap(new IdentityHashMap<>()), cursor.getValue());
 
                     return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after;
                 });
@@ -160,7 +158,7 @@ public class BlockStatementTemplateGenerator {
     }
 
     @SuppressWarnings("ConstantConditions")
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated) {
+    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, Set<J> templated, J toReplace) {
         templated.add(cursor.getValue());
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
@@ -192,16 +190,7 @@ public class BlockStatementTemplateGenerator {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
                 // variable declarations up to the point of insertion
-                assert m.getBody() != null;
-                for (Statement statement : m.getBody().getStatements()) {
-                    if (referToSameElement(prior, statement)) {
-                        break;
-                    } else if (statement instanceof J.VariableDeclarations) {
-                        before.insert(0, "\n" +
-                                         variable((J.VariableDeclarations) statement, true, cursor) +
-                                         ";\n");
-                    }
-                }
+                addLeadingVariableDeclarations(cursor, prior, m.getBody(), before, toReplace);
 
                 if (m.getReturnTypeExpression() != null && !JavaType.Primitive.Void
                         .equals(m.getReturnTypeExpression().getType())) {
@@ -215,19 +204,11 @@ public class BlockStatementTemplateGenerator {
                                          .withLeadingAnnotations(emptyList())
                                          .withPrefix(Space.EMPTY)
                                          .printTrimmed(cursor).trim() + '{');
-            } else if (parent instanceof J.Block || parent instanceof J.Lambda) {
+            } else if (parent instanceof J.Block || parent instanceof J.Lambda || parent instanceof J.Label || parent instanceof Loop) {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
-                for (Statement statement : b.getStatements()) {
-                    if (referToSameElement(prior, statement)) {
-                        break;
-                    } else if (statement instanceof J.VariableDeclarations) {
-                        before.insert(0, "\n" +
-                                         variable((J.VariableDeclarations) statement, true, cursor) +
-                                         ";\n");
-                    }
-                }
+                addLeadingVariableDeclarations(cursor, prior, b, before, toReplace);
 
                 before.insert(0, "{\n");
                 if (b.isStatic()) {
@@ -314,10 +295,12 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.ForLoop) {
             J.ForLoop f = (J.ForLoop) j;
-            insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
-                    f.withBody(null).withPrefix(Space.EMPTY)
-                            .withControl(f.getControl().withCondition(null).withUpdate(emptyList()))
-                            .printTrimmed(cursor).trim()));
+            if (referToSameElement(prior, f.getBody())) {
+                insertControlWithBlock(f.getBody(), before, after, () -> before.insert(0,
+                        f.withBody(null).withPrefix(Space.EMPTY)
+                                .withControl(f.getControl().withCondition(null).withUpdate(emptyList()))
+                                .printTrimmed(cursor).trim()));
+            }
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (c.getVariable() == prior) {
@@ -394,10 +377,47 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.If) {
             J.If iff = (J.If) j;
             if (referToSameElement(prior, iff.getIfCondition())) {
-                insertControlWithBlock(iff.getThenPart(), before, after, () -> {
-                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
-                    after.append(";");
-                });
+                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), toReplace);
+                if (condition != null) {
+                    int splitIdx = condition.indexOf('§');
+                    before.insert(0, "if (" + condition.substring(0, splitIdx) + '(');
+                    after.append(')').append(condition.substring(splitIdx + 1)).append(") {}");
+                } else {
+                    insertControlWithBlock(iff.getThenPart(), before, after, () -> {
+                        before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                        after.append(";");
+                    });
+                }
+            } else {
+                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), toReplace);
+                if (condition != null) {
+                    if (referToSameElement(prior, iff.getThenPart())) {
+                        insertControlWithBlock(iff.getThenPart(), before, after, () ->
+                                before.insert(0, "if (" + condition + ") "));
+                    } else if (referToSameElement(prior, iff.getElsePart())) {
+                        insertControlWithBlock(iff.getElsePart().getBody(), before, after, () ->
+                                before.insert(0, "if (" + condition + ") {} else "));
+                    }
+                }
+            }
+        } else if (j instanceof J.Ternary) {
+            J.Ternary ternary = (J.Ternary) j;
+            if (referToSameElement(prior, ternary.getCondition())) {
+                String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
+                if (condition != null) {
+                    int splitIdx = condition.indexOf('§');
+                    before.insert(0, condition.substring(0, splitIdx) + '(');
+                    after.append(')').append(condition.substring(splitIdx + 1))
+                            .append(" ? ").append(ternary.getTruePart().printTrimmed(cursor).trim())
+                            .append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
+                }
+            } else if (referToSameElement(prior, ternary.getTruePart())) {
+                String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
+                before.insert(0, condition + " ? ");
+                after.append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
+            } else if (referToSameElement(prior, ternary.getFalsePart())) {
+                String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
+                before.insert(0, condition + " ? " + ternary.getTruePart().printTrimmed(cursor).trim() + " : ");
             }
         } else if (j instanceof J.WhileLoop) {
             J.WhileLoop wl = (J.WhileLoop) j;
@@ -419,7 +439,36 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
         }
-        template(next(cursor), j, before, after, templated);
+        template(next(cursor), j, before, after, templated, toReplace);
+    }
+
+    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J toReplace) {
+        for (Statement statement : containingBlock.getStatements()) {
+            if (referToSameElement(current, statement)) {
+                break;
+            }
+            if (statement instanceof J.Label) {
+                statement = ((J.Label) statement).getStatement();
+            }
+            if (statement instanceof J.VariableDeclarations) {
+                before.insert(0, "\n" +
+                                 variable((J.VariableDeclarations) statement, true, cursor) +
+                                 ";\n");
+            } else if (statement instanceof J.If) {
+                J.If iff = (J.If) statement;
+                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), toReplace);
+                if (condition != null) {
+                    boolean thenNeverCompletesNormally = PatternVariables.neverCompletesNormally(iff.getThenPart());
+                    boolean elseNeverCompletesNormally = iff.getElsePart() != null && PatternVariables.neverCompletesNormally(iff.getElsePart().getBody());
+                    if (thenNeverCompletesNormally || elseNeverCompletesNormally) {
+                        StringBuilder ifStatement = new StringBuilder("if (").append(condition).append(") {");
+                        ifStatement.append(thenNeverCompletesNormally ? " throw new RuntimeException(); }" : " }");
+                        ifStatement.append(elseNeverCompletesNormally ? " else { throw new RuntimeException(); }" : " else { }");
+                        before.insert(0, ifStatement);
+                    }
+                }
+            }
+        }
     }
 
     private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {
