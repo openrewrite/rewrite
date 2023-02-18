@@ -44,7 +44,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
               
               class Test {
                   void test(Object obj) {
-                        Validate.notNull(obj);
+                      Validate.notNull(obj);
                   }
               }
               """,
@@ -53,7 +53,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
               
               class Test {
                   void test(Object obj) {
-                        Objects.requireNonNull(obj);
+                      Objects.requireNonNull(obj);
                   }
               }
               """
@@ -66,13 +66,13 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
         rewriteRun(
           java(
             """
-                     import org.apache.commons.lang3.Validate;
-                     class Test {
-                         void test(Object obj) {
-                               Validate.notNull(obj,"Object should not be null");
-                         }
-                     }
-                  """
+              import org.apache.commons.lang3.Validate;
+              class Test {
+                  void test(Object obj) {
+                      Validate.notNull(obj,"Object should not be null");
+                  }
+              }
+              """
           )
         );
     }
@@ -86,7 +86,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
               
               class Test {
                   void test(Object obj) {
-                        Validate.notNull(obj, "Object in %s should not be null", "request xyz");
+                      Validate.notNull(obj, "Object in %s should not be null", "request xyz");
                   }
               }
               """
