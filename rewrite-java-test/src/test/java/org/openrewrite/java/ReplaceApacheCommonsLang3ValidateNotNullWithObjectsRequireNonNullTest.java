@@ -62,7 +62,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
     }
 
     @Test
-    void DoNothingOnMethodsWithTwoArg(){
+    void doNothingOnMethodsWithTwoArg(){
         rewriteRun(
           java(
             """
