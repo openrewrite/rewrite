@@ -130,14 +130,15 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         for (String artifactName : new ArrayList<>(missingArtifactNames)) {
             Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+
             try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath").scan()) {
+                Class<?> caller = null;
                 ResourceList resources = result.getResourcesWithExtension(".jar");
                 for (Resource resource : resources) {
                     if (jarPattern.matcher(resource.getPath()).find()) {
                         try {
                             Path artifact = resourceTarget.toPath().resolve(Paths.get(resource.getPath()).getFileName());
 
-                            Class<?> caller;
                             try {
                                 // StackWalker is only available in Java 15+, but right now we only use classloader isolated
                                 // recipe instances in Java 17 environments, so we can safely use StackWalker there.
@@ -177,13 +178,18 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                         break;
                     }
                 }
+
+                if (!missingArtifactNames.isEmpty()) {
+                    throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
+                                                       missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
+                                                       "The caller is of type " + (caller == null ? "NO CALLER IDENTIFIED" : caller.getName()) + ".\n" +
+                                                       "The resources resolvable from the caller's classpath are: " +
+                                                       resources.stream().map(Resource::getPath).sorted().collect(joining(", "))
+                    );
+                }
             }
         }
 
-        if (!missingArtifactNames.isEmpty()) {
-            throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
-                                               missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
-        }
 
         return artifacts;
     }
