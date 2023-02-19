@@ -109,13 +109,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
-        List<String> missingArtifactNames = new ArrayList<>(artifactNamesWithVersions.length);
+        Set<String> missingArtifactNames = new LinkedHashSet<>(artifactNamesWithVersions.length);
         File resourceTarget = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget();
 
         nextArtifact:
         for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile(artifactName + "\\.jar$");
+            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
@@ -189,7 +189,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 }
             }
         }
-
 
         return artifacts;
     }
