@@ -53,7 +53,6 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Only if versions match",
             description = "Only remove the explicit version if it matches the managed dependency version. Default true.",
-            example = "false",
             required = false)
     @Nullable
     Boolean onlyIfVersionsMatch;
@@ -61,7 +60,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Except",
             description = "Accepts a list of GAVs. Dependencies matching a GAV will be ignored by this recipe."
                     + " GAV versions are ignored if provided.",
-            example = "- com.jcraft:jsch",
+            example = "com.jcraft:jsch",
             required = false)
     @Nullable
     List<String> except;

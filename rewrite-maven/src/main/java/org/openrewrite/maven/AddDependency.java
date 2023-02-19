@@ -82,7 +82,6 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration when using a semver selector",
-            example = "true",
             required = false)
     @Nullable
     Boolean releasesOnly;
@@ -109,7 +108,6 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Optional",
             description = "Set the value of the `<optional>` tag. No `<optional>` tag will be added when this is `null`.",
-            example = "true",
             required = false)
     @Nullable
     Boolean optional;

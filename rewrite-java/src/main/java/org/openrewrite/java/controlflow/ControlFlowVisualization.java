@@ -26,9 +26,7 @@ import org.openrewrite.TreeVisitor;
 @EqualsAndHashCode(callSuper = true)
 public class ControlFlowVisualization extends Recipe {
     @Option(displayName = "Include Dotfile",
-            description = "Also output with a Dotfile which can be then later visualized by Graphviz.",
-            example = "true"
-    )
+            description = "Also output with a Dotfile which can be then later visualized by Graphviz.")
     boolean includeDotfile;
     boolean darkMode;
 

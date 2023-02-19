@@ -57,7 +57,6 @@ public class ManageDependencies extends Recipe {
 
     @Option(displayName = "Add to the root pom",
             description = "Add to the root pom where root is the eldest parent of the pom within the source set.",
-            example = "true",
             required = false)
     @Nullable
     Boolean addToRootPom;
