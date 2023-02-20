@@ -172,26 +172,11 @@ public class AddDependency extends Recipe {
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
                 .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
                     @Override
-                    public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                        if(isDependencyTag() &&
-                           groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
-                           artifactId.equals(tag.getChildValue("artifactId").orElse(null)) &&
-                           (scope == null || scope.equals(tag.getChildValue("scope").orElse(null)))) {
-                            getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "alreadyHasDependency", true);
-                        }
-                        return super.visitTag(tag, executionContext);
-                    }
-
-                    @Override
                     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                         Xml maven = super.visitDocument(document, executionContext);
 
                         String maybeScope = scopeByProject.get(javaProject);
                         if (maybeScope == null) {
-                            return maven;
-                        }
-
-                        if(getCursor().getMessage("alreadyHasDependency", false)) {
                             return maven;
                         }
 
