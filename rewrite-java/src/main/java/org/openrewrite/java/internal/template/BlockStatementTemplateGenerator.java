@@ -254,7 +254,7 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
                 after.append("\n}");
             } else {
-                // same as `Expression` case
+                // no initializer
                 before.insert(0, "__M__.any(");
                 after.append(");");
             }
@@ -305,6 +305,12 @@ public class BlockStatementTemplateGenerator {
                 if (!(next(cursor).getValue() instanceof MethodCall)) {
                     after.append(';');
                 }
+            }
+        } else if (j instanceof J.ForLoop.Control) {
+            J.ForLoop.Control c = (J.ForLoop.Control) j;
+            if (referToSameElement(prior, c.getCondition())) {
+                before.insert(0, "for (" + c.getInit().get(0).printTrimmed(cursor).trim() + ";");
+                after.append(";) {}");
             }
         } else if (j instanceof J.ForLoop) {
             J.ForLoop f = (J.ForLoop) j;
@@ -412,9 +418,6 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
-        } else if (j instanceof Expression && j == prior) {
-            before.insert(0, "__M__.any(");
-            after.append(");");
         }
         template(next(cursor), j, before, after, templated);
     }
