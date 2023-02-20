@@ -552,7 +552,36 @@ public interface J extends Tree {
             Multiplication,
             RightShift,
             Subtraction,
-            UnsignedRightShift
+            UnsignedRightShift;
+
+            public String getKeyword() {
+                switch (this) {
+                    case Addition:
+                        return "+=";
+                    case Subtraction:
+                        return "-=";
+                    case Multiplication:
+                        return "*=";
+                    case Division:
+                        return "/=";
+                    case Modulo:
+                        return "%=";
+                    case BitAnd:
+                        return "&=";
+                    case BitOr:
+                        return "|=";
+                    case BitXor:
+                        return "^=";
+                    case LeftShift:
+                        return "<<=";
+                    case RightShift:
+                        return ">>=";
+                    case UnsignedRightShift:
+                        return ">>>=";
+                    default:
+                        throw new IllegalStateException("Unexpected value: " + this);
+                }
+            }
         }
 
         public Padding getPadding() {
@@ -667,7 +696,32 @@ public interface J extends Tree {
             RightShift,
             UnsignedRightShift,
             Or,
-            And
+            And;
+
+            public String getKeyword() {
+                switch (this) {
+                    case Addition: return "+";
+                    case Subtraction: return "-";
+                    case Multiplication: return "*";
+                    case Division: return "/";
+                    case Modulo: return "%";
+                    case LessThan: return "<";
+                    case GreaterThan: return ">";
+                    case LessThanOrEqual: return "<=";
+                    case GreaterThanOrEqual: return ">=";
+                    case Equal: return "==";
+                    case NotEqual: return "!=";
+                    case BitAnd: return "&";
+                    case BitOr: return "|";
+                    case BitXor: return "^";
+                    case LeftShift: return "<<";
+                    case RightShift: return ">>";
+                    case UnsignedRightShift: return ">>>";
+                    case Or: return "||";
+                    case And: return "&&";
+                    default: throw new IllegalStateException("Unexpected value: " + this);
+                }
+            }
         }
 
         public Padding getPadding() {
@@ -5330,6 +5384,27 @@ public interface J extends Tree {
                         return true;
                     default:
                         return false;
+                }
+            }
+
+            public String getKeyword() {
+                switch (this) {
+                    case PreIncrement:
+                    case PostIncrement:
+                        return "++";
+                    case PreDecrement:
+                    case PostDecrement:
+                        return "--";
+                    case Positive:
+                        return "+";
+                    case Negative:
+                        return "-";
+                    case Complement:
+                        return "~";
+                    case Not:
+                        return "!";
+                    default:
+                        throw new IllegalStateException("Unexpected value: " + this);
                 }
             }
         }

@@ -204,46 +204,10 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitAssignmentOperation(AssignmentOperation assignOp, PrintOutputCapture<P> p) {
-        String keyword = "";
-        switch (assignOp.getOperator()) {
-            case Addition:
-                keyword = "+=";
-                break;
-            case Subtraction:
-                keyword = "-=";
-                break;
-            case Multiplication:
-                keyword = "*=";
-                break;
-            case Division:
-                keyword = "/=";
-                break;
-            case Modulo:
-                keyword = "%=";
-                break;
-            case BitAnd:
-                keyword = "&=";
-                break;
-            case BitOr:
-                keyword = "|=";
-                break;
-            case BitXor:
-                keyword = "^=";
-                break;
-            case LeftShift:
-                keyword = "<<=";
-                break;
-            case RightShift:
-                keyword = ">>=";
-                break;
-            case UnsignedRightShift:
-                keyword = ">>>=";
-                break;
-        }
         beforeSyntax(assignOp, Space.Location.ASSIGNMENT_OPERATION_PREFIX, p);
         visit(assignOp.getVariable(), p);
         visitSpace(assignOp.getPadding().getOperator().getBefore(), Space.Location.ASSIGNMENT_OPERATION_OPERATOR, p);
-        p.append(keyword);
+        p.append(assignOp.getOperator().getKeyword());
         visit(assignOp.getAssignment(), p);
         afterSyntax(assignOp, p);
         return assignOp;
@@ -251,70 +215,10 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitBinary(Binary binary, PrintOutputCapture<P> p) {
-        String keyword = "";
-        switch (binary.getOperator()) {
-            case Addition:
-                keyword = "+";
-                break;
-            case Subtraction:
-                keyword = "-";
-                break;
-            case Multiplication:
-                keyword = "*";
-                break;
-            case Division:
-                keyword = "/";
-                break;
-            case Modulo:
-                keyword = "%";
-                break;
-            case LessThan:
-                keyword = "<";
-                break;
-            case GreaterThan:
-                keyword = ">";
-                break;
-            case LessThanOrEqual:
-                keyword = "<=";
-                break;
-            case GreaterThanOrEqual:
-                keyword = ">=";
-                break;
-            case Equal:
-                keyword = "==";
-                break;
-            case NotEqual:
-                keyword = "!=";
-                break;
-            case BitAnd:
-                keyword = "&";
-                break;
-            case BitOr:
-                keyword = "|";
-                break;
-            case BitXor:
-                keyword = "^";
-                break;
-            case LeftShift:
-                keyword = "<<";
-                break;
-            case RightShift:
-                keyword = ">>";
-                break;
-            case UnsignedRightShift:
-                keyword = ">>>";
-                break;
-            case Or:
-                keyword = "||";
-                break;
-            case And:
-                keyword = "&&";
-                break;
-        }
         beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);
         visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
-        p.append(keyword);
+        p.append(binary.getOperator().getKeyword());
         visit(binary.getRight(), p);
         afterSyntax(binary, p);
         return binary;
@@ -1012,39 +916,22 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
         switch (unary.getOperator()) {
             case PreIncrement:
-                p.append("++");
-                visit(unary.getExpression(), p);
-                break;
             case PreDecrement:
-                p.append("--");
+            case Positive:
+            case Negative:
+            case Complement:
+            case Not:
+                p.append(unary.getOperator().getKeyword());
                 visit(unary.getExpression(), p);
                 break;
             case PostIncrement:
-                visit(unary.getExpression(), p);
-                visitSpace(unary.getPadding().getOperator().getBefore(), Space.Location.UNARY_OPERATOR, p);
-                p.append("++");
-                break;
             case PostDecrement:
                 visit(unary.getExpression(), p);
                 visitSpace(unary.getPadding().getOperator().getBefore(), Space.Location.UNARY_OPERATOR, p);
-                p.append("--");
+                p.append(unary.getOperator().getKeyword());
                 break;
-            case Positive:
-                p.append("+");
-                visit(unary.getExpression(), p);
-                break;
-            case Negative:
-                p.append("-");
-                visit(unary.getExpression(), p);
-                break;
-            case Complement:
-                p.append("~");
-                visit(unary.getExpression(), p);
-                break;
-            case Not:
             default:
-                p.append("!");
-                visit(unary.getExpression(), p);
+                throw new IllegalArgumentException("Unknown unary operator: " + unary.getOperator());
         }
         afterSyntax(unary, p);
         return unary;
