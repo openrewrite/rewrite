@@ -81,4 +81,24 @@ class FindPropertiesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    void globMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("acme.my-project.*", false)),
+          properties(
+            """
+              acme.my-project.person.first-name=example
+              acme.myProject.person.firstName=example
+              acme.my_project.person.first_name=example
+              """,
+            """
+              acme.my-project.person.first-name=~~>example
+              acme.myProject.person.firstName=example
+              acme.my_project.person.first_name=example
+              """
+          )
+        );
+    }
 }
