@@ -23,8 +23,10 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -63,8 +65,13 @@ public class ResolvedDependency implements Serializable {
 
     int depth;
 
+    @Nullable
     @NonFinal
     List<GroupArtifact> effectiveExclusions;
+
+    public List<GroupArtifact> getEffectiveExclusions() {
+        return effectiveExclusions == null ? emptyList() : effectiveExclusions;
+    }
 
     /**
      * Only used by dependency resolution to avoid unnecessary empty list allocations for leaf dependencies.
