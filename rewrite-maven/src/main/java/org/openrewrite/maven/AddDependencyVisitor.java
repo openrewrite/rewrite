@@ -22,6 +22,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.tree.Version;
 import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestRelease;
@@ -86,6 +88,13 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
         Xml.Document maven = super.visitDocument(document, executionContext);
+
+        Scope resolvedScope = scope == null ? Scope.Compile : Scope.fromName(scope);
+        for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScope)) {
+            if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                return maven;
+            }
+        }
 
         Validated versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {

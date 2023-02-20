@@ -195,7 +195,7 @@ public class AddDependency extends Recipe {
                             return maven;
                         }
 
-                        //If the dependency is already in scope, no need to continue.
+                        // If the dependency is already in compile scope it will be available everywhere, no need to continue
                         for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
                             if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                 return maven;
