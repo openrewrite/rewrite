@@ -30,26 +30,26 @@ class BooleanChecksNotInvertedTest implements RewriteTest {
           spec -> spec.recipe(new BooleanChecksNotInverted()),
           java(
             """
-                  public class Test {
-                      int i;
-                      int a;
-                      void test() {
-                          if ( !(a == 2)) {
-                          }
-                          boolean b = !(i < 10);
+              public class Test {
+                  int i;
+                  int a;
+                  void test() {
+                      if ( !(a == 2)) {
                       }
+                      boolean b = !(i < 10);
                   }
+              }
               """,
             """
-                  public class Test {
-                      int i;
-                      int a;
-                      void test() {
-                          if ( a != 2) {
-                          }
-                          boolean b = i >= 10;
+              public class Test {
+                  int i;
+                  int a;
+                  void test() {
+                      if ( a != 2) {
                       }
+                      boolean b = i >= 10;
                   }
+              }
               """
           )
         );
@@ -61,18 +61,18 @@ class BooleanChecksNotInvertedTest implements RewriteTest {
           spec -> spec.recipe(new BooleanChecksNotInverted()),
           java(
             """
-                  public class Test {
-                      boolean test(boolean b) {
-                          return !(!b);
-                      }
+              public class Test {
+                  boolean test(boolean b) {
+                      return !(!b);
                   }
+              }
               """,
             """
-                  public class Test {
-                      boolean test(boolean b) {
-                          return b;
-                      }
+              public class Test {
+                  boolean test(boolean b) {
+                      return b;
                   }
+              }
               """
           )
         );

@@ -52,32 +52,32 @@ class ChangeMethodNameTest implements RewriteTest {
           java(b, SourceSpec::skip),
           java(
             """
-                  package com.abc;
-                  class C extends B {
-                      @Override
-                      public void singleArg(String s) {}
-                  }
+              package com.abc;
+              class C extends B {
+                  @Override
+                  public void singleArg(String s) {}
+              }
               """,
             SourceSpec::skip
           ),
           java(
             """
-                  package com.abc;
-                  class A {
-                      public void test() {
-                          new C().singleArg("boo");
-                          new java.util.ArrayList<String>().forEach(new C()::singleArg);
-                      }
+              package com.abc;
+              class A {
+                  public void test() {
+                      new C().singleArg("boo");
+                      new java.util.ArrayList<String>().forEach(new C()::singleArg);
                   }
+              }
               """,
             """
-                  package com.abc;
-                  class A {
-                      public void test() {
-                          new C().bar("boo");
-                          new java.util.ArrayList<String>().forEach(new C()::bar);
-                      }
+              package com.abc;
+              class A {
+                  public void test() {
+                      new C().bar("boo");
+                      new java.util.ArrayList<String>().forEach(new C()::bar);
                   }
+              }
               """,
             spec -> spec.afterRecipe(cu -> {
                 J.MethodDeclaration testMethodDecl = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);

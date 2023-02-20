@@ -706,14 +706,14 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.time.temporal.ChronoUnit", "MILLIS", true))),
           java(
             """
-                  package a;
-                  
-                  import java.time.temporal.ChronoUnit;
-                  
-                  class A {
-                      static final int MILLIS = 1;
-                      ChronoUnit unit = ChronoUnit.MILLIS;
-                  }
+              package a;
+              
+              import java.time.temporal.ChronoUnit;
+              
+              class A {
+                  static final int MILLIS = 1;
+                  ChronoUnit unit = ChronoUnit.MILLIS;
+              }
               """
           )
         );
@@ -1060,11 +1060,11 @@ class AddImportTest implements RewriteTest {
           ),
           java(
             """
-                  import java.util.List;
+              import java.util.List;
               """,
             """
-                  import java.util.List;
-                  import java.util.concurrent.*;
+              import java.util.List;
+              import java.util.concurrent.*;
               """
           )
         );
@@ -1106,7 +1106,7 @@ class AddImportTest implements RewriteTest {
             """
               """,
             """
-                  import java.util.List;
+              import java.util.List;
               """
           )
         );

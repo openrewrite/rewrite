@@ -29,29 +29,29 @@ class NoFinalizerTest implements RewriteTest {
           spec -> spec.recipe(new NoFinalizer()),
           java(
             """
-                  class Test {
-                      public void method() {
-                      }
-
-                      @Override
-                      protected void finalize() throws Throwable {
-                          super.finalize();
-                      }
-
-                      protected void finalize(Object param) throws Throwable {
-                          super.finalize();
-                      }
+              class Test {
+                  public void method() {
                   }
+
+                  @Override
+                  protected void finalize() throws Throwable {
+                      super.finalize();
+                  }
+
+                  protected void finalize(Object param) throws Throwable {
+                      super.finalize();
+                  }
+              }
               """,
             """
-                  class Test {
-                      public void method() {
-                      }
-
-                      protected void finalize(Object param) throws Throwable {
-                          super.finalize();
-                      }
+              class Test {
+                  public void method() {
                   }
+
+                  protected void finalize(Object param) throws Throwable {
+                      super.finalize();
+                  }
+              }
               """
           )
         );

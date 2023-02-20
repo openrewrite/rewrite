@@ -271,18 +271,18 @@ class ChangePackageTest implements RewriteTest {
           java(testClassBefore, testClassAfter),
           java(
             """
-                  import org.openrewrite.Test;
-                  
-                  public class A {
-                      Test a;
-                  }
+              import org.openrewrite.Test;
+              
+              public class A {
+                  Test a;
+              }
               """,
             """
-                  import org.openrewrite.test.Test;
-                  
-                  public class A {
-                      Test a;
-                  }
+              import org.openrewrite.test.Test;
+              
+              public class A {
+                  Test a;
+              }
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType()).

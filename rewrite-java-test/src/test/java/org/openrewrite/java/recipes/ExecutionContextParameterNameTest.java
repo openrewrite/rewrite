@@ -28,28 +28,28 @@ class ExecutionContextParameterNameTest implements RewriteTest {
           spec -> spec.recipe(new ExecutionContextParameterName()),
           java(
             """
-                  package org.openrewrite;
-                  public class Recipe {}
+              package org.openrewrite;
+              public class Recipe {}
               """
           ),
           java(
             """
-                  package org.openrewrite;
-                  public class ExecutionContext {}
+              package org.openrewrite;
+              public class ExecutionContext {}
               """
           ),
           java(
             """
-                  import org.openrewrite.*;
-                  class SampleRecipe extends Recipe {
-                      public void test(ExecutionContext executionContext) {}
-                  }
+              import org.openrewrite.*;
+              class SampleRecipe extends Recipe {
+                  public void test(ExecutionContext executionContext) {}
+              }
               """,
             """
-                  import org.openrewrite.*;
-                  class SampleRecipe extends Recipe {
-                      public void test(ExecutionContext ctx) {}
-                  }
+              import org.openrewrite.*;
+              class SampleRecipe extends Recipe {
+                  public void test(ExecutionContext ctx) {}
+              }
               """
           )
         );

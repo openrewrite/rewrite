@@ -50,23 +50,23 @@ class FindLocalFlowPathsNumericTest implements RewriteTest {
           spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1),
           java(
             """
-                  class Test {
-                      void test() {
-                          int n = 42;
-                          int o = n;
-                          System.out.println(o);
-                          int p = o;
-                      }
+              class Test {
+                  void test() {
+                      int n = 42;
+                      int o = n;
+                      System.out.println(o);
+                      int p = o;
                   }
+              }
               """, """
-                  class Test {
-                      void test() {
-                          int n = /*~~>*/42;
-                          int o = /*~~>*/n;
-                          System.out.println(/*~~>*/o);
-                          int p = /*~~>*/o;
-                      }
+              class Test {
+                  void test() {
+                      int n = /*~~>*/42;
+                      int o = /*~~>*/n;
+                      System.out.println(/*~~>*/o);
+                      int p = /*~~>*/o;
                   }
+              }
               """
           )
         );
@@ -79,27 +79,27 @@ class FindLocalFlowPathsNumericTest implements RewriteTest {
           spec -> spec.expectedCyclesThatMakeChanges(1).cycles(1),
           java(
             """
-                  class Test {
-                      void test() {
-                          if (true) {
-                              int n = 42;
-                              int o = n;
-                              System.out.println(o);
-                              int p = o;
-                          }
+              class Test {
+                  void test() {
+                      if (true) {
+                          int n = 42;
+                          int o = n;
+                          System.out.println(o);
+                          int p = o;
                       }
                   }
+              }
               """, """
-                  class Test {
-                      void test() {
-                          if (true) {
-                              int n = /*~~>*/42;
-                              int o = /*~~>*/n;
-                              System.out.println(/*~~>*/o);
-                              int p = /*~~>*/o;
-                          }
+              class Test {
+                  void test() {
+                      if (true) {
+                          int n = /*~~>*/42;
+                          int o = /*~~>*/n;
+                          System.out.println(/*~~>*/o);
+                          int p = /*~~>*/o;
                       }
                   }
+              }
               """
           )
         );

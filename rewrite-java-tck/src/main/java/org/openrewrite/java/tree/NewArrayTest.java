@@ -79,13 +79,13 @@ class NewArrayTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.lang.annotation.*;
-                  @Target({ElementType.TYPE})
-                  public @interface Produces {
-                      String[] value() default "*/*";
-                  }
-                  
-                  @Produces({"something"}) class A {}
+              import java.lang.annotation.*;
+              @Target({ElementType.TYPE})
+              public @interface Produces {
+                  String[] value() default "*/*";
+              }
+              
+              @Produces({"something"}) class A {}
               """
           )
         );

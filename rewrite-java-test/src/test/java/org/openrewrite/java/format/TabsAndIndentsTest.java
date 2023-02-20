@@ -384,21 +384,21 @@ class TabsAndIndentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.Collection;
-                  class Test {
-                      Test withData(Object... arg0) {
-                          return this;
-                      }
-
-                      void method(Test t, Collection<String> c) {
-                          t = t.withData(c.stream().map(a -> {
-                              if (!a.isEmpty()) {
-                                  return a.toLowerCase();
-                              }
-                              return a;
-                          }));
-                      }
+              import java.util.Collection;
+              class Test {
+                  Test withData(Object... arg0) {
+                      return this;
                   }
+
+                  void method(Test t, Collection<String> c) {
+                      t = t.withData(c.stream().map(a -> {
+                          if (!a.isEmpty()) {
+                              return a.toLowerCase();
+                          }
+                          return a;
+                      }));
+                  }
+              }
               """
           )
         );

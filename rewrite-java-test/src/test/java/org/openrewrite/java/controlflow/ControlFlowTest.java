@@ -1469,61 +1469,61 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.lang.StringBuffer;
-                  import java.nio.ByteBuffer;
+              import java.lang.StringBuffer;
+              import java.nio.ByteBuffer;
 
-                  class Test {
-                      /**
-                       * Decodes the specified URL as per RFC 3986, i.e. transforms
-                       * percent-encoded octets to characters by decodingWiththe UTF-8 character
-                       * set. This function is primarily intended for usage with
-                       * {@link java.net.URL} which unfortunately does not enforce proper URLs. As
-                       * such, this method will leniently accept invalid characters or malformed
-                       * percent-encoded octetsAndsimply pass them literally through to the
-                       * result string. Except for rare edge cases, this will make unencoded URLs
-                       * pass through unaltered.
-                       *
-                       * @param url  The URL to decode, may be <code>null</code>.
-                       * @return The decoded URL or <code>null</code> if the input was
-                       *         <code>null</code>.
-                       */
-                      static String test(String url) {
-                          String decoded = url;
-                          if (url != null && url.indexOf('%') >= 0) {
-                              int n = url.length();
-                              StringBuffer buffer = new StringBuffer();
-                              ByteBuffer bytes = ByteBuffer.allocate(n);
-                              for (int i = 0; i < n;) {
-                                  if (url.charAt(i) == '%') {
-                                      try {
-                                          do {
-                                              byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
-                                              bytes.put(octet);
-                                              i += 3;
-                                          } while (i < n && url.charAt(i) == '%');
-                                          continue;
-                                      } catch (RuntimeException e) {
-                                          // malformed percent-encoded octet, fall through and
-                                          // append characters literally
-                                      } finally {
-                                          if (bytes.position() > 0) {
-                                              bytes.flip();
-                                              buffer.append(utf8Decode(bytes));
-                                              bytes.clear();
-                                          }
+              class Test {
+                  /**
+                   * Decodes the specified URL as per RFC 3986, i.e. transforms
+                   * percent-encoded octets to characters by decodingWiththe UTF-8 character
+                   * set. This function is primarily intended for usage with
+                   * {@link java.net.URL} which unfortunately does not enforce proper URLs. As
+                   * such, this method will leniently accept invalid characters or malformed
+                   * percent-encoded octetsAndsimply pass them literally through to the
+                   * result string. Except for rare edge cases, this will make unencoded URLs
+                   * pass through unaltered.
+                   *
+                   * @param url  The URL to decode, may be <code>null</code>.
+                   * @return The decoded URL or <code>null</code> if the input was
+                   *         <code>null</code>.
+                   */
+                  static String test(String url) {
+                      String decoded = url;
+                      if (url != null && url.indexOf('%') >= 0) {
+                          int n = url.length();
+                          StringBuffer buffer = new StringBuffer();
+                          ByteBuffer bytes = ByteBuffer.allocate(n);
+                          for (int i = 0; i < n;) {
+                              if (url.charAt(i) == '%') {
+                                  try {
+                                      do {
+                                          byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
+                                          bytes.put(octet);
+                                          i += 3;
+                                      } while (i < n && url.charAt(i) == '%');
+                                      continue;
+                                  } catch (RuntimeException e) {
+                                      // malformed percent-encoded octet, fall through and
+                                      // append characters literally
+                                  } finally {
+                                      if (bytes.position() > 0) {
+                                          bytes.flip();
+                                          buffer.append(utf8Decode(bytes));
+                                          bytes.clear();
                                       }
                                   }
-                                  buffer.append(url.charAt(i++));
                               }
-                              decoded = buffer.toString();
+                              buffer.append(url.charAt(i++));
                           }
-                          return decoded;
+                          decoded = buffer.toString();
                       }
-
-                      private static String utf8Decode(ByteBuffer buff) {
-                          return null;
-                      }
+                      return decoded;
                   }
+
+                  private static String utf8Decode(ByteBuffer buff) {
+                      return null;
+                  }
+              }
               """,
             """
               import java.lang.StringBuffer;
@@ -1592,20 +1592,20 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void test() {
-                          Integer i = new Integer(1);
-                          System.out.println(i);
-                      }
+              class Test {
+                  void test() {
+                      Integer i = new Integer(1);
+                      System.out.println(i);
                   }
+              }
               """,
             """
-                  class Test {
-                      void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
-                          Integer i = new Integer(1);
-                          System.out.println(i);
-                      }
+              class Test {
+                  void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                      Integer i = new Integer(1);
+                      System.out.println(i);
                   }
+              }
               """
           )
         );
