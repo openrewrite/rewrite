@@ -115,7 +115,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         nextArtifact:
         for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+            Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
@@ -129,7 +129,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         }
 
         for (String artifactName : new ArrayList<>(missingArtifactNames)) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
+            Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
 
             try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath").scan()) {
                 Class<?> caller = null;
