@@ -39,7 +39,7 @@ public final class ExpressionUtils {
                 rets.add(binary);
                 return binary;
             }
-        }.reduce(cus.get(0), new ArrayList<>()).get(0);
+        }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
     }
 
     /**
