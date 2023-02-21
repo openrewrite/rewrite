@@ -39,7 +39,7 @@ public class ChainStringBuilderAppendCalls extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replace with chained 'StringBuilder.append()` calls";
+        return "Chain `StringBuilder.append()` calls";
     }
 
     @Override
