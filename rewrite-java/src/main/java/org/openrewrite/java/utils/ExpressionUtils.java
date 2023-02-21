@@ -15,34 +15,40 @@
  */
 package org.openrewrite.java.utils;
 
-import org.openrewrite.Tree;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.java.tree.J.Binary.Type;
+
+import java.util.ArrayList;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 public final class ExpressionUtils {
     private ExpressionUtils() {}
+
+    private static final J.Binary ADDITIVE_BINARY_TEMPLATE;
+    static {
+        List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
+            .parse("class A { void foo() {String s = \"A\" + \"B\";}}");
+        ADDITIVE_BINARY_TEMPLATE = new JavaIsoVisitor<List<J.Binary>>() {
+            @Override
+            public J.Binary visitBinary(J.Binary binary, List<J.Binary> rets) {
+                rets.add(binary);
+                return binary;
+            }
+        }.reduce(cus.get(0), new ArrayList<>()).get(0);
+    }
 
     /**
      * Concat two literals to an expression with '+' and surrounded with single space.
      */
     public static J.Binary concatAdditionBinary(Expression left, Expression right) {
-        JLeftPadded<Type> leftPadded = new JLeftPadded<>(Space.SINGLE_SPACE,
-                Type.Addition,
-                Markers.EMPTY);
-
-        return new J.Binary(
-                Tree.randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                left,
-                leftPadded,
-                right.withPrefix(Space.SINGLE_SPACE),
-                left.getType());
+        return ADDITIVE_BINARY_TEMPLATE.withPrefix(ADDITIVE_BINARY_TEMPLATE.getLeft().getPrefix())
+            .withLeft(left)
+            .withRight(right.withPrefix(Space.build(" " + right.getPrefix().getWhitespace(), emptyList())));
     }
 
     /**
@@ -50,7 +56,6 @@ public final class ExpressionUtils {
      */
     public static Expression additiveExpression(Expression... expressions) {
         Expression expression = null;
-
         for (Expression element : expressions) {
             if (element != null) {
                 expression = (expression == null) ? element : concatAdditionBinary(expression, element);
