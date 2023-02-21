@@ -30,6 +30,7 @@ import java.util.function.Supplier;
  */
 public interface ExecutionContext {
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
+    String PARENT_RECIPE = "org.openrewrite.parentRecipe";
     String UNCAUGHT_EXCEPTION_COUNT = "org.openrewrite.uncaughtExceptionCount";
     String DATA_TABLES = "org.openrewrite.dataTables";
 
@@ -88,9 +89,24 @@ public interface ExecutionContext {
         putMessage(CURRENT_RECIPE, recipe);
     }
 
-    default Recipe getCurrentRecipe() {
-        //noinspection ConstantConditions
-        return getMessage(CURRENT_RECIPE);
+    /**
+     * @return The previous parent recipe.
+     * @implNote For use in the {@link RecipeScheduler} only.
+     */
+    @Nullable
+    @Incubating(since = "7.37.0")
+    default Recipe putParentRecipe(@Nullable Recipe recipe) {
+        Recipe previousParent = getMessage(PARENT_RECIPE);
+        putMessage(PARENT_RECIPE, recipe);
+        return previousParent;
+    }
+
+    /**
+     * The recipe that scheduled this recipe's execution via {@link Recipe#getApplicableTests()} or {@link Recipe#getSingleSourceApplicableTests()}.
+     */
+    @Incubating(since = "7.37.0")
+    default Optional<Recipe> getParentRecipe() {
+        return Optional.ofNullable(getMessage(PARENT_RECIPE));
     }
 
     default int incrementAndGetUncaughtExceptionCount() {

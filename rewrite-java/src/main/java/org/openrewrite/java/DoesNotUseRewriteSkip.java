@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -25,6 +26,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
+import java.util.Optional;
 import java.util.Set;
 
 public class DoesNotUseRewriteSkip extends Recipe {
@@ -40,19 +42,7 @@ public class DoesNotUseRewriteSkip extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            final UsesRewriteSkipVisitor usesRewriteSkip = new UsesRewriteSkipVisitor();
-
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                JavaSourceFile c = cu;
-                if (c == usesRewriteSkip.visit(c, ctx)) {
-                    // if this source file is NOT skipped, then the recipe is applicable
-                    c = SearchResult.found(c);
-                }
-                return c;
-            }
-        };
+        return Applicability.not(new UsesRewriteSkipVisitor());
     }
 
     /**
@@ -82,9 +72,9 @@ public class DoesNotUseRewriteSkip extends Recipe {
             J.Literal l = literal;
             if (literal.getType() == JavaType.Primitive.String) {
                 assert literal.getValue() != null;
-                Recipe currentRecipe = ctx.getCurrentRecipe();
-                if (literal.getValue().toString().equals(currentRecipe.getClass().getName())) {
-                    l = SearchResult.found(l);
+                Optional<Recipe> parentRecipe = ctx.getParentRecipe();
+                if (parentRecipe.isPresent() && literal.getValue().toString().equals(parentRecipe.get().getClass().getName())) {
+                    return SearchResult.found(l);
                 }
             }
             return l;
@@ -94,9 +84,9 @@ public class DoesNotUseRewriteSkip extends Recipe {
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess f = fieldAccess;
             if (f.getSimpleName().equals("class")) {
-                Recipe currentRecipe = ctx.getCurrentRecipe();
-                if (TypeUtils.isOfClassType(f.getTarget().getType(), currentRecipe.getClass().getName())) {
-                    f = SearchResult.found(f);
+                Optional<Recipe> parentRecipe = ctx.getParentRecipe();
+                if (parentRecipe.isPresent() && TypeUtils.isOfClassType(f.getTarget().getType(), parentRecipe.get().getClass().getName())) {
+                    return SearchResult.found(f);
                 }
             }
             return f;

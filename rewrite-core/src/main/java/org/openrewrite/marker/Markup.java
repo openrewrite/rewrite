@@ -79,7 +79,7 @@ public interface Markup extends Marker {
 
     @Value
     @With
-    class Error implements Markup {
+    public class Error implements Markup {
         UUID id;
         Throwable exception;
 
