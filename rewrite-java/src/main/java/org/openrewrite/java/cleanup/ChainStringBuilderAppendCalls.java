@@ -17,7 +17,6 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -25,7 +24,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.java.utils.ExpressionUtils;
-import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,8 +32,6 @@ import static java.util.Collections.singletonList;
 
 public class ChainStringBuilderAppendCalls extends Recipe {
     private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
-    private static final JavaType STRING_BUILDER_TYPE = JavaType.buildType("java.lang.StringBuilder");
-    private static final String APPEND_METHOD_NAME = "append";
 
     @Override
     public String getDisplayName() {
@@ -44,7 +40,7 @@ public class ChainStringBuilderAppendCalls extends Recipe {
 
     @Override
     public String getDescription() {
-        return "String concatenation within calls to `StringBuilder.append()` causes unnecessary memory allocation. Except for concatenations of String literals, which are joined together at compile time. Replaces inefficient concatenations with chained calls to `StringBuilder.append()`";
+        return "String concatenation within calls to `StringBuilder.append()` causes unnecessary memory allocation. Except for concatenations of String literals, which are joined together at compile time. Replaces inefficient concatenations with chained calls to `StringBuilder.append()`.";
     }
 
     @Override
@@ -85,9 +81,12 @@ public class ChainStringBuilderAppendCalls extends Recipe {
                         }
                     }
                     addToGroups(group, groups);
+
                     J.MethodInvocation chainedMethods = method.withArguments(singletonList(groups.get(0)));
                     for (int i = 1; i < groups.size(); i++) {
-                        chainedMethods = buildAppendMethodInvocation(chainedMethods, groups.get(i));
+                        chainedMethods = chainedMethods.withSelect(chainedMethods)
+                            .withArguments(singletonList(groups.get(i)))
+                            .withPrefix(Space.EMPTY);
                     }
 
                     return chainedMethods;
@@ -106,33 +105,6 @@ public class ChainStringBuilderAppendCalls extends Recipe {
             groups.add(ExpressionUtils.additiveExpression(group));
             group.clear();
         }
-    }
-
-    private static J.MethodInvocation buildAppendMethodInvocation(
-        @Nullable Expression select,
-        Expression param
-    ) {
-        return new J.MethodInvocation(
-            Tree.randomId(),
-            Space.EMPTY,
-            Markers.EMPTY,
-            select != null ? new JRightPadded<>(select, Space.EMPTY, Markers.EMPTY) : null,
-            null,
-            new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, APPEND_METHOD_NAME,
-                JavaType.Primitive.Boolean, null),
-            JContainer.build(singletonList(new JRightPadded<>(param, Space.EMPTY,
-                Markers.EMPTY))),
-            new JavaType.Method(
-                null,
-                Flag.Public.getBitMask(),
-                TypeUtils.asFullyQualified(STRING_BUILDER_TYPE),
-                APPEND_METHOD_NAME,
-                STRING_BUILDER_TYPE,
-                singletonList("str"),
-                singletonList(JavaType.Primitive.String),
-                null, null, null
-            )
-        );
     }
 
     private static boolean flatAdditiveExpressions(Expression expression, List<Expression> expressionList) {
