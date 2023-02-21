@@ -449,6 +449,8 @@ class FinalizePrivateFieldsTest implements RewriteTest {
         );
     }
 
+    @Disabled("Multi constructors ignored")
+    @Issue("https://github.com/openrewrite/rewrite/issues/2865")
     @Test
     void fieldAssignedIndirectlyInAllAlternateConstructors() {
         rewriteRun(
@@ -813,6 +815,27 @@ class FinalizePrivateFieldsTest implements RewriteTest {
                   void func() {
                       B b = new B();
                       b.setNum(1);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2865")
+    void additionalConstructorIgnored() {
+        rewriteRun(
+          java(
+            """
+              class Reproducer {
+                  private String potentiallyFinal;
+
+                  Reproducer(String potentiallyFinal) {
+                      this.potentiallyFinal = potentiallyFinal;
+                  }
+
+                  Reproducer() {
                   }
               }
               """
