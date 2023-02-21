@@ -44,7 +44,7 @@ public class ChainStringBuilderAppendCalls extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace String concatenation in arguments of 'StringBuilder.append()' with chained append calls.";
+        return "String concatenation within calls to `StringBuilder.append()` causes unnecessary memory allocation. Except for concatenations of String literals, which are joined together at compile time. Replaces inefficient concatenations with chained calls to `StringBuilder.append()`";
     }
 
     @Override
