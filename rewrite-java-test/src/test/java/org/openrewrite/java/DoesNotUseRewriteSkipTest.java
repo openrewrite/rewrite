@@ -26,7 +26,7 @@ class DoesNotUseRewriteSkipTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeType("java.util.List", "java.util.Collection", false)
-            .addSingleSourceApplicableTest(new DoesNotUseRewriteSkip().getVisitor()))
+            .addSingleSourceApplicableTest(new DoesNotUseRewriteSkip()))
           .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 

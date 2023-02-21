@@ -18,6 +18,8 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
@@ -72,8 +74,8 @@ public abstract class Recipe implements Cloneable {
         }
     };
 
-    private transient List<TreeVisitor<?, ExecutionContext>> singleSourceApplicableTests;
-    private transient List<TreeVisitor<?, ExecutionContext>> applicableTests;
+    private transient List<Recipe> singleSourceApplicableTests;
+    private transient List<Recipe> applicableTests;
 
     @Nullable
     private transient List<DataTableDescriptor> dataTables;
@@ -96,6 +98,40 @@ public abstract class Recipe implements Cloneable {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return NOOP;
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private static class AdHocRecipe extends Recipe {
+        @Language("markdown")
+        String displayName;
+        @Language("markdown")
+        String description;
+        TreeVisitor<?, ExecutionContext> visitor;
+
+        @Override
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        @Override
+        public String getDescription() {
+            return description;
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return visitor;
+        }
+
+        @Nullable
+        static AdHocRecipe fromNullableVisitor(
+                @Language("markdown") String displayName,
+                @Language("markdown") String description,
+                @Nullable TreeVisitor<?, ExecutionContext> visitor
+        ) {
+            return visitor == null ? null : new AdHocRecipe(displayName, description, visitor);
         }
     }
 
@@ -230,7 +266,7 @@ public abstract class Recipe implements Cloneable {
      * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
      * on all conditions being met, that is, a logical 'AND' relationship.
      * <p>
-     * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
+     * To identify a {@link SourceFile} as applicable, the {@link TreeVisitor} should mark or change it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not be included in the results.
      * <p>
      *
@@ -238,6 +274,25 @@ public abstract class Recipe implements Cloneable {
      */
     @SuppressWarnings("unused")
     public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
+        return addApplicableTest(AdHocRecipe.fromNullableVisitor(
+                "Add applicable test for: " + getDisplayName(),
+                "Add applicable test for: " + getDescription(),
+                test
+        ));
+    }
+
+    /**
+     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
+     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
+     * on all conditions being met, that is, a logical 'AND' relationship.
+     * <p>
+     * To identify a {@link SourceFile} as applicable, the {@link Recipe} should mark or change it at any level. Any mutation
+     * that the applicability test recipe makes on the tree will not be included in the results.
+     * <p>
+     *
+     * @return This recipe. Not the argument passed.
+     */
+    public Recipe addApplicableTest(Recipe test) {
         if (applicableTests == null) {
             applicableTests = new ArrayList<>(1);
         }
@@ -252,8 +307,15 @@ public abstract class Recipe implements Cloneable {
         dataTables.add(dataTableDescriptorFromDataTable(dataTable));
     }
 
-    public List<TreeVisitor<?, ExecutionContext>> getApplicableTests() {
-        List<TreeVisitor<?, ExecutionContext>> tests = ListUtils.concat(getApplicableTest(), applicableTests);
+    public List<Recipe> getApplicableTests() {
+        List<Recipe> tests = ListUtils.concat(
+                AdHocRecipe.fromNullableVisitor(
+                        "Applicable test for: " + getDisplayName(),
+                        "Applicable test for: " + getDescription(),
+                        getApplicableTest()
+                ),
+                applicableTests
+        );
         return tests == null ? emptyList() : tests;
     }
 
@@ -276,12 +338,31 @@ public abstract class Recipe implements Cloneable {
      * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
      * on all conditions being met, that is, a logical 'AND' relationship.
      * <p>
-     * To identify a {@link SourceFile} as applicable, the visitor should mark or change it at any level. Any mutation
+     * To identify a {@link SourceFile} as applicable, the {@link TreeVisitor} should mark or change it at any level. Any mutation
      * that the applicability test visitor makes on the tree will not be included in the results.
      *
      * @return This recipe.
      */
+    @SuppressWarnings("unused")
     public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
+        return addSingleSourceApplicableTest(AdHocRecipe.fromNullableVisitor(
+                "Add single source applicable test for: " + getDisplayName(),
+                "Add single source applicable test for: " + getDescription(),
+                test
+        ));
+    }
+
+    /**
+     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
+     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
+     * on all conditions being met, that is, a logical 'AND' relationship.
+     * <p>
+     * To identify a {@link SourceFile} as applicable, the {@link Recipe} should mark or change it at any level. Any mutation
+     * that the applicability test recipe makes on the tree will not be included in the results.
+     *
+     * @return This recipe. Not the argument passed.
+     */
+    public Recipe addSingleSourceApplicableTest(Recipe test) {
         if (singleSourceApplicableTests == null) {
             singleSourceApplicableTests = new ArrayList<>(1);
         }
@@ -289,8 +370,15 @@ public abstract class Recipe implements Cloneable {
         return this;
     }
 
-    public List<TreeVisitor<?, ExecutionContext>> getSingleSourceApplicableTests() {
-        List<TreeVisitor<?, ExecutionContext>> tests = ListUtils.concat(getSingleSourceApplicableTest(), singleSourceApplicableTests);
+    public List<Recipe> getSingleSourceApplicableTests() {
+        List<Recipe> tests = ListUtils.concat(
+                AdHocRecipe.fromNullableVisitor(
+                        "Single Source Applicable test for: " + getDisplayName(),
+                        "Single Source Applicable test for: " + getDescription(),
+                        getSingleSourceApplicableTest()
+                ),
+                singleSourceApplicableTests
+        );
         return tests == null ? emptyList() : tests;
     }
 
