@@ -22,7 +22,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
 
 import java.util.Iterator;
 
@@ -36,7 +35,7 @@ public class NoFinalizedLocalVariables extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove the `final` modifier keyword from local variables regardl.";
+        return "Remove the `final` modifier keyword from local variables regardless of whether or not they are used within a local class or an anonymous class.";
     }
 
     @Override
