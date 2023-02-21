@@ -819,4 +819,25 @@ class FinalizePrivateFieldsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2865")
+    void additionalConstructorIgnored() {
+        rewriteRun(
+          java(
+            """
+              class Reproducer {
+                  private String potentiallyFinal;
+
+                  Reproducer(String potentiallyFinal) {
+                      this.potentiallyFinal = potentiallyFinal;
+                  }
+
+                  Reproducer() {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
