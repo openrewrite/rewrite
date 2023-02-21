@@ -35,18 +35,32 @@ class NoFinalizedLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.function.Supplier;
               class T {
                   final int field = 0;
                   public void test(final String s) {
                       final int n = 0;
+                      new Supplier<>() {
+                          final int innerField = 0;
+                          public String get() {
+                              return s;
+                          }
+                      };
                   }
               }
               """,
             """
+              import java.util.function.Supplier;
               class T {
                   final int field = 0;
                   public void test(String s) {
                       int n = 0;
+                      new Supplier<>() {
+                          final int innerField = 0;
+                          public String get() {
+                              return s;
+                          }
+                      };
                   }
               }
               """
