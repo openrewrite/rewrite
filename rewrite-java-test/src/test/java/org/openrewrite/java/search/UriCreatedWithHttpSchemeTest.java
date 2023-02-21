@@ -49,18 +49,18 @@ class UriCreatedWithHttpSchemeTest implements RewriteTest {
               }
               """,
             """
-                  import java.net.URI;
-                  class Test {
-                      void test() {
-                          String s = "https://test";
-                          String t = s;
-                          if(System.currentTimeMillis() > 0) {
-                              System.out.println(URI.create(t));
-                          } else {
-                              System.out.println(URI.create(t));
-                          }
+              import java.net.URI;
+              class Test {
+                  void test() {
+                      String s = "https://test";
+                      String t = s;
+                      if(System.currentTimeMillis() > 0) {
+                          System.out.println(URI.create(t));
+                      } else {
+                          System.out.println(URI.create(t));
                       }
                   }
+              }
               """
           )
         );
@@ -71,18 +71,18 @@ class UriCreatedWithHttpSchemeTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.net.URI;
-                  class Test {
-                      void test() {
-                          String s = "http://test";
-                          s = s.replace("http://", "https://");
-                          if(System.currentTimeMillis() > 0) {
-                              System.out.println(URI.create(s));
-                          } else {
-                              System.out.println(URI.create(s));
-                          }
+              import java.net.URI;
+              class Test {
+                  void test() {
+                      String s = "http://test";
+                      s = s.replace("http://", "https://");
+                      if(System.currentTimeMillis() > 0) {
+                          System.out.println(URI.create(s));
+                      } else {
+                          System.out.println(URI.create(s));
                       }
                   }
+              }
               """
           )
         );

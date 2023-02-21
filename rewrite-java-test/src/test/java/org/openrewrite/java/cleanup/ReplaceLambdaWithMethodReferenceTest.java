@@ -515,20 +515,20 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      Runnable r = () -> {
-                          this.execute();
-                      };
+              class Test {
+                  Runnable r = () -> {
+                      this.execute();
+                  };
 
-                      void execute() {}
-                  }
+                  void execute() {}
+              }
               """,
             """
-                  class Test {
-                      Runnable r = this::execute;
+              class Test {
+                  Runnable r = this::execute;
 
-                      void execute() {}
-                  }
+                  void execute() {}
+              }
               """
           )
         );

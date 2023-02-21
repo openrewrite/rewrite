@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -792,6 +793,41 @@ class AddDependencyTest implements RewriteTest {
                         <version>1</version>
                     </parent>
                 </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void rawVisitorDoesNotDuplicate() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new AdHocRecipe("Add dependency",
+              "Uses AddDependencyVisitor directly to validate that it will not add a dependency multiple times",
+              false,
+              () -> new AddDependencyVisitor("com.google.guava", "guava", "29.0-jre",
+                null, "test",  null, null, null, null, null),
+              null)),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>29.0-jre</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </project>
                 """
             )
           )

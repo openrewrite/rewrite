@@ -46,15 +46,13 @@ public class AddProperty extends Recipe {
 
     @Option(displayName = "Preserve value if property exists",
             description = "Preserve previous value if the property already exists in the pom file.",
-            required = false,
-            example = "false")
+            required = false)
     @Nullable
     Boolean preserveExistingValue;
 
     @Option(displayName = "Trust parent POM",
             description = "Even if the parent defines a property with the same key, trust it even if the value isn't the same. " +
                     "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
-            example = "false",
             required = false)
     @Nullable
     Boolean trustParent;

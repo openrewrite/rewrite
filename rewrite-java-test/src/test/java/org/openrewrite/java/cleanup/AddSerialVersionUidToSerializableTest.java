@@ -125,22 +125,22 @@ class AddSerialVersionUidToSerializableTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
+              import java.io.Serializable;
 
-                  public class Example implements Serializable {
-                      Long serialVersionUID = 1L;
-                      private String fred;
-                      private int numberOfFreds;
-                  }
+              public class Example implements Serializable {
+                  Long serialVersionUID = 1L;
+                  private String fred;
+                  private int numberOfFreds;
+              }
               """,
             """
-                  import java.io.Serializable;
+              import java.io.Serializable;
 
-                  public class Example implements Serializable {
-                      private static final long serialVersionUID = 1L;
-                      private String fred;
-                      private int numberOfFreds;
-                  }
+              public class Example implements Serializable {
+                  private static final long serialVersionUID = 1L;
+                  private String fred;
+                  private int numberOfFreds;
+              }
               """
           )
         );
@@ -151,13 +151,13 @@ class AddSerialVersionUidToSerializableTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                              
-                  public class Example implements Serializable {
-                      private static final long serialVersionUID = 1;
-                      private String fred;
-                      private int numberOfFreds;
-                  }
+              import java.io.Serializable;
+                          
+              public class Example implements Serializable {
+                  private static final long serialVersionUID = 1;
+                  private String fred;
+                  private int numberOfFreds;
+              }
               """
           )
         );
@@ -168,27 +168,27 @@ class AddSerialVersionUidToSerializableTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                              
-                  public class Example implements Serializable {
-                      private String fred;
-                      private int numberOfFreds;
-                      void doSomething() {
-                          int serialVersionUID = 1;
-                      }
+              import java.io.Serializable;
+                          
+              public class Example implements Serializable {
+                  private String fred;
+                  private int numberOfFreds;
+                  void doSomething() {
+                      int serialVersionUID = 1;
                   }
+              }
               """,
             """
-                  import java.io.Serializable;
-                              
-                  public class Example implements Serializable {
-                      private static final long serialVersionUID = 1;
-                      private String fred;
-                      private int numberOfFreds;
-                      void doSomething() {
-                          int serialVersionUID = 1;
-                      }
+              import java.io.Serializable;
+                          
+              public class Example implements Serializable {
+                  private static final long serialVersionUID = 1;
+                  private String fred;
+                  private int numberOfFreds;
+                  void doSomething() {
+                      int serialVersionUID = 1;
                   }
+              }
               """
           )
         );
@@ -199,10 +199,10 @@ class AddSerialVersionUidToSerializableTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                              
-                  public interface Example extends Serializable {
-                  }
+              import java.io.Serializable;
+                          
+              public interface Example extends Serializable {
+              }
               """
           )
         );
@@ -213,10 +213,10 @@ class AddSerialVersionUidToSerializableTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                              
-                  public class MyException extends Exception implements Serializable {
-                  }
+              import java.io.Serializable;
+                          
+              public class MyException extends Exception implements Serializable {
+              }
               """
           )
         );
@@ -227,10 +227,10 @@ class AddSerialVersionUidToSerializableTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                              
-                  public class MyException extends RuntimeException implements Serializable {
-                  }
+              import java.io.Serializable;
+                          
+              public class MyException extends RuntimeException implements Serializable {
+              }
               """
           )
         );
@@ -241,21 +241,21 @@ class AddSerialVersionUidToSerializableTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                  public class Outer {
-                      public static class Inner implements Serializable {
-                      
-                      }
+              import java.io.Serializable;
+              public class Outer {
+                  public static class Inner implements Serializable {
+                  
                   }
+              }
               """,
             """
-                  import java.io.Serializable;
-                  public class Outer {
-                      public static class Inner implements Serializable {
-                          private static final long serialVersionUID = 1;
-                      
-                      }
+              import java.io.Serializable;
+              public class Outer {
+                  public static class Inner implements Serializable {
+                      private static final long serialVersionUID = 1;
+                  
                   }
+              }
               """
           )
         );

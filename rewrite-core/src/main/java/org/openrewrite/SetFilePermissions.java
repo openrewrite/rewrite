@@ -31,18 +31,15 @@ public class SetFilePermissions extends Recipe {
     String fileMatcher;
 
     @Option(displayName = "Readable",
-            description = "File read permission.",
-            example = "true")
+            description = "File read permission.")
     Boolean isReadable;
 
     @Option(displayName = "Writable",
-            description = "File write permission.",
-            example = "true")
+            description = "File write permission.")
     Boolean isWritable;
 
     @Option(displayName = "Executable",
-            description = "Files executable permission.",
-            example = "true")
+            description = "Files executable permission.")
     Boolean isExecutable;
 
     @Override

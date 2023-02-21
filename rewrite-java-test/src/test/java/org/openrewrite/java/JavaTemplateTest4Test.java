@@ -451,14 +451,14 @@ public class JavaTemplateTest4Test implements RewriteTest {
               }
               """,
             """
-                  class Test {
-                      int n;
-                      void test() {
-                          int m = 0;
-                          // comment
-                          int n = 1;
-                      }
+              class Test {
+                  int n;
+                  void test() {
+                      int m = 0;
+                      // comment
+                      int n = 1;
                   }
+              }
               """
           )
         );

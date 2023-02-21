@@ -123,9 +123,9 @@ class MethodNameCasingTest implements RewriteTest {
         spec -> spec.recipe(new MethodNameCasing(null, null)),
           java(
             """
-              class Test {
-                  public void getFoo_bar() {}
-              }
+            class Test {
+                public void getFoo_bar() {}
+            }
             """
           )
         );
@@ -197,16 +197,16 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void MyMethod_with_über() {
-                      }
+              class Test {
+                  void MyMethod_with_über() {
                   }
+              }
               """,
             """
-                  class Test {
-                      void myMethodWithUber() {
-                      }
+              class Test {
+                  void myMethodWithUber() {
                   }
+              }
               """
           )
         );
@@ -217,16 +217,16 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void MyMethod() {
-                      }
+              class Test {
+                  void MyMethod() {
                   }
+              }
               """,
             """
-                  class Test {
-                      void myMethod() {
-                      }
+              class Test {
+                  void myMethod() {
                   }
+              }
               """
           )
         );
@@ -237,31 +237,31 @@ class MethodNameCasingTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void MyMethod_with_über() {
-                      }
+              class Test {
+                  void MyMethod_with_über() {
                   }
+              }
               """, """
-                  class Test {
-                      void myMethodWithUber() {
-                      }
+              class Test {
+                  void myMethodWithUber() {
                   }
+              }
               """
           ),
           java(
             """
-                  class A {
-                      void test() {
-                          new Test().MyMethod_with_über();
-                      }
+              class A {
+                  void test() {
+                      new Test().MyMethod_with_über();
                   }
+              }
               """,
             """
-                  class A {
-                      void test() {
-                          new Test().myMethodWithUber();
-                      }
+              class A {
+                  void test() {
+                      new Test().myMethodWithUber();
                   }
+              }
               """
           )
         );

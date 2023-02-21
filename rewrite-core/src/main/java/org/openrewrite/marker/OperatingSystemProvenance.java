@@ -15,6 +15,9 @@
  */
 package org.openrewrite.marker;
 
+import com.sun.jna.LastErrorException;
+import com.sun.jna.Library;
+import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Kernel32Util;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -22,9 +25,11 @@ import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.ci.POSIXUtil;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -55,20 +60,81 @@ public abstract class OperatingSystemProvenance implements Marker {
         toStringValue = getName() + " " + getVersion() + " " + System.getProperty("os.arch");
     }
 
+    private interface C extends Library {
+        @SuppressWarnings("UnusedReturnValue")
+        int gethostname(byte[] name, int size_t) throws LastErrorException;
+    }
+
     public static String hostname() {
         OperatingSystemProvenance currentOs = current();
         if (currentOs.isWindows()) {
             try {
+                if (System.getenv("COMPUTERNAME") != null) {
+                    return System.getenv("COMPUTERNAME");
+                }
                 return Kernel32Util.getComputerName();
             } catch (Throwable t) {
                 // unable to determine the host name on this Windows instance.
                 // with variations in build tool versions and JVMs, this can sometimes break
             }
+        } else if (currentOs.isMacOsX()) {
+            try {
+                if (System.getenv("HOSTNAME") != null) {
+                    return System.getenv("HOSTNAME");
+                }
+
+                Path plist = Paths.get("/Library/Preferences/SystemConfiguration/preferences.plist");
+                if (Files.exists(plist)) {
+                    try {
+                        /*
+                         <dict>
+                             <key>LocalHostName</key>
+                             <string>MacBook-Pro-4</string>
+                         </dict>
+                         */
+                        String hostname = new String(Files.readAllBytes(plist));
+                        int localHostName = hostname.indexOf("<key>LocalHostName</key>");
+                        if (localHostName > 0) {
+                            int valueTag = hostname.indexOf("<string>", localHostName);
+                            if (valueTag > 0) {
+                                int valueStart = valueTag + "<string>".length();
+                                return hostname.substring(valueStart, hostname.indexOf("</string>", valueStart)).trim() + ".local";
+                            }
+                        }
+                    } catch (Throwable t) {
+                        // fall through to the next option
+                    }
+                }
+
+                C c = Native.load("c", C.class);
+                byte[] hostname = new byte[256];
+                c.gethostname(hostname, hostname.length);
+                return Native.toString(hostname);
+            } catch (Throwable t) {
+                // unable to determine the host name on this instance.
+            }
         } else if (currentOs.isUnix()) {
             try {
-                return POSIXUtil.getHostName();
+                if (System.getenv("HOSTNAME") != null) {
+                    return System.getenv("HOSTNAME");
+                }
+
+                Path etcHostname = Paths.get("/etc/hostname");
+                if (Files.exists(etcHostname)) {
+                    try {
+                        String hostname = new String(Files.readAllBytes(etcHostname));
+                        return hostname.trim();
+                    } catch (Throwable t) {
+                        // fall through to the next option
+                    }
+                }
+
+                C c = Native.load("c", C.class);
+                byte[] hostname = new byte[256];
+                c.gethostname(hostname, hostname.length);
+                return Native.toString(hostname);
             } catch (Throwable t) {
-                // unable to determine the host name on this Windows instance.
+                // unable to determine the host name on this instance.
             }
         }
         return "localhost";

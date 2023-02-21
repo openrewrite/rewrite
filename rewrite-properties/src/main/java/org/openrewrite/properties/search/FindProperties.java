@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
@@ -67,7 +68,8 @@ public class FindProperties extends Recipe {
         PropertiesVisitor<Set<Properties.Entry>> findVisitor = new PropertiesVisitor<Set<Properties.Entry>>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, Set<Properties.Entry> ps) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey) :
+                        StringUtils.matchesGlob(entry.getKey(), propertyKey)) {
                     ps.add(entry);
                 }
                 return super.visitEntry(entry, ps);
@@ -84,7 +86,8 @@ public class FindProperties extends Recipe {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
+                if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.matchesGlobRelaxedBinding(entry.getKey(), propertyKey) :
+                        StringUtils.matchesGlob(entry.getKey(), propertyKey)) {
                     entry = entry.withValue(entry.getValue().withMarkers(entry.getValue().getMarkers()
                             .computeByType(new SearchResult(randomId(), null), (s1, s2) -> s1 == null ? s2 : s1)));
                 }
@@ -92,5 +95,4 @@ public class FindProperties extends Recipe {
             }
         };
     }
-
 }

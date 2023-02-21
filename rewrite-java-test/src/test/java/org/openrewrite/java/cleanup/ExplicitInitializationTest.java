@@ -66,13 +66,13 @@ class ExplicitInitializationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void doSomething() {
-                          for (int i=0; i<10; i++) {
-                              System.out.println(i);
-                          }
+              class Test {
+                  void doSomething() {
+                      for (int i=0; i<10; i++) {
+                          System.out.println(i);
                       }
                   }
+              }
               """
           )
         );

@@ -167,10 +167,10 @@ class MethodMatcherTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package a;
-                  class A {
-                      A a = new A();
-                  }
+              package a;
+              class A {
+                  A a = new A();
+              }
               """,
             spec -> spec.afterRecipe(cu -> assertThat(FindMethods.find(cu, methodPattern)).isNotEmpty())
           )

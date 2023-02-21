@@ -287,20 +287,20 @@ class JavaTemplateTest implements RewriteTest {
           })).expectedCyclesThatMakeChanges(2),
           java(
             """
-                  import java.util.List;
-                  class T {
-                      void m(List<?> l) {
-                          while (l.size() != 0) {}
-                      }
+              import java.util.List;
+              class T {
+                  void m(List<?> l) {
+                      while (l.size() != 0) {}
                   }
+              }
               """,
             """
-                  import java.util.List;
-                  class T {
-                      void m(List<?> l) {
-                          while (!l.isEmpty()) {}
-                      }
+              import java.util.List;
+              class T {
+                  void m(List<?> l) {
+                      while (!l.isEmpty()) {}
                   }
+              }
               """
           )
         );

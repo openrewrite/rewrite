@@ -32,12 +32,10 @@ public class ChangePropertyValue extends Recipe {
     String propertyKey;
 
     @Option(displayName = "New value",
-            description = "The new value to be used for key specified by `propertyKey`.",
-            example = "false")
+            description = "The new value to be used for key specified by `propertyKey`.")
     String newValue;
 
     @Option(displayName = "Old value",
-            example = "true",
             required = false,
             description = "Only change the property value if it matches the configured `oldValue`.")
     @Nullable

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -59,25 +58,9 @@ public class RemoveExclusion extends Recipe {
 
     @Option(displayName = "Only ineffective",
             description = "Default false. If enabled, matching exclusions will only be removed if they are ineffective (if the excluded dependency was not actually a transitive dependency of the target dependency).",
-            required = false,
-            example = "true")
+            required = false)
     @Nullable
     Boolean onlyIneffective;
-
-    @JsonCreator
-    public RemoveExclusion(String groupId, String artifactId, String exclusionGroupId, String exclusionArtifactId,
-            @Nullable Boolean onlyIneffective) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.exclusionGroupId = exclusionGroupId;
-        this.exclusionArtifactId = exclusionArtifactId;
-        this.onlyIneffective = onlyIneffective;
-    }
-
-    @Deprecated
-    public RemoveExclusion(String groupId, String artifactId, String exclusionGroupId, String exclusionArtifactId) {
-        this(groupId, artifactId, exclusionGroupId, exclusionArtifactId, null);
-    }
 
     @Override
     public String getDisplayName() {
@@ -107,7 +90,7 @@ public class RemoveExclusion extends Recipe {
                                             Xml.Tag exclusion = (Xml.Tag) child2;
                                             if (exclusion.getChildValue("groupId").map(g -> matchesGlob(g, exclusionGroupId)).orElse(false) &&
                                                 exclusion.getChildValue("artifactId").map(g -> matchesGlob(g, exclusionArtifactId)).orElse(false) &&
-                                                    !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && onlyIneffective())) {
+                                                    !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && Boolean.TRUE.equals(onlyIneffective))) {
                                                 return null;
                                             }
                                         }
@@ -150,9 +133,5 @@ public class RemoveExclusion extends Recipe {
                 return managedDependency != null && managedDependency.getRequested() != null;
             }
         };
-    }
-
-    private boolean onlyIneffective() {
-        return Boolean.TRUE.equals(onlyIneffective);
     }
 }

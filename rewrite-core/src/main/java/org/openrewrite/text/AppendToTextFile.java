@@ -48,7 +48,6 @@ public class AppendToTextFile extends Recipe {
 
     @Option(displayName = "Append newline",
             description = "Print a newline automatically after the content (and preamble). Default true.",
-            example = "false",
             required = false)
     @Nullable Boolean appendNewline;
 

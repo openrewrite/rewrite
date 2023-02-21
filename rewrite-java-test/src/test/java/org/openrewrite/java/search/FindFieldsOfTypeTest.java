@@ -30,12 +30,12 @@ class FindFieldsOfTypeTest implements RewriteTest {
           spec -> spec.recipe(new FindFieldsOfType("java.io.File")),
           java(
             """
-                  import java.io.*;
-                  public class Test {
-                      public static void main(String[] args) {
-                          File f = new File("/dev/null");
-                      }
+              import java.io.*;
+              public class Test {
+                  public static void main(String[] args) {
+                      File f = new File("/dev/null");
                   }
+              }
               """
           )
         );

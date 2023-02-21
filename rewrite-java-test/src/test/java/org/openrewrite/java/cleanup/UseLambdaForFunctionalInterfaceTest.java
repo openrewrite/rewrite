@@ -85,21 +85,21 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Function;
-                  class Test {
-                      Function<Integer, Integer> f = new Function<Integer, Integer>() {
-                          @Override
-                          public Integer apply(Integer n) {
-                              return n + 1;
-                          }
-                      };
-                  }
+              import java.util.function.Function;
+              class Test {
+                  Function<Integer, Integer> f = new Function<Integer, Integer>() {
+                      @Override
+                      public Integer apply(Integer n) {
+                          return n + 1;
+                      }
+                  };
+              }
               """,
             """
-                  import java.util.function.Function;
-                  class Test {
-                      Function<Integer, Integer> f = n -> n + 1;
-                  }
+              import java.util.function.Function;
+              class Test {
+                  Function<Integer, Integer> f = n -> n + 1;
+              }
               """
           )
         );
@@ -110,21 +110,21 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Supplier;
-                  class Test {
-                      Supplier<Integer> s = new Supplier<Integer>() {
-                          @Override
-                          public Integer get() {
-                              return 1;
-                          }
-                      };
-                  }
+              import java.util.function.Supplier;
+              class Test {
+                  Supplier<Integer> s = new Supplier<Integer>() {
+                      @Override
+                      public Integer get() {
+                          return 1;
+                      }
+                  };
+              }
               """,
             """
-                  import java.util.function.Supplier;
-                  class Test {
-                      Supplier<Integer> s = () -> 1;
-                  }
+              import java.util.function.Supplier;
+              class Test {
+                  Supplier<Integer> s = () -> 1;
+              }
               """
           )
         );
@@ -170,38 +170,38 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Consumer;
-                  
-                  class Test {
-                      void bar(Consumer<Integer> c) {
-                      }
-                      void foo() {
-                          bar(new Consumer<Integer>() {
-                              @Override
-                              public void accept(Integer i) {
-                                  bar(new Consumer<Integer>() {
-                                      @Override
-                                      public void accept(Integer i2) {
-                                      }
-                                  });
-                              }
-                          });
-                      }
+              import java.util.function.Consumer;
+              
+              class Test {
+                  void bar(Consumer<Integer> c) {
                   }
+                  void foo() {
+                      bar(new Consumer<Integer>() {
+                          @Override
+                          public void accept(Integer i) {
+                              bar(new Consumer<Integer>() {
+                                  @Override
+                                  public void accept(Integer i2) {
+                                  }
+                              });
+                          }
+                      });
+                  }
+              }
               """,
             """
-                  import java.util.function.Consumer;
-                  
-                  class Test {
-                      void bar(Consumer<Integer> c) {
-                      }
-                      void foo() {
-                          bar(i -> {
-                              bar(i2 -> {
-                              });
-                          });
-                      }
+              import java.util.function.Consumer;
+              
+              class Test {
+                  void bar(Consumer<Integer> c) {
                   }
+                  void foo() {
+                      bar(i -> {
+                          bar(i2 -> {
+                          });
+                      });
+                  }
+              }
               """
           )
         );
@@ -212,16 +212,16 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Function;
-                  class Test {
-                      int n;
-                      Function<Integer, Integer> f = new Function<Integer, Integer>() {
-                          @Override
-                          public Integer apply(Integer n) {
-                              return this.n;
-                          }
-                      };
-                  }
+              import java.util.function.Function;
+              class Test {
+                  int n;
+                  Function<Integer, Integer> f = new Function<Integer, Integer>() {
+                      @Override
+                      public Integer apply(Integer n) {
+                          return this.n;
+                      }
+                  };
+              }
               """
           )
         );
@@ -233,19 +233,19 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Supplier;
-                  class Test {
-                      void test() {
-                          int n = 1;
-                          Supplier<Integer> f = new Supplier<Integer>() {
-                              @Override
-                              public Integer get() {
-                                  int n = 0;
-                                  return n;
-                              }
-                          };
-                      }
+              import java.util.function.Supplier;
+              class Test {
+                  void test() {
+                      int n = 1;
+                      Supplier<Integer> f = new Supplier<Integer>() {
+                          @Override
+                          public Integer get() {
+                              int n = 0;
+                              return n;
+                          }
+                      };
                   }
+              }
               """
           )
         );
@@ -258,19 +258,19 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Supplier;
-                  class Test {
-                      int n = 1;
-                      void test() {
-                          Supplier<Integer> f = new Supplier<Integer>() {
-                              @Override
-                              public Integer get() {
-                                  int n = 0;
-                                  return n;
-                              }
-                          };
-                      }
+              import java.util.function.Supplier;
+              class Test {
+                  int n = 1;
+                  void test() {
+                      Supplier<Integer> f = new Supplier<Integer>() {
+                          @Override
+                          public Integer get() {
+                              int n = 0;
+                              return n;
+                          }
+                      };
                   }
+              }
               """
           )
         );
@@ -283,18 +283,18 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Supplier;
-                  class Test {
-                      void test(int n) {
-                          Supplier<Integer> f = new Supplier<Integer>() {
-                              @Override
-                              public Integer get() {
-                                  int n = 0;
-                                  return n;
-                              }
-                          };
-                      }
+              import java.util.function.Supplier;
+              class Test {
+                  void test(int n) {
+                      Supplier<Integer> f = new Supplier<Integer>() {
+                          @Override
+                          public Integer get() {
+                              int n = 0;
+                              return n;
+                          }
+                      };
                   }
+              }
               """
           )
         );
@@ -305,21 +305,21 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.function.Function;
-                  class Test {
-                      Function<Integer, Integer> f = new Function<Integer, Integer>() {
-                          @Override
-                          public Integer apply(final Integer n) {
-                              return n + 1;
-                          }
-                      };
-                  }
+              import java.util.function.Function;
+              class Test {
+                  Function<Integer, Integer> f = new Function<Integer, Integer>() {
+                      @Override
+                      public Integer apply(final Integer n) {
+                          return n + 1;
+                      }
+                  };
+              }
               """,
             """
-                  import java.util.function.Function;
-                  class Test {
-                      Function<Integer, Integer> f = n -> n + 1;
-                  }
+              import java.util.function.Function;
+              class Test {
+                  Function<Integer, Integer> f = n -> n + 1;
+              }
               """
           )
         );

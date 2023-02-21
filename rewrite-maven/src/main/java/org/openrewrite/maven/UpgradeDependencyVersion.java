@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -34,6 +33,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
@@ -54,9 +54,9 @@ public class UpgradeDependencyVersion extends Recipe {
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     // there are several implicitly defined version properties that we should never attempt to update
-    private static final Set<String> implicitlyDefinedVersionProperties = new HashSet<>(Arrays.asList(
+    private static final Collection<String> implicitlyDefinedVersionProperties = Arrays.asList(
             "${version}", "${project.version}", "${pom.version}", "${project.parent.version}"
-    ));
+    );
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
@@ -83,36 +83,18 @@ public class UpgradeDependencyVersion extends Recipe {
 
     @Option(displayName = "Override managed version",
             description = "This flag can be set to explicitly override a managed dependency's version. The default for this flag is `false`.",
-            example = "false",
             required = false)
     @Nullable
     Boolean overrideManagedVersion;
 
     @Option(displayName = "Retain versions",
             description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
-                    + "from dependency management after the changes from this recipe, then it will be retained with an explicit version. "
-                    + "The version can be omitted from the GAV to use the old value from dependency management",
-            example = "- com.jcraft:jsch",
+                          + "from dependency management after the changes from this recipe, then it will be retained with an explicit version. "
+                          + "The version can be omitted from the GAV to use the old value from dependency management",
+            example = "com.jcraft:jsch",
             required = false)
+    @Nullable
     List<String> retainVersions;
-
-    @Deprecated
-    public UpgradeDependencyVersion(String groupId, String artifactId, String newVersion,
-            @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
-        this(groupId, artifactId, newVersion, versionPattern, overrideManagedVersion, null);
-    }
-
-    @JsonCreator
-    public UpgradeDependencyVersion(String groupId, String artifactId, String newVersion,
-            @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion,
-            @Nullable List<String> retainVersions) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-        this.overrideManagedVersion = overrideManagedVersion;
-        this.retainVersions = retainVersions == null ? new ArrayList<>() : retainVersions;
-    }
 
     @SuppressWarnings("ConstantConditions")
     @Override
@@ -218,7 +200,8 @@ public class UpgradeDependencyVersion extends Recipe {
             }
 
             private void retainVersions() {
-                for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions)) {
+                for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions == null ?
+                        emptyList() : retainVersions)) {
                     doAfterVisit(retainVersionRecipe);
                 }
             }

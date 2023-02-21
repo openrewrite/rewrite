@@ -702,20 +702,20 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withAroundOperators(style.getAroundOperators().withLogical(false))),
           java(
             """
-                  class Test {
-                      void foo() {
-                          boolean x = true && false;
-                          boolean y = true || false;
-                      }
+              class Test {
+                  void foo() {
+                      boolean x = true && false;
+                      boolean y = true || false;
                   }
+              }
               """,
             """
-                  class Test {
-                      void foo() {
-                          boolean x = true&&false;
-                          boolean y = true||false;
-                      }
+              class Test {
+                  void foo() {
+                      boolean x = true&&false;
+                      boolean y = true||false;
                   }
+              }
               """
           )
         );
@@ -1399,22 +1399,22 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withBeforeLeftBrace(style.getBeforeLeftBrace().withElseLeftBrace(true))),
           java(
             """
-                  class Test {
-                      public void foo() {
-                          if (true) {
-                          } else{
-                          }
+              class Test {
+                  public void foo() {
+                      if (true) {
+                      } else{
                       }
                   }
+              }
               """,
             """
-                  class Test {
-                      public void foo() {
-                          if (true) {
-                          } else {
-                          }
+              class Test {
+                  public void foo() {
+                      if (true) {
+                      } else {
                       }
                   }
+              }
               """
           )
         );

@@ -69,11 +69,11 @@ class RemoveUnusedPrivateMethodsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test implements java.io.Serializable {
-                      private void writeObject(java.io.ObjectOutputStream out) {}
-                      private void readObject(java.io.ObjectInputStream in) {}
-                      private void readObjectNoData() {}
-                  }
+              class Test implements java.io.Serializable {
+                  private void writeObject(java.io.ObjectOutputStream out) {}
+                  private void readObject(java.io.ObjectInputStream in) {}
+                  private void readObjectNoData() {}
+              }
               """
           )
         );
@@ -84,17 +84,17 @@ class RemoveUnusedPrivateMethodsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import org.junit.jupiter.params.provider.MethodSource;
-                  import java.util.stream.Stream;
+              import org.junit.jupiter.params.provider.MethodSource;
+              import java.util.stream.Stream;
 
-                  class Test {
-                      @MethodSource("sourceExample")
-                      void test(String input) {
-                      }
-                      private Stream<Object> sourceExample() {
-                          return null;
-                      }
+              class Test {
+                  @MethodSource("sourceExample")
+                  void test(String input) {
                   }
+                  private Stream<Object> sourceExample() {
+                      return null;
+                  }
+              }
               """
           )
         );
@@ -106,17 +106,17 @@ class RemoveUnusedPrivateMethodsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public class TestClass {
-                      void method() {
-                          checkMethodInUse("String", "String");
-                      }
-
-                      private static void checkMethodInUse(String arg0, String arg1) {
-                      }
-
-                      private static <T> void checkMethodInUse(String arg0, T arg1) {
-                      }
+              public class TestClass {
+                  void method() {
+                      checkMethodInUse("String", "String");
                   }
+
+                  private static void checkMethodInUse(String arg0, String arg1) {
+                  }
+
+                  private static <T> void checkMethodInUse(String arg0, T arg1) {
+                  }
+              }
               """
           )
         );
