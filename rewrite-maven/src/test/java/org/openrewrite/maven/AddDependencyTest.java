@@ -819,13 +819,6 @@ class AddDependencyTest implements RewriteTest {
                         <groupId>com.mycompany.app</groupId>
                         <artifactId>my-app</artifactId>
                         <version>1</version>
-                    </project>
-                """,
-              """
-                    <project>
-                        <groupId>com.mycompany.app</groupId>
-                        <artifactId>my-app</artifactId>
-                        <version>1</version>
                         <dependencies>
                             <dependency>
                                 <groupId>com.google.guava</groupId>
