@@ -23,7 +23,7 @@ import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class ParserTest implements RewriteTest {
+class ParserTest implements RewriteTest {
 
     @Test
     void overrideCharset() {

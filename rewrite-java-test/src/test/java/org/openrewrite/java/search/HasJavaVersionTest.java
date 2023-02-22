@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
 
-public class HasJavaVersionTest implements RewriteTest {
+class HasJavaVersionTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"[8,17)", "11", "11.x"})

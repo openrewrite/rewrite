@@ -26,7 +26,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class TreeTest implements RewriteTest {
+class TreeTest implements RewriteTest {
 
     @Test
     void customMarkerPrinting() {

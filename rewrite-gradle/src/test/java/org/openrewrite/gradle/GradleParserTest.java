@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-public class GradleParserTest implements RewriteTest {
+class GradleParserTest implements RewriteTest {
 
     @Test
     void buildGradleAndSettingsGradle() {

@@ -31,7 +31,7 @@ import java.nio.file.Paths;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RemoteArchiveTest {
+class RemoteArchiveTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"7.4.2", "7.5-rc-1", "7.6"})

@@ -29,7 +29,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
-public class JavaTemplateTest5Test implements RewriteTest {
+class JavaTemplateTest5Test implements RewriteTest {
 
     @Test
     void lastStatementInClassBlock() {

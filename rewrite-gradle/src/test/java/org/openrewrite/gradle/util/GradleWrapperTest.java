@@ -21,7 +21,7 @@ import org.openrewrite.Validated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class GradleWrapperTest {
+class GradleWrapperTest {
 
     @Test
     void validateDistributionTypeBin() {

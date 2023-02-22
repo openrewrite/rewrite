@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class RemoveRepositoryTest implements RewriteTest {
+class RemoveRepositoryTest implements RewriteTest {
 
     @Test
     @DisplayName("It should only remove a repo when both the id and the urls are the same")

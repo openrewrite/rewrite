@@ -20,7 +20,7 @@ import org.openrewrite.Issue;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public interface JavaTypeSignatureBuilderTest {
+interface JavaTypeSignatureBuilderTest {
     String fieldSignature(String field);
 
     String methodSignature(String methodName);

@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class AddRepositoryTest implements RewriteTest {
+class AddRepositoryTest implements RewriteTest {
 
     @Test
     void addSimpleRepo() {
