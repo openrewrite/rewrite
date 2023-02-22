@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class FindRecipesTest implements RewriteTest {
+class FindRecipesTest implements RewriteTest {
 
     @Test
     void findRecipes() {

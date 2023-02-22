@@ -26,7 +26,7 @@ import java.util.Properties;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class YamlResourceLoaderTest implements RewriteTest {
+class YamlResourceLoaderTest implements RewriteTest {
 
     @Test
     void dataTables() {

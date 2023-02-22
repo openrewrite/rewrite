@@ -27,7 +27,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"UnnecessaryBoxing", "PatternVariableCanBeUsed"})
-public class JavaTemplateTest7Test implements RewriteTest {
+class JavaTemplateTest7Test implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1198")
     @Test

@@ -27,7 +27,7 @@ import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class EncodingDetectingInputStreamTest {
+class EncodingDetectingInputStreamTest {
 
     private static final Charset WINDOWS_1252 = Charset.forName("Windows-1252");
 

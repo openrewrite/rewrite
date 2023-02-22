@@ -26,7 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.other;
 
-public class QuarkTest implements RewriteTest {
+class QuarkTest implements RewriteTest {
 
     @Test
     void renderMarkersOnQuarks() {
