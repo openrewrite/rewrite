@@ -22,95 +22,95 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implements RewriteTest {
+class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-            .parser(JavaParser.fromJavaVersion()
-                .logCompilationWarningsAndErrors(true)
-                .classpath("commons-lang3"))
-            .recipe(new ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull());
+          .parser(JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .classpath("commons-lang3"))
+          .recipe(new ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull());
     }
 
     @Test
-    void doNothingIfMethodNotFound(){
+    void doNothingIfMethodNotFound() {
         rewriteRun(
-            java(
-                """
-                  import org.apache.commons.lang3.Validate;
-                  class Test {
-                      void test(Object obj) {
-                          
-                      }
+          java(
+            """
+              import org.apache.commons.lang3.Validate;
+              class Test {
+                  void test(Object obj) {
+                      
                   }
-                  """
-            )
+              }
+              """
+          )
         );
     }
 
     @Test
-    void doNothingOnMethodsWithOneArg(){
+    void doNothingOnMethodsWithOneArg() {
         rewriteRun(
-            java(
-                """
-                  import org.apache.commons.lang3.Validate;
-                  class Test {
-                      void test(Object obj) {
-                            Validate.notNull(obj);
-                      }
+          java(
+            """
+              import org.apache.commons.lang3.Validate;
+              class Test {
+                  void test(Object obj) {
+                        Validate.notNull(obj);
                   }
-                  """
-            )
+              }
+              """
+          )
         );
     }
 
     @Test
-    void replaceMethodsWithTwoArg(){
+    void replaceMethodsWithTwoArg() {
         rewriteRun(
-            java(
-                """
-                         import org.apache.commons.lang3.Validate;
-                         class Test {
-                             void test(Object obj) {
-                                   Validate.notNull(obj,"Object should not be null");
-                             }
-                         }
-                      """,
-                """
-                  import java.util.Objects;
-    
-                  class Test {
-                      void test(Object obj) {
-                          Objects.requireNonNull(obj, "Object should not be null");
-                      }
+          java(
+            """
+              import org.apache.commons.lang3.Validate;
+              class Test {
+                  void test(Object obj) {
+                        Validate.notNull(obj, "Object should not be null");
                   }
-                  """
-            )
+              }
+              """,
+            """
+              import java.util.Objects;
+                  
+              class Test {
+                  void test(Object obj) {
+                      Objects.requireNonNull(obj, "Object should not be null");
+                  }
+              }
+              """
+          )
         );
     }
 
     @Test
-    void replaceMethodsWithThreeArg(){
+    void replaceMethodsWithThreeArg() {
         rewriteRun(
-            java(
-                """
-                         import org.apache.commons.lang3.Validate;
-                         class Test {
-                             void test(Object obj) {
-                                   Validate.notNull(obj,"Object in %s should not be null","request xyz");
-                             }
-                         }
-                      """,
-                """
-                  import java.util.Objects;
-    
-                  class Test {
-                      void test(Object obj) {
-                          Objects.requireNonNull(obj, String.format("Object in %s should not be null", "request xyz"));
-                      }
+          java(
+            """
+              import org.apache.commons.lang3.Validate;
+              class Test {
+                  void test(Object obj) {
+                        Validate.notNull(obj, "Object in %s should not be null", "request xyz");
                   }
-                  """
-            )
+              }
+              """,
+            """
+              import java.util.Objects;
+                  
+              class Test {
+                  void test(Object obj) {
+                      Objects.requireNonNull(obj, String.format("Object in %s should not be null", "request xyz"));
+                  }
+              }
+              """
+          )
         );
     }
 }

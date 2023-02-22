@@ -36,7 +36,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
     }
 
     @Test
-    void doNothingIfMethodNotFound(){
+    void doNothingIfMethodNotFound() {
         rewriteRun(
           java(
             """
@@ -78,7 +78,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
     }
 
     @Test
-    void replaceMethodsWithTwoArg(){
+    void replaceMethodsWithTwoArg() {
         rewriteRun(
           java(
             """
@@ -104,7 +104,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
     }
 
     @Test
-    void replaceMethodsWithThreeArg(){
+    void replaceMethodsWithThreeArg() {
         rewriteRun(
           java(
             """
