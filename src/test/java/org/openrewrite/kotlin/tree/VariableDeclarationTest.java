@@ -181,4 +181,13 @@ public class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ifElseExpression() {
+        rewriteRun(
+          kotlin("""
+              fun method(condition: Boolean): Unit = if (condition) Unit else Unit
+          """)
+        );
+    }
 }

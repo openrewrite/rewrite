@@ -2290,12 +2290,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             J.ControlParentheses<Expression> controlParentheses = mapControlParentheses(whenBranch.getCondition());
 
             FirElement result = singleExpression ? ((FirSingleExpressionBlock) whenBranch.getResult()).getStatement() : whenBranch.getResult();
+            J j = convert(result, ctx);
+            if (!(j instanceof Statement) && j instanceof Expression) {
+                j = new K.ExpressionStatement(randomId(), (Expression) j);
+            }
             return new J.If(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     controlParentheses,
-                    JRightPadded.build(convert(result, ctx)),
+                    JRightPadded.build((Statement) j),
                     null);
         }
     }
@@ -2396,6 +2400,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             Space elsePrefix = sourceBefore("else");
             J j = visitWhenBranch(branch, ctx);
+            if (!(j instanceof Statement) && j instanceof Expression) {
+                j = new K.ExpressionStatement(randomId(), (Expression) j);
+            }
             J.If.Else ifElse = new J.If.Else(
                     randomId(),
                     elsePrefix,
