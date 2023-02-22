@@ -285,7 +285,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitAnonymousFunctionExpression(FirAnonymousFunctionExpression anonymousFunctionExpression, ExecutionContext ctx) {
         if (!anonymousFunctionExpression.getAnonymousFunction().isLambda()) {
-            throw new UnsupportedOperationException("Unsupported anonymous function expression.");
+            throw new IllegalArgumentException("Unsupported anonymous function expression.");
         }
 
         return visitAnonymousFunction(anonymousFunctionExpression.getAnonymousFunction(), ctx);
@@ -422,7 +422,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip("||");
             op = J.Binary.Type.Or;
         } else {
-            throw new UnsupportedOperationException("Unsupported binary expression type " + binaryLogicExpression.getKind().name());
+            throw new IllegalArgumentException("Unsupported binary expression type " + binaryLogicExpression.getKind().name());
         }
 
         Expression right = (Expression) visitElement(binaryLogicExpression.getRightOperand(), ctx);
@@ -538,7 +538,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     if (expr instanceof Expression) {
                         expr = new K.ExpressionStatement(randomId(), (Expression) expr);
                     } else {
-                        throw new UnsupportedOperationException("Unexpected statement type.");
+                        throw new IllegalArgumentException("Unexpected statement type.");
                     }
                 }
             }
@@ -816,7 +816,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Binary.Type op = mapOperation(comparisonExpression.getOperation());
 
         if (functionCall.getArgumentList().getArguments().size() != 1) {
-            throw new UnsupportedOperationException("Unsupported FirComparisonExpression argument size");
+            throw new IllegalArgumentException("Unsupported FirComparisonExpression argument size");
         }
 
         Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
@@ -841,7 +841,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             ConeClassLikeType coneClassLikeType = (ConeClassLikeType) ((FirResolvedTypeRef) constExpression.getTypeRef()).getType();
             type = typeMapping.primitive(coneClassLikeType);
         } else {
-            throw new UnsupportedOperationException("Unresolved primitive type.");
+            throw new IllegalArgumentException("Unresolved primitive type.");
         }
 
         return new J.Literal(
@@ -857,7 +857,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitEqualityOperatorCall(FirEqualityOperatorCall equalityOperatorCall, ExecutionContext ctx) {
         if (equalityOperatorCall.getArgumentList().getArguments().size() != 2) {
-            throw new UnsupportedOperationException("Unsupported number of equality operator arguments.");
+            throw new IllegalArgumentException("Unsupported number of equality operator arguments.");
         }
 
         FirElement left = equalityOperatorCall.getArgumentList().getArguments().get(0);
@@ -1119,7 +1119,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeMapping.methodInvocationType(functionCall, owner));
         }
 
-        throw new UnsupportedOperationException("Unsupported function call.");
+        throw new IllegalArgumentException("Unsupported function call.");
     }
 
     @Nullable
@@ -1162,7 +1162,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (source.startsWith("<", cursor)) {
             skip("<");
         }
-        List<JRightPadded<Expression>> parameters = new ArrayList<>(types.size());;
+        List<JRightPadded<Expression>> parameters = new ArrayList<>(types.size());
 
         for (int i = 0; i < types.size(); i++) {
             FirElement type = types.get(i);
@@ -1239,7 +1239,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
                 break;
             default:
-                throw new UnsupportedOperationException("Unsupported unary operator type.");
+                throw new IllegalArgumentException("Unsupported unary operator type.");
         }
 
         return new J.Unary(
@@ -1343,7 +1343,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 opPrefix = sourceBefore("*");
                 break;
             default:
-                throw new UnsupportedOperationException("Unsupported binary operator type.");
+                throw new IllegalArgumentException("Unsupported binary operator type.");
         }
         Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
 
@@ -1578,7 +1578,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
-            throw new UnsupportedOperationException("Explicit setter initialization are not currently supported.");
+            throw new IllegalArgumentException("Explicit setter initialization are not currently supported.");
         }
 
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
@@ -1700,7 +1700,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeMapping.methodDeclarationType(propertyAccessor, null, getCurrentFile()));
         }
 
-        throw new UnsupportedOperationException("Unsupported property accessor.");
+        throw new IllegalArgumentException("Unsupported property accessor.");
     }
 
     @Override
@@ -1734,7 +1734,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             return j;
         }
-        throw new UnsupportedOperationException("Unsupported null delegated type reference.");
+        throw new IllegalArgumentException("Unsupported null delegated type reference.");
     }
 
     @Override
@@ -1956,7 +1956,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
                 break;
             default:
-                throw new UnsupportedOperationException("Unsupported type operator " + typeOperatorCall.getOperation().name());
+                throw new IllegalArgumentException("Unsupported type operator " + typeOperatorCall.getOperation().name());
         }
 
         if (typeOperatorCall.getOperation() == FirOperation.AS || typeOperatorCall.getOperation() == FirOperation.SAFE_AS) {
@@ -2074,7 +2074,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             name.append(part.getName().asString());
             if (i < qualifier.size() - 1) {
                 if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
-                    throw new UnsupportedOperationException("Unsupported type parameters in user part " + part.getName());
+                    throw new IllegalArgumentException("Unsupported type parameters in user part " + part.getName());
                 }
                 name.append(".");
             }
@@ -2278,7 +2278,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip("if");
         } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
                 whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
-            throw new UnsupportedOperationException("Unsupported condition type.");
+            throw new IllegalArgumentException("Unsupported condition type.");
         }
 
         boolean singleExpression = whenBranch.getResult() instanceof FirSingleExpressionBlock;
@@ -2432,7 +2432,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Expression left = (Expression) visitElement(lhs.getArgumentList().getArguments().get(1), ctx);
             expressions.add(padRight(left, sourceBefore(",")));
         } else {
-            throw new UnsupportedOperationException("Unsupported logical operator from when expression.");
+            throw new IllegalArgumentException("Unsupported logical operator from when expression.");
         }
 
         FirEqualityOperatorCall rhs = (FirEqualityOperatorCall) logicExpression.getRightOperand();
@@ -2578,7 +2578,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitWhileLoop((FirWhileLoop) firElement, ctx);
         }
 
-        throw new UnsupportedOperationException("Unsupported FirElement.");
+        throw new IllegalArgumentException("Unsupported FirElement.");
     }
 
     private J.Identifier createIdentifier(String name) {
@@ -2647,7 +2647,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private J.Annotation mapAnnotation(List<FirAnnotation> firAnnotations) {
         if (firAnnotations.isEmpty()) {
-            throw new UnsupportedOperationException("Unexpected empty list of FIR Annotations.");
+            throw new IllegalArgumentException("Unexpected empty list of FIR Annotations.");
         }
 
         FirAnnotation firAnnotation = firAnnotations.get(0);
@@ -2904,7 +2904,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 op = J.Binary.Type.LessThan;
                 break;
             default:
-                throw new UnsupportedOperationException("Unsupported FirOperation " + op.name());
+                throw new IllegalArgumentException("Unsupported FirOperation " + op.name());
         }
 
         return op;

@@ -52,7 +52,7 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertClassIdToFqn;
 import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertKotlinFqToJavaFq;
 
-@Incubating(since = "0")
+@Incubating(since = "0.0")
 public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private final KotlinTypeSignatureBuilder signatureBuilder;
     private final JavaTypeCache typeCache;
@@ -129,7 +129,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             } else if (resolvedSymbol instanceof FirFieldSymbol) {
                 return type(((FirFieldSymbol) resolvedSymbol).getResolvedReturnType(), ownerFallBack);
             } else {
-                throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+                throw new IllegalArgumentException("Unsupported FirResolvedNamedReference: " + type.getClass().getName());
             }
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
@@ -146,7 +146,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return type(((FirVariableAssignment) type).getCalleeReference(), ownerFallBack);
         }
 
-        throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+        throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
     }
 
     private JavaType.FullyQualified classType(Object classType, String signature, @Nullable FirBasedSymbol<?> ownerFallBack) {
@@ -542,7 +542,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return JavaType.Primitive.Null;
         }
 
-        throw new UnsupportedOperationException("Unknown primitive type " + type);
+        throw new IllegalArgumentException("Unsupported primitive type " + type);
     }
 
     private JavaType resolveConeTypeProjection(ConeTypeProjection type, String signature, @Nullable FirBasedSymbol<?> ownerSymbol) {
@@ -584,7 +584,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 bounds.add(classSymbol != null ? type(classSymbol.getFir()) : JavaType.Unknown.getInstance());
             }
 
-            gtv.unsafeSet(variance, bounds);
+            gtv.unsafeSet(name, variance, bounds);
             resolvedType = gtv;
         } else {
             // The ConeTypeProjection is not a generic type, so it must be a class type.
@@ -627,7 +627,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             }
         }
 
-        gtv.unsafeSet(variance, bounds);
+        gtv.unsafeSet(gtv.getName(), variance, bounds);
         return gtv;
     }
 
@@ -685,7 +685,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         } else if (ClassKind.OBJECT == classKind) {
             kind = JavaType.FullyQualified.Kind.Class;
         } else {
-            throw new UnsupportedOperationException("Unexpected classKind: " + classKind.name());
+            throw new IllegalArgumentException("Unsupported classKind: " + classKind.name());
         }
 
         return kind;

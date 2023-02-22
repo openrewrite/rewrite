@@ -142,7 +142,14 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
         Disposable disposable = Disposer.newDisposable();
-        Map<FirSession, List<CompiledKotlinSource>> firSessionToCus = parseInputsToCompilerAst(disposable, sources, relativeTo, pctx);
+        Map<FirSession, List<CompiledKotlinSource>> firSessionToCus;
+        try {
+            firSessionToCus = parseInputsToCompilerAst(disposable, sources, relativeTo, pctx);
+        } catch (Exception e) {
+            // TODO: associate the compiler exception to a specific source file.
+            // https://github.com/openrewrite/rewrite-kotlin/issues/24
+            return emptyList();
+        }
 
         FirSession firSession = (FirSession) firSessionToCus.keySet().toArray()[0];
         List<CompiledKotlinSource> compilerCus = firSessionToCus.get(firSession);

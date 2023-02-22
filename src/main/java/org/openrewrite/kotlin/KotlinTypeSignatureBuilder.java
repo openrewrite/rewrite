@@ -43,7 +43,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
 
-@Incubating(since = "0")
+@Incubating(since = "0.0")
 public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
     private final FirSession firSession;
@@ -114,7 +114,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             } else if (resolvedSymbol instanceof FirFieldSymbol) {
                 return signature(((FirFieldSymbol) resolvedSymbol).getResolvedReturnType(), ownerSymbol);
             } else {
-                throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+                throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
             }
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = ((FirResolvedTypeRef) type).getType();
@@ -137,7 +137,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirOuterClassTypeParameterRef) type).getSymbol());
         }
 
-        throw new UnsupportedOperationException("Unexpected type " + type.getClass().getName());
+        throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
     }
 
     /**
@@ -145,7 +145,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      */
     @Override
     public String arraySignature(Object type) {
-        throw new UnsupportedOperationException("NA");
+        throw new UnsupportedOperationException("This should never happen.");
     }
 
     /**
@@ -311,7 +311,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s.append(type);
             s.append("}");
         } else {
-            throw new UnsupportedOperationException("Unsupported ConeTypeProjection.");
+            throw new IllegalArgumentException("Unsupported ConeTypeProjection.");
         }
 
         return s.toString();
@@ -322,7 +322,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      */
     @Override
     public String primitiveSignature(Object type) {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("This should never happen.");
     }
 
     /**
