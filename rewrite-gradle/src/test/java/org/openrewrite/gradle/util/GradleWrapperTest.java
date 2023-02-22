@@ -35,7 +35,7 @@ import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class GradleWrapperTest {
+public class GradleWrapperTest {
 
     public static void mockGradleServices(Consumer<MockWebServer> block) {
         mockGradleServices(List.of("7.5.1", "7.6", "7.6-milestone-1", "7.6-rc-1"), block);
