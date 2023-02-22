@@ -162,7 +162,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath")
                 .addClassLoader(caller.getClassLoader())
-                .ignoreParentClassLoaders()
                 .scan()) {
             ResourceList resources = result.getResourcesWithExtension(".jar");
 
