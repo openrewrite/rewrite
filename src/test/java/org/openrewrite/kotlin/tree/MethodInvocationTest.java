@@ -238,7 +238,54 @@ public class MethodInvocationTest implements RewriteTest {
                     test ( object : Test ( ) {
                     } )
                 }
-            """)
+            """
+          )
+        );
+    }
+
+    @Test
+    void lambdaArgument() {
+        rewriteRun(
+          kotlin(
+            """
+                interface Test < in R > {
+                    public fun < B > shift ( r : R ) : B
+                    public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
+                        if ( condition ) Unit else shift( shift ( ) )
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun Test < String > . test ( ) : Int {
+                    ensure ( false , { "failure" } )
+                    return 1
+                }
+            """
+          )
+        );
+    }
+
+    @Test
+    void trailingLambdaArgument() {
+        rewriteRun(
+          kotlin(
+            """
+                interface Test < in R > {
+                    public fun < B > shift ( r : R ) : B
+                    public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
+                        if ( condition ) Unit else shift( shift ( ) )
+                }
+            """
+          ),
+          kotlin(
+            """
+                fun Test < String > . test ( ) : Int {
+                    ensure ( false ) { "failure" }
+                    return 1
+                }
+            """
+          )
         );
     }
 }

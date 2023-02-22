@@ -483,8 +483,17 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
             boolean omitParensOnMethod = method.getMarkers().findFirst(OmitParentheses.class).isPresent();
+            boolean isTrailingLambda = !args.isEmpty() && args.get(args.size() - 1).getElement().getMarkers().findFirst(TrailingLambdaArgument.class).isPresent();
             for (int i = 0; i < args.size(); i++) {
                 JRightPadded<Expression> arg = args.get(i);
+
+                // Print trailing lambda.
+                if (i == args.size() - 1 && isTrailingLambda) {
+                    visitSpace(arg.getAfter(), JRightPadded.Location.METHOD_INVOCATION_ARGUMENT.getAfterLocation(), p);
+                    p.append(")");
+                    visit(arg.getElement(), p);
+                    break;
+                }
 
                 if (i == 0 && !omitParensOnMethod) {
                     p.append('(');

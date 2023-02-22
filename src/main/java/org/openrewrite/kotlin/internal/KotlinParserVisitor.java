@@ -1150,9 +1150,35 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 args = JContainer.build(sourceBefore("("), convertAll(singletonList(firExpression), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
             }
         } else {
-            args = JContainer.build(sourceBefore("("), firExpressions.isEmpty() ?
-                    singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                    convertAll(firExpressions, commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+            if (firExpressions.isEmpty()) {
+                args = JContainer.build(sourceBefore("("),
+                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+            } else {
+                Space containerPrefix = sourceBefore("(");
+                List<JRightPadded<Expression>> expressions = new ArrayList<>(firExpressions.size());
+                for (int i = 0; i < firExpressions.size(); i++) {
+                    FirExpression expression = firExpressions.get(i);
+                    if (i == firExpressions.size() - 1 && expression instanceof FirLambdaArgumentExpression) {
+                        int saveCursor = cursor;
+                        Space space = whitespace();
+                        // Trailing lambda argument: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
+                        if (source.startsWith(")", cursor)) {
+                            skip(")");
+                            Expression expr = convert(expression, ctx);
+                            expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
+                            expressions.add(padRight(expr, space));
+                            break;
+                        } else {
+                            cursor(saveCursor);
+                        }
+                    }
+
+                    Expression expr = convert(expression, ctx);
+                    Space padding = i < firExpressions.size() - 1 ? sourceBefore(",") : sourceBefore(")");
+                    expressions.add(padRight(expr, padding));
+                }
+                args = JContainer.build(containerPrefix, expressions, Markers.EMPTY);
+            }
         }
         return args;
     }
