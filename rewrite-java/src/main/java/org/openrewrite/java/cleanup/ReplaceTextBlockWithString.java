@@ -25,7 +25,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType.Primitive;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.utils.ExpressionUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;

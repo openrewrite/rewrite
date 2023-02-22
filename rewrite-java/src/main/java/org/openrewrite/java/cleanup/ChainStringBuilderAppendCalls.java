@@ -23,7 +23,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.utils.ExpressionUtils;
 
 import java.util.ArrayList;
 import java.util.List;

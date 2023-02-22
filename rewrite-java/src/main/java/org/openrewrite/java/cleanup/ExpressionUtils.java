@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.utils;
+package org.openrewrite.java.cleanup;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
@@ -26,27 +26,16 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 
-public final class ExpressionUtils {
+class ExpressionUtils {
     private ExpressionUtils() {}
-
-    private static final J.Binary ADDITIVE_BINARY_TEMPLATE;
-    static {
-        List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
-            .parse("class A { void foo() {String s = \"A\" + \"B\";}}");
-        ADDITIVE_BINARY_TEMPLATE = new JavaIsoVisitor<List<J.Binary>>() {
-            @Override
-            public J.Binary visitBinary(J.Binary binary, List<J.Binary> rets) {
-                rets.add(binary);
-                return binary;
-            }
-        }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
-    }
+    private static J.Binary additiveBinaryTemplate = null;
 
     /**
      * Concat two literals to an expression with '+' and surrounded with single space.
      */
-    public static J.Binary concatAdditionBinary(Expression left, Expression right) {
-        return ADDITIVE_BINARY_TEMPLATE.withPrefix(ADDITIVE_BINARY_TEMPLATE.getLeft().getPrefix())
+    static J.Binary concatAdditionBinary(Expression left, Expression right) {
+        J.Binary b = getAdditiveBinaryTemplate();
+        return b.withPrefix(b.getLeft().getPrefix())
             .withLeft(left)
             .withRight(right.withPrefix(Space.build(" " + right.getPrefix().getWhitespace(), emptyList())));
     }
@@ -54,7 +43,7 @@ public final class ExpressionUtils {
     /**
      * Concat expressions to an expression with '+' connected.
      */
-    public static Expression additiveExpression(Expression... expressions) {
+    static Expression additiveExpression(Expression... expressions) {
         Expression expression = null;
         for (Expression element : expressions) {
             if (element != null) {
@@ -64,7 +53,22 @@ public final class ExpressionUtils {
         return expression;
     }
 
-    public static Expression additiveExpression(List<Expression> expressions) {
-       return additiveExpression(expressions.toArray(new Expression[0]));
+    static Expression additiveExpression(List<Expression> expressions) {
+        return additiveExpression(expressions.toArray(new Expression[0]));
+    }
+
+    private static J.Binary getAdditiveBinaryTemplate() {
+        if (additiveBinaryTemplate == null) {
+            List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
+                .parse("class A { void foo() {String s = \"A\" + \"B\";}}");
+            additiveBinaryTemplate = new JavaIsoVisitor<List<J.Binary>>() {
+                @Override
+                public J.Binary visitBinary(J.Binary binary, List<J.Binary> rets) {
+                    rets.add(binary);
+                    return binary;
+                }
+            }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
+        }
+        return additiveBinaryTemplate;
     }
 }

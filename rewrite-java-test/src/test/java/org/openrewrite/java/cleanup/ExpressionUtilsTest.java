@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.Utils;
+package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.utils.ExpressionUtils;
 import org.openrewrite.marker.Markers;
-
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
