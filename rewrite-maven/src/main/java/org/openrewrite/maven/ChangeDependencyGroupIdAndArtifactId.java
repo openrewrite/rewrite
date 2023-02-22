@@ -81,7 +81,6 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
 
     @Option(displayName = "Override managed version",
             description = "If the new dependency has a managed version, this flag can be used to explicitly set the version on the dependency. The default for this flag is `false`.",
-            example = "false",
             required = false)
     @Nullable
     Boolean overrideManagedVersion;

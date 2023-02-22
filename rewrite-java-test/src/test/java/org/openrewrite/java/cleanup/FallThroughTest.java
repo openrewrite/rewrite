@@ -93,16 +93,16 @@ class FallThroughTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public class A {
-                      int i;
-                      {
-                          switch (i) {
-                          case 0:
-                          case 99:
-                              i++;
-                          }
+              public class A {
+                  int i;
+                  {
+                      switch (i) {
+                      case 0:
+                      case 99:
+                          i++;
                       }
                   }
+              }
               """
           )
         );
@@ -131,17 +131,17 @@ class FallThroughTest implements RewriteTest {
               }
               """,
             """
-                  public class A {
-                      int i;
-                      {
-                          switch (i) {
-                          case 0:
-                          case 99:
-                              i++;
-                              break;
-                          }
+              public class A {
+                  int i;
+                  {
+                      switch (i) {
+                      case 0:
+                      case 99:
+                          i++;
+                          break;
                       }
                   }
+              }
               """
           )
         );
@@ -152,25 +152,25 @@ class FallThroughTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public class A {
-                      int i;
-                      {
-                          switch (i) {
-                          case 0:
-                              i++;
-                              break;
-                          case 1:
-                              i++;
-                              return;
-                          case 2:
-                              i++;
-                              throw new Exception();
-                          case 3:
-                              i++;
-                              continue;
-                          }
+              public class A {
+                  int i;
+                  {
+                      switch (i) {
+                      case 0:
+                          i++;
+                          break;
+                      case 1:
+                          i++;
+                          return;
+                      case 2:
+                          i++;
+                          throw new Exception();
+                      case 3:
+                          i++;
+                          continue;
                       }
                   }
+              }
               """
           )
         );
@@ -181,28 +181,28 @@ class FallThroughTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public class A {
-                      int i;
-                      {
-                          switch (i) {
-                          case 0:
-                              i++; // fall through
-                          case 1:
-                              i++; // falls through
-                          case 2:
-                              i++; // fallthrough
-                          case 3:
-                              i++; // fallthru
-                          case 4:
-                              i++; // fall-through
-                          case 5:
-                              i++; // fallthrough
-                          case 99:
-                              i++;
-                              break;
-                          }
+              public class A {
+                  int i;
+                  {
+                      switch (i) {
+                      case 0:
+                          i++; // fall through
+                      case 1:
+                          i++; // falls through
+                      case 2:
+                          i++; // fallthrough
+                      case 3:
+                          i++; // fallthru
+                      case 4:
+                          i++; // fall-through
+                      case 5:
+                          i++; // fallthrough
+                      case 99:
+                          i++;
+                          break;
                       }
                   }
+              }
               """
           )
         );
@@ -213,19 +213,19 @@ class FallThroughTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public class A {
-                      public void noCase(int i) {
-                          switch (i) {
-                          }
-                      }
-                      
-                      public void oneCase(int i) {
-                          switch (i) {
-                              case 0:
-                                  i++;
-                          }
+              public class A {
+                  public void noCase(int i) {
+                      switch (i) {
                       }
                   }
+                  
+                  public void oneCase(int i) {
+                      switch (i) {
+                          case 0:
+                              i++;
+                      }
+                  }
+              }
               """
           )
         );
@@ -236,75 +236,75 @@ class FallThroughTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  public class A {
-                      int i;
-                      {
-                          switch (i) {
-                          case 0:
-                              i++; // fall through
+              public class A {
+                  int i;
+                  {
+                      switch (i) {
+                      case 0:
+                          i++; // fall through
 
-                          case 1:
-                              i++;
-                              // falls through
-                          case 2:
-                          case 3: {{
-                          }}
-                          case 4: {
-                              i++;
-                          }
+                      case 1:
+                          i++;
+                          // falls through
+                      case 2:
+                      case 3: {{
+                      }}
+                      case 4: {
+                          i++;
+                      }
+                      // fallthrough
+                      case 5:
+                          i++;
+                      /* fallthru */case 6:
+                          i++;
+                          // fall-through
+                      case 7:
+                          i++;
+                          break;
+                      case 8: {
                           // fallthrough
-                          case 5:
-                              i++;
-                          /* fallthru */case 6:
-                              i++;
-                              // fall-through
-                          case 7:
-                              i++;
-                              break;
-                          case 8: {
-                              // fallthrough
-                          }
-                          case 9:
-                              i++;
-                          }
+                      }
+                      case 9:
+                          i++;
                       }
                   }
+              }
               """,
             """
-                  public class A {
-                      int i;
-                      {
-                          switch (i) {
-                          case 0:
-                              i++; // fall through
+              public class A {
+                  int i;
+                  {
+                      switch (i) {
+                      case 0:
+                          i++; // fall through
 
-                          case 1:
-                              i++;
-                              // falls through
-                          case 2:
-                          case 3: {{
-                              break;
-                          }}
-                          case 4: {
-                              i++;
-                          }
+                      case 1:
+                          i++;
+                          // falls through
+                      case 2:
+                      case 3: {{
+                          break;
+                      }}
+                      case 4: {
+                          i++;
+                      }
+                      // fallthrough
+                      case 5:
+                          i++;
+                      /* fallthru */case 6:
+                          i++;
+                          // fall-through
+                      case 7:
+                          i++;
+                          break;
+                      case 8: {
                           // fallthrough
-                          case 5:
-                              i++;
-                          /* fallthru */case 6:
-                              i++;
-                              // fall-through
-                          case 7:
-                              i++;
-                              break;
-                          case 8: {
-                              // fallthrough
-                          }
-                          case 9:
-                              i++;
-                          }
+                      }
+                      case 9:
+                          i++;
                       }
                   }
+              }
               """
           )
         );

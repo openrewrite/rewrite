@@ -39,8 +39,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
     @Option(displayName = "Apply recipe to test source set",
             description = "Changes only apply to main by default. `includeTestSources` will apply the recipe to `test` source files.",
-            required = false,
-            example = "true")
+            required = false)
     @Nullable
     Boolean includeTestSources;
 

@@ -30,25 +30,53 @@ public class CsvLoader {
         AtomicReference<R> model = new AtomicReference<>(emptyModel);
         try (ScanResult scanResult = new ClassGraph().acceptPaths("data-flow").enableMemoryMapping().scan()) {
             scanResult.getResourcesWithLeafName(csvFileName)
-                    .forEachInputStreamIgnoringIOException((res, input) -> model.set(model.get().merge(loadCvs(input, res.getURI(), merger, csvMapper))));
+                    .forEachInputStreamIgnoringIOException((res, input) -> model.set(model.get().merge(loadCsv(input, res.getURI(), merger, csvMapper))));
         }
         return model.get();
     }
 
-    private static <R extends Mergeable<R>, E> R loadCvs(InputStream input, URI source, Function<Iterable<E>, R> merger, Function<String[], E> csvMapper) {
+    private static <R extends Mergeable<R>, E> R loadCsv(InputStream input, URI source, Function<Iterable<E>, R> merger, Function<String[], E> csvMapper) {
         BufferedReader reader = new BufferedReader(new InputStreamReader(input));
         try {
             List<E> models = new ArrayList<>();
             //noinspection UnusedAssignment skip the header line
             String line = reader.readLine();
             while ((line = reader.readLine()) != null) {
-                String[] tokens = line.split(";");
+                String[] tokens = parseLine(line);
                 models.add(csvMapper.apply(tokens));
             }
             return merger.apply(models);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to read data-flow values from " + source, e);
         }
+    }
+
+    private static String[] parseLine(String line) {
+        if (line.isEmpty()) {
+            return new String[0];
+        }
+
+        ArrayList<String> result = new ArrayList<>();
+        for (int i = 0; i < line.length(); i++) {
+            if (line.charAt(i) == ',') {
+                result.add("");
+                continue;
+            }
+            int valueStart = i;
+            char stopAt = ',';
+            if (line.charAt(i) == '"') {
+                valueStart = ++i;
+                stopAt = '"';
+            }
+            while (i < line.length() && line.charAt(i) != stopAt) {
+                i++;
+            }
+            result.add(line.substring(valueStart, i));
+            if (stopAt == '"') {
+                i++;
+            }
+        }
+        return result.toArray(new String[0]);
     }
 
 }

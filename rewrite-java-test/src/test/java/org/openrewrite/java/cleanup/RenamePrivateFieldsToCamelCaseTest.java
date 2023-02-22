@@ -71,18 +71,18 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private final String _var = "";
-                      private void a() {
-                          if (true) {
-                              Thread t = new Thread() {
-                                  public void run() {
-                                      String var = "a";
-                                  }
-                              };
-                          }
+              class A {
+                  private final String _var = "";
+                  private void a() {
+                      if (true) {
+                          Thread t = new Thread() {
+                              public void run() {
+                                  String var = "a";
+                              }
+                          };
                       }
                   }
+              }
               """
           )
         );
@@ -94,36 +94,36 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      private static String MY_STRING = "VAR";
+              class A {
+                  private static String MY_STRING = "VAR";
+                  void doSomething() {
+                      MY_STRING.toLowerCase();
+                      AB.INNER_STRING.toLowerCase();
+                  }
+              
+                  private static class AB {
+                      private static String INNER_STRING = "var";
                       void doSomething() {
                           MY_STRING.toLowerCase();
-                          AB.INNER_STRING.toLowerCase();
-                      }
-                  
-                      private static class AB {
-                          private static String INNER_STRING = "var";
-                          void doSomething() {
-                              MY_STRING.toLowerCase();
-                          }
                       }
                   }
+              }
               """,
             """
-                  class A {
-                      private static String myString = "VAR";
+              class A {
+                  private static String myString = "VAR";
+                  void doSomething() {
+                      myString.toLowerCase();
+                      AB.INNER_STRING.toLowerCase();
+                  }
+              
+                  private static class AB {
+                      private static String INNER_STRING = "var";
                       void doSomething() {
                           myString.toLowerCase();
-                          AB.INNER_STRING.toLowerCase();
-                      }
-                  
-                      private static class AB {
-                          private static String INNER_STRING = "var";
-                          void doSomething() {
-                              myString.toLowerCase();
-                          }
                       }
                   }
+              }
               """
           )
         );
@@ -134,19 +134,19 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package p;
-                  public class B {
-                      public static int _staticImport_ = 0;
-                  }
+              package p;
+              public class B {
+                  public static int _staticImport_ = 0;
+              }
               """
           ),
           java(
             """
-                  import static p.B._staticImport_;
+              import static p.B._staticImport_;
 
-                  class Test {
-                      private int member = _staticImport_;
-                  }
+              class Test {
+                  private int member = _staticImport_;
+              }
               """
           )
         );
@@ -157,21 +157,21 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      public int _inheritedField_ = 0;
-                  }
+              class A {
+                  public int _inheritedField_ = 0;
+              }
               """
           ),
           java(
             """
-                  class Test extends A {
-                      private int _inheritedField_ = super._inheritedField_;
-                  }
+              class Test extends A {
+                  private int _inheritedField_ = super._inheritedField_;
+              }
               """,
             """
-                  class Test extends A {
-                      private int inheritedField = super._inheritedField_;
-                  }
+              class Test extends A {
+                  private int inheritedField = super._inheritedField_;
+              }
               """
           )
         );
@@ -182,13 +182,13 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      int test_value;
+              class Test {
+                  int test_value;
 
-                      public int addTen(int testValue) {
-                          return test_value + testValue;
-                      }
+                  public int addTen(int testValue) {
+                      return test_value + testValue;
                   }
+              }
               """
           )
         );
@@ -199,16 +199,16 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      private int DoNoTChange;
-                      
-                      public int addTwenty(String doNoTChange) {
-                          return DoNoTChange + 20;
-                      }
-                      public int addTen(String value) {
-                          return DoNoTChange + 10;
-                      }
+              class Test {
+                  private int DoNoTChange;
+                  
+                  public int addTwenty(String doNoTChange) {
+                      return DoNoTChange + 20;
                   }
+                  public int addTen(String value) {
+                      return DoNoTChange + 10;
+                  }
+              }
               """
           )
         );
@@ -219,42 +219,42 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      private int DoChange = 10;
-                      public int DoNotChangePublicMember;
-                      int DoNotChangeDefaultMember;
+              class Test {
+                  private int DoChange = 10;
+                  public int DoNotChangePublicMember;
+                  int DoNotChangeDefaultMember;
 
-                      public int getTen() {
-                          return DoChange;
-                      }
-
-                      public int getTwenty() {
-                          return this.DoChange * 2;
-                      }
-
-                      public int getThirty() {
-                          return DoChange * 3;
-                      }
+                  public int getTen() {
+                      return DoChange;
                   }
+
+                  public int getTwenty() {
+                      return this.DoChange * 2;
+                  }
+
+                  public int getThirty() {
+                      return DoChange * 3;
+                  }
+              }
               """,
             """
-                  class Test {
-                      private int doChange = 10;
-                      public int DoNotChangePublicMember;
-                      int DoNotChangeDefaultMember;
+              class Test {
+                  private int doChange = 10;
+                  public int DoNotChangePublicMember;
+                  int DoNotChangeDefaultMember;
 
-                      public int getTen() {
-                          return doChange;
-                      }
-
-                      public int getTwenty() {
-                          return this.doChange * 2;
-                      }
-
-                      public int getThirty() {
-                          return doChange * 3;
-                      }
+                  public int getTen() {
+                      return doChange;
                   }
+
+                  public int getTwenty() {
+                      return this.doChange * 2;
+                  }
+
+                  public int getThirty() {
+                      return doChange * 3;
+                  }
+              }
               """
           )
         );
@@ -265,29 +265,29 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class ClassWithPublicField {
-                      public int publicField = 10;
-                  }
+              class ClassWithPublicField {
+                  public int publicField = 10;
+              }
               """
           ),
           java(
             """
-                  class Test {
-                      private ClassWithPublicField DoChange = new ClassWithPublicField();
+              class Test {
+                  private ClassWithPublicField DoChange = new ClassWithPublicField();
 
-                      public int getTen() {
-                          return DoChange.publicField;
-                      }
+                  public int getTen() {
+                      return DoChange.publicField;
                   }
+              }
               """,
             """
-                  class Test {
-                      private ClassWithPublicField doChange = new ClassWithPublicField();
+              class Test {
+                  private ClassWithPublicField doChange = new ClassWithPublicField();
 
-                      public int getTen() {
-                          return doChange.publicField;
-                      }
+                  public int getTen() {
+                      return doChange.publicField;
                   }
+              }
               """
           )
         );
@@ -298,14 +298,14 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                   class Test {
-                       private int test = new InnerClass().DoNotChange + new InnerClass().DoNotChange2;
-                       
-                       private class InnerClass{
-                           public int DoNotChange = 10;
-                           private int DoNotChange2 = 10;
-                       }
-                   }
+              class Test {
+                  private int test = new InnerClass().DoNotChange + new InnerClass().DoNotChange2;
+                  
+                  private class InnerClass{
+                      public int DoNotChange = 10;
+                      private int DoNotChange2 = 10;
+                  }
+              }
               """
           )
         );
@@ -316,22 +316,22 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      private int DoChange = 10;
-                      
-                      private class InnerClass{
-                          private int test = DoChange + 1;
-                      }
+              class Test {
+                  private int DoChange = 10;
+                  
+                  private class InnerClass{
+                      private int test = DoChange + 1;
                   }
+              }
               """,
             """
-                  class Test {
-                      private int doChange = 10;
-                      
-                      private class InnerClass{
-                          private int test = doChange + 1;
-                      }
+              class Test {
+                  private int doChange = 10;
+                  
+                  private class InnerClass{
+                      private int test = doChange + 1;
                   }
+              }
               """
           )
         );
@@ -342,23 +342,23 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  interface Book{}
+              interface Book{}
               """
           ),
           java(
             """
-                      class B {
-                          B(){
-                              new Book() {
-                                private String DoChange;
+              class B {
+                  B(){
+                      new Book() {
+                        private String DoChange;
 
-                                @Override
-                                public String toString() {
-                                  return DoChange;
-                                }
-                              };
-                          }
-                      }
+                        @Override
+                        public String toString() {
+                          return DoChange;
+                        }
+                      };
+                  }
+              }
               """
           )
         );
@@ -369,24 +369,24 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                      class A {
-                          private int _variable;
-                          public static A getInstance(){
-                              A a = new A();
-                              a._variable = 12;
-                              return a;
-                          }
-                      }
+              class A {
+                  private int _variable;
+                  public static A getInstance(){
+                      A a = new A();
+                      a._variable = 12;
+                      return a;
+                  }
+              }
               """,
             """
-                      class A {
-                          private int variable;
-                          public static A getInstance(){
-                              A a = new A();
-                              a.variable = 12;
-                              return a;
-                          }
-                      }
+              class A {
+                  private int variable;
+                  public static A getInstance(){
+                      A a = new A();
+                      a.variable = 12;
+                      return a;
+                  }
+              }
               """
           )
         );
@@ -397,18 +397,18 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                      class A {
-                          private final int _final_variable;
-                          private static int _static_variable;
-                          private static final int DO_NOT_CHANGE;
-                      }
+              class A {
+                  private final int _final_variable;
+                  private static int _static_variable;
+                  private static final int DO_NOT_CHANGE;
+              }
               """,
             """
-                      class A {
-                          private final int finalVariable;
-                          private static int staticVariable;
-                          private static final int DO_NOT_CHANGE;
-                      }
+              class A {
+                  private final int finalVariable;
+                  private static int staticVariable;
+                  private static final int DO_NOT_CHANGE;
+              }
               """
           )
         );
@@ -419,12 +419,12 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                      class A {
-                          private int _variable;
-                          public void getInstance(int _variable) {
-                              this._variable = _variable;
-                          }
-                      }
+              class A {
+                  private int _variable;
+                  public void getInstance(int _variable) {
+                      this._variable = _variable;
+                  }
+              }
               """
           )
         );
@@ -435,20 +435,20 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                      class A {
-                          private boolean _hasMethod;
-                          public boolean hasMethod() {
-                              return _hasMethod;
-                          }
-                      }
+              class A {
+                  private boolean _hasMethod;
+                  public boolean hasMethod() {
+                      return _hasMethod;
+                  }
+              }
               """,
             """
-                      class A {
-                          private boolean hasMethod;
-                          public boolean hasMethod() {
-                              return hasMethod;
-                          }
-                      }
+              class A {
+                  private boolean hasMethod;
+                  public boolean hasMethod() {
+                      return hasMethod;
+                  }
+              }
               """
           )
         );
@@ -467,16 +467,16 @@ class RenamePrivateFieldsToCamelCaseTest implements RewriteTest {
           }),
           java(
             """
-                  public record MyRecord(
-                     boolean bar,
-                     String foo
-                  ) {
-                     public MyRecord {
-                        if (foo == null) {
-                            foo = "defaultValue";
-                        }
+              public record MyRecord(
+                 boolean bar,
+                 String foo
+              ) {
+                 public MyRecord {
+                    if (foo == null) {
+                        foo = "defaultValue";
                     }
-                  }
+                }
+              }
               """
           )
         );

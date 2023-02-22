@@ -280,16 +280,16 @@ class RenameLocalVariablesToCamelCaseTest implements RewriteTest {
           }),
           java(
             """
-                  public record MyRecord(
-                     boolean bar,
-                     String foo
-                  ) {
-                     public MyRecord {
-                        if (foo == null) {
-                            foo = "defaultValue";
-                        }
+              public record MyRecord(
+                 boolean bar,
+                 String foo
+              ) {
+                 public MyRecord {
+                    if (foo == null) {
+                        foo = "defaultValue";
                     }
-                  }
+                }
+              }
               """
           )
         );

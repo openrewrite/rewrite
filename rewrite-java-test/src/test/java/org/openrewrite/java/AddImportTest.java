@@ -195,6 +195,24 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2809")
+    @Test
+    void staticImportsFromJavaLangShouldWork() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.lang.System", "lineSeparator", false))),
+          java(
+            """
+              class A {}
+              """,
+            """
+              import static java.lang.System.lineSeparator;
+
+              class A {}
+              """
+          )
+        );
+    }
+
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1156")
     void dontImportJavaLangWhenUsingDefaultPackage() {
@@ -688,14 +706,14 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.time.temporal.ChronoUnit", "MILLIS", true))),
           java(
             """
-                  package a;
-                  
-                  import java.time.temporal.ChronoUnit;
-                  
-                  class A {
-                      static final int MILLIS = 1;
-                      ChronoUnit unit = ChronoUnit.MILLIS;
-                  }
+              package a;
+              
+              import java.time.temporal.ChronoUnit;
+              
+              class A {
+                  static final int MILLIS = 1;
+                  ChronoUnit unit = ChronoUnit.MILLIS;
+              }
               """
           )
         );
@@ -1042,11 +1060,11 @@ class AddImportTest implements RewriteTest {
           ),
           java(
             """
-                  import java.util.List;
+              import java.util.List;
               """,
             """
-                  import java.util.List;
-                  import java.util.concurrent.*;
+              import java.util.List;
+              import java.util.concurrent.*;
               """
           )
         );
@@ -1088,7 +1106,7 @@ class AddImportTest implements RewriteTest {
             """
               """,
             """
-                  import java.util.List;
+              import java.util.List;
               """
           )
         );

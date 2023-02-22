@@ -16,13 +16,13 @@
 package org.openrewrite.test;
 
 import org.assertj.core.api.SoftAssertions;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SourceSet;
 import org.openrewrite.quark.Quark;
@@ -47,11 +47,11 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null, visitor, null);
+        return new AdHocRecipe(null, null, null, visitor, null, null, null);
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null);
+        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
@@ -454,17 +454,22 @@ public interface RewriteTest extends SourceSpecs {
                         }
                     }
 
-                    //noinspection unchecked
-                    ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                    try {
+                        //noinspection unchecked
+                        ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(result.getAfter());
+                    } catch (ClassCastException ignored) {
+                        // the source file instance type changed, e.g. in FindAndReplace.
+                    }
+
                     continue nextSourceFile;
                 } else if (result.getBefore() == null
-                    && !(result.getAfter() instanceof Remote)
-                    && !expectedNewResults.contains(result)
-                    && testMethodSpec.afterRecipes.isEmpty()
+                           && !(result.getAfter() instanceof Remote)
+                           && !expectedNewResults.contains(result)
+                           && testMethodSpec.afterRecipes.isEmpty()
                 ) {
                     // falsely added files detected.
                     fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
-                        + "\" that was not expected.");
+                         + "\" that was not expected.");
                 }
             }
 
@@ -506,7 +511,7 @@ public interface RewriteTest extends SourceSpecs {
         return new InMemoryExecutionContext(t -> fail("Failed to parse sources or run recipe", t));
     }
 
-    @NotNull
+    @NonNull
     @Override
     default Iterator<SourceSpec<?>> iterator() {
         return new Iterator<SourceSpec<?>>() {

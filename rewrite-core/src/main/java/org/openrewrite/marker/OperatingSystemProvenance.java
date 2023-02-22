@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marker.ci;
+package org.openrewrite.marker;
 
+import com.sun.jna.LastErrorException;
+import com.sun.jna.Library;
+import com.sun.jna.Native;
 import com.sun.jna.platform.win32.Kernel32Util;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -22,9 +25,11 @@ import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Marker;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -33,10 +38,10 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 
 /**
- * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/OperatingSystem.java</a>
+ * Detection logic from <a href="Gradle">https://github.com/gradle/gradle/blob/master/subprojects/base-services/src/main/java/org/gradle/internal/os/c.java</a>
  */
 @SuppressWarnings("StaticInitializerReferencesSubClass")
-public abstract class OperatingSystem implements Marker {
+public abstract class OperatingSystemProvenance implements Marker {
     public static final Windows WINDOWS = new Windows();
     public static final MacOs MAC_OS = new MacOs();
     public static final Solaris SOLARIS = new Solaris();
@@ -44,37 +49,98 @@ public abstract class OperatingSystem implements Marker {
     public static final FreeBSD FREE_BSD = new FreeBSD();
     public static final Unix UNIX = new Unix();
 
-    private static OperatingSystem currentOs;
+    private static OperatingSystemProvenance currentOs;
     private final String toStringValue;
     private final String osName;
     private final String osVersion;
 
-    OperatingSystem() {
+    OperatingSystemProvenance() {
         osName = System.getProperty("os.name");
         osVersion = System.getProperty("os.version");
         toStringValue = getName() + " " + getVersion() + " " + System.getProperty("os.arch");
     }
 
+    private interface C extends Library {
+        @SuppressWarnings("UnusedReturnValue")
+        int gethostname(byte[] name, int size_t) throws LastErrorException;
+    }
+
     public static String hostname() {
-        OperatingSystem currentOs = current();
+        OperatingSystemProvenance currentOs = current();
         if (currentOs.isWindows()) {
             try {
+                if (System.getenv("COMPUTERNAME") != null) {
+                    return System.getenv("COMPUTERNAME");
+                }
                 return Kernel32Util.getComputerName();
             } catch (Throwable t) {
                 // unable to determine the host name on this Windows instance.
                 // with variations in build tool versions and JVMs, this can sometimes break
             }
+        } else if (currentOs.isMacOsX()) {
+            try {
+                if (System.getenv("HOSTNAME") != null) {
+                    return System.getenv("HOSTNAME");
+                }
+
+                Path plist = Paths.get("/Library/Preferences/SystemConfiguration/preferences.plist");
+                if (Files.exists(plist)) {
+                    try {
+                        /*
+                         <dict>
+                             <key>LocalHostName</key>
+                             <string>MacBook-Pro-4</string>
+                         </dict>
+                         */
+                        String hostname = new String(Files.readAllBytes(plist));
+                        int localHostName = hostname.indexOf("<key>LocalHostName</key>");
+                        if (localHostName > 0) {
+                            int valueTag = hostname.indexOf("<string>", localHostName);
+                            if (valueTag > 0) {
+                                int valueStart = valueTag + "<string>".length();
+                                return hostname.substring(valueStart, hostname.indexOf("</string>", valueStart)).trim() + ".local";
+                            }
+                        }
+                    } catch (Throwable t) {
+                        // fall through to the next option
+                    }
+                }
+
+                C c = Native.load("c", C.class);
+                byte[] hostname = new byte[256];
+                c.gethostname(hostname, hostname.length);
+                return Native.toString(hostname);
+            } catch (Throwable t) {
+                // unable to determine the host name on this instance.
+            }
         } else if (currentOs.isUnix()) {
             try {
-                return POSIXUtil.getHostName();
+                if (System.getenv("HOSTNAME") != null) {
+                    return System.getenv("HOSTNAME");
+                }
+
+                Path etcHostname = Paths.get("/etc/hostname");
+                if (Files.exists(etcHostname)) {
+                    try {
+                        String hostname = new String(Files.readAllBytes(etcHostname));
+                        return hostname.trim();
+                    } catch (Throwable t) {
+                        // fall through to the next option
+                    }
+                }
+
+                C c = Native.load("c", C.class);
+                byte[] hostname = new byte[256];
+                c.gethostname(hostname, hostname.length);
+                return Native.toString(hostname);
             } catch (Throwable t) {
-                // unable to determine the host name on this Windows instance.
+                // unable to determine the host name on this instance.
             }
         }
         return "localhost";
     }
 
-    public static OperatingSystem current() {
+    public static OperatingSystemProvenance current() {
         if (currentOs == null) {
             currentOs = forName(System.getProperty("os.name"));
         }
@@ -86,7 +152,7 @@ public abstract class OperatingSystem implements Marker {
         currentOs = null;
     }
 
-    public static OperatingSystem forName(String os) {
+    public static OperatingSystemProvenance forName(String os) {
         String osName = os.toLowerCase();
         if (osName.contains("windows")) {
             return WINDOWS;
@@ -155,9 +221,9 @@ public abstract class OperatingSystem implements Marker {
 
     public abstract String getFamilyName();
 
-    public abstract LineEnding getLineEnding();
+    public abstract EOL getEOL();
 
-    protected enum LineEnding {
+    protected enum EOL {
         CRLF,
         LF
     }
@@ -214,7 +280,7 @@ public abstract class OperatingSystem implements Marker {
 
     @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
-    static class Windows extends OperatingSystem {
+    static class Windows extends OperatingSystemProvenance {
         String nativePrefix;
 
         @With
@@ -227,8 +293,8 @@ public abstract class OperatingSystem implements Marker {
         }
 
         @Override
-        public LineEnding getLineEnding() {
-            return LineEnding.CRLF;
+        public EOL getEOL() {
+            return EOL.CRLF;
         }
 
         @Override
@@ -313,7 +379,7 @@ public abstract class OperatingSystem implements Marker {
 
     @AllArgsConstructor
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
-    static class Unix extends OperatingSystem {
+    static class Unix extends OperatingSystemProvenance {
         String nativePrefix;
 
         @With
@@ -326,8 +392,8 @@ public abstract class OperatingSystem implements Marker {
         }
 
         @Override
-        public LineEnding getLineEnding() {
-            return LineEnding.LF;
+        public EOL getEOL() {
+            return EOL.LF;
         }
 
         @Override

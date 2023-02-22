@@ -24,7 +24,6 @@ import org.codehaus.groovy.ast.expr.*;
 import org.codehaus.groovy.ast.stmt.*;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -32,6 +31,7 @@ import org.openrewrite.groovy.marker.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
@@ -124,9 +124,9 @@ public class GroovyParserVisitor {
 
         for (ClassNode aClass : ast.getClasses()) {
             if (aClass.getSuperClass() == null
-                    || !("groovy.lang.Script".equals(aClass.getSuperClass().getName())
-                            || "RewriteGradleProject".equals(aClass.getSuperClass().getName())
-                            || "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
+                || !("groovy.lang.Script".equals(aClass.getSuperClass().getName())
+                     || "RewriteGradleProject".equals(aClass.getSuperClass().getName())
+                     || "RewriteSettings".equals(aClass.getSuperClass().getName()))) {
                 sortedByPosition.computeIfAbsent(pos(aClass), i -> new ArrayList<>()).add(aClass);
             }
         }
@@ -210,7 +210,7 @@ public class GroovyParserVisitor {
             } else if (source.startsWith("@interface", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Annotation;
                 cursor += "@interface".length();
-            } else if(source.startsWith("enum", cursor)) {
+            } else if (source.startsWith("enum", cursor)) {
                 kindType = J.ClassDeclaration.Kind.Type.Enum;
                 cursor += "enum".length();
             }
@@ -786,6 +786,9 @@ public class GroovyParserVisitor {
                 case "[":
                     gBinaryOp = G.Binary.Type.Access;
                     break;
+                case "in":
+                    gBinaryOp = G.Binary.Type.In;
+                    break;
             }
 
             cursor += binary.getOperation().getText().length();
@@ -993,7 +996,7 @@ public class GroovyParserVisitor {
                 cursor += "->".length();
                 if (params.getParameters().isEmpty()) {
                     params = params.getPadding().withParams(singletonList(JRightPadded
-                            .build((J)new J.Empty(randomId(), EMPTY, Markers.EMPTY))
+                            .build((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY))
                             .withAfter(arrowPrefix)));
                 } else {
                     params = params.getPadding().withParams(
@@ -1073,11 +1076,11 @@ public class GroovyParserVisitor {
                 int length = sourceLengthOfNext(expression);
                 text = source.substring(cursor, cursor + length);
                 int delimiterLength = 0;
-                if(text.startsWith("$/")) {
+                if (text.startsWith("$/")) {
                     delimiterLength = 2;
-                } else if(text.startsWith("\"\"\"") || text.startsWith("'''")) {
+                } else if (text.startsWith("\"\"\"") || text.startsWith("'''")) {
                     delimiterLength = 3;
-                } else if(text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
+                } else if (text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
                     delimiterLength = 1;
                 }
                 value = text.substring(delimiterLength, text.length() - delimiterLength);
@@ -1171,11 +1174,11 @@ public class GroovyParserVisitor {
         @Override
         public void visitExpressionStatement(ExpressionStatement statement) {
             List<J.Label> labels = null;
-            if(statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
+            if (statement.getStatementLabels() != null && !statement.getStatementLabels().isEmpty()) {
                 labels = new ArrayList<>(statement.getStatementLabels().size());
                 // Labels appear in statement.getStatementLabels() in reverse order of their appearance in source code
                 // Could iterate over those in reverse order, but feels safer to just take the count and go off source code alone
-                for(int i = 0; i < statement.getStatementLabels().size(); i++) {
+                for (int i = 0; i < statement.getStatementLabels().size(); i++) {
                     labels.add(new J.Label(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(
                             new J.Identifier(randomId(), EMPTY, Markers.EMPTY, name(), null, null)).withAfter(sourceBefore(":")),
                             new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
@@ -1185,7 +1188,7 @@ public class GroovyParserVisitor {
             if (queue.peek() instanceof Expression && !(queue.peek() instanceof Statement)) {
                 queue.add(new G.ExpressionStatement(randomId(), (Expression) queue.poll()));
             }
-            if(labels != null) {
+            if (labels != null) {
                 //noinspection ConstantConditions
                 Statement result = condenseLabels(labels, (Statement) queue.poll());
                 queue.add(result);
@@ -1193,7 +1196,7 @@ public class GroovyParserVisitor {
         }
 
         Statement condenseLabels(List<J.Label> labels, Statement s) {
-            if(labels.size() == 0) {
+            if (labels.size() == 0) {
                 return s;
             }
             return labels.get(0).withStatement(condenseLabels(labels.subList(1, labels.size()), s));
@@ -1224,8 +1227,9 @@ public class GroovyParserVisitor {
                         JRightPadded.build(visit(forLoop.getLoopBlock()))));
             } else {
                 Parameter param = forLoop.getVariable();
-
-                TypeTree paramType = visitTypeTree(param.getOriginType());
+                Space paramFmt = whitespace();
+                TypeTree paramType = param.getOriginType().getColumnNumber() >= 0 ?
+                        visitTypeTree(param.getOriginType()) : null;
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
                                 new J.Identifier(randomId(), EMPTY, Markers.EMPTY, param.getName(), null, null),
@@ -1241,9 +1245,8 @@ public class GroovyParserVisitor {
                     forEachMarkers = forEachMarkers.add(new InStyleForEachLoop(randomId()));
                 }
 
-                JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramType.getPrefix(),
-                        Markers.EMPTY, emptyList(), emptyList(), paramType.withPrefix(EMPTY),
-                        null, emptyList(),
+                JRightPadded<J.VariableDeclarations> variable = JRightPadded.build(new J.VariableDeclarations(randomId(), paramFmt,
+                        Markers.EMPTY, emptyList(), emptyList(), paramType, null, emptyList(),
                         singletonList(paramName))
                 ).withAfter(rightPad);
 
@@ -1251,7 +1254,7 @@ public class GroovyParserVisitor {
                         .withAfter(sourceBefore(")"));
 
                 queue.add(new J.ForEachLoop(randomId(), fmt, forEachMarkers,
-                        new J.ForEachLoop.Control(randomId(), EMPTY, Markers.EMPTY, variable, iterable),
+                        new J.ForEachLoop.Control(randomId(), controlFmt, Markers.EMPTY, variable, iterable),
                         JRightPadded.build(visit(forLoop.getLoopBlock())))
                 );
             }
@@ -1273,11 +1276,11 @@ public class GroovyParserVisitor {
         public void visitGStringExpression(GStringExpression gstring) {
             Space fmt = whitespace();
             String delimiter;
-            if(source.startsWith("\"\"\"", cursor)) {
+            if (source.startsWith("\"\"\"", cursor)) {
                 delimiter = "\"\"\"";
-            } else if(source.startsWith("/", cursor)) {
+            } else if (source.startsWith("/", cursor)) {
                 delimiter = "/";
-            } else if(source.startsWith("$/", cursor)) {
+            } else if (source.startsWith("$/", cursor)) {
                 delimiter = "$/";
             } else {
                 delimiter = "\"";
@@ -1288,16 +1291,16 @@ public class GroovyParserVisitor {
             for (org.codehaus.groovy.ast.expr.ConstantExpression e : gstring.getStrings()) {
                 // There will always be constant expressions before and after any values
                 // No need to represent these empty strings
-                if(!e.getText().isEmpty()) {
+                if (!e.getText().isEmpty()) {
                     sortedByPosition.put(pos(e), e);
                 }
             }
-            for(org.codehaus.groovy.ast.expr.Expression e : gstring.getValues()) {
+            for (org.codehaus.groovy.ast.expr.Expression e : gstring.getValues()) {
                 sortedByPosition.put(pos(e), e);
             }
             List<org.codehaus.groovy.ast.expr.Expression> rawExprs = new ArrayList<>(sortedByPosition.values());
             List<J> strings = new ArrayList<>(rawExprs.size());
-            for (int i = 0; i < rawExprs.size(); i++ ) {
+            for (int i = 0; i < rawExprs.size(); i++) {
                 org.codehaus.groovy.ast.expr.Expression e = rawExprs.get(i);
                 if (source.charAt(cursor) == '$') {
                     cursor++;
@@ -1315,12 +1318,12 @@ public class GroovyParserVisitor {
                     // ConstantExpression.getValue() cannot be trusted for strings as its values don't match source code because sequences like "\\" have already been replaced with a single "\"
                     // Use the AST element's line/column positions to figure out its extent, but those numbers need tweaks to be correct
                     int length = sourceLengthOfNext(cs);
-                    if(i == 0 || i == rawExprs.size() -1) {
+                    if (i == 0 || i == rawExprs.size() - 1) {
                         // The first and last constants within a GString have line/column position which incorrectly include the GString's delimiters
                         length -= delimiter.length();
                     }
                     // The line/column numbers incorrectly indicate that the following expression's opening "$" is part of this expression
-                    if(i < rawExprs.size() - 1) {
+                    if (i < rawExprs.size() - 1) {
                         length--;
                     }
                     String value = source.substring(cursor, cursor + length);
@@ -1364,7 +1367,7 @@ public class GroovyParserVisitor {
         public void visitMapExpression(MapExpression map) {
             Space prefix = sourceBefore("[");
             JContainer<G.MapEntry> entries;
-            if(map.getMapEntryExpressions().isEmpty()) {
+            if (map.getMapEntryExpressions().isEmpty()) {
                 entries = JContainer.build(Collections.singletonList(JRightPadded.build(
                         new G.MapEntry(randomId(), whitespace(), Markers.EMPTY,
                                 JRightPadded.build(new J.Empty(randomId(), sourceBefore(":"), Markers.EMPTY)),
@@ -1397,11 +1400,11 @@ public class GroovyParserVisitor {
             // closure() has implicitThis set to false
             // So the "select" that was just parsed _may_ have actually been the method name
             J.Identifier name;
-            if(call.getMethodAsString().equals(source.substring(cursor, cursor + call.getMethodAsString().length()))) {
+            if (call.getMethodAsString().equals(source.substring(cursor, cursor + call.getMethodAsString().length()))) {
                 name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
                         call.getMethodAsString(), null, null);
 
-            } else if(select != null && select.getElement() instanceof J.Identifier) {
+            } else if (select != null && select.getElement() instanceof J.Identifier) {
                 name = (J.Identifier) select.getElement();
                 select = null;
             } else {
@@ -1530,6 +1533,14 @@ public class GroovyParserVisitor {
                 name = name.withMarkers(name.getMarkers().add(new NullSafe(randomId())));
             }
             queue.add(new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, padLeft(beforeDot, (J.Identifier) name), null));
+        }
+
+        @Override
+        public void visitRangeExpression(RangeExpression range) {
+            queue.add(new G.Range(randomId(), whitespace(), Markers.EMPTY,
+                    visit(range.getFrom()),
+                    JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..>")),
+                    visit(range.getTo())));
         }
 
         @Override
@@ -1835,7 +1846,7 @@ public class GroovyParserVisitor {
         int column;
 
         @Override
-        public int compareTo(@NotNull GroovyParserVisitor.LineColumn lc) {
+        public int compareTo(@NonNull GroovyParserVisitor.LineColumn lc) {
             return line != lc.line ? line - lc.line : column - lc.column;
         }
     }
@@ -1961,24 +1972,24 @@ public class GroovyParserVisitor {
             return 0;
         }
         int lineCount = node.getLastLineNumber() - node.getLineNumber();
-        if(lineCount == 0) {
+        if (lineCount == 0) {
             return node.getLastColumnNumber() - node.getColumnNumber();
         }
         int linesSoFar = 0;
         int length = 0;
         int finalLineChars = 0;
-        while(true) {
+        while (true) {
             char c = source.charAt(cursor + length);
-            if(c == '\n') {
+            if (c == '\n') {
                 linesSoFar++;
             }
-            if(linesSoFar == lineCount) {
+            if (linesSoFar == lineCount) {
                 finalLineChars++;
             }
 
             length++;
 
-            if(finalLineChars == node.getLastColumnNumber()) {
+            if (finalLineChars == node.getLastColumnNumber()) {
                 return length;
             }
         }

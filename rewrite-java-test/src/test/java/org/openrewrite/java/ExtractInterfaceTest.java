@@ -100,12 +100,12 @@ class ExtractInterfaceTest implements RewriteTest {
           java(
             null,
             """
-                  package org.openrewrite.interfaces;
-                  
-                  interface ITest {
-                  
-                      int test();
-                  }
+              package org.openrewrite.interfaces;
+              
+              interface ITest {
+              
+                  int test();
+              }
               """,
             spec -> spec.path("org/openrewrite/interfaces/ITest.java")
           )

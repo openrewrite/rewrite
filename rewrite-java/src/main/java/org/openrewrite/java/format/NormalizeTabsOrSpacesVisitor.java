@@ -15,10 +15,10 @@
  */
 package org.openrewrite.java.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -68,7 +68,7 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
         }));
     }
 
-    @NotNull
+    @NonNull
     private String normalizeAfterFirstNewline(String text) {
         int firstNewline = text.indexOf('\n');
         if (firstNewline >= 0 && firstNewline != text.length() - 1) {

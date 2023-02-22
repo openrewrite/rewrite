@@ -23,7 +23,6 @@ import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.marker.ci.OperatingSystem.hostname;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -41,7 +40,7 @@ public class GitlabBuildEnvironment implements BuildEnvironment {
                 randomId(),
                 environment.apply("CI_BUILD_ID"),
                 environment.apply("CI_JOB_URL"),
-                hostname(),
+                environment.apply("CI_SERVER_HOST"),
                 environment.apply("CI_BUILD_NAME")
         );
     }

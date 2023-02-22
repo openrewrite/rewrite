@@ -43,17 +43,22 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
     }
 
     @Override
-    public <S extends SourceFile> List<S> scheduleVisit(RecipeRunStats runStats, Stack<Recipe> recipeStack, List<S> before,
-                                                        @Nullable List<Boolean> singleSourceApplicableTestResult, ExecutionContext ctx,
-                                                        Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile) {
+    public <S extends SourceFile> List<S> scheduleVisit(
+            RecipeRunStats runStats,
+            Stack<Recipe> recipeStack,
+            List<S> before,
+            ExecutionContext ctx,
+            @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
+            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile
+    ) {
         ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges);
-        List<S> afterList = delegate.scheduleVisit(runStats, recipeStack, before, singleSourceApplicableTestResult, ctx, recipeThatAddedOrDeletedSourceFile);
+        List<S> afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, singleSourceApplicableTestResult, recipeThatAddedOrDeletedSourceFile);
         if (afterList != before) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&
                     !before.isEmpty() && !afterList.isEmpty()) {
                 for (int i = 0; i < before.size(); i++) {
-                    if(!(afterList.get(i) instanceof Quark)) {
+                    if (!(afterList.get(i) instanceof Quark)) {
                         assertThat(afterList.get(i).printAllTrimmed())
                                 .as(
                                         "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +

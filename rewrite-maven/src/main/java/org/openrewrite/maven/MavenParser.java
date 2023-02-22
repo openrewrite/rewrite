@@ -15,13 +15,12 @@
  */
 package org.openrewrite.maven;
 
+import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -43,21 +42,9 @@ import java.util.regex.Pattern;
 import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
+@RequiredArgsConstructor
 public class MavenParser implements Parser<Xml.Document> {
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @Deprecated
-    @Nullable
-    private final HttpSender httpSender;
-
     private final Collection<String> activeProfiles;
-
-    /**
-     * @param activeProfiles The maven profile names set to be active. Profiles are typically defined in the settings.xml
-     */
-    private MavenParser(@Nullable HttpSender httpSender, Collection<String> activeProfiles) {
-        this.httpSender = httpSender;
-        this.activeProfiles = activeProfiles;
-    }
 
     @Override
     public List<Xml.Document> parse(@Language("xml") String... sources) {
@@ -107,10 +94,6 @@ public class MavenParser implements Parser<Xml.Document> {
         }
 
         List<Xml.Document> parsed = new ArrayList<>();
-
-        if (httpSender != null) {
-            ctx = HttpSenderExecutionContextView.view(ctx).setHttpSender(httpSender);
-        }
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
@@ -172,11 +155,6 @@ public class MavenParser implements Parser<Xml.Document> {
     public static class Builder extends Parser.Builder {
         private final Collection<String> activeProfiles = new HashSet<>();
 
-        @SuppressWarnings("DeprecatedIsStillUsed")
-        @Deprecated
-        @Nullable
-        private HttpSender httpSender;
-
         public Builder() {
             super(Xml.Document.class);
         }
@@ -186,17 +164,6 @@ public class MavenParser implements Parser<Xml.Document> {
             if (profiles != null) {
                 Collections.addAll(this.activeProfiles, profiles);
             }
-            return this;
-        }
-
-        /**
-         * @param httpSender The HTTP sender to use.
-         * @return This builder
-         * @deprecated Use {@link org.openrewrite.HttpSenderExecutionContextView#setHttpSender(HttpSender)} instead.
-         */
-        @Deprecated
-        public Builder httpSender(HttpSender httpSender) {
-            this.httpSender = httpSender;
             return this;
         }
 
@@ -217,7 +184,7 @@ public class MavenParser implements Parser<Xml.Document> {
         }
 
         public MavenParser build() {
-            return new MavenParser(httpSender, activeProfiles);
+            return new MavenParser(activeProfiles);
         }
 
         @Override

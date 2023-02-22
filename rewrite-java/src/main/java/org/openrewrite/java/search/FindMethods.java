@@ -192,7 +192,7 @@ public class FindMethods extends Recipe {
      * @return A set of {@link J.MethodInvocation}, {@link J.MemberReference}, and {@link J.NewClass} representing calls to this method.
      */
     public static Set<J> find(J j, String methodPattern, boolean matchOverrides) {
-        FindMethods findMethods = new FindMethods(methodPattern, null, null);
+        FindMethods findMethods = new FindMethods(methodPattern, matchOverrides, null);
         findMethods.methodCalls.setEnabled(false);
         return TreeVisitor.collect(
                         findMethods.getVisitor(),

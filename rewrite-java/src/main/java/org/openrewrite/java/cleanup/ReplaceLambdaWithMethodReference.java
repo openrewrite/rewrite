@@ -81,8 +81,9 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                         body = ((J.Return) statement).getExpression();
                     }
                 } else if (body instanceof J.InstanceOf) {
-                    J j = ((J.InstanceOf) body).getClazz();
-                    if (j instanceof J.Identifier) {
+                    J.InstanceOf instanceOf = (J.InstanceOf) body;
+                    J j = instanceOf.getClazz();
+                    if (j instanceof J.Identifier && instanceOf.getExpression() instanceof J.Identifier) {
                         body = j;
                         code = "#{}.class::isInstance";
                     }

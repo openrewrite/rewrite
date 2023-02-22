@@ -112,9 +112,9 @@ final class ExternalFlowModels {
      * <p>
      * As an example, take the following model method signatures:
      * <ul>
-     *     <li>{@code java.lang;String;false;toLowerCase;;;Argument[-1];ReturnValue;taint}</li>
-     *     <li>{@code java.lang;String;false;toUpperCase;;;Argument[-1];ReturnValue;taint}</li>
-     *     <li>{@code java.lang;String;false;trim;;;Argument[-1];ReturnValue;taint}</li>
+     *     <li>{@code "java.lang","String",false,"toLowerCase","","","Argument[-1]","ReturnValue","taint","manual"}</li>
+     *     <li>{@code "java.lang","String",false,"toUpperCase","","","Argument[-1]","ReturnValue","taint","manual"}</li>
+     *     <li>{@code "java.lang","String",false,"trim","","","Argument[-1]","ReturnValue","taint","manual"}</li>
      * </ul>
      * <p>
      * These can be merged into a single {@link InvocationMatcher} that matches all these methods.
@@ -248,7 +248,7 @@ final class ExternalFlowModels {
 
     @AllArgsConstructor
     static class FlowModel implements GenericExternalModel {
-        // namespace, type, subtypes, name, signature, ext, input, output, kind
+        // package, type, subtypes, name, signature, ext, input, output, kind, provenance
         @Getter
         String namespace;
 
@@ -268,6 +268,7 @@ final class ExternalFlowModels {
         String input;
         String output;
         String kind;
+        String provenance;
 
         @Override
         public String getArguments() {
@@ -299,7 +300,8 @@ final class ExternalFlowModels {
                             tokens[5],
                             tokens[6],
                             tokens[7],
-                            tokens[8]
+                            tokens[8],
+                            tokens[9]
                     )
             );
         }

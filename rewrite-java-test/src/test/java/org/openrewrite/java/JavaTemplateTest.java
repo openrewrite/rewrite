@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.cleanup.IndexOfReplaceableByContains;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -114,7 +115,7 @@ class JavaTemplateTest implements RewriteTest {
 
     @SuppressWarnings({"RedundantOperationOnEmptyContainer"})
     @Test
-    void replaceForEachControlVariable() {
+    void replaceForEachControlVariableType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
@@ -145,6 +146,80 @@ class JavaTemplateTest implements RewriteTest {
               class T {
                   void m() {
                       for (Object s : new ArrayList<String>()) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceForEachControlIterable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, ExecutionContext executionContext) {
+                  control = super.visitForEachControl(control, executionContext);
+                  Expression iterable = control.getIterable();
+                  if ( !TypeUtils.isOfClassType(iterable.getType(), "java.lang.String"))
+                      return control;
+                  iterable = iterable.withTemplate(
+                    JavaTemplate.builder(this::getCursor, "new Object[0]")
+                      .build(),
+                    iterable.getCoordinates().replace()
+                  );
+                  return control.withIterable(iterable);
+              }
+          })),
+          java(
+            """
+              class T {
+                  void m() {
+                      for (Object o : new String[0]) {}
+                  }
+              }
+              """,
+            """
+              class T {
+                  void m() {
+                      for (Object o : new Object[0]) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceBinaryExpression() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Binary visitBinary(J.Binary binary, ExecutionContext executionContext) {
+                  binary = super.visitBinary(binary, executionContext);
+                  if (binary.getLeft() instanceof J.Literal lit && lit.getValue().equals(42)) {
+                      lit = lit.withTemplate(
+                        JavaTemplate.builder(this::getCursor, "43")
+                          .build(),
+                        lit.getCoordinates().replace()
+                      );
+                      return binary.withLeft(lit);
+                  }
+                  return binary;
+              }
+          })),
+          java(
+            """
+              class T {
+                  boolean m() {
+                      return 42 == 0x2A;
+                  }
+              }
+              """,
+            """
+              class T {
+                  boolean m() {
+                      return 43 == 0x2A;
                   }
               }
               """
@@ -212,20 +287,20 @@ class JavaTemplateTest implements RewriteTest {
           })).expectedCyclesThatMakeChanges(2),
           java(
             """
-                  import java.util.List;
-                  class T {
-                      void m(List<?> l) {
-                          while (l.size() != 0) {}
-                      }
+              import java.util.List;
+              class T {
+                  void m(List<?> l) {
+                      while (l.size() != 0) {}
                   }
+              }
               """,
             """
-                  import java.util.List;
-                  class T {
-                      void m(List<?> l) {
-                          while (!l.isEmpty()) {}
-                      }
+              import java.util.List;
+              class T {
+                  void m(List<?> l) {
+                      while (!l.isEmpty()) {}
                   }
+              }
               """
           )
         );

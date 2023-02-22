@@ -32,10 +32,10 @@ class NewStringBuilderBufferWithCharArgumentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      StringBuffer buffer = new StringBuffer("a");
-                      StringBuilder builder = new StringBuilder("a");
-                  }
+              class A {
+                  StringBuffer buffer = new StringBuffer("a");
+                  StringBuilder builder = new StringBuilder("a");
+              }
               """
           )
         );
@@ -47,20 +47,20 @@ class NewStringBuilderBufferWithCharArgumentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      StringBuffer buffer = new StringBuffer('a');
-                      StringBuilder builder = new StringBuilder('a');
-                      char notALiteral = 'c';
-                      StringBuffer buffer = new StringBuffer(notALiteral);
-                  }
+              class A {
+                  StringBuffer buffer = new StringBuffer('a');
+                  StringBuilder builder = new StringBuilder('a');
+                  char notALiteral = 'c';
+                  StringBuffer buffer = new StringBuffer(notALiteral);
+              }
               """,
             """
-                  class A {
-                      StringBuffer buffer = new StringBuffer("a");
-                      StringBuilder builder = new StringBuilder("a");
-                      char notALiteral = 'c';
-                      StringBuffer buffer = new StringBuffer(String.valueOf(notALiteral));
-                  }
+              class A {
+                  StringBuffer buffer = new StringBuffer("a");
+                  StringBuilder builder = new StringBuilder("a");
+                  char notALiteral = 'c';
+                  StringBuffer buffer = new StringBuffer(String.valueOf(notALiteral));
+              }
               """
           )
         );

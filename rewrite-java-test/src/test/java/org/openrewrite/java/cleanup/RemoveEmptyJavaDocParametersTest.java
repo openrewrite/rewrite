@@ -82,15 +82,15 @@ class RemoveEmptyJavaDocParametersTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                class Test {
-                    /**
-                     * @param arg0 description1
-                     * @param arg1
-                     * @param arg2 description3
-                     */
-                    void method(int arg0, int arg1, int arg2) {
-                    }
-                }
+              class Test {
+                  /**
+                   * @param arg0 description1
+                   * @param arg1
+                   * @param arg2 description3
+                   */
+                  void method(int arg0, int arg1, int arg2) {
+                  }
+              }
               """,
             """
               class Test {

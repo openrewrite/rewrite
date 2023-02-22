@@ -24,7 +24,6 @@ class AddRepositoryTest implements RewriteTest {
 
     @Test
     void addSimpleRepo() {
-
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
@@ -56,7 +55,6 @@ class AddRepositoryTest implements RewriteTest {
 
     @Test
     void updateExistingRepo() {
-
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", "bb", null,
             null, null, null,
@@ -96,7 +94,6 @@ class AddRepositoryTest implements RewriteTest {
 
     @Test
     void doNotRemoveRepoName() {
-
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
@@ -122,7 +119,6 @@ class AddRepositoryTest implements RewriteTest {
 
     @Test
     void removeSnapshots() {
-
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, null, null,
@@ -163,7 +159,6 @@ class AddRepositoryTest implements RewriteTest {
 
     @Test
     void updateSnapshots1() {
-
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             false, "whatever", null,
@@ -208,7 +203,6 @@ class AddRepositoryTest implements RewriteTest {
 
     @Test
     void updateSnapshots2() {
-
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             null, "whatever", null,
@@ -252,7 +246,6 @@ class AddRepositoryTest implements RewriteTest {
 
     @Test
     void noIdMatch1SameSnapshots() {
-
         rewriteRun(
           spec -> spec.recipe(new AddRepository("myRepo", "http://myrepo.maven.com/repo", null, null,
             true, null, null,
@@ -322,6 +315,4 @@ class AddRepositoryTest implements RewriteTest {
           )
         );
     }
-
-
 }

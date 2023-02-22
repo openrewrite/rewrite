@@ -8,7 +8,7 @@ plugins {
 dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
-    implementation("de.danielbechler:java-object-diff:latest.release")
+    implementation("org.openrewrite.tools:java-object-diff:latest.release")
     implementation("org.apache.ant:ant:latest.release")
 
     implementation("io.quarkus.gizmo:gizmo:1.0.+")

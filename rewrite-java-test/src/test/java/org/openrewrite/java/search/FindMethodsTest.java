@@ -29,21 +29,21 @@ class FindMethodsTest implements RewriteTest {
           spec -> spec.recipe(new FindMethods("A <constructor>(String)", false, null)),
           java(
             """
-                  class Test {
-                      A a = new A("test");
-                  }
+              class Test {
+                  A a = new A("test");
+              }
               """,
             """
-                  class Test {
-                      A a = /*~~>*/new A("test");
-                  }
+              class Test {
+                  A a = /*~~>*/new A("test");
+              }
               """
           ),
           java(
             """
-                  class A {
-                      public A(String s) {}
-                  }
+              class A {
+                  public A(String s) {}
+              }
               """
           )
         );
@@ -197,11 +197,11 @@ class FindMethodsTest implements RewriteTest {
           ),
           java(
             """
-                  public class B {
-                     public static class C {
-                         public void foo() {}
-                     }
-                  }
+              public class B {
+                 public static class C {
+                     public void foo() {}
+                 }
+              }
               """
           )
         );

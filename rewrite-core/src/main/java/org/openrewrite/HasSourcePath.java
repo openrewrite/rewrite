@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 
@@ -42,7 +43,7 @@ public class HasSourcePath<P> extends TreeVisitor<Tree, P> {
     @Nullable
     @Override
     public Tree preVisit(Tree tree, P p) {
-        if (filePattern == null) {
+        if (StringUtils.isBlank(filePattern)) {
             return SearchResult.found(tree, "has file");
         }
 

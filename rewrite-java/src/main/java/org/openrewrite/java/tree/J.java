@@ -2821,7 +2821,6 @@ public interface J extends Tree {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
         }
-
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

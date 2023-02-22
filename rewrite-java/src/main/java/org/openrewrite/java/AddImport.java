@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.FindMethods;
@@ -77,7 +78,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         if (dotIndex >= 0) {
             String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
             // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
-            if ("java.lang".equals(packageName) || (cu.getPackageDeclaration() != null &&
+            if (("java.lang".equals(packageName) && StringUtils.isBlank(statik)) || (cu.getPackageDeclaration() != null &&
                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
                 return cu;
             }

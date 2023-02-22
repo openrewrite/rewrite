@@ -369,20 +369,20 @@ class ExplicitLambdaArgumentTypesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      static void run(TriConsumer tc) {
-                      }
-
-                      static void method() {
-                          run((a, b, c) -> {
-                              return a + b - c;
-                          });
-                      }
-
-                      private interface TriConsumer {
-                          int method(int a, int b, int c);
-                      }
+              class Test {
+                  static void run(TriConsumer tc) {
                   }
+
+                  static void method() {
+                      run((a, b, c) -> {
+                          return a + b - c;
+                      });
+                  }
+
+                  private interface TriConsumer {
+                      int method(int a, int b, int c);
+                  }
+              }
               """,
             """
               class Test {

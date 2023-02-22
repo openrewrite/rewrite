@@ -1071,6 +1071,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         } else {
             t = (J.Ternary) temp;
         }
+        Statement tempStat = (Statement) visitStatement(t, p);
+        if (!(tempStat instanceof J.Ternary)) {
+            return tempStat;
+        } else {
+            t = (J.Ternary) tempStat;
+        }
         t = t.withCondition(visitAndCast(t.getCondition(), p));
         t = t.getPadding().withTruePart(visitLeftPadded(t.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p));
         t = t.getPadding().withFalsePart(visitLeftPadded(t.getPadding().getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, p));

@@ -17,7 +17,8 @@ package org.openrewrite.groovy.tree;
 
 public class GLeftPadded {
     public enum Location {
-        BINARY_OPERATOR(GSpace.Location.BINARY_OPERATOR);
+        BINARY_OPERATOR(GSpace.Location.BINARY_OPERATOR),
+        RANGE_INCLUSION(GSpace.Location.RANGE_INCLUSION);
 
         private final GSpace.Location beforeLocation;
 

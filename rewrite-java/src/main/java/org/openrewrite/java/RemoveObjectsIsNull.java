@@ -16,10 +16,9 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.java.cleanup.UnnecessaryParentheses;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.Expression;
@@ -63,7 +62,7 @@ public class RemoveObjectsIsNull extends Recipe {
             return m;
         }
 
-        @NotNull
+        @NonNull
         private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
             JavaTemplate template = JavaTemplate.builder(this::getCursor, pattern).build();
             Expression e = m.getArguments().get(0);

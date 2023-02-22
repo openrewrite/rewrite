@@ -97,7 +97,7 @@ public class UpdateSourcePositions extends Recipe {
 
                 Range range = positionMap.get(tree);
                 if (range != null) {
-                    J t = ((J) tree).withMarkers(((J) tree).getMarkers().add(range));
+                    J t = tree.withMarkers(tree.getMarkers().add(range));
                     return super.visit(t, ctx);
                 }
                 return super.visit(tree, ctx);
@@ -135,7 +135,7 @@ public class UpdateSourcePositions extends Recipe {
             if (c == '\n') {
                 lineBoundary = true;
             }
-            return super.append(c);
+            return this;
         }
 
         @Override
@@ -146,16 +146,24 @@ public class UpdateSourcePositions extends Recipe {
                     column = 0;
                     lineBoundary = false;
                 }
-                pos += text.length();
-                long numberOfLines = text.chars().filter(c -> c == '\n').count();
+                int length = text.length();
+                pos += length;
+                int numberOfLines = 0;
+                int indexOfLastNewLine = -1;
+                for (int i = 0; i < length; i++) {
+                    if (text.charAt(i) == '\n') {
+                        indexOfLastNewLine = i;
+                        numberOfLines++;
+                    }
+                }
                 if (numberOfLines > 0) {
                     line += numberOfLines;
-                    column = text.length() - text.lastIndexOf('\n');
+                    column = length - indexOfLastNewLine;
                 } else {
-                    column += text.length();
+                    column += length;
                 }
             }
-            return super.append(text);
+            return this;
         }
     }
 }

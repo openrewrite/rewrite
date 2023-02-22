@@ -16,7 +16,6 @@
 package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -57,22 +56,21 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void singleSourceApplicability() {
         rewriteRun(
-          spec -> spec.recipe(
-            new ByteArrayInputStream(
-              //language=yml
+          spec -> spec.recipeFromYaml(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              applicability:
+                  singleSource:
+                      - org.openrewrite.FindSourceFiles:
+                          filePattern: '**/hello.txt'
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
               """
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.ChangeTextToHello
-                displayName: Change text to hello
-                applicability:
-                    singleSource:
-                        - org.openrewrite.FindSourceFiles:
-                            filePattern: '**/hello.txt'
-                recipeList:
-                    - org.openrewrite.text.ChangeText:
-                        toText: Hello!
-                """.getBytes()
-            ),
+            ,
             "test.ChangeTextToHello"
           ),
           text(
@@ -90,22 +88,20 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void anySourceApplicability() {
         rewriteRun(
-          spec -> spec.recipe(
-            new ByteArrayInputStream(
-              //language=yml
-              """
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.ChangeTextToHello
-                displayName: Change text to hello
-                applicability:
-                    anySource:
-                        - org.openrewrite.FindSourceFiles:
-                            filePattern: '**/hello.txt'
-                recipeList:
-                    - org.openrewrite.text.ChangeText:
-                        toText: Hello!
-                """.getBytes()
-            ),
+          spec -> spec.recipeFromYaml(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              applicability:
+                  anySource:
+                      - org.openrewrite.FindSourceFiles:
+                          filePattern: '**/hello.txt'
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """,
             "test.ChangeTextToHello"
           ),
           text(
@@ -124,25 +120,23 @@ class YamlResourceLoaderTest implements RewriteTest {
     @Test
     void bothAnySourceAndSingleSourceApplicability() {
         rewriteRun(
-          spec -> spec.recipe(
-            new ByteArrayInputStream(
-              //language=yml
-              """
-                type: specs.openrewrite.org/v1beta/recipe
-                name: test.ChangeTextToHello
-                displayName: Change text to hello
-                applicability:
-                    anySource:
-                        - org.openrewrite.FindSourceFiles:
-                            filePattern: '**/day.txt'
-                    singleSource:
-                        - org.openrewrite.FindSourceFiles:
-                            filePattern: '**/night.txt'
-                recipeList:
-                    - org.openrewrite.text.ChangeText:
-                        toText: Hello!
-                """.getBytes()
-            ),
+          spec -> spec.recipeFromYaml(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              applicability:
+                  anySource:
+                      - org.openrewrite.FindSourceFiles:
+                          filePattern: '**/day.txt'
+                  singleSource:
+                      - org.openrewrite.FindSourceFiles:
+                          filePattern: '**/night.txt'
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """,
             "test.ChangeTextToHello"
           ),
           text(

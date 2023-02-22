@@ -250,8 +250,14 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, "assert ");
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
-            before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
-            after.append("\n}");
+            if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
+                before.insert(0, n.withInitializer(null).printTrimmed(cursor) + "{\n");
+                after.append("\n}");
+            } else {
+                // no initializer
+                before.insert(0, "__M__.any(");
+                after.append(");");
+            }
         } else if (j instanceof J.NewClass) {
             J.NewClass n = (J.NewClass) j;
             String newClassString;
@@ -299,6 +305,12 @@ public class BlockStatementTemplateGenerator {
                 if (!(next(cursor).getValue() instanceof MethodCall)) {
                     after.append(';');
                 }
+            }
+        } else if (j instanceof J.ForLoop.Control) {
+            J.ForLoop.Control c = (J.ForLoop.Control) j;
+            if (referToSameElement(prior, c.getCondition())) {
+                before.insert(0, "for (" + c.getInit().get(0).printTrimmed(cursor).trim() + ";");
+                after.append(";) {}");
             }
         } else if (j instanceof J.ForLoop) {
             J.ForLoop f = (J.ForLoop) j;
@@ -411,11 +423,9 @@ public class BlockStatementTemplateGenerator {
     }
 
     private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {
-        if (!(body instanceof J.Block)) {
-            before.insert(0, "{");
-        }
         insertion.run();
         if (!(body instanceof J.Block)) {
+            before.insert(0, "{");
             after.append("}");
         }
     }

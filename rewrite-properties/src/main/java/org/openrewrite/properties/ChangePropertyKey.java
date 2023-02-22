@@ -55,8 +55,7 @@ public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Regex",
             description = "Default false. If enabled, `oldPropertyKey` will be interepreted as a Regular Expression, and capture group contents will be available in `newPropertyKey`",
-            required = false,
-            example = "true")
+            required = false)
     @Nullable
     Boolean regex;
 

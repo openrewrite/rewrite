@@ -212,7 +212,7 @@ public final class ExternalSinkModels {
 
     @AllArgsConstructor
     static class SinkModel implements GenericExternalModel {
-        // namespace, type, subtypes, name, signature, ext, input, kind, generated
+        // package, type, subtypes, name, signature, ext, input, kind, provenance
         @Getter
         String namespace;
 
@@ -231,7 +231,7 @@ public final class ExternalSinkModels {
         String ext;
         String input;
         String kind;
-        boolean generated;
+        String provenance;
 
         @Override
         public String getArguments() {
@@ -254,7 +254,7 @@ public final class ExternalSinkModels {
                             tokens[5],
                             tokens[6],
                             tokens[7],
-                            Boolean.parseBoolean(tokens[8])
+                            tokens[8]
                     )
             );
         }

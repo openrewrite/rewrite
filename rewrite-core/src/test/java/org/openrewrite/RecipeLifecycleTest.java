@@ -16,27 +16,23 @@
 package org.openrewrite;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
+import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
-import java.io.ByteArrayInputStream;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
-import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +63,7 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Test
-    void notApplicableRecipe() {
+    void notApplicableVisitor() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
               @Override
@@ -76,6 +72,51 @@ class RecipeLifecycleTest implements RewriteTest {
               }
           }).addApplicableTest(NOOP)),
           text("hello")
+        );
+    }
+
+    @Test
+    void notApplicableRecipe() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
+              @Override
+              public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                  return text.withText("goodbye");
+              }
+          }).addApplicableTest(toRecipe())),
+          text("hello")
+        );
+    }
+
+    static class ReplaceWithGoodbyeVisitor<P> extends PlainTextVisitor<P> {
+        @Override
+        public PlainText visitText(PlainText text, P p) {
+            return text.withText("goodbye");
+        }
+    }
+
+    static class FindEverythingVisitor<P> extends PlainTextVisitor<P> {
+        @Override
+        public PlainText visitText(PlainText tree, P p) {
+            return SearchResult.found(tree);
+        }
+    }
+
+    @Test
+    void recipeApplicabilityWithFindNothingApplicability() {
+        // Given:
+        // A recipe `ReplaceWithGoodbyeVisitor`
+        // And:
+        // That has another recipe as an applicability test `ReplaceWithGoodbyeVisitor`
+        // And that second recipe has a `FindEverythingVisitor` as `getSingleSourceApplicableTest`
+        // Then:
+        // The recipe should make a change
+        AdHocRecipe applicableTest = toRecipe()
+          .withGetSingleSourceApplicableTest(FindEverythingVisitor::new)
+          .withGetVisitor(ReplaceWithGoodbyeVisitor::new);
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(ReplaceWithGoodbyeVisitor::new).addApplicableTest(applicableTest)),
+          text("hello", "goodbye")
         );
     }
 
@@ -137,7 +178,7 @@ class RecipeLifecycleTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2711")
     @Test
     void yamlApplicabilityWithAnySource() {
-        //language=yaml
+        @Language("yaml")
         String yamlRecipe = """
           ---
           type: specs.openrewrite.org/v1beta/recipe
@@ -162,15 +203,7 @@ class RecipeLifecycleTest implements RewriteTest {
                   toText: "3"
           """;
         rewriteRun(
-          spec -> spec.recipe(Environment.builder()
-            .scanRuntimeClasspath()
-            .load(
-              new YamlResourceLoader(
-                new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
-                Paths.get("applicability.yml").toUri(),
-                new Properties()))
-            .build()
-            .activateRecipes("org.openrewrite.ApplicabilityExactlyOnce")),
+          spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.ApplicabilityExactlyOnce"),
           text("1", "3"),
           text("unknown", "3")
         );
@@ -179,7 +212,7 @@ class RecipeLifecycleTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2711")
     @Test
     void yamlApplicabilityWithSingleSource() {
-        //language=yaml
+        @Language("yaml")
         String yamlRecipe = """
           ---
           type: specs.openrewrite.org/v1beta/recipe
@@ -204,15 +237,7 @@ class RecipeLifecycleTest implements RewriteTest {
                   toText: "3"
           """;
         rewriteRun(
-          spec -> spec.recipe(Environment.builder()
-              .scanRuntimeClasspath()
-              .load(
-                new YamlResourceLoader(
-                  new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
-                  Paths.get("applicability.yml").toUri(),
-                  new Properties()))
-              .build()
-              .activateRecipes("org.openrewrite.ApplicabilityExactlyOnce")),
+          spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.ApplicabilityExactlyOnce"),
           text("1", "3"),
           text("2")
         );
@@ -221,7 +246,7 @@ class RecipeLifecycleTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2754")
     @Test
     void yamlApplicabilityTrueWithRecipesHaveVisitMethodOverridden() {
-        //language=yaml
+        @Language("yaml")
         String yamlRecipe = """
           ---
           type: specs.openrewrite.org/v1beta/recipe
@@ -258,15 +283,7 @@ class RecipeLifecycleTest implements RewriteTest {
                   existingFileStrategy: "continue"
           """;
         rewriteRun(
-          spec -> spec.recipe(Environment.builder()
-            .scanRuntimeClasspath()
-            .load(
-              new YamlResourceLoader(
-                new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
-                Paths.get("applicability.yml").toUri(),
-                new Properties()))
-            .build()
-            .activateRecipes("org.openrewrite.RecipesToTransformMultiFiles")),
+          spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.RecipesToTransformMultiFiles"),
           text("1",
             "1->2->3",
             spec -> spec.path("file.txt").noTrim())
@@ -274,10 +291,9 @@ class RecipeLifecycleTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2754")
-    @Disabled
     @Test
     void yamlApplicabilityFalseWithRecipesHaveVisitMethodOverridden() {
-        //language=yaml
+        @Language("yaml")
         String yamlRecipe = """
           ---
           type: specs.openrewrite.org/v1beta/recipe
@@ -314,15 +330,7 @@ class RecipeLifecycleTest implements RewriteTest {
                   existingFileStrategy: "continue"
           """;
         rewriteRun(
-          spec -> spec.recipe(Environment.builder()
-            .scanRuntimeClasspath()
-            .load(
-              new YamlResourceLoader(
-                new ByteArrayInputStream(yamlRecipe.getBytes(StandardCharsets.UTF_8)),
-                Paths.get("applicability.yml").toUri(),
-                new Properties()))
-            .build()
-            .activateRecipes("org.openrewrite.RecipesToTransformMultiFiles")),
+          spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.RecipesToTransformMultiFiles"),
           text("2",
             spec -> spec.path("file.txt").noTrim())
         );
