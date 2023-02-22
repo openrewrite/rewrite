@@ -164,7 +164,8 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
         }
 
         if (tree instanceof J.Literal) {
-            return ((J.Literal) tree).getValue().toString();
+            String s = ((J.Literal) tree).getValueSource();
+            return s != null ? s : "";
         }
 
         String[] lines = tree.toString().split("\n");
