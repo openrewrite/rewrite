@@ -33,7 +33,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class MavenArtifactDownloaderTest {
+class MavenArtifactDownloaderTest {
 
     @Test
     void downloadDependencies(@TempDir Path tempDir) {

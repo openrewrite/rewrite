@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
+class ChangeDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
     @Test
     void changeDependencyGroupIdAndArtifactId() {

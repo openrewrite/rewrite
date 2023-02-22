@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class AddManagedDependencyTest implements RewriteTest {
+class AddManagedDependencyTest implements RewriteTest {
 
     @Test
     void validation()  {

@@ -25,7 +25,7 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeSchedulerTest implements RewriteTest {
+class RecipeSchedulerTest implements RewriteTest {
 
     @Test
     void exceptionsCauseResult() {

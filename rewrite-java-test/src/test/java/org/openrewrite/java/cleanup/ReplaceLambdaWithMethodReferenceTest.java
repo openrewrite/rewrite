@@ -164,6 +164,34 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2875")
+    @Test
+    void instanceOfLeftHandIsNotLambdaParameter() {
+        rewriteRun(
+          java(
+            """
+              package org.test;
+              public class CheckType {
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Collectors;
+
+              import org.test.CheckType;
+
+              class Test {
+                  List<Optional<Object>> method(List<Optional<Object>> input) {
+                      return input.stream().filter(n -> n.get() instanceof CheckType).collect(Collectors.toList());
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void functionMultiParamReference() {
         rewriteRun(
