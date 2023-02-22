@@ -222,4 +222,12 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(" object Test")
         );
     }
+
+    @Test
+    void variance() {
+        rewriteRun(
+          kotlin("interface A < in R >"),
+          kotlin("interface B < out R >")
+        );
+    }
 }

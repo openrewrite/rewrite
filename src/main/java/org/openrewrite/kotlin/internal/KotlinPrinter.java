@@ -597,7 +597,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitWildcard(J.Wildcard wildcard, PrintOutputCapture<P> p) {
             beforeSyntax(wildcard, Space.Location.WILDCARD_PREFIX, p);
-            p.append('*');
+            if (wildcard.getPadding().getBound() != null) {
+                p.append(wildcard.getPadding().getBound().getElement() == J.Wildcard.Bound.Super ? "in" : "out");
+            }
+            if (wildcard.getBoundedType() == null) {
+                p.append('*');
+            } else {
+                visit(wildcard.getBoundedType(), p);
+            }
             afterSyntax(wildcard, p);
             return wildcard;
         }

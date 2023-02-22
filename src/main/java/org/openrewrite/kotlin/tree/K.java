@@ -249,6 +249,99 @@ public interface K extends J {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class Binary implements K, Expression, TypedTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.Binary.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Expression left;
+
+        JLeftPadded<K.Binary.Type> operator;
+
+        public K.Binary.Type getOperator() {
+            return operator.getElement();
+        }
+
+        public K.Binary withOperator(K.Binary.Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @With
+        Expression right;
+
+        @With
+        Space after;
+
+        @With
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitBinary(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public enum Type {
+            Contains,
+            Get,
+            IdentityEquals,
+            IdentityNotEquals,
+            RangeTo
+        }
+
+        public K.Binary.Padding getPadding() {
+            K.Binary.Padding p;
+            if (this.padding == null) {
+                p = new K.Binary.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new K.Binary.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final K.Binary t;
+
+            public JLeftPadded<K.Binary.Type> getOperator() {
+                return t.operator;
+            }
+
+            public K.Binary withOperator(JLeftPadded<K.Binary.Type> operator) {
+                return t.operator == operator ? t : new K.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.after, t.type);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -381,93 +474,54 @@ public interface K extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
-    final class Binary implements K, Expression, TypedTree {
-
-        @Nullable
-        @NonFinal
-        transient WeakReference<K.Binary.Padding> padding;
+    final class KReturn implements K, Statement {
 
         @With
         @EqualsAndHashCode.Include
         UUID id;
 
         @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        Expression left;
-
-        JLeftPadded<K.Binary.Type> operator;
-
-        public K.Binary.Type getOperator() {
-            return operator.getElement();
-        }
-
-        public K.Binary withOperator(K.Binary.Type operator) {
-            return getPadding().withOperator(this.operator.withElement(operator));
-        }
-
-        @With
-        Expression right;
-
-        @With
-        Space after;
+        J.Return expression;
 
         @With
         @Nullable
-        JavaType type;
+        J.Identifier label;
+
+        @Override
+        public Space getPrefix() {
+            return expression.getPrefix();
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withExpression(expression.withPrefix(space));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getMarkers();
+        }
+
+        @Override
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withExpression(expression.withMarkers(markers));
+        }
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            return v.visitBinary(this, p);
+            return v.visitKReturn(this, p);
         }
 
-        @Transient
         @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
-        public enum Type {
-            Contains,
-            Get,
-            IdentityEquals,
-            IdentityNotEquals,
-            RangeTo
-        }
-
-        public K.Binary.Padding getPadding() {
-            K.Binary.Padding p;
-            if (this.padding == null) {
-                p = new K.Binary.Padding(this);
-                this.padding = new WeakReference<>(p);
-            } else {
-                p = this.padding.get();
-                if (p == null || p.t != this) {
-                    p = new K.Binary.Padding(this);
-                    this.padding = new WeakReference<>(p);
-                }
-            }
-            return p;
-        }
-
-        @RequiredArgsConstructor
-        public static class Padding {
-            private final K.Binary t;
-
-            public JLeftPadded<K.Binary.Type> getOperator() {
-                return t.operator;
-            }
-
-            public K.Binary withOperator(JLeftPadded<K.Binary.Type> operator) {
-                return t.operator == operator ? t : new K.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.after, t.type);
-            }
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
         }
     }
 
@@ -667,59 +721,6 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class KReturn implements K, Statement {
-
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        J.Return expression;
-
-        @With
-        @Nullable
-        J.Identifier label;
-
-        @Override
-        public Space getPrefix() {
-            return expression.getPrefix();
-        }
-
-        @Override
-        public <J2 extends J> J2 withPrefix(Space space) {
-            return (J2) withExpression(expression.withPrefix(space));
-        }
-
-        @Override
-        public Markers getMarkers() {
-            return expression.getMarkers();
-        }
-
-        @Override
-        public <J2 extends Tree> J2 withMarkers(Markers markers) {
-            return (J2) withExpression(expression.withMarkers(markers));
-        }
-
-        @Override
-        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            return v.visitKReturn(this, p);
-        }
-
-        @Override
-        @Transient
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
-        }
-
-        @Override
-        public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
-        }
-    }
 
     /**
      * Kotlin defines certain java statements like J.If as expression.

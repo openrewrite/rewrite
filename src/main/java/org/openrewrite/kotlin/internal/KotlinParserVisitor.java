@@ -2011,28 +2011,52 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             annotations.add(reified);
         }
 
-        Expression name = createIdentifier(typeParameter.getName().asString(), typeParameter);
 
         List<FirTypeRef> nonImplicitParams = new ArrayList<>(typeParameter.getBounds().size());
+        boolean hasImplicitAny = false;
         for (FirTypeRef bound : typeParameter.getBounds()) {
-            if (!(bound instanceof FirImplicitNullableAnyTypeRef)) {
+            if (bound instanceof FirImplicitNullableAnyTypeRef) {
+                hasImplicitAny = true;
+            } else {
                 nonImplicitParams.add(bound);
             }
         }
 
-        JContainer<TypeTree> bounds = null;
-        if (nonImplicitParams.size() == 1) {
-            bounds = JContainer.build(sourceBefore(":"),
-                    convertAll(nonImplicitParams, t -> sourceBefore(","), noDelim, ctx), Markers.EMPTY);
-        }
+        // Generate a J.WildCard if there is an implicit any bound.
+        if (hasImplicitAny) {
+            J.Wildcard.Bound bound;
+            if (source.startsWith("in", cursor)) {
+                skip("in");
+                bound = J.Wildcard.Bound.Super;
+            } else {
+                skip("out");
+                bound = J.Wildcard.Bound.Extends;
+            }
+            NameTree name = createIdentifier(typeParameter.getName().asString(), typeParameter);
+            return new J.Wildcard(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    padLeft(EMPTY, bound),
+                    name
+            );
+        } else {
+            Expression name = createIdentifier(typeParameter.getName().asString(), typeParameter);
 
-        return new J.TypeParameter(
-                randomId(),
-                prefix,
-                markers,
-                annotations,
-                name,
-                bounds);
+            JContainer<TypeTree> bounds = null;
+            if (nonImplicitParams.size() == 1) {
+                bounds = JContainer.build(sourceBefore(":"),
+                        convertAll(nonImplicitParams, t -> sourceBefore(","), noDelim, ctx), Markers.EMPTY);
+            }
+
+            return new J.TypeParameter(
+                    randomId(),
+                    prefix,
+                    markers,
+                    annotations,
+                    name,
+                    bounds);
+        }
     }
 
     @Override
