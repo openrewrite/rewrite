@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.utils;
 
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.Expression;
@@ -30,9 +31,16 @@ public final class ExpressionUtils {
     private ExpressionUtils() {}
 
     private static final J.Binary ADDITIVE_BINARY_TEMPLATE;
+    private static final J.Parentheses SIMPLE_PARENTHESE_TEMPLATE;
+
+    @Language("java")
+    private static final String ADDITIVE_BINARY_TEMPLATE_CODE = "class A { void foo() {String s = \"A\" + \"B\";}}";
+    @Language("java")
+    private static final String SIMPLE_PARENTHESE_TEMPLATE_CODE = "class B { void foo() { (\"A\" + \"B\").length(); } }";
+
     static {
         List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
-            .parse("class A { void foo() {String s = \"A\" + \"B\";}}");
+            .parse(ADDITIVE_BINARY_TEMPLATE_CODE, SIMPLE_PARENTHESE_TEMPLATE_CODE);
         ADDITIVE_BINARY_TEMPLATE = new JavaIsoVisitor<List<J.Binary>>() {
             @Override
             public J.Binary visitBinary(J.Binary binary, List<J.Binary> rets) {
@@ -40,6 +48,15 @@ public final class ExpressionUtils {
                 return binary;
             }
         }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
+
+        SIMPLE_PARENTHESE_TEMPLATE = new JavaIsoVisitor<List<J.Parentheses>>() {
+            @Override
+            public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens,
+                List<J.Parentheses> parentheses) {
+                parentheses.add(parens);
+                return parens;
+            }
+        }.reduce(cus.get(1), new ArrayList<>(1)).get(0);
     }
 
     /**
@@ -66,5 +83,9 @@ public final class ExpressionUtils {
 
     public static Expression additiveExpression(List<Expression> expressions) {
        return additiveExpression(expressions.toArray(new Expression[0]));
+    }
+
+    public static  <T extends J>  J.Parentheses<T> wrapExpression(Expression exp) {
+        return SIMPLE_PARENTHESE_TEMPLATE.withTree(exp);
     }
 }
