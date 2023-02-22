@@ -81,7 +81,8 @@ public class ChainStringBuilderAppendCalls extends Recipe {
                     List<Expression> groups = new ArrayList<>();
                     List<Expression> group = new ArrayList<>();
                     for (Expression exp : flattenExpressions) {
-                        if (exp instanceof J.Literal) {
+                        if (exp instanceof J.Literal
+                            && (((J.Literal) exp).getType() == JavaType.Primitive.String)) {
                             group.add(exp);
                         } else {
                             addToGroups(group, groups);

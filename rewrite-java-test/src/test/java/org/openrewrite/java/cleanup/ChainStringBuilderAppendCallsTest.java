@@ -72,7 +72,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
     }
 
     @Test
-    void groupedObjectsConcatenation() {
+    void groupedStringsConcatenation() {
         rewriteRun(
           java(
             """
@@ -90,6 +90,32 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                       StringBuilder sb = new StringBuilder();
                       String op = "+";
                       sb.append("A" + "B" + "C").append(op).append("D" + "E");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void correctlyGroupConcatenations() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append(op + 1 + 2 + "A" + "B" + 'x');
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append(op).append(1).append(2).append("A" + "B").append('x');
                   }
               }
               """
