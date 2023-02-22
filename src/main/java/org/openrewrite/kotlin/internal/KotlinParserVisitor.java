@@ -2023,7 +2023,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         // Generate a J.WildCard if there is an implicit any bound.
-        if (hasImplicitAny) {
+        if (hasImplicitAny && (source.startsWith("in", cursor) || source.startsWith("out", cursor))) {
             J.Wildcard.Bound bound;
             if (source.startsWith("in", cursor)) {
                 skip("in");
