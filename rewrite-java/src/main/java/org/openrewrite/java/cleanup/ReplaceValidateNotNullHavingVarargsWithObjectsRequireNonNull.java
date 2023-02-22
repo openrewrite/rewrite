@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,10 +58,10 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
                 }
 
                 List<Expression> arguments = mi.getArguments();
-                String template = arguments.size()==2
+                String template = arguments.size() == 2
                         ? "Objects.requireNonNull(#{any()}, #{any(java.lang.String)})"
                         : String.format("Objects.requireNonNull(#{any()}, String.format(#{any(java.lang.String)}, %s))",
-                                String.join(", ", Collections.nCopies(arguments.size() - 2, "#{any()}")));
+                        String.join(", ", Collections.nCopies(arguments.size() - 2, "#{any()}")));
 
 
                 maybeRemoveImport("org.apache.commons.lang3.Validate");
