@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,23 +15,22 @@
  */
 package org.openrewrite.groovy.tree;
 
-public class GSpace {
-    public enum Location {
-        BINARY_PREFIX,
-        BINARY_OPERATOR,
-        BINARY_SUFFIX,
-        GSTRING,
-        LIST_LITERAL,
-        LIST_LITERAL_ELEMENT_SUFFIX,
-        LIST_LITERAL_ELEMENTS,
-        MAP_ENTRY,
-        MAP_ENTRY_PREFIX,
-        MAP_ENTRY_KEY_SUFFIX,
-        MAP_LITERAL,
-        MAP_LITERAL_ELEMENT_SUFFIX,
-        MAP_LITERAL_ELEMENTS,
-        RANGE_PREFIX,
-        RANGE_INCLUSION,
-        TOP_LEVEL_STATEMENT,
+import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RewriteTest;
+
+import static org.openrewrite.groovy.Assertions.groovy;
+
+public class RangeTest implements RewriteTest {
+
+    @Test
+    void rangeExpression() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              println(a[0..-2])
+              """
+          )
+        );
     }
 }
