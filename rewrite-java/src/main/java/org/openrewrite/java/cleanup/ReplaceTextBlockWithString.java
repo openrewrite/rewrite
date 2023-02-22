@@ -85,7 +85,7 @@ public class ReplaceTextBlockWithString extends Recipe {
                     literals[i] = toLiteral(lines[i]).withPrefix(Space.build("\n", Collections.emptyList()));
                 }
                 // Format the resulting expression
-                return autoFormat(ExpressionUtils.additiveExpression(literals), ctx);
+                return autoFormat(ChainStringBuilderAppendCalls.additiveExpression(literals), ctx);
             }
             return literal;
         }

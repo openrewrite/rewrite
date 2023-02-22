@@ -20,17 +20,21 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public class ChainStringBuilderAppendCalls extends Recipe {
     private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
+    private static J.Binary additiveBinaryTemplate = null;
 
     @Override
     public String getDisplayName() {
@@ -40,6 +44,11 @@ public class ChainStringBuilderAppendCalls extends Recipe {
     @Override
     public String getDescription() {
         return "String concatenation within calls to `StringBuilder.append()` causes unnecessary memory allocation. Except for concatenations of String literals, which are joined together at compile time. Replaces inefficient concatenations with chained calls to `StringBuilder.append()`.";
+    }
+
+    @Override
+    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+        return Duration.ofMinutes(2);
     }
 
     @Override
@@ -97,11 +106,53 @@ public class ChainStringBuilderAppendCalls extends Recipe {
     }
 
     /**
+     * Concat two literals to an expression with '+' and surrounded with single space.
+     */
+    public static J.Binary concatAdditionBinary(Expression left, Expression right) {
+        J.Binary b = getAdditiveBinaryTemplate();
+        return b.withPrefix(b.getLeft().getPrefix())
+            .withLeft(left)
+            .withRight(right.withPrefix(Space.build(" " + right.getPrefix().getWhitespace(), emptyList())));
+    }
+
+    /**
+     * Concat expressions to an expression with '+' connected.
+     */
+    public static Expression additiveExpression(Expression... expressions) {
+        Expression expression = null;
+        for (Expression element : expressions) {
+            if (element != null) {
+                expression = (expression == null) ? element : concatAdditionBinary(expression, element);
+            }
+        }
+        return expression;
+    }
+
+    public static Expression additiveExpression(List<Expression> expressions) {
+        return additiveExpression(expressions.toArray(new Expression[0]));
+    }
+
+    public static J.Binary getAdditiveBinaryTemplate() {
+        if (additiveBinaryTemplate == null) {
+            List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
+                .parse("class A { void foo() {String s = \"A\" + \"B\";}}");
+            additiveBinaryTemplate = new JavaIsoVisitor<List<J.Binary>>() {
+                @Override
+                public J.Binary visitBinary(J.Binary binary, List<J.Binary> rets) {
+                    rets.add(binary);
+                    return binary;
+                }
+            }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
+        }
+        return additiveBinaryTemplate;
+    }
+
+    /**
      * Concat an additive expression in a group and add to groups
      */
     private static void addToGroups(List<Expression> group, List<Expression> groups) {
         if (!group.isEmpty()) {
-            groups.add(ExpressionUtils.additiveExpression(group));
+            groups.add(additiveExpression(group));
             group.clear();
         }
     }
