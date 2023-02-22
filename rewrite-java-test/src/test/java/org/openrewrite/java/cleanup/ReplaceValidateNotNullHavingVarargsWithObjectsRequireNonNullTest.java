@@ -40,7 +40,6 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               import org.apache.commons.lang3.Validate;
               class Test {
                   void test(Object obj) {
-                      
                   }
               }
               """
@@ -56,7 +55,7 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               import org.apache.commons.lang3.Validate;
               class Test {
                   void test(Object obj) {
-                        Validate.notNull(obj);
+                      Validate.notNull(obj);
                   }
               }
               """
@@ -72,7 +71,7 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               import org.apache.commons.lang3.Validate;
               class Test {
                   void test(Object obj) {
-                        Validate.notNull(obj, "Object should not be null");
+                      Validate.notNull(obj, "Object should not be null");
                   }
               }
               """,
@@ -107,6 +106,58 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               class Test {
                   void test(Object obj) {
                       Objects.requireNonNull(obj, String.format("Object in %s should not be null", "request xyz"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodsWithThreeArgRetainWhitespace() {
+        rewriteRun(
+          java(
+            """
+              import org.apache.commons.lang3.Validate;
+              class Test {
+                  void test(Object obj) {
+                      Validate.notNull(obj, "Object in %s should not be null",
+                        "request xyz");
+                  }
+              }
+              """,
+            """
+              import java.util.Objects;
+                  
+              class Test {
+                  void test(Object obj) {
+                      Objects.requireNonNull(obj, String.format("Object in %s should not be null",
+                        "request xyz"));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceMethodsWithThreeArgRetainComment() {
+        rewriteRun(
+          java(
+            """
+              import org.apache.commons.lang3.Validate;
+              class Test {
+                  void test(Object obj) {
+                      Validate.notNull(obj, "Object in %s should not be null", /* Foo */ "request xyz");
+                  }
+              }
+              """,
+            """
+              import java.util.Objects;
+                  
+              class Test {
+                  void test(Object obj) {
+                      Objects.requireNonNull(obj, String.format("Object in %s should not be null", /* Foo */ "request xyz"));
                   }
               }
               """

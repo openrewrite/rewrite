@@ -67,14 +67,12 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
                 maybeRemoveImport("org.apache.commons.lang3.Validate");
                 maybeAddImport("java.util.Objects");
 
-                mi = mi.withTemplate(
+                return mi.withTemplate(
                         JavaTemplate.builder(this::getCursor, template)
                                 .imports("java.util.Objects")
                                 .build(),
                         mi.getCoordinates().replace(),
                         arguments.toArray());
-
-                return mi;
             }
         };
     }
