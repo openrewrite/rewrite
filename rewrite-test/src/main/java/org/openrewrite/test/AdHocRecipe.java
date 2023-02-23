@@ -53,6 +53,14 @@ public class AdHocRecipe extends Recipe {
     @With
     BiFunction<List<SourceFile>, ExecutionContext, List<SourceFile>> visit;
 
+    @Nullable
+    @With
+    Supplier<TreeVisitor<?, ExecutionContext>> getSingleSourceApplicableTest;
+
+    @Nullable
+    @With
+    Supplier<TreeVisitor<?, ExecutionContext>> getApplicableTest;
+
     public String getDisplayName() {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
     }
@@ -74,5 +82,15 @@ public class AdHocRecipe extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return getVisitor.get();
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return getSingleSourceApplicableTest == null ? super.getSingleSourceApplicableTest() : getSingleSourceApplicableTest.get();
+    }
+
+    @Override
+    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
+        return getApplicableTest == null ? super.getApplicableTest() : getApplicableTest.get();
     }
 }

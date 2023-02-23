@@ -47,11 +47,11 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null, visitor, null);
+        return new AdHocRecipe(null, null, null, visitor, null, null, null);
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null);
+        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {

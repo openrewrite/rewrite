@@ -172,6 +172,19 @@ class ForLoopTest implements RewriteTest {
     }
 
     @Test
+    void forIn() {
+        rewriteRun(
+          groovy(
+            """
+              def dependenciesType = ['implementation', 'testImplementation']
+              for (type in dependenciesType) {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void forEachWithIn() {
         rewriteRun(
           groovy(

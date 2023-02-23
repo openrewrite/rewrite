@@ -36,6 +36,18 @@ class BinaryTest implements RewriteTest {
         );
     }
 
+    @Test
+    void in() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              boolean b = 42 in a;
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1531")
     @Test
     void regexFindOperator() {

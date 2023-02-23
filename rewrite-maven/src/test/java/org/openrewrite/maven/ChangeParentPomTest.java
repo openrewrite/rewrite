@@ -26,7 +26,7 @@ import java.util.List;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangeParentPomTest implements RewriteTest {
+class ChangeParentPomTest implements RewriteTest {
 
     @Test
     void changeParent() {

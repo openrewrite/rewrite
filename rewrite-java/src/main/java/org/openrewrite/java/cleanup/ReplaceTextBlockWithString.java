@@ -25,7 +25,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType.Primitive;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.utils.ExpressionUtils;
 import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
@@ -86,7 +85,7 @@ public class ReplaceTextBlockWithString extends Recipe {
                     literals[i] = toLiteral(lines[i]).withPrefix(Space.build("\n", Collections.emptyList()));
                 }
                 // Format the resulting expression
-                return autoFormat(ExpressionUtils.additiveExpression(literals), ctx);
+                return autoFormat(ChainStringBuilderAppendCalls.additiveExpression(literals), ctx);
             }
             return literal;
         }

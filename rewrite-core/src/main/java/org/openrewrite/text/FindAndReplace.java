@@ -44,7 +44,7 @@ public class FindAndReplace extends Recipe {
     Boolean regex;
 
     /**
-     * @deprecated Use {@link Recipe#addSingleSourceApplicableTest(TreeVisitor)} instead.
+     * @deprecated Use {@link Recipe#addSingleSourceApplicableTest(Recipe)} instead.
      */
     @SuppressWarnings("DeprecatedIsStillUsed")
     @Option(displayName = "Optional file Matcher",

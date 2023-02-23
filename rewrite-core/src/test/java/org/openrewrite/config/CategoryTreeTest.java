@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.config.CategoryTreeTest.Group.Group1;
 import static org.openrewrite.config.CategoryTreeTest.Group.Group2;
 
-public class CategoryTreeTest {
+class CategoryTreeTest {
     private final Environment env = Environment.builder()
       .scanRuntimeClasspath()
       .build();

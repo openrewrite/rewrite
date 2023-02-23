@@ -83,7 +83,6 @@ class RecipeExceptionDemonstrationTest implements RewriteTest {
         );
     }
 
-    @Disabled(value = "The exception thrown in getSingleSourceApplicableTest() is caught by RecipeScheduler, so disable this.")
     @Test
     void singleSourceApplicableTest() {
         rewriteRun(
@@ -101,15 +100,13 @@ class RecipeExceptionDemonstrationTest implements RewriteTest {
                       list.add(42);
                   }
               }
-              """,
-            """
-              /*~~(Demonstrating an exception thrown on the single-source applicable test.)~~>*/import java.util.*;
-              class Test {
-                  void test(List<Integer> list) {
-                      list.add(42);
-                  }
-              }
               """
+          ),
+          text(
+            null,
+            "~~(Demonstrating an exception thrown on the single-source applicable test.)~~>" +
+              "Rewrite encountered an uncaught recipe error in org.openrewrite.java.RecipeExceptionDemonstration.",
+            spec -> spec.path("recipe-exception-1.txt")
           )
         );
     }

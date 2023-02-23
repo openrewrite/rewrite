@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
-public class ArrayTest implements RewriteTest {
+class ArrayTest implements RewriteTest {
 
     @Test
     void array() {

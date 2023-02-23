@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
-public class UpgradePluginVersionTest implements RewriteTest {
+class UpgradePluginVersionTest implements RewriteTest {
 
     @Test
     void upgradeGradleSettingsPlugin() {
