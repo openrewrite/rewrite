@@ -121,7 +121,7 @@ class ReplaceApacheCommonsLang3ValidateNotNullWithObjectsRequireNonNullTest impl
 
               class Test {
                   void test(Object obj) {
-                      Objects.requireNonNull(obj, String.format("Object in %s should not be null", "request xyz"));
+                      Objects.requireNonNull(obj, () -> String.format("Object in %s should not be null", "request xyz"));
                   }
               }
               """
