@@ -1,12 +1,14 @@
 package org.openrewrite.java.cleanup;
 
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.utils.ExpressionUtils;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ import java.util.List;
 public class ReplaceStringBuilderWithString extends Recipe {
     private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
     private static final MethodMatcher STRING_BUILDER_TO_STRING = new MethodMatcher("java.lang.StringBuilder toString()");
+    private static J.Parentheses parenthesesTemplate = null;
 
     @Override
     public String getDisplayName() {
@@ -56,11 +59,11 @@ public class ReplaceStringBuilderWithString extends Recipe {
                     }
 
                     Collections.reverse(arguments);
-                    Expression additive = ExpressionUtils.additiveExpression(arguments)
+                    Expression additive = ChainStringBuilderAppendCalls.additiveExpression(arguments)
                         .withPrefix(method.getPrefix());
 
                     if (isAMethodSelect(method)) {
-                        additive = ExpressionUtils.wrapExpression(additive);
+                        additive = wrapExpression(additive);
                     }
 
                     return additive;
@@ -119,5 +122,29 @@ public class ReplaceStringBuilderWithString extends Recipe {
 
         return select instanceof J.NewClass
                && TypeUtils.isOfClassType(((J.NewClass) select).getClazz().getType(), "java.lang.StringBuilder");
+    }
+
+    public static J.Parentheses getParenthesesTemplate() {
+        if (parenthesesTemplate == null) {
+            @Language("java")
+            String simpleParentheseCode = " class B { void foo() { (\"A\" + \"B\").length(); } } ";
+            List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
+                .parse(simpleParentheseCode);
+
+            parenthesesTemplate = new JavaIsoVisitor<List<J.Parentheses>>() {
+                @Override
+                public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens,
+                    List<J.Parentheses> parentheses) {
+                    parentheses.add(parens);
+                    return parens;
+                }
+            }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
+        }
+
+        return parenthesesTemplate;
+    }
+
+    public static <T extends J> J.Parentheses<T> wrapExpression(Expression exp) {
+        return getParenthesesTemplate().withTree(exp);
     }
 }
