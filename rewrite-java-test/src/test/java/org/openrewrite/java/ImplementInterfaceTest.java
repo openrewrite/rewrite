@@ -114,7 +114,7 @@ class ImplementInterfaceTest implements RewriteTest {
                       ),
                       new J.Identifier(
                         randomId(),
-                        Space.SINGLE_SPACE,
+                        Space.build(" ", emptyList()),
                         Markers.EMPTY,
                         "LocalDate",
                         ShallowClass.build("java.time.LocalDate"),
