@@ -936,24 +936,15 @@ public class GroovyParserVisitor {
                 Space prefix = whitespace();
                 Expression expr = visit(cast.getExpression());
                 Space asPrefix = sourceBefore("as");
-                Space typePrefix = whitespace();
-                String typeIdentifierText = name();
 
                 queue.add(new J.TypeCast(randomId(), prefix, new Markers(randomId(), singletonList(new AsStyleTypeCast(randomId()))),
                         new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
-                                new JRightPadded<>(new J.Identifier(randomId(), typePrefix, Markers.EMPTY, typeIdentifierText, typeMapping.type(staticType(cast)), null), asPrefix, Markers.EMPTY)
-                        ),
+                                new JRightPadded<>(visitTypeTree(cast.getType()), asPrefix, Markers.EMPTY)),
                         expr));
             } else {
-                Space prefix = sourceBefore("(");
-                Space identifierPrefix = whitespace();
-
-                String typeIdentifierText = name();
-                Space closingParenPrefix = sourceBefore(")");
-
-                queue.add(new J.TypeCast(randomId(), prefix, Markers.EMPTY,
+                queue.add(new J.TypeCast(randomId(), sourceBefore("("), Markers.EMPTY,
                         new J.ControlParentheses<>(randomId(), EMPTY, Markers.EMPTY,
-                                new JRightPadded<>(new J.Identifier(randomId(), identifierPrefix, Markers.EMPTY, typeIdentifierText, typeMapping.type(staticType(cast)), null), closingParenPrefix, Markers.EMPTY)
+                                new JRightPadded<>(visitTypeTree(cast.getType()), sourceBefore(")"), Markers.EMPTY)
                         ),
                         visit(cast.getExpression())));
             }
@@ -1937,10 +1928,23 @@ public class GroovyParserVisitor {
         }
 
         assert expr != null;
-        if (classNode != null && classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
-            expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
+        if (classNode != null) {
+            if(classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
+                expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
+            } else if(classNode.isArray()) {
+                expr = new J.ArrayType(randomId(), EMPTY, Markers.EMPTY, (TypeTree) expr, arrayDimensionsFrom(classNode));
+            }
         }
         return expr.withPrefix(prefix);
+    }
+
+    private List<JRightPadded<Space>> arrayDimensionsFrom(ClassNode classNode) {
+        List<JRightPadded<Space>> result = new ArrayList<>();
+        while(classNode != null && classNode.isArray()) {
+            classNode = classNode.getComponentType();
+            result.add(JRightPadded.build(sourceBefore("[")).withAfter(sourceBefore("]")));
+        }
+        return result;
     }
 
     private Space sourceBefore(String untilDelim) {
