@@ -123,11 +123,10 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
                             if (enumValueSet != null) {
                                 // Temporary work around due to an issue in the JavaTemplate related to BlockStatementTemplateGenerator#enumClassDeclaration.
-                                Space singleSpace = Space.build(" ", emptyList());
                                 Expression literal = duplicateLiteralsMap.get(valueOfLiteral).toArray(new J.Literal[0])[0].withId(randomId());
                                 J.Modifier privateModifier = new J.Modifier(randomId(), Space.build("\n", emptyList()), Markers.EMPTY, J.Modifier.Type.Private, emptyList());
-                                J.Modifier staticModifier = new J.Modifier(randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Static, emptyList());
-                                J.Modifier finalModifier = new J.Modifier(randomId(), singleSpace, Markers.EMPTY, J.Modifier.Type.Final, emptyList());
+                                J.Modifier staticModifier = new J.Modifier(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, J.Modifier.Type.Static, emptyList());
+                                J.Modifier finalModifier = new J.Modifier(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, J.Modifier.Type.Final, emptyList());
                                 J.VariableDeclarations variableDeclarations = autoFormat(new J.VariableDeclarations(
                                         randomId(),
                                         Space.EMPTY,
@@ -136,7 +135,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                                         Arrays.asList(privateModifier, staticModifier, finalModifier),
                                         new J.Identifier(
                                                 randomId(),
-                                                singleSpace,
+                                                Space.SINGLE_SPACE,
                                                 Markers.EMPTY,
                                                 "String",
                                                 JavaType.ShallowClass.build("java.lang.String"),
@@ -155,7 +154,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                                                         JavaType.ShallowClass.build("java.lang.String"),
                                                         null),
                                                 emptyList(),
-                                                JLeftPadded.build(literal).withBefore(singleSpace),
+                                                JLeftPadded.build(literal).withBefore(Space.SINGLE_SPACE),
                                                 null)))
                                 ), executionContext, new Cursor(getCursor(), classDecl.getBody()));
 

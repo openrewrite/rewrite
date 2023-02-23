@@ -216,7 +216,7 @@ public class InstanceOfPatternMatch extends Recipe {
             String name = patternVariableName(instanceOf, cursor);
             J.InstanceOf result = instanceOf.withPattern(new J.Identifier(
                     randomId(),
-                    Space.build(" ", emptyList()),
+                    Space.SINGLE_SPACE,
                     Markers.EMPTY,
                     name,
                     type,

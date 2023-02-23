@@ -151,7 +151,7 @@ public class DependencyUseMapNotation extends Recipe {
 
     private static G.MapEntry mapEntry(String key, String value) {
         return mapEntry(key,
-                new J.Literal(randomId(), Space.build(" ", emptyList()), Markers.EMPTY, value, "'" + value + "'", null, JavaType.Primitive.String));
+                new J.Literal(randomId(), Space.SINGLE_SPACE, Markers.EMPTY, value, "'" + value + "'", null, JavaType.Primitive.String));
     }
 
     private static G.MapEntry mapEntry(String key, Expression e) {
