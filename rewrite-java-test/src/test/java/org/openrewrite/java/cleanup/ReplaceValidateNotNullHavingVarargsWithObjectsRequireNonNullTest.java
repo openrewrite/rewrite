@@ -122,7 +122,7 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               class Test {
                   void test(Object obj) {
                       Validate.notNull(obj, "Object in %s should not be null",
-                        "request xyz");
+                            "request xyz");
                   }
               }
               """,
@@ -148,7 +148,7 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               import org.apache.commons.lang3.Validate;
               class Test {
                   void test(Object obj) {
-                      Validate.notNull(/* FOO */ obj, "Object in %s should not be null", /* Foo */ "request xyz");
+                      Validate.notNull(/* FOO */ obj, "Object in %s should not be null", /* Bar */ "request xyz");
                   }
               }
               """,
@@ -157,7 +157,7 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
 
               class Test {
                   void test(Object obj) {
-                      Objects.requireNonNull(/* FOO */ obj, () -> String.format("Object in %s should not be null", /* Foo */ "request xyz"));
+                      Objects.requireNonNull(/* FOO */ obj, () -> String.format("Object in %s should not be null", /* Bar */ "request xyz"));
                   }
               }
               """

@@ -77,10 +77,10 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
                         mi.getCoordinates().replace(),
                         arguments.toArray());
 
-                if(arguments.size()==2){
+                if (arguments.size() == 2) {
                     mi = maybeAutoFormat(mi, mi.withArguments(
                             ListUtils.map(mi.getArguments(), (a, b) -> b.withPrefix(arguments.get(a).getPrefix()))), p);
-                }else{
+                } else {
                     Expression arg0 = arguments.get(0);
                     arguments.remove(0);
                     J.Lambda lambda = (J.Lambda) mi.getArguments().get(1);
@@ -89,9 +89,9 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
                     stringFormatMi = stringFormatMi.withArguments(
                             ListUtils.map(stringFormatMi.getArguments(), (a, b) -> b.withPrefix(arguments.get(a).getPrefix())));
 
-                    lambda = maybeAutoFormat(lambda,lambda.withBody(stringFormatMi),p);
+                    lambda = maybeAutoFormat(lambda, lambda.withBody(stringFormatMi), p);
 
-                    mi = maybeAutoFormat(mi, mi.withArguments(Stream.of(arg0,lambda).collect(Collectors.toList())),p);
+                    mi = maybeAutoFormat(mi, mi.withArguments(Stream.of(arg0, lambda).collect(Collectors.toList())), p);
                 }
 
                 return mi;
