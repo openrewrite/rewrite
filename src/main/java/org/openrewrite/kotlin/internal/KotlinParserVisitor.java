@@ -976,6 +976,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
 
         FirNamedReference namedReference = functionCall.getCalleeReference();
+        if (namedReference instanceof FirErrorNamedReference) {
+            throw new IllegalStateException("Unresolved name reference: " + ((FirErrorNamedReference) namedReference).getDiagnostic());
+        }
+
         if (namedReference instanceof FirResolvedNamedReference &&
                 ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
             TypeTree name = (J.Identifier) visitElement(namedReference, null);

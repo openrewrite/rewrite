@@ -187,7 +187,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
      * @param ctx Execution context to use for collecting parsing failures.
      * @return FirSession associated to type attributing the CompiledKotlinSources.
      */
-    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Disposable disposable, Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
+    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Disposable disposable, Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
 
         File buildFile = null;
@@ -267,14 +267,14 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             `LightVirtualFile` are created to support tests and in the future, Kotlin template.
             We might want to extract the generation of `platformSources` later on.
          */
-        int i = 0;
-        for (Input source : sources) {
+        List<Input> inputs = acceptedInputs(sources);
+        for (int i = 0; i < inputs.size(); i++) {
+            Input source = inputs.get(i);
             String fileName = "openRewriteFile.kt".equals(source.getPath().toString()) ? "openRewriteFile.kt" + i : source.getPath().toString();
             VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
             platformSources.add(new KtVirtualFileSourceFile(vFile));
         }
 
-        BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
         ModuleCompilerInput compilerInput = new ModuleCompilerInput(
                 new TargetId(module.getModuleName(), module.getModuleType()),
                 CommonPlatforms.INSTANCE.getDefaultCommonPlatform(),
@@ -285,6 +285,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 emptyList()
         );
 
+        BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
         ModuleCompilerEnvironment compilerEnvironment = new ModuleCompilerEnvironment(projectEnvironment, diagnosticsReporter);
         CommonCompilerPerformanceManager performanceManager = compilerConfiguration.get(PERF_MANAGER);
         ModuleCompilerAnalyzedOutput output = compileModuleToAnalyzedFir(
@@ -295,11 +296,14 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 diagnosticsReporter,
                 performanceManager
         );
-        convertAnalyzedFirToIr(compilerInput, output, compilerEnvironment);
+
+        try {
+            convertAnalyzedFirToIr(compilerInput, output, compilerEnvironment);
+        } catch (Throwable ignored) {
+            // Defer the exception until the Source that caused the compilation error is parsed to create a PlainText for the input.
+        }
 
         List<FirFile> firFiles = output.getFir();
-        List<Input> inputs = new ArrayList<>(firFiles.size());
-        sources.iterator().forEachRemaining(inputs::add);
         assert firFiles.size() == inputs.size();
 
         List<CompiledKotlinSource> cus = new ArrayList<>();
