@@ -27,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class GradleJavaTemplateTest implements RewriteTest {
+class GradleJavaTemplateTest implements RewriteTest {
 
     @Test
     @Disabled("work in progress")

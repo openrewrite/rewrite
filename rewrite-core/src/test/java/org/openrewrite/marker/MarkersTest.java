@@ -24,7 +24,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 
-public class MarkersTest {
+class MarkersTest {
 
     @Test
     void computeThatDoesntChangeReference() {

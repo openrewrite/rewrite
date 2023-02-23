@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class MavenDependencyFailuresTest implements RewriteTest {
+class MavenDependencyFailuresTest implements RewriteTest {
 
     @Test
     void unresolvableMavenMetadata() {

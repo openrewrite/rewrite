@@ -27,7 +27,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnusedAssignment"})
-public class JavaTemplateTest3Test implements RewriteTest {
+class JavaTemplateTest3Test implements RewriteTest {
 
     @Test
     void replacePackage() {

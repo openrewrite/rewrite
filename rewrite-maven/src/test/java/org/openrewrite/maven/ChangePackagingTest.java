@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangePackagingTest implements RewriteTest {
+class ChangePackagingTest implements RewriteTest {
 
     @Test
     void addPackaging() {

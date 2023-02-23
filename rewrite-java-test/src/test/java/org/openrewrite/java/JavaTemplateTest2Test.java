@@ -27,7 +27,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"StringOperationCanBeSimplified", "ConstantConditions"})
-public class JavaTemplateTest2Test implements RewriteTest {
+class JavaTemplateTest2Test implements RewriteTest {
 
     private final Recipe replaceToStringWithLiteralRecipe = toRecipe(() -> new JavaVisitor<>() {
         private final MethodMatcher toString = new MethodMatcher("java.lang.String toString()");

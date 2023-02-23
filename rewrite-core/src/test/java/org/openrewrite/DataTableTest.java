@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class DataTableTest implements RewriteTest {
+class DataTableTest implements RewriteTest {
 
     @Test
     void dataTable() {

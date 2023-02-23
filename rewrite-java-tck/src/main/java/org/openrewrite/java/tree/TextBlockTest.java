@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @MinimumJava17
-public class TextBlockTest implements RewriteTest {
+class TextBlockTest implements RewriteTest {
 
     @Test
     void textBlock() {
