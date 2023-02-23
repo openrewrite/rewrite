@@ -77,7 +77,7 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               """,
             """
               import java.util.Objects;
-                  
+
               class Test {
                   void test(Object obj) {
                       Objects.requireNonNull(obj, "Object should not be null");
@@ -102,10 +102,10 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               """,
             """
               import java.util.Objects;
-                  
+
               class Test {
                   void test(Object obj) {
-                      Objects.requireNonNull(obj, String.format("Object in %s should not be null", "request xyz"));
+                      Objects.requireNonNull(obj, () -> String.format("Object in %s should not be null", "request xyz"));
                   }
               }
               """
@@ -128,11 +128,11 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               """,
             """
               import java.util.Objects;
-                  
+
               class Test {
                   void test(Object obj) {
-                      Objects.requireNonNull(obj, String.format("Object in %s should not be null",
-                        "request xyz"));
+                      Objects.requireNonNull(obj, () -> String.format("Object in %s should not be null",
+                              "request xyz"));
                   }
               }
               """
@@ -148,16 +148,16 @@ class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNullTest implement
               import org.apache.commons.lang3.Validate;
               class Test {
                   void test(Object obj) {
-                      Validate.notNull(obj, "Object in %s should not be null", /* Foo */ "request xyz");
+                      Validate.notNull(/* FOO */ obj, "Object in %s should not be null", /* Foo */ "request xyz");
                   }
               }
               """,
             """
               import java.util.Objects;
-                  
+
               class Test {
                   void test(Object obj) {
-                      Objects.requireNonNull(obj, String.format("Object in %s should not be null", /* Foo */ "request xyz"));
+                      Objects.requireNonNull(/* FOO */ obj, () -> String.format("Object in %s should not be null", /* Foo */ "request xyz"));
                   }
               }
               """

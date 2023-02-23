@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -27,6 +28,8 @@ import org.openrewrite.java.tree.J;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extends Recipe {
 
@@ -60,19 +63,38 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
                 List<Expression> arguments = mi.getArguments();
                 String template = arguments.size() == 2
                         ? "Objects.requireNonNull(#{any()}, #{any(java.lang.String)})"
-                        : String.format("Objects.requireNonNull(#{any()}, String.format(#{any(java.lang.String)}, %s))",
+                        : String.format("Objects.requireNonNull(#{any()}, () -> String.format(#{any(java.lang.String)}, %s))",
                         String.join(", ", Collections.nCopies(arguments.size() - 2, "#{any()}")));
 
 
                 maybeRemoveImport("org.apache.commons.lang3.Validate");
                 maybeAddImport("java.util.Objects");
 
-                return mi.withTemplate(
+                mi = mi.withTemplate(
                         JavaTemplate.builder(this::getCursor, template)
                                 .imports("java.util.Objects")
                                 .build(),
                         mi.getCoordinates().replace(),
                         arguments.toArray());
+
+                if(arguments.size()==2){
+                    mi = maybeAutoFormat(mi, mi.withArguments(
+                            ListUtils.map(mi.getArguments(), (a, b) -> b.withPrefix(arguments.get(a).getPrefix()))), p);
+                }else{
+                    Expression arg0 = arguments.get(0);
+                    arguments.remove(0);
+                    J.Lambda lambda = (J.Lambda) mi.getArguments().get(1);
+                    J.MethodInvocation stringFormatMi = (J.MethodInvocation) lambda.getBody();
+
+                    stringFormatMi = stringFormatMi.withArguments(
+                            ListUtils.map(stringFormatMi.getArguments(), (a, b) -> b.withPrefix(arguments.get(a).getPrefix())));
+
+                    lambda = maybeAutoFormat(lambda,lambda.withBody(stringFormatMi),p);
+
+                    mi = maybeAutoFormat(mi, mi.withArguments(Stream.of(arg0,lambda).collect(Collectors.toList())),p);
+                }
+
+                return mi;
             }
         };
     }
