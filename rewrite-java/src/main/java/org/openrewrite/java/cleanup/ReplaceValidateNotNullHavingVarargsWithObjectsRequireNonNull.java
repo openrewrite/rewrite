@@ -78,23 +78,21 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
                         arguments.toArray());
 
                 if (arguments.size() == 2) {
-                    mi = maybeAutoFormat(mi, mi.withArguments(
+                    return maybeAutoFormat(mi, mi.withArguments(
                             ListUtils.map(mi.getArguments(), (a, b) -> b.withPrefix(arguments.get(a).getPrefix()))), p);
-                } else {
-                    Expression arg0 = arguments.get(0);
-                    arguments.remove(0);
-                    J.Lambda lambda = (J.Lambda) mi.getArguments().get(1);
-                    J.MethodInvocation stringFormatMi = (J.MethodInvocation) lambda.getBody();
-
-                    stringFormatMi = stringFormatMi.withArguments(
-                            ListUtils.map(stringFormatMi.getArguments(), (a, b) -> b.withPrefix(arguments.get(a).getPrefix())));
-
-                    lambda = maybeAutoFormat(lambda, lambda.withBody(stringFormatMi), p);
-
-                    mi = maybeAutoFormat(mi, mi.withArguments(Stream.of(arg0, lambda).collect(Collectors.toList())), p);
                 }
 
-                return mi;
+                // Retain comments and whitespace around lambda arguments
+                Expression arg0 = arguments.get(0);
+                arguments.remove(0);
+                J.Lambda lambda = (J.Lambda) mi.getArguments().get(1);
+                J.MethodInvocation stringFormatMi = (J.MethodInvocation) lambda.getBody();
+
+                stringFormatMi = stringFormatMi.withArguments(
+                        ListUtils.map(stringFormatMi.getArguments(), (a, b) -> b.withPrefix(arguments.get(a).getPrefix())));
+
+                lambda = maybeAutoFormat(lambda, lambda.withBody(stringFormatMi), p);
+                return maybeAutoFormat(mi, mi.withArguments(Stream.of(arg0, lambda).collect(Collectors.toList())), p);
             }
         };
     }
