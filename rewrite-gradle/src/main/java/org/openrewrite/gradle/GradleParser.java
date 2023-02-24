@@ -15,9 +15,6 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.Getter;
-import lombok.Setter;
-import lombok.experimental.Accessors;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
@@ -98,9 +95,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         return new Builder();
     }
 
-    @Accessors(chain=true)
-    @Setter
-    @Getter
     public static class Builder extends Parser.Builder {
         protected GroovyParser.Builder groovyParser = GroovyParser.builder();
 
@@ -112,6 +106,24 @@ public class GradleParser implements Parser<G.CompilationUnit> {
 
         public Builder() {
             super(G.CompilationUnit.class);
+        }
+
+        public Builder groovyParser(GroovyParser.Builder groovyParser) {
+            this.groovyParser = groovyParser;
+            return this;
+        }
+
+        /**
+         * @deprecated Use {@code groovyParser(GroovyParser.Builder)} instead.
+         */
+        @Deprecated//(since = "7.37.0", forRemoval = true)
+        public Builder setGroovyParser(GroovyParser.Builder groovyParser) {
+            return groovyParser(groovyParser);
+        }
+
+        @Deprecated//(since = "7.37.0", forRemoval = true)
+        public GroovyParser.Builder getGroovyParser() {
+            return groovyParser;
         }
 
         public Builder buildscriptClasspath(Collection<Path> classpath) {
