@@ -103,6 +103,9 @@ public class JRightPadded<T> {
         }
         List<T> list = new ArrayList<>();
         for (JRightPadded<T> l : ls) {
+            if(l == null) {
+                continue;
+            }
             T elem = l.getElement();
             list.add(elem);
         }
