@@ -395,4 +395,34 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dontAutoFormatBody() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated protected static void aMethod(Double d) {
+                      System.out.print (  "foo");
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated
+                  static void aMethod(Double d) {
+                      System.out.print (  "foo");
+                  }
+              }
+              """
+          )
+        );
+    }
 }
