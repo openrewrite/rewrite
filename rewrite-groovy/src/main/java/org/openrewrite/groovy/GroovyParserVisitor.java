@@ -481,7 +481,7 @@ public class GroovyParserVisitor {
                 );
                 cursor += param.getName().length();
 
-                org.codehaus.groovy.ast.expr.Expression defaultValue = param.getDefaultValue();
+                org.codehaus.groovy.ast.expr.Expression defaultValue = param.getInitialExpression();
                 if (defaultValue != null) {
                     paramName = paramName.withElement(paramName.getElement().getPadding()
                             .withInitializer(new JLeftPadded<>(
