@@ -107,7 +107,10 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                       StringBuilder sb = new StringBuilder();
                       String op = "+";
                       sb.append(op + 1 + 2 + "A" + "B" + 'x');
+                      sb.append(1 + 2 + op + 3 + 4);
+                      sb.append(1 + 2 + name() + 3 + 4);
                   }
+                  String name() { return "name"; }
               }
               """,
             """
@@ -116,7 +119,10 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                       StringBuilder sb = new StringBuilder();
                       String op = "+";
                       sb.append(op).append(1).append(2).append("A" + "B").append('x');
+                      sb.append(1 + 2).append(op).append(3).append(4);
+                      sb.append(1 + 2).append(name()).append(3).append(4);
                   }
+                  String name() { return "name"; }
               }
               """
           )
