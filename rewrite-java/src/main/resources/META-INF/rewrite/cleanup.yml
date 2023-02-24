@@ -37,6 +37,8 @@ recipeList:
   - org.openrewrite.java.cleanup.OperatorWrap
   - org.openrewrite.java.cleanup.UnnecessaryParentheses
   - org.openrewrite.java.cleanup.ReplaceThreadRunWithThreadStart
+  - org.openrewrite.java.cleanup.ChainStringBuilderAppendCalls
+  - org.openrewrite.java.cleanup.ReplaceStringBuilderWithString
 #  - org.openrewrite.java.cleanup.RemoveRedundantTypeCast
 ---
 type: specs.openrewrite.org/v1beta/recipe
