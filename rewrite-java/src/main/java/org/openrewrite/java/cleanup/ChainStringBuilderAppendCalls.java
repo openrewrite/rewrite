@@ -80,13 +80,31 @@ public class ChainStringBuilderAppendCalls extends Recipe {
                     // group expressions
                     List<Expression> groups = new ArrayList<>();
                     List<Expression> group = new ArrayList<>();
+                    boolean appendToString = false;
                     for (Expression exp : flattenExpressions) {
-                        if (exp instanceof J.Literal
-                            && (((J.Literal) exp).getType() == JavaType.Primitive.String)) {
-                            group.add(exp);
+                        if (appendToString) {
+                            if (exp instanceof J.Literal
+                                && (((J.Literal) exp).getType() == JavaType.Primitive.String)
+                            ) {
+                                group.add(exp);
+                            } else {
+                                addToGroups(group, groups);
+                                groups.add(exp);
+                            }
                         } else {
-                            addToGroups(group, groups);
-                            groups.add(exp);
+                            if (exp instanceof J.Literal
+                                && (((J.Literal) exp).getType() == JavaType.Primitive.String)) {
+                                addToGroups(group, groups);
+                                appendToString = true;
+                            }  else if ((exp instanceof J.Identifier || exp instanceof J.MethodInvocation) && exp.getType() != null) {
+                                JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(exp.getType());
+                                if (fullyQualified != null && fullyQualified.getFullyQualifiedName().equals("java.lang.String")) {
+                                    addToGroups(group, groups);
+                                    appendToString = true;
+                                }
+                            }
+                            group.add(exp);
+
                         }
                     }
                     addToGroups(group, groups);
