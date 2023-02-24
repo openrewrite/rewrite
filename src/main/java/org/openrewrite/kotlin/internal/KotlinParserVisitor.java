@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -27,10 +28,7 @@ import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.expressions.impl.*;
-import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
-import org.jetbrains.kotlin.fir.references.FirNamedReference;
-import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
-import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
+import org.jetbrains.kotlin.fir.references.*;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
@@ -948,6 +946,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Markers.EMPTY,
                 annotations == null ? emptyList() : annotations,
                 createIdentifier(enumEntry.getName().asString(), enumEntry),
+                null);
+    }
+
+    @Override
+    public J visitSuperReference(@NotNull FirSuperReference superReference, ExecutionContext data) {
+        Space prefix = sourceBefore("super");
+
+        return new J.Identifier(randomId(),
+                prefix,
+                Markers.EMPTY,
+                "super",
+                null,
                 null);
     }
 
@@ -2577,6 +2587,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitEnumEntry((FirEnumEntry) firElement, ctx);
         } else if (firElement instanceof FirEqualityOperatorCall) {
             return visitEqualityOperatorCall((FirEqualityOperatorCall) firElement, ctx);
+        } else if (firElement instanceof FirSuperReference) {
+            return visitSuperReference((FirSuperReference) firElement, ctx);
         } else if (firElement instanceof FirFunctionCall) {
             return visitFunctionCall((FirFunctionCall) firElement, ctx);
         } else if (firElement instanceof FirFunctionTypeRef) {

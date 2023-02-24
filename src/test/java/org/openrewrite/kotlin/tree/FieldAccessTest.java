@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -23,7 +24,7 @@ import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 public class FieldAccessTest implements RewriteTest {
 
     @Test
-    void fieldAccess() {
+    void thisAccess() {
         rewriteRun(
           kotlin(
             """
@@ -31,6 +32,29 @@ public class FieldAccessTest implements RewriteTest {
                     var id : String = ""
                     fun setId ( id : String ) {
                         this . id = id
+                    }
+                }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/18")
+    @Test
+    void superAccess() {
+        rewriteRun(
+          kotlin(
+            """
+                open class Super {
+                    val id : String = ""
+                }
+            """
+          ),
+          kotlin(
+            """
+                class Test : Super() {
+                    fun getId ( ) : String {
+                        return super . id
                     }
                 }
             """
