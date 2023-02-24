@@ -353,6 +353,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 KotlinPrinter.this.visitSpace(isNullable.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
                 p.append("?");
             }
+            CheckNotNull checkNotNull = ident.getMarkers().findFirst(CheckNotNull.class).orElse(null);
+            if (checkNotNull != null) {
+                KotlinPrinter.this.visitSpace(checkNotNull.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p);
+                p.append("!!");
+            }
             afterSyntax(ident, p);
             return ident;
         }
@@ -512,6 +517,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
             }
 
+            CheckNotNull checkNotNull = method.getMarkers().findFirst(CheckNotNull.class).orElse(null);
+            if (checkNotNull != null) {
+                KotlinPrinter.this.visitSpace(checkNotNull.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p);
+                p.append("!!");
+            }
             afterSyntax(method, p);
             return method;
         }

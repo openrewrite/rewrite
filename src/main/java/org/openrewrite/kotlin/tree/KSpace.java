@@ -21,6 +21,7 @@ public class KSpace {
         BINARY_PREFIX,
         BINARY_OPERATOR,
         BINARY_SUFFIX,
+        CHECK_NOT_NULL_PREFIX,
         FILE_ANNOTATION_SUFFIX,
         FUNCTION_TYPE_RECEIVER,
         IS_NULLABLE_PREFIX,

@@ -37,4 +37,26 @@ class CheckTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void checkNotNull() {
+        rewriteRun(
+          kotlin(
+            """
+            class A {
+                fun method ( ) : Int ? {
+                    return 1
+                }
+            }
+            """
+          ),
+          kotlin(
+            """
+                val a = A ( )
+                val b = a . method() !!
+                val c = b !!
+            """
+          )
+        );
+    }
 }

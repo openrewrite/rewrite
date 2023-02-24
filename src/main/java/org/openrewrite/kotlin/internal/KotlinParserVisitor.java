@@ -604,6 +604,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitCheckNotNullCall(FirCheckNotNullCall checkNotNullCall, ExecutionContext ctx) {
+        J j = visitElement(checkNotNullCall.getArgumentList().getArguments().get(0), ctx);
+        return j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), sourceBefore("!!"))));
+    }
+
+    @Override
     public J visitClass(FirClass klass, ExecutionContext ctx) {
         FirRegularClass firRegularClass = (FirRegularClass) klass;
         Space prefix = whitespace();
@@ -950,7 +956,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitSuperReference(@NotNull FirSuperReference superReference, ExecutionContext data) {
+    public J visitSuperReference(FirSuperReference superReference, ExecutionContext ctx) {
         Space prefix = sourceBefore("super");
 
         return new J.Identifier(randomId(),
@@ -2571,6 +2577,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitCallableReferenceAccess((FirCallableReferenceAccess) firElement, ctx);
         } else if (firElement instanceof FirCatch) {
             return visitCatch((FirCatch) firElement, ctx);
+        } else if (firElement instanceof FirCheckNotNullCall) {
+            return visitCheckNotNullCall((FirCheckNotNullCall) firElement, ctx);
         } else if (firElement instanceof FirClass) {
             return visitClass((FirClass) firElement, ctx);
         } else if (firElement instanceof FirComparisonExpression) {
