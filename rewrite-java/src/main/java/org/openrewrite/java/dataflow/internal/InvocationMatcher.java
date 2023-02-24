@@ -45,14 +45,13 @@ public interface InvocationMatcher {
     }
 
     static InvocationMatcher fromInvocationMatchers(Collection<InvocationMatcher> matchers) {
+        if (matchers.isEmpty()) {
+            return expression -> false;
+        }
         if (matchers.size() == 1) {
             return matchers.iterator().next();
         }
-        if (matchers.size() > 750) {
-            return expression -> matchers.parallelStream().anyMatch(matcher -> matcher.matches(expression));
-        } else {
-            return expression -> matchers.stream().anyMatch(matcher -> matcher.matches(expression));
-        }
+        return expression -> matchers.stream().anyMatch(matcher -> matcher.matches(expression));
     }
 
     static InvocationMatcher fromMethodMatchers(MethodMatcher... methodMatchers) {
