@@ -506,6 +506,69 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2897")
+    @Test
+    void notEqualToNull2() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+
+              public class A {
+                  private static Class<?> determineCommonAncestor(Class<?> clazz1, Class<?> clazz2) {
+                      return clazz1;
+                  }
+
+                  private static String forClass(Class<?> clazz) {
+                      return clazz.getName();
+                  }
+
+                  private static String deriveElementType(Collection<?> elements, String fallbackType) {
+
+                      if (elements.isEmpty()) {
+                          return fallbackType;
+                      }
+
+                      return elements.stream()
+                          .filter(it -> it != null)
+                          .<Class<?>> map(Object::getClass)
+                          .reduce(A::determineCommonAncestor)
+                          .map(A::forClass)
+                          .orElse(fallbackType);
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+
+              public class A {
+                  private static Class<?> determineCommonAncestor(Class<?> clazz1, Class<?> clazz2) {
+                      return clazz1;
+                  }
+
+                  private static String forClass(Class<?> clazz) {
+                      return clazz.getName();
+                  }
+
+                  private static String deriveElementType(Collection<?> elements, String fallbackType) {
+
+                      if (elements.isEmpty()) {
+                          return fallbackType;
+                      }
+
+                      return elements.stream()
+                          .filter(Objects::nonNull)
+                          .<Class<?>> map(Object::getClass)
+                          .reduce(A::determineCommonAncestor)
+                          .map(A::forClass)
+                          .orElse(fallbackType);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("Convert2MethodRef")
     @Test
     void isEqualToNull() {

@@ -38,7 +38,7 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Replace Deprecated Runtime.Exec() methods";
+        return "Replace deprecated Runtime.Exec() methods";
     }
 
     @Override
