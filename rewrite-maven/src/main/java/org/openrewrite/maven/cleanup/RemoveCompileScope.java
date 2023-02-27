@@ -18,11 +18,13 @@ package org.openrewrite.maven.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
+import java.util.HashMap;
+import java.util.Map;
 
 public class RemoveCompileScope extends Recipe {
 
@@ -38,18 +40,51 @@ public class RemoveCompileScope extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+
+        Map<String,String> seen = new HashMap<>();
+
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag()) {
-                        Optional<Xml.Tag> scope = tag.getChild("scope");
-                        if (scope.isPresent() && "compile".equals(scope.get().getValue().orElse(null))) {
-                                doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
+
+                if (isManagedDependencyTag()){
+                    String groupId = getGroupId(tag);
+                    String artifactId = getArtifactId(tag);
+                    String scope = getScope(tag);
+
+                    if (groupId != null && artifactId!= null && scope!= null){
+                        seen.put(groupId + artifactId, scope);
                     }
+                }
+                else if (isDependencyTag()) {
+                    String groupId = getGroupId(tag);
+                    String artifactId = getArtifactId(tag);
+                    String scope = getScope(tag);
+                    String seenScope = seen.get(groupId + artifactId);
+
+                    if ("compile".equalsIgnoreCase(seenScope) || seenScope == null && "compile".equals(scope) ){
+                        doAfterVisit(new RemoveContentVisitor<>(tag.getChild("scope").get(), false));
+                    }
+
                 }
 
                 return super.visitTag(tag, ctx);
             }
         };
+    }
+
+    @Nullable
+    private static String getScope(Xml.Tag tag) {
+        return tag.getChild("scope").flatMap(Xml.Tag::getValue).orElse(null);
+    }
+
+    @Nullable
+    private static String getArtifactId(Xml.Tag tag) {
+        return tag.getChild("artifactId").flatMap(Xml.Tag::getValue).orElse(null);
+    }
+
+    @Nullable
+    private static String getGroupId(Xml.Tag tag) {
+        return tag.getChild("groupId").flatMap(Xml.Tag::getValue).orElse(null);
     }
 }
