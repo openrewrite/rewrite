@@ -211,4 +211,39 @@ public class RemoveCompileScopeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void overridenDependencyManagementScopeIsUntouched() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.2-jre</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>28.2-jre</version>
+                        <scope>compile</scope>
+                    </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
 }
