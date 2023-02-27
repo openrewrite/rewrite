@@ -22,6 +22,10 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.*;
 import org.codehaus.groovy.control.io.InputStreamReaderSource;
+import org.codehaus.groovy.control.messages.ExceptionMessage;
+import org.codehaus.groovy.control.messages.Message;
+import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
+import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
@@ -128,6 +132,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         for (Input input : sources) {
             CompilerConfiguration configuration = new CompilerConfiguration();
             configuration.setTolerance(Integer.MAX_VALUE);
+            configuration.setWarningLevel(WarningMessage.NONE);
             configuration.setClasspathList(classpath == null ? emptyList() : classpath.stream()
                     .flatMap(cp -> {
                         try {
@@ -142,7 +147,22 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 compilerCustomizer.accept(configuration);
             }
 
-            ErrorCollector errorCollector = new ErrorCollector(configuration);
+            ErrorCollector errorCollector = new ErrorCollector(configuration) {
+                @Override
+                public void addErrorAndContinue(Message message) throws CompilationFailedException {
+                    super.addErrorAndContinue(message);
+                    if (message instanceof SyntaxErrorMessage) {
+                        ctx.parseFailure(input, relativeTo, GroovyParser.this, ((SyntaxErrorMessage) message).getCause());
+                    } else if (message instanceof ExceptionMessage) {
+                        ctx.parseFailure(input, relativeTo, GroovyParser.this, ((ExceptionMessage) message).getCause());
+                    }
+                }
+
+                @Override
+                protected void failIfErrors() throws CompilationFailedException {
+                    // don't fail on phase complete
+                }
+            };
             GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true);
             SourceUnit unit = new SourceUnit(
                     "doesntmatter",
