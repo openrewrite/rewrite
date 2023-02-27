@@ -510,7 +510,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/2897")
     @Test
-    void notEqualToNull2() {
+    void notNullToObjectsNonNullError() {
         rewriteRun(
           java(
             """
