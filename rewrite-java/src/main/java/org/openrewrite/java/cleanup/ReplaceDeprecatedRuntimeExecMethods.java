@@ -32,8 +32,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
-    private static final MethodMatcher RUNTIME_EXEC = new MethodMatcher("java.lang.Runtime exec(String)");
-    private static final MethodMatcher RUNTIME_EXEC_ENVP = new MethodMatcher("java.lang.Runtime exec(String, String[])");
+    private static final MethodMatcher RUNTIME_EXEC_CMD = new MethodMatcher("java.lang.Runtime exec(String)");
+    private static final MethodMatcher RUNTIME_EXEC_CMD_ENVP = new MethodMatcher("java.lang.Runtime exec(String, String[])");
+    private static final MethodMatcher RUNTIME_EXEC_CMD_ENVP_FILE = new MethodMatcher("java.lang.Runtime exec(String, String[], java.io.File)");
 
     @Override
     public String getDisplayName() {
@@ -64,7 +65,7 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                                                             ExecutionContext executionContext) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
-                if (RUNTIME_EXEC.matches(m)) {
+                if (RUNTIME_EXEC_CMD.matches(m) || RUNTIME_EXEC_CMD_ENVP.matches(m) || RUNTIME_EXEC_CMD_ENVP_FILE.matches(m)) {
                     Expression command = m.getArguments().get(0);
                     List<Expression> commands = new ArrayList<>();
                     boolean flattenAble= ChainStringBuilderAppendCalls.flatAdditiveExpressions(command, commands);
@@ -83,10 +84,18 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
 
                     if (flattenAble) {
                         String[] cmds = sb.toString().split(" ");
-                        String templateCode = String.format("#{any(java.lang.Runtime)}.exec(new String[] {%s})", toStringArguments(cmds));
+                        String templateCode = String.format("new String[] {%s}", toStringArguments(cmds));
                         JavaTemplate template = JavaTemplate.builder(
                             this::getCursor, templateCode).build();
-                        return m.withTemplate(template, m.getCoordinates().replace(), m.getSelect());
+
+                        List<Expression> args = m.getArguments();
+                        args.set(0, args.get(0).withTemplate(template, args.get(0).getCoordinates().replace()));
+
+                        List<JavaType> parameterTypes = m.getMethodType().getParameterTypes();
+                        parameterTypes.set(0, JavaType.ShallowClass.build("java.lang.String[]"));
+
+                        return m.withArguments(args)
+                         .withMethodType(m.getMethodType().withParameterTypes(parameterTypes));
                     } else {
                         // replace argument to 'command.split(" ")'
                         JavaTemplate template = JavaTemplate.builder(
@@ -98,47 +107,8 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                             && !(splitSelect instanceof J.MethodInvocation)) {
                             splitSelect = ReplaceStringBuilderWithString.wrapExpression(splitSelect);
                         }
-
                         return m.withTemplate(template, m.getCoordinates().replace(), m.getSelect(), splitSelect);
                     }
-                } else if (RUNTIME_EXEC_ENVP.matches(m)) {
-                    Expression command = m.getArguments().get(0);
-                    List<Expression> commands = new ArrayList<>();
-                    boolean flattenAble= ChainStringBuilderAppendCalls.flatAdditiveExpressions(command, commands);
-
-                    StringBuilder sb = new StringBuilder();
-                    if (flattenAble) {
-                        for (Expression e : commands) {
-                            if (e instanceof J.Literal && ((J.Literal) e).getType() == JavaType.Primitive.String) {
-                                sb.append(((J.Literal) e).getValue());
-                            } else {
-                                flattenAble = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (flattenAble) {
-                        String[] cmds = sb.toString().split(" ");
-                        String templateCode = String.format("#{any(java.lang.Runtime)}.exec(new String[] {%s}, #{anyArray(java.lang.String)})", toStringArguments(cmds));
-                        JavaTemplate template = JavaTemplate.builder(
-                            this::getCursor, templateCode).build();
-                        return m.withTemplate(template, m.getCoordinates().replace(), m.getSelect(), m.getArguments().get(1));
-                    } else {
-                        // replace argument to 'command.split(" ")'
-                        JavaTemplate template = JavaTemplate.builder(
-                            this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"), #{anyArray(java.lang.String)})").build();
-                        Expression splitSelect = m.getArguments().get(0);
-
-                        if (!(splitSelect instanceof J.Identifier)
-                            && !(splitSelect instanceof J.Literal)
-                            && !(splitSelect instanceof J.MethodInvocation)) {
-                            splitSelect = ReplaceStringBuilderWithString.wrapExpression(splitSelect);
-                        }
-
-                        return m.withTemplate(template, m.getCoordinates().replace(), m.getSelect(), splitSelect, m.getArguments().get(1));
-                    }
-
                 }
 
                 return m;
