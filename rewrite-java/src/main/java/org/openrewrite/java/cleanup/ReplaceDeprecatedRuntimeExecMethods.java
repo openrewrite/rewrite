@@ -106,9 +106,9 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                             this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"), #{anyArray(java.lang.String)}, #{any(java.io.File)})").build();
 
                         Expression splitSelect = m.getArguments().get(0);
-                        if (!(splitSelect instanceof J.Identifier)
-                            && !(splitSelect instanceof J.Literal)
-                            && !(splitSelect instanceof J.MethodInvocation)) {
+                        if (!(splitSelect instanceof J.Identifier) && 
+                            !(splitSelect instanceof J.Literal) &&
+                            !(splitSelect instanceof J.MethodInvocation)) {
                             splitSelect = ReplaceStringBuilderWithString.wrapExpression(splitSelect);
                         }
 
