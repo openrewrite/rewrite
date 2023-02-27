@@ -32,7 +32,7 @@ dependencies {
     testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
 
-tasks.withType<ShadowJar> {
+val shadowJar = tasks.named<ShadowJar>("shadowJar") {
     dependencies {
         include(dependency("org.eclipse.jgit:"))
     }
@@ -44,5 +44,6 @@ tasks.withType<ShadowJar> {
 }
 
 tasks.named<Test>("test").configure {
-    classpath = files(tasks.named<ShadowJar>("shadowJar"), sourceSets.test.get().output, configurations.testRuntimeClasspath)
+    dependsOn(shadowJar)
+    classpath = files(shadowJar, sourceSets.test.get().output, configurations.testRuntimeClasspath)
 }
