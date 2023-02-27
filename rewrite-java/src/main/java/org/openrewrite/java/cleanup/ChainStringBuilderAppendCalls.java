@@ -176,7 +176,7 @@ public class ChainStringBuilderAppendCalls extends Recipe {
         }
     }
 
-    private static boolean flatAdditiveExpressions(Expression expression, List<Expression> expressionList) {
+    public static boolean flatAdditiveExpressions(Expression expression, List<Expression> expressionList) {
         if (expression instanceof J.Binary) {
             J.Binary b = (J.Binary) expression;
             if (b.getOperator() != J.Binary.Type.Addition) {
