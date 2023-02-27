@@ -100,14 +100,25 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                         // replace argument to 'command.split(" ")'
                         JavaTemplate template = JavaTemplate.builder(
                             this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"))").build();
-                        Expression splitSelect = m.getArguments().get(0);
+                        JavaTemplate template2 = JavaTemplate.builder(
+                            this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"), #{anyArray(java.lang.String)})").build();
+                        JavaTemplate template3 = JavaTemplate.builder(
+                            this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"), #{anyArray(java.lang.String)}, #{any(java.io.File)})").build();
 
+                        Expression splitSelect = m.getArguments().get(0);
                         if (!(splitSelect instanceof J.Identifier)
                             && !(splitSelect instanceof J.Literal)
                             && !(splitSelect instanceof J.MethodInvocation)) {
                             splitSelect = ReplaceStringBuilderWithString.wrapExpression(splitSelect);
                         }
-                        return m.withTemplate(template, m.getCoordinates().replace(), m.getSelect(), splitSelect);
+
+                        if (RUNTIME_EXEC_CMD.matches(m)) {
+                            return m.withTemplate(template, m.getCoordinates().replace(), m.getSelect(), splitSelect);
+                        } else if (RUNTIME_EXEC_CMD_ENVP.matches(m) ) {
+                            return m.withTemplate(template2, m.getCoordinates().replace(), m.getSelect(), splitSelect, m.getArguments().get(1));
+                        } else if (RUNTIME_EXEC_CMD_ENVP_FILE.matches(m)) {
+                            return m.withTemplate(template3, m.getCoordinates().replace(), m.getSelect(), splitSelect, m.getArguments().get(1), m.getArguments().get(2));
+                        }
                     }
                 }
 

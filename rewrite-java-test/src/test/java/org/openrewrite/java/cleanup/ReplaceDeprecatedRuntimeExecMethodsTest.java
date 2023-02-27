@@ -28,42 +28,6 @@ class ReplaceDeprecatedRuntimeExecMethodsTest implements RewriteTest {
         spec.recipe(new ReplaceDeprecatedRuntimeExecMethods());
     }
 
-
-    @Test
-    void debug() {
-        rewriteRun(
-          version(
-            java(
-              """
-                import java.io.File;
-                import java.io.IOException;
-
-                class A {
-                    void method() throws IOException {
-                        Runtime runtime = Runtime.getRuntime();
-                        String[] envp = { "E1=1", "E2=2"};
-                        File dir = new File("/tmp");
-                        Process process3 = runtime.exec("ls -a -l", envp, dir);
-                    }
-                }
-                """,
-              """
-                import java.io.File;
-                import java.io.IOException;
-
-                class A {
-                    void method() throws IOException {
-                        Runtime runtime = Runtime.getRuntime();
-                        String[] envp = { "E1=1", "E2=2"};
-                        File dir = new File("/tmp");
-                        Process process3 = runtime.exec(new String[]{"ls", "-a", "-l"}, envp, dir);
-                    }
-                }
-                """
-            ), 18)
-        );
-    }
-
     @Test
     void rawString() {
         rewriteRun(
