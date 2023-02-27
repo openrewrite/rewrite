@@ -338,6 +338,7 @@ public class Space {
         IF_PREFIX,
         IF_THEN_SUFFIX,
         IMPLEMENTS,
+        IMPORT_ALIAS_PREFIX,
         PERMITS,
         IMPLEMENTS_SUFFIX,
         IMPORT_PREFIX,
