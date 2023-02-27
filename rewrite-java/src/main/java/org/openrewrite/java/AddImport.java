@@ -110,7 +110,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 new JLeftPadded<>(statik == null ? Space.EMPTY : Space.format(" "),
                         statik != null, Markers.EMPTY),
                 TypeTree.build(classType.getFullyQualifiedName() +
-                        (statik == null ? "" : "." + statik)).withPrefix(Space.format(" ")));
+                        (statik == null ? "" : "." + statik)).withPrefix(Space.format(" ")),
+                null);
 
         List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 

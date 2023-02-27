@@ -2556,6 +2556,8 @@ public interface J extends Tree {
         @Getter
         FieldAccess qualid;
 
+        @Nullable
+        J.Identifier alias;
         public boolean isStatic() {
             return statik.getElement();
         }
@@ -2710,7 +2712,7 @@ public interface J extends Tree {
             }
 
             public Import withStatic(JLeftPadded<Boolean> statik) {
-                return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid);
+                return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid, t.alias);
             }
         }
 

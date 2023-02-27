@@ -706,7 +706,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Import(randomId(), fmt, Markers.EMPTY,
                 new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
                         node.isStatic(), Markers.EMPTY),
-                convert(node.getQualifiedIdentifier()));
+                convert(node.getQualifiedIdentifier()),
+                null);
     }
 
     @Override

@@ -1814,7 +1814,8 @@ public class GroovyParserVisitor {
                 qualid = TypeTree.build(packageName).withPrefix(sourceBefore(packageName));
             }
 
-            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid);
+            // TODO: Parse aliases
+            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid, null);
             return maybeSemicolon(anImport);
         }
 
