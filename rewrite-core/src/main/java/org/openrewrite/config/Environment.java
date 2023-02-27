@@ -34,12 +34,19 @@ public class Environment {
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
     public Collection<Recipe> listRecipes() {
-        List<Recipe> dependencyRecipes = dependencyResourceLoaders.stream()
-                .flatMap(r -> r.listRecipes().stream())
-                .collect(toList());
-        List<Recipe> recipes = resourceLoaders.stream()
-                .flatMap(r -> r.listRecipes().stream())
-                .collect(toList());
+        List<Recipe> dependencyRecipes = new ArrayList<>();
+        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
+            dependencyRecipes.addAll(dependencyResourceLoader.listRecipes());
+        }
+        List<Recipe> recipes = new ArrayList<>();
+        for (ResourceLoader r : resourceLoaders) {
+            recipes.addAll(r.listRecipes());
+        }
+        for (Recipe recipe : dependencyRecipes) {
+            if (recipe instanceof DeclarativeRecipe) {
+                ((DeclarativeRecipe) recipe).initialize(dependencyRecipes);
+            }
+        }
         for (Recipe recipe : recipes) {
             if (recipe instanceof DeclarativeRecipe) {
                 List<Recipe> availableRecipes = new ArrayList<>();
