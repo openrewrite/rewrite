@@ -221,6 +221,20 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
+            J.Import i = (J.Import) super.visitImport(impoort, p);
+            JLeftPadded<J.Identifier> alias = i.getPadding().getAlias();
+            if (alias == null) {
+                return i;
+            }
+
+            visitSpace(alias.getBefore(), Space.Location.IMPORT_ALIAS_PREFIX, p);
+            p.out.append("as");
+            visitIdentifier(alias.getElement(), p);
+            return i;
+        }
+
+        @Override
         public J visitTypeCast(J.TypeCast t, PrintOutputCapture<P> p) {
             if (!t.getMarkers().findFirst(AsStyleTypeCast.class).isPresent()) {
                 return super.visitTypeCast(t, p);
