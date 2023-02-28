@@ -420,6 +420,11 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             } else if (ancestor instanceof J.TypeCast ||
                     ancestor instanceof J.Parentheses ||
                     ancestor instanceof J.ControlParentheses) {
+                Cursor parent = ancestorCursor.getParentOrThrow();
+                if (parent.getValue() instanceof J.Switch || parent.getValue() instanceof J.SwitchExpression) {
+                    // Don't add control flow to control parentheses in switch statements
+                    break;
+                }
                 nextFlowGraph = nextFlowGraph.addEdge(ancestorCursor);
             } else if (ancestor instanceof J.NewClass) {
                 break;

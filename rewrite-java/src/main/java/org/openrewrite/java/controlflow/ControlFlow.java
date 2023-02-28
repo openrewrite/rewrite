@@ -34,6 +34,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.exceptionMessageBuilder;
 
 @Incubating(since = "7.25.0")
@@ -103,17 +104,17 @@ public final class ControlFlow {
         /**
          * Flows that terminate in a {@link J.Return} or {@link J.Throw} statement.
          */
-        private final Set<ControlFlowNode> exitFlow = new HashSet<>();
+        protected final Set<ControlFlowNode> exitFlow = new HashSet<>();
 
         /**
          * Flows that terminate in a {@link J.Continue} statement.
          */
-        private final Set<ControlFlowNode> continueFlow = new HashSet<>();
+        protected final Set<ControlFlowNode> continueFlow = new HashSet<>();
 
         /**
          * Flows that terminate in a {@link J.Break} statement.
          */
-        private final Set<ControlFlowNode> breakFlow = new HashSet<>();
+        protected final Set<ControlFlowNode> breakFlow = new HashSet<>();
 
         ControlFlowAnalysis(ControlFlowNode.Start start, boolean methodEntryPoint) {
             this.current = Collections.singleton(Objects.requireNonNull(start, "start cannot be null"));
@@ -164,33 +165,49 @@ public final class ControlFlow {
             current = Collections.singleton(node);
         }
 
-        private void addCursorToBasicBlock() {
+        void addCursorToBasicBlock() {
             currentAsBasicBlock().addCursorToBasicBlock(getCursor());
         }
 
+        ControlFlowAnalysis<P> createAnalysisForRecursion(Set<? extends ControlFlowNode> start) {
+            return new ControlFlowAnalysis<>(start, graphType);
+        }
+
         ControlFlowAnalysis<P> visitRecursive(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
-            ControlFlowAnalysis<P> analysis = new ControlFlowAnalysis<>(start, graphType);
+            ControlFlowAnalysis<P> analysis = createAnalysisForRecursion(start);
             analysis.visit(toVisit, param, getCursor());
             return analysis;
         }
 
         ControlFlowAnalysis<P> visitRecursiveTransferringExit(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
             ControlFlowAnalysis<P> analysis = visitRecursive(start, toVisit, param);
-            if (!analysis.exitFlow.isEmpty()) {
-                this.exitFlow.addAll(analysis.exitFlow);
-            }
+            transferExit(analysis);
             return analysis;
         }
 
         ControlFlowAnalysis<P> visitRecursiveTransferringAll(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
             ControlFlowAnalysis<P> analysis = visitRecursiveTransferringExit(start, toVisit, param);
+            transferContinueFlow(analysis);
+            transferBreakFlow(analysis);
+            return analysis;
+        }
+
+        void transferExit(ControlFlowAnalysis<P> analysis) {
+            if (!analysis.exitFlow.isEmpty()) {
+                this.exitFlow.addAll(analysis.exitFlow);
+            }
+        }
+
+        void transferContinueFlow(ControlFlowAnalysis<P> analysis) {
             if (!analysis.continueFlow.isEmpty()) {
                 this.continueFlow.addAll(analysis.continueFlow);
             }
+        }
+
+        void transferBreakFlow(ControlFlowAnalysis<P> analysis) {
             if (!analysis.breakFlow.isEmpty()) {
                 this.breakFlow.addAll(analysis.breakFlow);
             }
-            return analysis;
         }
 
         @Override
@@ -201,10 +218,8 @@ public final class ControlFlow {
             return assignment;
         }
 
-        @Override
-        public J.Block visitBlock(J.Block block, P p) {
-            addCursorToBasicBlock();
-            for (Statement statement : block.getStatements()) {
+        void visitStatementList(List<Statement> statements, P p) {
+            for (Statement statement : statements) {
                 ControlFlowAnalysis<P> analysis = visitRecursive(current, statement, p);
                 current = analysis.current;
                 continueFlow.addAll(analysis.continueFlow);
@@ -217,6 +232,12 @@ public final class ControlFlow {
                     break;
                 }
             }
+        }
+
+        @Override
+        public J.Block visitBlock(J.Block block, P p) {
+            addCursorToBasicBlock();
+            visitStatementList(block.getStatements(), p);
             if (methodEntryPoint) {
                 ControlFlowNode end = ControlFlowNode.End.create(this.graphType);
                 addSuccessorToCurrent(end);
@@ -314,6 +335,75 @@ public final class ControlFlow {
             return unary;
         }
 
+        @Override
+        @SelfLoathing(name = "Jonathan Leitschuh")
+        public J.Switch visitSwitch(J.Switch _switch, P p) {
+            addCursorToBasicBlock();
+            visit(_switch.getSelector(), p);
+            ControlFlowAnalysis<P> analysis = new ControlFlowAnalysis<P>(current, graphType) {
+
+                /**
+                 * Flows that exit a {@link J.Case} and don't complete with a {@link J.Break}.
+                 */
+                private final Set<ControlFlowNode> caseFlow = new HashSet<>();
+
+                @Override
+                @SelfLoathing(name = "Jonathan Leitschuh")
+                ControlFlowAnalysis<P> createAnalysisForRecursion(Set<? extends ControlFlowNode> start) {
+                    return new ControlFlowAnalysis<P>(start, graphType) {
+
+                        @Override
+                        public J.Case visitCase(J.Case _case, P p) {
+                            if (isDefaultCase(_case)) {
+                                // The default case is not a conditional node, there can be no `false` on a `default` case.
+                                // It's just like an `else` case.
+                                current = Stream.concat(current.stream(), caseFlow.stream()).collect(Collectors.toSet());
+                                addCursorToBasicBlock();
+                                return super.visitCase(_case, p);
+                            }
+                            // TODO: Handle complex conditional expressions in case statements (ie. Java 17 pattern matching)
+                            // visit(_case.getExpressions(), p);
+                            addCursorToBasicBlock();
+                            ControlFlowNode.ConditionNode conditionNode = currentAsBasicBlock().addConditionNodeTruthFirst();
+                            current = Stream.concat(Stream.of(conditionNode), caseFlow.stream()).collect(Collectors.toSet());
+                            caseFlow.clear();
+                            switch (_case.getType()) {
+                                case Statement:
+                                    if (_case.getStatements().isEmpty()) {
+                                        // Visit a fake empty statement to ensure that the ConditionNode has a true successor
+                                        visit(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), p);
+                                    } else {
+                                        visitStatementList(_case.getStatements(), p);
+                                    }
+                                    break;
+                                case Rule:
+                                    visit(_case.getBody(), p);
+                                    breakFlow.add(currentAsBasicBlock());
+                                    current = Collections.emptySet();
+                                    break;
+                            }
+                            caseFlow.addAll(current);
+                            current = Collections.singleton(conditionNode);
+                            return _case;
+                        }
+                    };
+                }
+            };
+            analysis.visit(_switch.getCases(), p, getCursor());
+            transferContinueFlow(analysis);
+            transferExit(analysis);
+            current = Stream.concat(analysis.current.stream(), analysis.breakFlow.stream()).collect(Collectors.toSet());
+            return _switch;
+        }
+
+        @Override
+        public J.Case visitCase(J.Case _case, P p) {
+            if (!isDefaultCase(_case)) {
+                throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Case statements should be visited by the switch statement").addCursor(getCursor()));
+            }
+            return super.visitCase(_case, p);
+        }
+
         private static Set<ControlFlowNode.ConditionNode> allAsConditionNodesMissingTruthFirst(Set<? extends ControlFlowNode> nodes) {
             return nodes.stream().map(controlFlowNode -> {
                 if (controlFlowNode instanceof ControlFlowNode.ConditionNode) {
@@ -404,7 +494,6 @@ public final class ControlFlow {
 
             // First the condition is invoked
             ControlFlowAnalysis<P> conditionAnalysis = visitRecursiveTransferringAll(current, branching.getCondition(), p);
-            J truePart = branching.getTruePart();
 
             Set<ControlFlowNode.ConditionNode> conditionNodes = allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
             // Then the then block is visited
@@ -574,7 +663,7 @@ public final class ControlFlow {
 
         private static J.Literal trueLiteral() {
             return new J.Literal(
-                    Tree.randomId(),
+                    randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
                     true,
@@ -824,12 +913,6 @@ public final class ControlFlow {
         }
 
         @Override
-        public J.Switch visitSwitch(J.Switch _switch, P p) {
-            addCursorToBasicBlock();
-            return _switch;
-        }
-
-        @Override
         public J.Empty visitEmpty(J.Empty empty, P p) {
             J.MethodInvocation parent = getCursor().firstEnclosing(J.MethodInvocation.class);
             if (parent != null && parent.getArguments().contains(empty)) {
@@ -883,6 +966,16 @@ public final class ControlFlow {
                 cfnIterator.next().addSuccessor(basicBlock);
             }
             return basicBlock;
+        }
+
+        /**
+         * @return true if this case is the default case.
+         */
+        private static boolean isDefaultCase(J.Case _case) {
+            List<Expression> expressions = _case.getExpressions();
+            return expressions.size() == 1 &&
+                    expressions.get(0) instanceof J.Identifier &&
+                    "default".equals(((J.Identifier) expressions.get(0)).getSimpleName());
         }
     }
 }
