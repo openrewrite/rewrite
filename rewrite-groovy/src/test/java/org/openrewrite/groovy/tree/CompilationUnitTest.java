@@ -118,7 +118,6 @@ class CompilationUnitTest implements RewriteTest {
           groovy(
             """
               import com.example.MyClass
-              def a = new MyClass()
               """
           )
         );

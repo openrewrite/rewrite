@@ -1802,11 +1802,14 @@ public class GroovyParserVisitor {
             String packageName = importNode.getPackageName();
             J.FieldAccess qualid;
             if (packageName == null) {
-                // Groovy implicitly imports various packages, including java.lang, in every source file
-                // If you explicitly import one of these, or something from a subpackage that does require explicit import like java.lang.annotation.Retention
-                // then ImportNode.getPackageName() may return null
-                Space space = whitespace();
-                qualid = TypeTree.build(name()).withPrefix(space);
+                String type = importNode.getType().getName();
+                if (importNode.isStar()) {
+                    type += ".*";
+                } else if (importNode.getFieldName() != null) {
+                    type += "." + importNode.getFieldName();
+                }
+                Space space = sourceBefore(type);
+                qualid = TypeTree.build(type).withPrefix(space);
             } else {
                 if (importNode.isStar()) {
                     packageName += "*";
@@ -1814,8 +1817,14 @@ public class GroovyParserVisitor {
                 qualid = TypeTree.build(packageName).withPrefix(sourceBefore(packageName));
             }
 
-            // TODO: Parse aliases
-            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid, null);
+            JLeftPadded<J.Identifier> alias = null;
+            int endOfWhitespace = indexOfNextNonWhitespace(cursor, source);
+            if (endOfWhitespace + 2 <= source.length() && "as".equals(source.substring(endOfWhitespace, endOfWhitespace + 2))) {
+                String simpleName = importNode.getAlias();
+                alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), sourceBefore(simpleName), Markers.EMPTY, simpleName, null, null));
+            }
+
+            J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid, alias);
             return maybeSemicolon(anImport);
         }
 
