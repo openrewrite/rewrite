@@ -61,13 +61,6 @@ public class DeclarativeRecipe extends CompositeRecipe {
     private final boolean causesAnotherCycle;
 
     @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return estimatedEffortPerOccurrence == null ?
-                super.getEstimatedEffortPerOccurrence() :
-                estimatedEffortPerOccurrence;
-    }
-
-    @Override
     public boolean causesAnotherCycle() {
         return causesAnotherCycle || super.causesAnotherCycle();
     }

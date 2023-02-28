@@ -237,10 +237,11 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            def closure = {}
-            closure()
-            closure.call()
-            """)
+              def closure = {}
+              closure()
+              closure.call()
+              """
+          )
         );
     }
 }
