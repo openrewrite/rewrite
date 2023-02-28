@@ -16,7 +16,6 @@
 
 package org.openrewrite.java.cleanup;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -507,7 +506,6 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/2897")
     @Test
     void notNullToObjectsNonNullError() {
@@ -542,6 +540,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
               """,
             """
               import java.util.Collection;
+              import java.util.Objects;
 
               public class A {
                   private static Class<?> determineCommonAncestor(Class<?> clazz1, Class<?> clazz2) {
