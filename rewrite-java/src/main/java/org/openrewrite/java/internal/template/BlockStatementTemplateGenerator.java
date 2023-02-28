@@ -116,8 +116,21 @@ public class BlockStatementTemplateGenerator {
                     @SuppressWarnings("unchecked") J2 t = (J2) tree;
 
                     if (blockEnclosingTemplateComment != null) {
+                        boolean caughtStopComment = false;
+                        if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof JContainer) {
+                            JContainer container = getCursor().getParent().getValue();
+                            if (container.getBefore() != null && container.getBefore().getComments() != null) {
+                                for (Comment comment : container.getBefore().getComments()) {
+                                    if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                                        caughtStopComment  =true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
                         //noinspection unchecked
-                        J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree(t);
+                        J2 trimmed = caughtStopComment ? null : (J2) TemplatedTreeTrimmer.trimTree(t);
                         if (trimmed != null) {
                             js.add(trimmed);
                         } else {
