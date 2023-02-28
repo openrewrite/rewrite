@@ -30,17 +30,25 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = false)
 public class ReplaceStringLiteralWithConstant extends Recipe {
 
-    @Option(displayName = "Owning type of the constant",
-            example = "org.springframework.http.MediaType")
-    String owningType;
+    @Option(displayName = "Fully Qualified Name of the constant",
+            example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
+    String fullyQualifiedNameOfConst;
 
-    @Option(displayName = "Constant name",
-            example = "APPLICATION_JSON_VALUE")
-    String constantName;
-
-    @Option(displayName = "Literal value",
-            example = "application/json")
+    @Option(displayName = "(Optional) String literal value that needs to be replaced. Only String literal accepted.",
+            example = "application/json",
+            required = false )
+    @Nullable
     String literalValue;
+
+    public ReplaceStringLiteralWithConstant(String fullyQualifiedNameOfConst) {
+        this.fullyQualifiedNameOfConst = fullyQualifiedNameOfConst;
+        this.literalValue = fullyQualifiedNameOfConst.substring(fullyQualifiedNameOfConst.lastIndexOf(".")+1);
+    }
+
+    public ReplaceStringLiteralWithConstant(String fullyQualifiedNameOfConst, String literalValue) {
+        this.fullyQualifiedNameOfConst = fullyQualifiedNameOfConst;
+        this.literalValue = literalValue;
+    }
 
     @Override
     public String getDisplayName() {
@@ -49,7 +57,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace a String Literal with named constant.";
+        return "Replace a String Literal with named constant. If String literal value no provided, the recipe will use constant's Name in place of literal value.";
     }
 
     @Override
@@ -62,6 +70,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             @Override
             public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                 if(isStringLiteral(literal)) {
+                    String owningType = fullyQualifiedNameOfConst.substring(0,fullyQualifiedNameOfConst.lastIndexOf("."));
                     maybeAddImport(owningType,false);
                     return buildConstant().withPrefix(literal.getPrefix());
                 }
@@ -75,19 +84,24 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
             private J.FieldAccess buildConstant() {
                 if(constant == null) {
+                    //split fqn into owning type and constant name
+                    String constantName = fullyQualifiedNameOfConst.substring(fullyQualifiedNameOfConst.lastIndexOf(".")+1);
+                    String owningType = fullyQualifiedNameOfConst.substring(0,fullyQualifiedNameOfConst.lastIndexOf("."));
+                    String className = owningType.substring(owningType.lastIndexOf(".")+1);
+
                     // Instead of creating new FieldAccess using constructor, parsing code snippet to create Field Access using JavaParser.
                     JavaParser parser = JavaParser.fromJavaVersion().build();
                     List<J.CompilationUnit> result = parser.parse(
-                            "import "+owningType+";\n" +
+                            "import "+ owningType +";\n" +
                                     "class Test {\n" +
-                                    "   Object o = "+String.join(".",owningType.substring(owningType.lastIndexOf(".")+1),constantName)+";\n" +
+                                    "   Object o = "+String.join(".",className,constantName)+";\n" +
                                     "}"
                     );
 
                     // Retrieving FieldAccess from Compilation Unit
                     J j = ((J.VariableDeclarations) result.get(0).getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0).getInitializer();
                     if (!(j instanceof J.FieldAccess)) {
-                        throw new IllegalArgumentException("Invalid constant " + constantName + " or owningType " + owningType);
+                        throw new IllegalArgumentException("Invalid FQN : " + fullyQualifiedNameOfConst);
                     }
 
                     J.FieldAccess parsedFieldAccess = (J.FieldAccess) j;

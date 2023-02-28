@@ -25,86 +25,107 @@ public class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
-            .parser(JavaParser.fromJavaVersion()
-                .logCompilationWarningsAndErrors(true)
-                .classpath("guava"));
+          .parser(JavaParser.fromJavaVersion()
+            .logCompilationWarningsAndErrors(true)
+            .classpath("guava"));
     }
 
     @Test
     void doNothingIfStringLiteralNotFound() {
         rewriteRun(
-            spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets", "UTF_8", "UTF_8")),
-            java(
-                """
-                  class Test {
-                      void test(Object obj) {
-                          String s = "FooBar";
-                      }
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets.UTF_8", "UTF_8")),
+          java(
+            """
+              class Test {
+                  void test(Object obj) {
+                      String s = "FooBar";
                   }
-                  """
-            )
+              }
+              """
+          )
         );
     }
 
     @Test
     void replaceStringLiteralWithConstant() {
         rewriteRun(
-            spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets", "UTF_8", "UTF_8")),
-            java(
-                """
-                  class Test {
-                      Object o = "UTF_8";
-                  }
-                  """,
-                """
-                  import com.google.common.base.Charsets;
-                  
-                  class Test {
-                      Object o = Charsets.UTF_8;
-                  }
-                  """
-            )
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets.UTF_8", "UTF_8")),
+          java(
+            """
+              class Test {
+                  Object o = "UTF_8";
+              }
+              """,
+            """
+              import com.google.common.base.Charsets;
+
+              class Test {
+                  Object o = Charsets.UTF_8;
+              }
+              """
+          )
         );
     }
 
     @Test
     void replaceLiteralWithUserDefinedConstant() {
         rewriteRun(
-            spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.constant.B", "VAR", "newValue")),
-            java(
-                """
-                  package com.constant;
-                  public class B {
-                      public static final String VAR = "default";
-                      void method() {
-                          String VAR = "";
-                      }
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.constant.B.VAR", "newValue")),
+          java(
+            """
+              package com.constant;
+              public class B {
+                  public static final String VAR = "default";
+                  void method() {
+                      String VAR = "";
                   }
-                  """
-            ),
-            java(
-                """
-                  package com.abc;
-                  class A {
-                      String v = "newValue";
-                      private String method() {
-                          return "newValue";
-                      }
+              }
+              """
+          ),
+          java(
+            """
+              package com.abc;
+              class A {
+                  String v = "newValue";
+                  private String method() {
+                      return "newValue";
                   }
-                  """,
-                """
-                  package com.abc;
-                  
-                  import com.constant.B;
-                  
-                  class A {
-                      String v = B.VAR;
-                      private String method() {
-                          return B.VAR;
-                      }
+              }
+              """,
+            """
+              package com.abc;
+
+              import com.constant.B;
+
+              class A {
+                  String v = B.VAR;
+                  private String method() {
+                      return B.VAR;
                   }
-                  """
-            )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStringLiteralWithConstantWithSingleArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets.UTF_8")),
+          java(
+            """
+              class Test {
+                  Object o = "UTF_8";
+              }
+              """,
+            """
+              import com.google.common.base.Charsets;
+
+              class Test {
+                  Object o = Charsets.UTF_8;
+              }
+              """
+          )
         );
     }
 }
