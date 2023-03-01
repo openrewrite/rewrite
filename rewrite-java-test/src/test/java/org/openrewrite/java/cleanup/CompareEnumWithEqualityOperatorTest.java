@@ -101,4 +101,32 @@ class CompareEnumWithEqualityOperatorTest implements RewriteTest {
           )
         );
     }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void changeEnumNotEqualsWithParenthese() {
+        rewriteRun(
+          enumA,
+          java(
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (!(A.FOO.equals(arg0))) {
+                      }
+                  }
+              }
+              """,
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (A.FOO != arg0) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
