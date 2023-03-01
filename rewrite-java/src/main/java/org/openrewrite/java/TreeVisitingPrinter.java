@@ -159,6 +159,7 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
             || tree instanceof J.DoWhileLoop
             || tree instanceof J.Lambda
             || tree instanceof J.Lambda.Parameters
+            || tree instanceof J.If
         ) {
             return "";
         }

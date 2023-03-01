@@ -97,27 +97,25 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                          .withMethodType(m.getMethodType().withParameterTypes(parameterTypes));
                     } else {
                         // replace argument to 'command.split(" ")'
+                        List<Expression> args = m.getArguments();
+                        boolean needWrap = false;
+                        Expression arg0 = args.get(0);
+                        if (!(arg0 instanceof J.Identifier) &&
+                            !(arg0 instanceof J.Literal) &&
+                            !(arg0 instanceof J.MethodInvocation)) {
+                            needWrap = true;
+                        }
+
+                        String code = needWrap ? "(#{any()}).split(\" \")" : "#{any()}.split(\" \")";
                         JavaTemplate template = JavaTemplate.builder(
-                            this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"))").build();
-                        JavaTemplate template2 = JavaTemplate.builder(
-                            this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"), #{anyArray(java.lang.String)})").build();
-                        JavaTemplate template3 = JavaTemplate.builder(
-                            this::getCursor, "#{any(java.lang.Runtime)}.exec(#{any(java.lang.String)}.split(\" \"), #{anyArray(java.lang.String)}, #{any(java.io.File)})").build();
+                            this::getCursor, code).build();
+                        arg0 = args.get(0).withTemplate(template, args.get(0).getCoordinates().replace(), args.get(0));
+                        args.set(0, arg0);
 
-                        Expression splitSelect = m.getArguments().get(0);
-                        if (!(splitSelect instanceof J.Identifier) && 
-                            !(splitSelect instanceof J.Literal) &&
-                            !(splitSelect instanceof J.MethodInvocation)) {
-                            splitSelect = ReplaceStringBuilderWithString.wrapExpression(splitSelect);
-                        }
+                        List<JavaType> parameterTypes = m.getMethodType().getParameterTypes();
+                        parameterTypes.set(0, JavaType.ShallowClass.build("java.lang.String[]"));
 
-                        if (RUNTIME_EXEC_CMD.matches(m)) {
-                            return m.withTemplate(template, m.getCoordinates().replace(), m.getSelect(), splitSelect);
-                        } else if (RUNTIME_EXEC_CMD_ENVP.matches(m) ) {
-                            return m.withTemplate(template2, m.getCoordinates().replace(), m.getSelect(), splitSelect, m.getArguments().get(1));
-                        } else if (RUNTIME_EXEC_CMD_ENVP_FILE.matches(m)) {
-                            return m.withTemplate(template3, m.getCoordinates().replace(), m.getSelect(), splitSelect, m.getArguments().get(1), m.getArguments().get(2));
-                        }
+                        return m.withArguments(args).withMethodType(m.getMethodType().withParameterTypes(parameterTypes));
                     }
                 }
 
