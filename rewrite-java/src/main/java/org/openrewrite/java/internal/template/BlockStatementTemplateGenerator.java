@@ -28,7 +28,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
 import java.util.*;
 
@@ -95,6 +94,8 @@ public class BlockStatementTemplateGenerator {
 
             @Nullable
             J.Block blockEnclosingTemplateComment;
+            @Nullable
+            JContainer<?> containerEnclosingTemplateComment;
 
             @Override
             public J.Block visitBlock(J.Block block, Integer p) {
@@ -103,6 +104,15 @@ public class BlockStatementTemplateGenerator {
                     done = true;
                 }
                 return b;
+            }
+
+            @Override
+            public <J3 extends J> JContainer<J3> visitContainer(@Nullable JContainer<J3> container, JContainer.Location loc, Integer p) {
+                container = super.visitContainer(container, loc, p);
+                if (container == containerEnclosingTemplateComment) {
+                    done = true;
+                }
+                return container;
             }
 
             @Nullable
@@ -115,22 +125,9 @@ public class BlockStatementTemplateGenerator {
                 if (expected.isInstance(tree)) {
                     @SuppressWarnings("unchecked") J2 t = (J2) tree;
 
-                    if (blockEnclosingTemplateComment != null) {
-                        boolean caughtStopComment = false;
-                        if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof JContainer) {
-                            JContainer container = getCursor().getParent().getValue();
-                            if (container.getBefore() != null && container.getBefore().getComments() != null) {
-                                for (Comment comment : container.getBefore().getComments()) {
-                                    if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
-                                        caughtStopComment  =true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
+                    if (blockEnclosingTemplateComment != null || containerEnclosingTemplateComment != null) {
                         //noinspection unchecked
-                        J2 trimmed = caughtStopComment ? null : (J2) TemplatedTreeTrimmer.trimTree(t);
+                        J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree(t);
                         if (trimmed != null) {
                             js.add(trimmed);
                         } else {
@@ -143,7 +140,22 @@ public class BlockStatementTemplateGenerator {
                     for (int i = 0; i < comments.size(); i++) {
                         Comment comment = comments.get(i);
                         if (comment instanceof TextComment && ((TextComment) comment).getText().equals(TEMPLATE_COMMENT)) {
-                            blockEnclosingTemplateComment = getCursor().firstEnclosing(J.Block.class);
+                            Object value = getCursor().getValue();
+                            if (value instanceof JRightPadded) {
+                                for (Comment comment1 : ((JRightPadded<?>) value).getAfter().getComments()) {
+                                    if (comment1 instanceof TextComment && ((TextComment) comment1).getText().equals(STOP_COMMENT)) {
+                                        done = true;
+                                        js.add(t.withPrefix(t.getPrefix().withComments(comments.subList(i + 1, comments.size()))));
+                                        return t;
+                                    }
+                                }
+                            }
+                            Object enclosing = getCursor().dropParentUntil(is -> is instanceof J.Block || is instanceof JContainer).getValue();
+                            if (enclosing instanceof J.Block) {
+                                blockEnclosingTemplateComment = (J.Block) enclosing;
+                            } else {
+                                containerEnclosingTemplateComment = (JContainer<?>) enclosing;
+                            }
                             //noinspection unchecked
                             J2 trimmed = (J2) TemplatedTreeTrimmer.trimTree(t);
                             if (t != trimmed) {
@@ -167,7 +179,7 @@ public class BlockStatementTemplateGenerator {
 
                 return super.visit(tree, p);
             }
-        }.visit(cu, 0);
+        }.visit(cu, 0); // FIXME should we skip __P__ and __M__ classes?
 
         return js;
     }
@@ -297,15 +309,12 @@ public class BlockStatementTemplateGenerator {
                         }
                         beforeSegments.append(valueOfType(arg.getType())).append(",");
                     } else {
-                        afterSegments.append(",/*" + STOP_COMMENT + "*/").append(valueOfType(arg.getType()));
+                        afterSegments.append(",").append(valueOfType(arg.getType()));
                     }
                 }
                 afterSegments.append(")");
-                if (priorFound && !afterSegments.toString().contains(STOP_COMMENT)) {
-                    if (isEnum) {
-                        afterSegments.append(";");
-                    }
-                    afterSegments.append("/*" + STOP_COMMENT + "*/");
+                if (isEnum) {
+                    afterSegments.append(";");
                 }
                 before.insert(0, beforeSegments);
                 after.append(afterSegments);
@@ -334,7 +343,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
             if (c.getVariable() == prior) {
-                after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+                after.append(" = ").append(c.getIterable().printTrimmed(cursor));
             }
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;
@@ -394,9 +403,7 @@ public class BlockStatementTemplateGenerator {
                     after.append(">()");
                 }
             } else if (m.getSelect() == prior) {
-                List<Comment> comments = new ArrayList<>(1);
-                comments.add(new TextComment(true, STOP_COMMENT, "", Markers.EMPTY));
-                after.append(".").append(m.withSelect(null).withComments(comments).printTrimmed(cursor.getParentOrThrow()));
+                after.append(".").append(m.withSelect(null).printTrimmed(cursor.getParentOrThrow()));
                 if (cursor.getParentOrThrow().firstEnclosing(J.class) instanceof J.Block) {
                     after.append(";");
                 }
@@ -693,6 +700,17 @@ public class BlockStatementTemplateGenerator {
                 return false;
             }
 
+            private boolean stopCommentExists(@Nullable JRightPadded<?> right) {
+                if (right != null) {
+                    for (Comment comment : right.getAfter().getComments()) {
+                        if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
             @Override
             public @Nullable J visit(@Nullable Tree tree, Integer integer) {
                 J j = super.visit(tree, integer);
@@ -707,12 +725,14 @@ public class BlockStatementTemplateGenerator {
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, Integer integer) {
-                J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, integer);
-                if (stopCommentExists(mi.getName())) {
-                    //noinspection ConstantConditions
-                    return mi.getSelect();
+                if (method.getSelect() != null && stopCommentExists(method.getPadding().getSelect())) {
+                    return method.getSelect();
                 }
-                return mi;
+                if (stopCommentExists(method.getName())) {
+                    //noinspection ConstantConditions
+                    return method.getSelect();
+                }
+                return super.visitMethodInvocation(method, integer);
             }
         }
     }
