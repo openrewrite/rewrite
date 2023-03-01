@@ -3823,6 +3823,7 @@ public interface J extends Tree {
             Synchronized,
             Native,
             Strictfp,
+            Async
         }
     }
 
