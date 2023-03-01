@@ -13,11 +13,15 @@ package org.openrewrite.java.cleanup;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.Empty;
 import org.openrewrite.java.tree.J.MethodDeclaration;
 import org.openrewrite.java.tree.J.Modifier;
@@ -31,7 +35,7 @@ import org.openrewrite.marker.Markers;
 import static java.util.Collections.emptyList;
 
 /**
- * Finalize method arguments
+ * Finalize method arguments v2
  */
 public class FinalizeMethodArguments extends Recipe {
 
@@ -55,18 +59,77 @@ public class FinalizeMethodArguments extends Recipe {
                 if (isEmpty(declarations.getParameters()) || hasFinalModifiers(declarations.getParameters())) {
                     return declarations;
                 }
+
+                final AtomicBoolean assigned = new AtomicBoolean(false);
+
+                methodDeclaration.getParameters().forEach(p -> checkIfAssigned(assigned, p));
+                if (assigned.get()) {
+                    return declarations;
+                }
+
                 List<Statement> list = new ArrayList<>();
                 declarations.getParameters().forEach(p -> updateFields(list, p));
                 declarations = declarations.withParameters(list);
                 return declarations;
             }
 
+            private void checkIfAssigned(final AtomicBoolean assigned, final Statement p) {
+                if (p instanceof VariableDeclarations) {
+                    VariableDeclarations variableDeclarations = (VariableDeclarations) p;
+                    if (variableDeclarations.getVariables().stream()
+                        .anyMatch(namedVariable ->
+                            FindAssignmentReferencesToVariable.find(getCursor()
+                                        .getParentTreeCursor()
+                                        .getValue(),
+                                    namedVariable)
+                                .get())) {
+                        assigned.set(true);
+                    }
+                }
+            }
+
             @Override
             public boolean isAcceptable(final SourceFile sourceFile, final ExecutionContext executionContext) {
                 return sourceFile instanceof JavaSourceFile;
             }
-
         };
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private static class FindAssignmentReferencesToVariable extends JavaIsoVisitor<AtomicBoolean> {
+
+        VariableDeclarations.NamedVariable variable;
+
+        /**
+         * @param subtree The subtree to search.
+         * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for any reassignment calls.
+         * @return An {@link AtomicBoolean} that is true if the variable has been reassigned and false otherwise.
+         */
+        static AtomicBoolean find(J subtree, VariableDeclarations.NamedVariable variable) {
+            return new FindAssignmentReferencesToVariable(variable)
+                .reduce(subtree, new AtomicBoolean());
+        }
+
+        @Override
+        public J.Assignment visitAssignment(J.Assignment a, AtomicBoolean hasAssignment) {
+            // Return quickly if the variable has been reassigned before
+            if (hasAssignment.get()) {
+                return a;
+            }
+
+            J.Assignment assignment = super.visitAssignment(a, hasAssignment);
+
+            if (assignment.getVariable() instanceof J.Identifier) {
+                J.Identifier identifier = (J.Identifier) assignment.getVariable();
+
+                if (identifier.getSimpleName().equals(variable.getSimpleName())) {
+                    hasAssignment.set(true);
+                }
+            }
+
+            return assignment;
+        }
     }
 
     private static void updateFields(final List<Statement> list, final Statement p) {
