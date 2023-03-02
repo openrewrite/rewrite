@@ -144,7 +144,9 @@ public class GitProvenance implements Marker {
      * @return A marker containing git provenance information.
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment buildEnvironment) {
-        try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
+        Repository repository = null;
+        try {
+            repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build();
             String branch = null;
             String changeset = getChangeset(repository);
 
@@ -189,6 +191,14 @@ public class GitProvenance implements Marker {
                 e.printStackTrace();
             }
             return null;
+        } finally {
+            if(repository != null) {
+                try {
+                    repository.close();
+                } catch (Throwable e) {
+                    // Suppress
+                }
+            }
         }
     }
 
