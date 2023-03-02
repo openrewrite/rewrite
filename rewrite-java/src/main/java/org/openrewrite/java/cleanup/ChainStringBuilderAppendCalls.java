@@ -20,10 +20,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.PartProvider;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -153,15 +153,7 @@ public class ChainStringBuilderAppendCalls extends Recipe {
 
     public static J.Binary getAdditiveBinaryTemplate() {
         if (additiveBinaryTemplate == null) {
-            List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
-                .parse("class A { void foo() {String s = \"A\" + \"B\";}}");
-            additiveBinaryTemplate = new JavaIsoVisitor<List<J.Binary>>() {
-                @Override
-                public J.Binary visitBinary(J.Binary binary, List<J.Binary> rets) {
-                    rets.add(binary);
-                    return binary;
-                }
-            }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
+            additiveBinaryTemplate = PartProvider.buildPart("class A { void foo() {String s = \"A\" + \"B\";}}", J.Binary.class);
         }
         return additiveBinaryTemplate;
     }
