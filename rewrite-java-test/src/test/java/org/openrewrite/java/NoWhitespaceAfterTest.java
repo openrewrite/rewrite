@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.cleanup.NoWhitespaceAfter;
 import org.openrewrite.java.format.AutoFormatVisitor;
@@ -416,6 +418,72 @@ class NoWhitespaceAfterTest implements RewriteTest {
                   };
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2911")
+    @Disabled
+    @Test
+    void dontWronglyHandleArray() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+          java(
+            """
+            package sample;
+            
+            import org.jetbrains.annotations.NotNull;
+            
+            public class ArrayNotNull {
+            
+                byte[] bytes = new byte[0];
+            
+                public byte @NotNull [] getBytes() {
+                    return bytes;
+                }
+            
+                int[] ints = new int[0];
+            
+                public int @NotNull [] getInts() {
+                    return ints;
+                }
+            
+                Object[] objects = new Object[0];
+            
+                public Object @NotNull [] getObjects() {
+                    return objects;
+                }
+            
+            }
+              """,
+            """
+            package sample;
+            
+            import org.jetbrains.annotations.NotNull;
+            
+            public class ArrayNotNull {
+            
+                byte[] bytes = new byte[0];
+            
+                public byte @NotNull [] getBytes() {
+                    return bytes;
+                }
+            
+                int[] ints = new int[0];
+            
+                public int @NotNull [] getInts() {
+                    return ints;
+                }
+            
+                Object[] objects = new Object[0];
+            
+                public Object @NotNull [] getObjects() {
+                    return objects;
+                }
+            
+            }
+              """,
+            autoFormatIsIdempotent()
           )
         );
     }
