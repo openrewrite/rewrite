@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -30,8 +30,15 @@ import java.util.List;
 public final class PartProvider {
     private PartProvider(){}
 
-    public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart, Class<J2> expected) {
-        J.CompilationUnit cu = JavaParser.fromJavaVersion().build()
+    public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
+                                              Class<J2> expected,
+                                              String... classpath) {
+        JavaParser.Builder<? extends JavaParser, ?> builder = JavaParser.fromJavaVersion();
+        if (classpath.length != 0) {
+            builder.classpathFromResources(new InMemoryExecutionContext(), classpath);
+        }
+
+        J.CompilationUnit cu = builder.build()
             .parse(codeToProvideAPart).get(0);
 
         List<J2> parts = new ArrayList<>(1);
