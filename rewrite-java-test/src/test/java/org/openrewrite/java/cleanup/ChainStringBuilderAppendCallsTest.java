@@ -98,6 +98,85 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
     }
 
     @Test
+    void unWrap() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append(("A" + op + "B"));
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append("A").append(op).append("B");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chainedAppend() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append(("A" + op)).append("B");
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append("A").append(op).append("B");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void runMultipleTimes() {
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append(("A" + op) + "B");
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method1() {
+                      StringBuilder sb = new StringBuilder();
+                      String op = "+";
+                      sb.append("A").append(op).append("B");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void correctlyGroupConcatenations() {
         rewriteRun(
           java(
@@ -109,6 +188,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                       sb.append(op + 1 + 2 + "A" + "B" + 'x');
                       sb.append(1 + 2 + op + 3 + 4);
                       sb.append(1 + 2 + name() + 3 + 4);
+                      sb.append(op + (1 + 2));
                   }
                   String name() { return "name"; }
               }
@@ -121,6 +201,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                       sb.append(op).append(1).append(2).append("A" + "B").append('x');
                       sb.append(1 + 2).append(op).append(3).append(4);
                       sb.append(1 + 2).append(name()).append(3).append(4);
+                      sb.append(op).append(1 + 2);
                   }
                   String name() { return "name"; }
               }
@@ -188,7 +269,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
     }
 
     @Test
-    void methodArgumentIgnored() {
+    void methodArgument() {
         rewriteRun(
           java(
             """
@@ -196,6 +277,17 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
                   void method1() {
                       String op = "+";
                       print(new StringBuilder().append("A" + op + "C").toString());
+                  }
+
+                  void print(String str) {
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method1() {
+                      String op = "+";
+                      print(new StringBuilder().append("A").append(op).append("C").toString());
                   }
 
                   void print(String str) {
