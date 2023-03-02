@@ -30,10 +30,12 @@ import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.MethodCall;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Loads and stores models from the `model.csv` file to be used for data flow and taint tracking analysis.
@@ -137,15 +139,32 @@ final class ExternalFlowModels {
             if (argumentIndex == -1) {
                 // Argument[-1] is the 'select' or 'qualifier' of a method call
                 return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
-                        callMatcher.advanced().isSelect(srcCursor);
+                        sinkExpression instanceof MethodCall &&
+                                callMatcher.advanced().isSelect(srcCursor);
             } else {
                 return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
-                        callMatcher.advanced().isParameter(srcCursor, argumentIndex);
+                        sinkExpression instanceof MethodCall &&
+                                callMatcher.advanced().isParameter(srcCursor, argumentIndex);
             }
+        }
+
+        /**
+         * Return the 'optimized' {@link AdditionalFlowStepPredicate} for the {@link MethodMatcher}.
+         */
+        private AdditionalFlowStepPredicate forFlowFromArgumentIndexToQualifier(
+                int argumentIndex,
+                Collection<MethodMatcher> methodMatchers
+        ) {
+            InvocationMatcher callMatcher = InvocationMatcher.fromMethodMatchers(methodMatchers);
+            assert argumentIndex != -1 : "Argument[-1] is the 'select' or 'qualifier' of a method call. Flow would be cyclic.";
+            return (srcExpression, srcCursor, sinkExpression, sinkCursor) ->
+                    callMatcher.advanced().isSelect(sinkCursor) &&
+                            callMatcher.advanced().isParameter(srcCursor, argumentIndex);
         }
 
         private List<AdditionalFlowStepPredicate> optimize(Collection<FlowModel> models) {
             Map<Integer, List<FlowModel>> flowFromArgumentIndexToReturn = new HashMap<>();
+            Map<Integer, List<FlowModel>> flowFromArgumentIndexToQualifier = new HashMap<>();
             models.forEach(model -> {
                 if ("ReturnValue".equals(model.output) || model.isConstructor()) {
                     model.getArgumentRange().ifPresent(argumentRange -> {
@@ -155,18 +174,40 @@ final class ExternalFlowModels {
                         }
                     });
                 }
+                if ("Argument[-1]".equals(model.output) && !model.isConstructor()) {
+                    model.getArgumentRange().ifPresent(argumentRange -> {
+                        for (int i = argumentRange.getStart(); i <= argumentRange.getEnd(); i++) {
+                            flowFromArgumentIndexToQualifier.computeIfAbsent(i, __ -> new ArrayList<>())
+                                    .add(model);
+                        }
+                    });
+                }
             });
 
-            return flowFromArgumentIndexToReturn
-                    .entrySet()
-                    .stream()
-                    .map(entry -> {
-                        Collection<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
-                        return forFlowFromArgumentIndexToReturn(
-                                entry.getKey(),
-                                methodMatchers
-                        );
-                    })
+            Stream<AdditionalFlowStepPredicate> flowFromArgumentIndexToReturnStream =
+                    flowFromArgumentIndexToReturn
+                            .entrySet()
+                            .stream()
+                            .map(entry -> {
+                                Collection<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
+                                return forFlowFromArgumentIndexToReturn(
+                                        entry.getKey(),
+                                        methodMatchers
+                                );
+                            });
+            Stream<AdditionalFlowStepPredicate> flowFromArgumentIndexToQualifierStream =
+                    flowFromArgumentIndexToQualifier
+                            .entrySet()
+                            .stream()
+                            .map(entry -> {
+                                Collection<MethodMatcher> methodMatchers = methodMatcherCache.provideMethodMatchers(entry.getValue());
+                                return forFlowFromArgumentIndexToQualifier(
+                                        entry.getKey(),
+                                        methodMatchers
+                                );
+                            });
+
+            return Stream.concat(flowFromArgumentIndexToReturnStream, flowFromArgumentIndexToQualifierStream)
                     .collect(Collectors.toList());
         }
 
@@ -223,6 +264,7 @@ final class ExternalFlowModels {
                     .stream()
                     .map(JavaType.Method::getDeclaringType)
                     .filter(o -> o != null && !(o instanceof JavaType.Unknown))
+                    .flatMap(FullyQualifiedNameToFlowModels::getAllTypesInHierarchy)
                     .map(JavaType.FullyQualified::getFullyQualifiedName)
                     .distinct()
                     .forEach(fqn -> {
@@ -238,6 +280,22 @@ final class ExternalFlowModels {
             return new FlowModels(
                     value,
                     taint
+            );
+        }
+
+        static Stream<JavaType.FullyQualified> getAllTypesInHierarchy(JavaType.FullyQualified type) {
+            if (type.getSupertype() == null) {
+                return Stream.concat(
+                        Stream.of(type),
+                        type.getInterfaces().stream().flatMap(FullyQualifiedNameToFlowModels::getAllTypesInHierarchy)
+                );
+            }
+            return Stream.concat(
+                    Stream.of(type),
+                    Stream.concat(
+                            type.getInterfaces().stream().flatMap(FullyQualifiedNameToFlowModels::getAllTypesInHierarchy),
+                            getAllTypesInHierarchy(type.getSupertype())
+                    )
             );
         }
 
