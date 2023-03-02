@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,38 +28,30 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class GitlabBuildEnvironment implements BuildEnvironment {
+public class CustomBuildEnvironment implements BuildEnvironment{
     @With
     UUID id;
+    String cloneURL;
+    String ref;
+    String sha;
 
-    String buildId;
-    String buildUrl;
-    String host;
-    String job;
-    String ciRepositoryUrl;
-    String ciCommitRefName;
-    String ciCommitSha;
-
-    public static GitlabBuildEnvironment build(UnaryOperator<String> environment) {
-        return new GitlabBuildEnvironment(
+    public static CustomBuildEnvironment build(UnaryOperator<String> environment) {
+        return new CustomBuildEnvironment(
                 randomId(),
-                environment.apply("CI_BUILD_ID"),
-                environment.apply("CI_JOB_URL"),
-                environment.apply("CI_SERVER_HOST"),
-                environment.apply("CI_BUILD_NAME"),
-                environment.apply("CI_REPOSITORY_URL"),
-                environment.apply("CI_COMMIT_REF_NAME"),
-                environment.apply("CI_COMMIT_SHA")
-        );
+                environment.apply("CUSTOM_GIT_CLONE_URL"),
+                environment.apply("CUSTOM_GIT_REF"),
+                environment.apply("CUSTOM_GIT_SHA"));
     }
 
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
-        if (StringUtils.isBlank(ciRepositoryUrl)
-                || StringUtils.isBlank(ciCommitRefName)
-                || StringUtils.isBlank(ciCommitSha)) {
+        if (StringUtils.isBlank(cloneURL)
+                || StringUtils.isBlank(ref)
+                || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
+        } else {
+            return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha, null, null);
         }
-        return new GitProvenance(UUID.randomUUID(), ciRepositoryUrl, ciCommitRefName, ciCommitSha, null, null);
     }
+
 }

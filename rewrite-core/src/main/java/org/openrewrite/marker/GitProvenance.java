@@ -24,8 +24,7 @@ import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.ci.BuildEnvironment;
-import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
+import org.openrewrite.marker.ci.*;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -139,50 +138,91 @@ public class GitProvenance implements Marker {
 
     /**
      * @param projectDir       The project directory.
-     * @param buildEnvironment In detached head scenarios, the branch is best
+     * @param environment In detached head scenarios, the branch is best
      *                         determined from a {@link BuildEnvironment} marker if possible.
      * @return A marker containing git provenance information.
      */
-    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment buildEnvironment) {
-        Repository repository = null;
-        try {
-            repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build();
-            String branch = null;
-            String changeset = getChangeset(repository);
+    public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
 
+        if (environment != null) {
+            if(environment instanceof JenkinsBuildEnvironment) {
+                JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
+                try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
+                    String branch = jenkinsBuildEnvironment.getLocalBranch()  != null
+                            ? jenkinsBuildEnvironment.getLocalBranch()
+                            :  localBranchName(repository, jenkinsBuildEnvironment.getBranch());
+                    return fromGitConfig(repository, branch, getChangeset(repository));
+                } catch (IllegalArgumentException | GitAPIException e) {
+                    // Silently ignore if the project directory is not a git repository
+                    printRequireGitDirOrWorkTreeException(e);
+                    return null;
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            } else {
+                try {
+                    return environment.buildGitProvenance();
+                } catch (IncompleteGitConfigException e) {
+                    return fromGitConfig(projectDir);
+                }
+            }
+        } else {
+            return fromGitConfig(projectDir);
+        }
+    }
+
+    private static void printRequireGitDirOrWorkTreeException(Exception e) {
+        if (!"requireGitDirOrWorkTree".equals(e.getStackTrace()[0].getMethodName())) {
+            e.printStackTrace();
+        }
+    }
+
+    private static GitProvenance fromGitConfig(Path projectDir) {
+        String branch = null;
+        try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
+            String changeset = getChangeset(repository);
             if (!repository.getBranch().equals(changeset)) {
                 branch = repository.getBranch();
-            } else if (buildEnvironment instanceof JenkinsBuildEnvironment) {
-                JenkinsBuildEnvironment jenkins = (JenkinsBuildEnvironment) buildEnvironment;
-                branch = jenkins.getLocalBranch() != null ?
-                        jenkins.getLocalBranch() :
-                        localBranchName(repository, jenkins.getBranch());
             }
+            return fromGitConfig(repository, branch, changeset);
+        } catch (IllegalArgumentException e) {
+            printRequireGitDirOrWorkTreeException(e);
+            return null;
+        }catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, String changeset) {
+        if (branch == null) {
+            branch = resolveBranchFromGitConfig(repository);
+        }
+        return new GitProvenance(randomId(), getOrigin(repository), branch, changeset,
+                getAutocrlf(repository), getEOF(repository));
+    }
 
-            if (branch == null) {
-                try (Git git = Git.open(repository.getDirectory())) {
-                    ObjectId commit = repository.resolve(Constants.HEAD);
-                    Map<ObjectId, String> branchesByCommit = git.nameRev().addPrefix("refs/heads/").add(commit).call();
-                    if (branchesByCommit.containsKey(commit)) {
-                        // detached head but _not_ a shallow clone
-                        branch = branchesByCommit.get(commit);
-                    } else {
-                        // detached head and _also_ a shallow clone
-                        branchesByCommit = git.nameRev().add(commit).call();
-                        branch = localBranchName(repository, branchesByCommit.get(commit));
-                    }
-                    if (branch != null) {
-                        if (branch.contains("^")) {
-                            branch = branch.substring(0, branch.indexOf('^'));
-                        } else if (branch.contains("~")) {
-                            branch = branch.substring(0, branch.indexOf('~'));
-                        }
+    @Nullable
+    static String resolveBranchFromGitConfig(Repository repository) {
+        String branch = null;
+        try {
+            try (Git git = Git.open(repository.getDirectory())) {
+                ObjectId commit = repository.resolve(Constants.HEAD);
+                Map<ObjectId, String> branchesByCommit = git.nameRev().addPrefix("refs/heads/").add(commit).call();
+                if (branchesByCommit.containsKey(commit)) {
+                    // detached head but _not_ a shallow clone
+                    branch = branchesByCommit.get(commit);
+                } else {
+                    // detached head and _also_ a shallow clone
+                    branchesByCommit = git.nameRev().add(commit).call();
+                    branch = localBranchName(repository, branchesByCommit.get(commit));
+                }
+                if (branch != null) {
+                    if (branch.contains("^")) {
+                        branch = branch.substring(0, branch.indexOf('^'));
+                    } else if (branch.contains("~")) {
+                        branch = branch.substring(0, branch.indexOf('~'));
                     }
                 }
             }
-
-            return new GitProvenance(randomId(), getOrigin(repository), branch, changeset,
-                    getAutocrlf(repository), getEOF(repository));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         } catch (IllegalArgumentException | GitAPIException e) {
@@ -191,15 +231,9 @@ public class GitProvenance implements Marker {
                 e.printStackTrace();
             }
             return null;
-        } finally {
-            if(repository != null) {
-                try {
-                    repository.close();
-                } catch (Throwable e) {
-                    // Suppress
-                }
-            }
         }
+        return branch;
+
     }
 
     @Nullable
