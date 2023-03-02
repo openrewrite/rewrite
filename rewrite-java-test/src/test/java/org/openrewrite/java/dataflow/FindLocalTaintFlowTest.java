@@ -341,4 +341,98 @@ class FindLocalTaintFlowTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void taintTrackingThroughStringBuilder() {
+         rewriteRun(
+          java(
+            """
+              class Test {
+                  String source() { return null; }
+                  void test() {
+                      String n = source();
+                      StringBuilder o = new StringBuilder("hello ");
+                      o.append(n);
+                      o.append(" world");
+                      System.out.println(o);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String source() { return null; }
+                  void test() {
+                      String n = /*~~>*/source();
+                      StringBuilder o = new StringBuilder("hello ");
+                      /*~~>*//*~~>*/o.append(/*~~>*/n);
+                      /*~~>*//*~~>*/o.append(" world");
+                      System.out.println(/*~~>*/o);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void taintTrackingThroughStringBuilderAssignment() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  String source() { return null; }
+                  void test() {
+                      String n = source();
+                      StringBuilder o = new StringBuilder("hello ");
+                      StringBuilder p = o.append(n);
+                      StringBuilder q = p.append(" world");
+                      System.out.println(q);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String source() { return null; }
+                  void test() {
+                      String n = /*~~>*/source();
+                      StringBuilder o = new StringBuilder("hello ");
+                      StringBuilder p = /*~~>*//*~~>*/o.append(/*~~>*/n);
+                      StringBuilder q = /*~~>*//*~~>*/p.append(" world");
+                      System.out.println(/*~~>*/q);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void taintTrackingIntoStringBuilderAppend() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  String source() { return null; }
+                  void test() {
+                      StringBuilder o = new StringBuilder("hello ");
+                      o.append(source());
+                      o.append(" world");
+                      System.out.println(o);
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String source() { return null; }
+                  void test() {
+                      StringBuilder o = new StringBuilder("hello ");
+                      /*~~>*//*~~>*/o.append(/*~~>*/source());
+                      /*~~>*//*~~>*/o.append(" world");
+                      System.out.println(/*~~>*/o);
+                  }
+              }
+              """
+          )
+        );
+    }
 }
