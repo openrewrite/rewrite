@@ -41,7 +41,7 @@ public class ReplaceStreamToListWithCollect extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace Java 16 Stream.toList() with Java 11 Stream.collect(Collectors.toList()).";
+        return "Replace Java 16 `Stream.toList()` with Java 11 `Stream.collect(Collectors.toList())`.";
     }
 
     @Override
