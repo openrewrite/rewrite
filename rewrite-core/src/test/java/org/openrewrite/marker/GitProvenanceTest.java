@@ -17,6 +17,7 @@ package org.openrewrite.marker;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.transport.TagOpt;
@@ -274,6 +275,24 @@ class GitProvenanceTest {
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
         assertThat(prov.getBranch()).isEqualTo("main");
         assertThat(prov.getChange()).isEqualTo("287364287357");
+    }
+
+    @Test
+    void ignoresBuildEnvironmentIfThereIsGitConfig(@TempDir Path projectDir) throws GitAPIException {
+        Map<String, String> envVars = new HashMap<>();
+        envVars.put("GITHUB_API_URL", "https://api.github.com");
+        envVars.put("GITHUB_REPOSITORY", "octocat/Hello-World");
+        envVars.put("GITHUB_REF", "refs/heads/foo");
+        envVars.put("GITHUB_SHA", "287364287357");
+        envVars.put("GITHUB_HEAD_REF", "");
+        try (Git g = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
+            GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
+              GithubActionsBuildEnvironment.build(var -> envVars.get(var)));
+            assertThat(prov != null);
+            assertThat(prov.getOrigin()).isNotEqualTo("https://github.com/octocat/Hello-World.git");
+            assertThat(prov.getBranch()).isEqualTo("main");
+            assertThat(prov.getChange()).isNotEqualTo("287364287357");
+        }
     }
 
     @Test

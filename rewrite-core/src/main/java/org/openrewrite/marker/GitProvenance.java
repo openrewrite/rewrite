@@ -160,10 +160,16 @@ public class GitProvenance implements Marker {
                     throw new UncheckedIOException(e);
                 }
             } else {
-                try {
-                    return environment.buildGitProvenance();
-                } catch (IncompleteGitConfigException e) {
+                if (new RepositoryBuilder().findGitDir(projectDir.toFile()).getGitDir().exists()) {
+                    //it has been cloned with --depth > 0
                     return fromGitConfig(projectDir);
+                } else {
+                    //there is not .git config
+                    try {
+                        return environment.buildGitProvenance();
+                    } catch (IncompleteGitConfigException e) {
+                        return fromGitConfig(projectDir);
+                    }
                 }
             }
         } else {
