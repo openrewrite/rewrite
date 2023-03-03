@@ -26,6 +26,7 @@ import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.*;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
@@ -160,7 +161,8 @@ public class GitProvenance implements Marker {
                     throw new UncheckedIOException(e);
                 }
             } else {
-                if (new RepositoryBuilder().findGitDir(projectDir.toFile()).getGitDir().exists()) {
+                File gitDir = new RepositoryBuilder().findGitDir(projectDir.toFile()).getGitDir();
+                if (gitDir != null && gitDir.exists()) {
                     //it has been cloned with --depth > 0
                     return fromGitConfig(projectDir);
                 } else {
