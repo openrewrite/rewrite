@@ -13,6 +13,7 @@ package org.openrewrite.java.cleanup;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -28,6 +29,9 @@ import org.openrewrite.java.tree.J.Modifier;
 import org.openrewrite.java.tree.J.Modifier.Type;
 import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType.FullyQualified;
+import org.openrewrite.java.tree.JavaType.FullyQualified.Kind;
+import org.openrewrite.java.tree.JavaType.Method;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
@@ -56,7 +60,7 @@ public class FinalizeMethodArguments extends Recipe {
             public MethodDeclaration visitMethodDeclaration(MethodDeclaration methodDeclaration, ExecutionContext executionContext) {
                 MethodDeclaration declarations = super.visitMethodDeclaration(methodDeclaration, executionContext);
 
-                if (isEmpty(declarations.getParameters()) || hasFinalModifiers(declarations.getParameters())) {
+                if (isWrongKind(methodDeclaration) || isEmpty(declarations.getParameters()) || hasFinalModifiers(declarations.getParameters())) {
                     return declarations;
                 }
 
@@ -93,6 +97,14 @@ public class FinalizeMethodArguments extends Recipe {
                 return sourceFile instanceof JavaSourceFile;
             }
         };
+    }
+
+    private boolean isWrongKind(final MethodDeclaration methodDeclaration) {
+        return Optional.ofNullable(methodDeclaration.getMethodType())
+            .map(Method::getDeclaringType)
+            .map(FullyQualified::getKind)
+            .filter(Kind.Interface::equals)
+            .isPresent();
     }
 
     @Value
@@ -136,7 +148,7 @@ public class FinalizeMethodArguments extends Recipe {
         if (p instanceof VariableDeclarations) {
             VariableDeclarations variableDeclarations = (VariableDeclarations) p;
             if (variableDeclarations.getModifiers().isEmpty()) {
-                variableDeclarations = updateModifiers(variableDeclarations);
+                variableDeclarations = updateModifiers(variableDeclarations, !((VariableDeclarations) p).getLeadingAnnotations().isEmpty());
                 variableDeclarations = updateDeclarations(variableDeclarations);
                 list.add(variableDeclarations);
             }
@@ -147,7 +159,15 @@ public class FinalizeMethodArguments extends Recipe {
         return variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression() != null ? variableDeclarations.getTypeExpression().withPrefix(Space.build(" ", emptyList())) : null);
     }
 
-    private static VariableDeclarations updateModifiers(final VariableDeclarations variableDeclarations) {
+    private static VariableDeclarations updateModifiers(final VariableDeclarations variableDeclarations, final boolean leadingAnnotations) {
+        if (leadingAnnotations) {
+            return variableDeclarations.withModifiers(Collections.singletonList(new Modifier(Tree.randomId(),
+                Space.build("",
+                    emptyList()),
+                Markers.EMPTY,
+                Type.Final,
+                emptyList()).withPrefix(Space.build(" ", emptyList()))));
+        }
         return variableDeclarations.withModifiers(Collections.singletonList(new Modifier(Tree.randomId(),
             Space.build("",
                 emptyList()),

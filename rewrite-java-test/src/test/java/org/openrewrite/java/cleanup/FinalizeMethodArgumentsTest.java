@@ -18,13 +18,28 @@ class FinalizeMethodArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package a;
-                   class A {
-                       SubeventUtils(String a) {
-                           a = "abc";
-                       }
-                   }
-              """
+                    package a;
+                     class A {
+                         void SubeventUtils(String a) {
+                             a = "abc";
+                         }
+                     }
+                """
+          )
+        );
+    }
+
+    @Test
+    void doNotAddFinalIfInterface() {
+        rewriteRun(
+          java(
+            """
+                    package a;
+                     public interface MarketDeleteService {
+                        
+                          void deleteMarket(Long marketId, String deletionTimestamp);
+                        }
+                """
           )
         );
     }
@@ -34,25 +49,43 @@ class FinalizeMethodArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package com.test;
-                  
-                  class TestClass {
-                  
-                      private void getAccaCouponData(String responsiveRequestConfig, String card) {
-                       
-                      }
-                  }
-              """,
+                    package com.test;
+                    
+                    class TestClass {
+                    
+                        private void getAccaCouponData(String responsiveRequestConfig, String card) {
+                         
+                        }
+                    }
+                """,
             """
-                  package com.test;
-                  
-                  class TestClass {
-                  
-                      private void getAccaCouponData(final String responsiveRequestConfig, final String card) {
-                       
-                      }
-                  }
-              """
+                    package com.test;
+                    
+                    class TestClass {
+                    
+                        private void getAccaCouponData(final String responsiveRequestConfig, final String card) {
+                         
+                        }
+                    }
+                """
+          )
+        );
+    }
+
+    @Test
+    void replaceWithFinalModifierWhenAnnotated() {
+        rewriteRun(
+          java(
+            """
+                public class Test {
+                    public void test(@Override Integer test) {}
+                }
+                """,
+            """
+                public class Test {
+                    public void test(@Override final Integer test) {}
+                }
+                """
           )
         );
     }
@@ -62,15 +95,15 @@ class FinalizeMethodArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package com.test;
-                  
-                  class TestClass {
-                  
-                      private void getAccaCouponData() {
-                       
-                      }
-                  }
-              """
+                    package com.test;
+                    
+                    class TestClass {
+                    
+                        private void getAccaCouponData() {
+                         
+                        }
+                    }
+                """
           )
         );
     }
@@ -80,23 +113,64 @@ class FinalizeMethodArgumentsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package responsive.utils.subevent;
-                   
-                   public class SubeventUtils {
-                   
-                       public SubeventUtils(final List<Integer> categoryGroupIdForChangeSubeventName) {
-                           
-                       }
-                   
-                       public static boolean isSubeventOfSpecifiedType(final Object subEvent, final List<Object> requiredTypes) {
-                           return false;
-                       }
-                       
-                       public String getSubeventNameForCategoryGroupId(final String subeventName, final Integer categoryGroupId) {
-                           return subeventName;
-                       }
-                   }
-              """
+                    package responsive.utils.subevent;
+                     
+                     import responsive.enums.subevent.SubeventTypes;
+                     import responsive.model.dto.card.SubEvent;
+                     import java.util.List;
+                     import org.springframework.beans.factory.annotation.Value;
+                     import org.springframework.stereotype.Component;
+                     
+                     import static responsive.enums.matchdata.MatchDataTitleSeparator.AT;
+                     import static responsive.enums.matchdata.MatchDataTitleSeparator.VS;
+                     import static java.lang.String.format;
+                     import static org.apache.commons.lang3.StringUtils.splitByWholeSeparator;
+                     
+                     /**
+                      * Created by mza05 on 13/10/2017.
+                      */
+                     @Component
+                     public class SubeventUtils {
+                     
+                         private static final String SUBEVENT_FORMAT = "%s%s%s";
+                         private final List<Integer> categoryGroupIdForChangeSubeventName;
+                     
+                         public SubeventUtils(
+                                 @Value("#{'${responsive.category.group.id.change.subevent.name}'.split(',')}")  final List<Integer> categoryGroupIdForChangeSubeventName) {
+                             this.categoryGroupIdForChangeSubeventName = categoryGroupIdForChangeSubeventName;
+                         }
+                     
+                         public static boolean isSubeventOfSpecifiedType(final SubEvent subEvent, final List<SubeventTypes> requiredTypes) {
+                     
+                             if (subEvent.getType() == null) {
+                                 return false;
+                             }
+                             return requiredTypes.stream()
+                                     .anyMatch(requiredType -> requiredType.getType().equalsIgnoreCase(subEvent.getType()));
+                     
+                         }
+                     
+                         /**
+                          * Change SubeventName by CategoryGroupId and rebub
+                          * @param subeventName
+                          * @param categoryGroupId
+                          * @return
+                          */
+                         public String getSubeventNameForCategoryGroupId(final String subeventName, final Integer categoryGroupId) {
+                     
+                             if  (subeventName != null && categoryGroupId != null
+                                     && subeventName.contains(AT.getSeparator())
+                                     && categoryGroupIdForChangeSubeventName.contains(categoryGroupId)) {
+                                 final var subeventTeamSplit = splitByWholeSeparator(subeventName, AT.getSeparator());
+                                 if (subeventTeamSplit.length > 0) {
+                                     return format(SUBEVENT_FORMAT, subeventTeamSplit[0], VS.getSeparator(), subeventTeamSplit[1]);
+                                 }
+                             }
+                     
+                             return subeventName;
+                         }
+                     }
+                """
           )
         );
     }
