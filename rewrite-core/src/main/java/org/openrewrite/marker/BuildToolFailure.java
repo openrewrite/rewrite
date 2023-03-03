@@ -30,10 +30,9 @@ public class BuildToolFailure implements Marker {
     UUID id;
 
     // String allows flexibility for future build tools and wrappers like gradlew and mvnw
+    String type;
     @Nullable
     String version;
-    String type;
-
     @Nullable
     Integer exitCode;
 }
