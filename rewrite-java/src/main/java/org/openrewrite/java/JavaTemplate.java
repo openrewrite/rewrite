@@ -230,7 +230,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         public JavaTemplate.Builder build(JavaVisitor<?> owner) {
             try {
-                Class<?> templateClass = Class.forName(owner.getClass().getName() + "_" + name);
+                Class<?> templateClass = Class.forName(owner.getClass().getName() + "_" + name, true,
+                        owner.getClass().getClassLoader());
                 Method getTemplate = templateClass.getDeclaredMethod("getTemplate", JavaVisitor.class);
                 return (JavaTemplate.Builder) getTemplate.invoke(null, owner);
             } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException |
