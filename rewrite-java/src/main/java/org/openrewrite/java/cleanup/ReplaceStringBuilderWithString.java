@@ -15,13 +15,9 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
@@ -141,21 +137,8 @@ public class ReplaceStringBuilderWithString extends Recipe {
 
     public static J.Parentheses getParenthesesTemplate() {
         if (parenthesesTemplate == null) {
-            @Language("java")
-            String simpleParentheseCode = " class B { void foo() { (\"A\" + \"B\").length(); } } ";
-            List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
-                .parse(simpleParentheseCode);
-
-            parenthesesTemplate = new JavaIsoVisitor<List<J.Parentheses>>() {
-                @Override
-                public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens,
-                    List<J.Parentheses> parentheses) {
-                    parentheses.add(parens);
-                    return parens;
-                }
-            }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
+            return PartProvider.buildPart("class B { void foo() { (\"A\" + \"B\").length(); } } ", J.Parentheses.class);
         }
-
         return parenthesesTemplate;
     }
 

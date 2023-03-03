@@ -50,4 +50,15 @@ public class FlowGraph {
         edges.add(edge);
         return edge;
     }
+
+    /**
+     * @return The edge argument.
+     */
+    FlowGraph addEdge(FlowGraph edge) {
+        if (edges.isEmpty()) {
+            edges = new ArrayList<>(2);
+        }
+        edges.add(edge);
+        return edge;
+    }
 }

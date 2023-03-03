@@ -1292,7 +1292,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                           default:
                               break;
                       }
-                      String o = n + "";
+                      String o = /*~~>*/n + "";
                       System.out.println(o);
                       String p = o;
                   }

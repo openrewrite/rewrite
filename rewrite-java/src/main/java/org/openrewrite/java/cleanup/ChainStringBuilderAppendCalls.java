@@ -20,10 +20,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.PartProvider;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -61,20 +61,22 @@ public class ChainStringBuilderAppendCalls extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                if (STRING_BUILDER_APPEND.matches(method)) {
-                    List<Expression> arguments = method.getArguments();
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+
+                if (STRING_BUILDER_APPEND.matches(m)) {
+                    List<Expression> arguments = m.getArguments();
                     if (arguments.size() != 1) {
-                        return method;
+                        return m;
                     }
 
                     List<Expression> flattenExpressions = new ArrayList<>();
-                    boolean flattenable = flatAdditiveExpressions(arguments.get(0), flattenExpressions);
+                    boolean flattenable = flatAdditiveExpressions(arguments.get(0).unwrap(), flattenExpressions);
                     if (!flattenable) {
-                        return method;
+                        return m;
                     }
 
                     if (flattenExpressions.stream().allMatch(exp -> exp instanceof J.Literal)) {
-                        return method;
+                        return m;
                     }
 
                     // group expressions
@@ -109,17 +111,17 @@ public class ChainStringBuilderAppendCalls extends Recipe {
                     }
                     addToGroups(group, groups);
 
-                    J.MethodInvocation chainedMethods = method.withArguments(singletonList(groups.get(0)));
+                    J.MethodInvocation chainedMethods = m.withArguments(singletonList(groups.get(0)));
                     for (int i = 1; i < groups.size(); i++) {
                         chainedMethods = chainedMethods.withSelect(chainedMethods)
-                            .withArguments(singletonList(groups.get(i)))
+                            .withArguments(singletonList(groups.get(i).unwrap()))
                             .withPrefix(Space.EMPTY);
                     }
 
                     return chainedMethods;
                 }
 
-                return method;
+                return m;
             }
         };
     }
@@ -153,15 +155,7 @@ public class ChainStringBuilderAppendCalls extends Recipe {
 
     public static J.Binary getAdditiveBinaryTemplate() {
         if (additiveBinaryTemplate == null) {
-            List<J.CompilationUnit> cus = JavaParser.fromJavaVersion().build()
-                .parse("class A { void foo() {String s = \"A\" + \"B\";}}");
-            additiveBinaryTemplate = new JavaIsoVisitor<List<J.Binary>>() {
-                @Override
-                public J.Binary visitBinary(J.Binary binary, List<J.Binary> rets) {
-                    rets.add(binary);
-                    return binary;
-                }
-            }.reduce(cus.get(0), new ArrayList<>(1)).get(0);
+            additiveBinaryTemplate = PartProvider.buildPart("class A { void foo() {String s = \"A\" + \"B\";}}", J.Binary.class);
         }
         return additiveBinaryTemplate;
     }
@@ -185,7 +179,10 @@ public class ChainStringBuilderAppendCalls extends Recipe {
 
             return flatAdditiveExpressions(b.getLeft(), expressionList)
                 && flatAdditiveExpressions(b.getRight(), expressionList);
-        } else if (expression instanceof J.Literal || expression instanceof J.Identifier || expression instanceof J.MethodInvocation) {
+        } else if (expression instanceof J.Literal ||
+                   expression instanceof J.Identifier ||
+                   expression instanceof J.MethodInvocation ||
+                   expression instanceof J.Parentheses) {
             expressionList.add(expression.withPrefix(Space.EMPTY));
             return true;
         }

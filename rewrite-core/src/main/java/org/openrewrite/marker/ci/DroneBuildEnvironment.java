@@ -18,6 +18,8 @@ package org.openrewrite.marker.ci;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marker.GitProvenance;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -35,13 +37,37 @@ public class DroneBuildEnvironment implements BuildEnvironment {
     String host;
     String job;
 
+    String branch;
+
+    String tag;
+
+    String remoteURL;
+
+    String commitSha;
+
+
     public static DroneBuildEnvironment build(UnaryOperator<String> environment) {
         return new DroneBuildEnvironment(
                 randomId(),
                 environment.apply("DRONE_BUILD_NUMBER"),
                 hostname(),
-                environment.apply("DRONE_REPO")
+                environment.apply("DRONE_REPO"),
+                environment.apply("DRONE_BRANCH"),
+                environment.apply("DRONE_TAG"),
+                environment.apply("DRONE_REMOTE_URL"),
+                environment.apply("DRONE_COMMIT_SHA")
         );
+    }
+
+    @Override
+    public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
+        if(StringUtils.isBlank(remoteURL)
+        || (StringUtils.isBlank(branch) && StringUtils.isBlank(tag))
+        || StringUtils.isBlank(commitSha)) {
+            throw new IncompleteGitConfigException();
+        }
+        return new GitProvenance(UUID.randomUUID(), remoteURL,
+                StringUtils.isBlank(branch)? tag: branch, commitSha, null, null);
     }
 
     public String getBuildUrl() {
