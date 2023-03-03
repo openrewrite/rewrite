@@ -1480,12 +1480,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 firImport.getImportedFqName().asString();
         J.FieldAccess qualid = TypeTree.build(packageName).withPrefix(space);
         skip(qualid.toString());
+        JLeftPadded<J.Identifier> alias = null;
+        if(firImport.getAliasName() != null) {
+            Space asPrefix = sourceBefore("as");
+            Space aliasPrefix = whitespace();
+            String aliasText = firImport.getAliasName().asString();
+            cursor += aliasText.length();
+            // This feels not quite right, could probably record type information here
+            J.Identifier aliasId = createIdentifier(aliasText)
+                    .withPrefix(aliasPrefix);
+            alias = padLeft(asPrefix, aliasId);
+        }
         return new J.Import(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 statik,
-                qualid);
+                qualid,
+                alias);
     }
 
     @Override

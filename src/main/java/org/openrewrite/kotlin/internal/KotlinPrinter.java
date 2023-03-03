@@ -363,6 +363,25 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
+            beforeSyntax(impoort, Space.Location.IMPORT_PREFIX, p);
+            p.append("import");
+            if (impoort.isStatic()) {
+                visitSpace(impoort.getPadding().getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
+                p.append("static");
+            }
+            visit(impoort.getQualid(), p);
+            JLeftPadded<J.Identifier> alias = impoort.getPadding().getAlias();
+            if(alias != null) {
+                visitSpace(alias.getBefore(), Space.Location.IMPORT_ALIAS_PREFIX, p);
+                p.append("as");
+                visit(alias.getElement(), p);
+            }
+            afterSyntax(impoort, p);
+            return impoort;
+        }
+
+        @Override
         public J visitInstanceOf(J.InstanceOf instanceOf, PrintOutputCapture<P> p) {
             beforeSyntax(instanceOf, Space.Location.INSTANCEOF_PREFIX, p);
             String suffix = instanceOf.getMarkers().findFirst(NotIs.class).isPresent() ? "!is" : "is";
@@ -776,6 +795,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         beforeSyntax(k.getPrefix(), k.getMarkers(), loc, p);
     }
 
+    private void beforeSyntax(J j, Space.Location loc, PrintOutputCapture<P> p) {
+        beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
+    }
+
     private void beforeSyntax(Space prefix, Markers markers, @Nullable KSpace.Location loc, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
@@ -806,8 +829,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    private void afterSyntax(K k, PrintOutputCapture<P> p) {
-        afterSyntax(k.getMarkers(), p);
+    private void afterSyntax(J j, PrintOutputCapture<P> p) {
+        afterSyntax(j.getMarkers(), p);
     }
 
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {

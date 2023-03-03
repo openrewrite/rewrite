@@ -42,4 +42,11 @@ public class ImportTest implements RewriteTest {
           kotlin("import kotlin.collections.*")
         );
     }
+
+    @Test
+    void alias() {
+        rewriteRun(
+          kotlin("import kotlin.collections.List as L")
+        );
+    }
 }
