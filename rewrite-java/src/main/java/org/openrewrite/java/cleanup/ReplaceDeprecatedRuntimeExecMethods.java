@@ -43,8 +43,8 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace Runtime.exec(String) methods to use exec(String[]) instead because the former is deprecated " +
-               "after java 18 and no longer recommended for use by the Java documentation.";
+        return "Replace `Runtime.exec(String)` methods to use `exec(String[])` instead because the former is deprecated " +
+               "after Java 18 and is no longer recommended for use by the Java documentation.";
     }
 
     @Override
