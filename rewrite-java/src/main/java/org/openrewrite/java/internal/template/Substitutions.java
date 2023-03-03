@@ -98,7 +98,11 @@ public class Substitutions {
                                 fqn = params.get(0).FullyQualifiedName().getText();
                             }
                         } else {
-                            if (!(parameter instanceof TypedTree)) {
+                            if (parameter instanceof J.NewClass && ((J.NewClass) parameter).getBody() != null
+                                    && ((J.NewClass) parameter).getClazz() != null) {
+                                // for anonymous classes get the type from the supertype
+                                fqn = getTypeName(((J.NewClass) parameter).getClazz().getType());
+                            } else if (!(parameter instanceof TypedTree)) {
                                 // any should only be used on TypedTree parameters, but will give it best effort
                                 fqn = "java.lang.Object";
                             } else {
