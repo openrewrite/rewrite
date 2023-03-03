@@ -59,7 +59,11 @@ public class AnnotationMatcher {
     public AnnotationMatcher(String signature, @Nullable Boolean matchesMetaAnnotations) {
         this.match = new AnnotationSignatureParser(new CommonTokenStream(new AnnotationSignatureLexer(CharStreams.fromString(signature))))
                 .annotation();
-        this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(match.annotationName().getText()));
+        String annotationTypePattern = match.annotationName().getText();
+        if (annotationTypePattern.indexOf('.') == -1) {
+            annotationTypePattern = "java.lang." + annotationTypePattern;
+        }
+        this.matcher = Pattern.compile(StringUtils.aspectjNameToPattern(annotationTypePattern));
         this.matchMetaAnnotations = Boolean.TRUE.equals(matchesMetaAnnotations);
     }
 
