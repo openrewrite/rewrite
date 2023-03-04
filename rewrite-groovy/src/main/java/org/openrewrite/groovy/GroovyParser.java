@@ -266,6 +266,11 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
+        public Builder classpathFromResource(ExecutionContext ctx, String... artifactNamesWithVersions) {
+            this.classpath = JavaParser.dependenciesFromResources(ctx, artifactNamesWithVersions);
+            return this;
+        }
+
         @SuppressWarnings("unused")
         public Builder typeCache(JavaTypeCache typeCache) {
             this.typeCache = typeCache;

@@ -3,6 +3,8 @@ plugins {
     id("groovy")
 }
 
+val parserClasspath = configurations.create("parserClasspath")
+
 repositories {
     maven {
         url = uri("https://repo.gradle.org/gradle/libs-releases/")
@@ -30,6 +32,19 @@ dependencies {
 
     compileOnly("org.gradle:gradle-tooling-api:latest.release")
 
+    "parserClasspath"("org.gradle:gradle-base-services:latest.release")
+    "parserClasspath"("org.gradle:gradle-core-api:latest.release")
+    "parserClasspath"("org.gradle:gradle-language-groovy:latest.release")
+    "parserClasspath"("org.gradle:gradle-language-java:latest.release")
+    "parserClasspath"("org.gradle:gradle-logging:latest.release")
+    "parserClasspath"("org.gradle:gradle-messaging:latest.release")
+    "parserClasspath"("org.gradle:gradle-native:latest.release")
+    "parserClasspath"("org.gradle:gradle-process-services:latest.release")
+    "parserClasspath"("org.gradle:gradle-resources:latest.release")
+    "parserClasspath"("org.gradle:gradle-testing-base:latest.release")
+    "parserClasspath"("org.gradle:gradle-testing-jvm:latest.release")
+    "parserClasspath"("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
+
     testImplementation("org.gradle:gradle-tooling-api:latest.release")
 
     testImplementation(project(":rewrite-test")) {
@@ -52,4 +67,10 @@ tasks.withType<GroovyCompile> {
     this.javaLauncher.set(javaToolchains.launcherFor {
         languageVersion.set(JavaLanguageVersion.of(8))
     })
+}
+
+tasks.named<Copy>("processResources") {
+    from(parserClasspath) {
+        into("META-INF/rewrite/classpath")
+    }
 }
