@@ -32,9 +32,9 @@ import java.util.stream.Stream;
 @Incubating(since = "7.24.0")
 public class ForwardFlow extends JavaVisitor<Integer> {
 
-    public static void findSinks(SinkFlow<?, ?> root) {
+    public static void findSinks(FlowGraph root, LocalFlowSpec<?, ?> spec) {
         VariableNameToFlowGraph variableNameToFlowGraph =
-                computeVariableAssignment(root.getCursor(), root, root.getSpec());
+                computeVariableAssignment(root.getCursor(), root, spec);
         if (variableNameToFlowGraph.identifierToFlow.isEmpty()) {
             return;
         }
@@ -57,7 +57,7 @@ public class ForwardFlow extends JavaVisitor<Integer> {
             }
         }
 
-        Analysis analysis = new Analysis(root.getSpec(), variableNameToFlowGraph.identifierToFlow.copy());
+        Analysis analysis = new Analysis(spec, variableNameToFlowGraph.identifierToFlow.copy());
         if (taintStmtCursorParent == null) {
             throw new IllegalStateException("`taintStmtCursorParent` is null. Computing flow starting at " + root.getCursor().getValue());
         }
@@ -194,6 +194,8 @@ public class ForwardFlow extends JavaVisitor<Integer> {
                 FlowGraph next = iterator.next();
                 next.addEdge(newFlowGraph);
             }
+            // Replace the existing flows with the new flow
+            identifierToFlows.get(identifier).clear();
             put(identifier, newFlowGraph);
             return newFlowGraph;
         }
@@ -215,8 +217,9 @@ public class ForwardFlow extends JavaVisitor<Integer> {
         }
 
         public IdentifierToFlows copy() {
-            // Don't copy the internal sets, just the map
-            return new IdentifierToFlows(new HashMap<>(identifierToFlows));
+            HashMap<String, Set<FlowGraph>> newIdentifierToFlows = new HashMap<>();
+            identifierToFlows.forEach((identifier, flows) -> newIdentifierToFlows.put(identifier, new HashSet<>(flows)));
+            return new IdentifierToFlows(newIdentifierToFlows);
         }
     }
 

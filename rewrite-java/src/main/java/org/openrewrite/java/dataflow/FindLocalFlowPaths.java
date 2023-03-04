@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.dataflow.analysis.SinkFlow;
+import org.openrewrite.java.dataflow.analysis.SinkFlowSummary;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
@@ -41,13 +42,9 @@ public class FindLocalFlowPaths<P> extends JavaIsoVisitor<P> {
         JavaSourceFile c = super.visitJavaSourceFile(cu, p);
 
         Set<Expression> flowSteps = Collections.newSetFromMap(new IdentityHashMap<>());
-        List<SinkFlow<?, ?>> sinkFlows = getCursor().getMessage(FLOW_GRAPHS);
-        for (SinkFlow<?, ?> flowGraph : requireNonNull(sinkFlows)) {
-            for (List<Cursor> flow : flowGraph.getFlows()) {
-                for (Cursor step : flow) {
-                    flowSteps.add(step.getValue());
-                }
-            }
+        List<SinkFlowSummary<?, ?>> sinkFlows = getCursor().getMessage(FLOW_GRAPHS);
+        for (SinkFlowSummary<?, ?> flowGraphSummary : requireNonNull(sinkFlows)) {
+            flowSteps.addAll(flowGraphSummary.getFlowParticipants());
         }
 
         if (!flowSteps.isEmpty()) {
@@ -67,7 +64,7 @@ public class FindLocalFlowPaths<P> extends JavaIsoVisitor<P> {
     public Expression visitExpression(Expression expression, P p) {
         Dataflow.startingAt(getCursor()).findSinks(spec).ifPresent(flow -> {
             if (flow.isNotEmpty()) {
-                List<SinkFlow<?, ?>> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
+                List<SinkFlowSummary> flowGraphs = getCursor().getNearestMessage(FLOW_GRAPHS);
                 assert flowGraphs != null;
                 flowGraphs.add(flow);
             }

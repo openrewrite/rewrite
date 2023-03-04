@@ -20,9 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.controlflow.ControlFlow;
-import org.openrewrite.java.dataflow.analysis.ForwardFlow;
-import org.openrewrite.java.dataflow.analysis.SinkFlow;
-import org.openrewrite.java.dataflow.analysis.SourceFlow;
+import org.openrewrite.java.dataflow.analysis.*;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -38,7 +36,7 @@ public class Dataflow {
     @Nullable
     private final Cursor start;
 
-    public <Source extends Expression, Sink extends J> Optional<SinkFlow<Source, Sink>> findSinks(LocalFlowSpec<Source, Sink> spec) {
+    public <Source extends Expression, Sink extends J> Optional<SinkFlowSummary<Source, Sink>> findSinks(LocalFlowSpec<Source, Sink> spec) {
         if (start == null) {
             return Optional.empty();
         }
@@ -52,10 +50,10 @@ public class Dataflow {
             return ControlFlow.startingAt(start).findControlFlow().flatMap(summary -> {
                 Set<Expression> reachable = summary.computeReachableExpressions(spec::isBarrierGuard);
 
-                SinkFlow<Source, Sink> flow = new SinkFlow<>(start, spec, reachable);
-
-                ForwardFlow.findSinks(flow);
-                return flow.isNotEmpty() ? Optional.of(flow) : Optional.empty();
+                FlowGraph flow = new SinkFlow(start);
+                ForwardFlow.findSinks(flow, spec);
+                SinkFlowSummary<Source, Sink> sinkFlowSummary = SinkFlowSummary.create(flow, spec, reachable);
+                return sinkFlowSummary.isNotEmpty() ? Optional.of(sinkFlowSummary) : Optional.empty();
             });
         }
         return Optional.empty();
