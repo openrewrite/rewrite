@@ -103,25 +103,29 @@ public abstract class ControlFlowNode {
     /**
      * A control flow node that represents a branching point in the code.
      */
-    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     static final class ConditionNode extends ControlFlowNode {
 
-        private final Cursor condition;
+        private final Guard guard;
         private final boolean truthFirst;
 
+        private ConditionNode(Guard guard, boolean truthFirst) {
+            this.guard = guard;
+            this.truthFirst = truthFirst;
+        }
+
         /**
-         * The successor that will be evaluated if the {@link #condition} is true.
+         * The successor that will be evaluated if the {@link #getCondition()}} is true.
          */
         @Getter
         private ControlFlowNode truthySuccessor;
         /**
-         * The successor that will be evaluated if the {@link #condition} is false.
+         * The successor that will be evaluated if the {@link #getCondition()} is false.
          */
         @Getter
         private ControlFlowNode falsySuccessor;
 
         public J getCondition() {
-            return condition.getValue();
+            return guard.getCursor().getValue();
         }
 
         @Override
@@ -146,8 +150,8 @@ public abstract class ControlFlowNode {
         }
 
         private Optional<Boolean> asBooleanLiteralValue() {
-            if (condition.getValue() instanceof J.Literal) {
-                J.Literal literal = condition.getValue();
+            if (getCondition() instanceof J.Literal) {
+                J.Literal literal = (J.Literal) getCondition();
                 if (TypeUtils.isAssignableTo(JavaType.Primitive.Boolean, literal.getType())) {
                     Boolean value = (Boolean) literal.getValue();
                     return Optional.ofNullable(value);
@@ -208,9 +212,8 @@ public abstract class ControlFlowNode {
         }
 
         Guard asGuard() {
-            return Guard
-                    .from(condition)
-                    .orElseThrow(() -> new ControlFlowIllegalStateException(exceptionMessageBuilder("Condition node has no guard!").thisNode(this).addCursor(condition)));
+            return guard;
+
         }
 
         @Override
@@ -223,16 +226,27 @@ public abstract class ControlFlowNode {
             if (falsySuccessor != null) {
                 falsyDescriptive = falsySuccessor.internalToDescriptiveString();
             }
-            return "ConditionNode{" + "condition=" + condition.getValue() + ", truthySuccessor=" + truthyDescriptive + ", falsySuccessor=" + falsyDescriptive + '}';
+            return "ConditionNode{" + "condition=" + getCondition() + ", truthySuccessor=" + truthyDescriptive + ", falsySuccessor=" + falsyDescriptive + '}';
         }
 
         @Override
         String toVisualizerString() {
-            J condition = this.condition.getValue();
+            J condition = this.getCondition();
             if (condition instanceof J.Literal) {
                 J.Literal literal = (J.Literal) condition;
                 if (literal.getValue() instanceof Boolean) {
                     return literal.getValue().toString();
+                }
+            }
+            if (condition instanceof J.Case) {
+                // Self loathing
+                J.Case caseStatement = (J.Case) condition;
+                String caseString = caseStatement.toString();
+                switch (caseStatement.getType()) {
+                    case Statement:
+                        return caseString.substring(0, caseString.indexOf(":") + 1);
+                    case Rule:
+                        return caseString.substring(0, caseString.indexOf("->") + 2);
                 }
             }
             return condition.toString();
@@ -240,7 +254,14 @@ public abstract class ControlFlowNode {
 
         @Override
         public String toString() {
-            return "ConditionNode{" + "condition=" + condition.getValue() + ", truthySuccessor=" + truthySuccessor + ", falsySuccessor=" + falsySuccessor + '}';
+            return "ConditionNode{" + "condition=" + getCondition() + ", truthySuccessor=" + truthySuccessor + ", falsySuccessor=" + falsySuccessor + '}';
+        }
+
+        private static ConditionNode create(Cursor cursor, boolean truthFirst) {
+            return Guard
+                    .from(cursor)
+                    .map(guard -> new ConditionNode(guard, truthFirst))
+                    .orElseThrow(() -> new ControlFlowIllegalStateException(exceptionMessageBuilder("Condition Node is not a guard!").addCursor(cursor)));
         }
     }
 
@@ -275,7 +296,20 @@ public abstract class ControlFlowNode {
         String getStatementsWithinBlock() {
             ControlFlowJavaPrinter.ControlFlowPrintOutputCapture<Integer> capture
                     = new ControlFlowJavaPrinter.ControlFlowPrintOutputCapture<>(0);
-            ControlFlowJavaPrinter<Integer> printer = new ControlFlowJavaPrinter<>(getNodeValues());
+            List<J> nodeValuesExpanded =
+                    getNodeValues()
+                            .stream()
+                            .flatMap(v -> {
+                                if (v instanceof J.Case) {
+                                    J.Case caseStatement = (J.Case) v;
+                                    if (caseStatement.getExpressions().size() == 1 && caseStatement.getExpressions().get(0) instanceof J.Literal) {
+                                        return Stream.of(v, caseStatement.getExpressions().get(0));
+                                    }
+                                }
+                                return Stream.of(v);
+                            })
+                            .collect(Collectors.toList());
+            ControlFlowJavaPrinter<Integer> printer = new ControlFlowJavaPrinter<>(nodeValuesExpanded);
             Cursor commonBlock = getCommonBlock();
             printer.visit(commonBlock.getValue(), capture, commonBlock.getParentOrThrow());
             return StringUtils.trimIndentPreserveCRLF(capture.getOut()).
@@ -320,7 +354,7 @@ public abstract class ControlFlowNode {
             if (node.isEmpty()) {
                 throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Cannot add condition node to empty basic block").addPredecessors(this));
             }
-            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), nextConditionDefault));
+            return addSuccessor(ControlFlowNode.ConditionNode.create(node.get(node.size() - 1), nextConditionDefault));
         }
 
         @Override
@@ -328,7 +362,7 @@ public abstract class ControlFlowNode {
             if (node.isEmpty()) {
                 throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Cannot add condition node to empty basic block").addPredecessors(this));
             }
-            return addSuccessor(new ControlFlowNode.ConditionNode(node.get(node.size() - 1), !nextConditionDefault));
+            return addSuccessor(ControlFlowNode.ConditionNode.create(node.get(node.size() - 1), !nextConditionDefault));
         }
 
         @Override
@@ -433,7 +467,7 @@ public abstract class ControlFlowNode {
     }
 
     @RequiredArgsConstructor(access = AccessLevel.PACKAGE, staticName = "create")
-    static final class End extends ControlFlowNode implements GraphTerminator{
+    static final class End extends ControlFlowNode implements GraphTerminator {
         @Getter
         private final GraphType graphType;
         private ControlFlowNode successor = null;

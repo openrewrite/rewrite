@@ -15,15 +15,22 @@
  */
 package org.openrewrite.java.dataflow;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ScanResult;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Objects;
+import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -45,10 +52,10 @@ class FindLocalTaintFlowTest implements RewriteTest {
 
             @Override
             public boolean isSanitizer(Expression expression, Cursor cursor) {
-                if(expression instanceof J.Binary binary) {
+                if (expression instanceof J.Binary binary) {
                     return binary.getOperator() == J.Binary.Type.Addition &&
-                           binary.getRight() instanceof J.Literal &&
-                           Objects.equals(((J.Literal) binary.getRight()).getValue(), "sanitizer");
+                      binary.getRight() instanceof J.Literal &&
+                      Objects.equals(((J.Literal) binary.getRight()).getValue(), "sanitizer");
                 }
                 return false;
             }
@@ -344,7 +351,7 @@ class FindLocalTaintFlowTest implements RewriteTest {
 
     @Test
     void taintTrackingThroughStringBuilder() {
-         rewriteRun(
+        rewriteRun(
           java(
             """
               class Test {
@@ -432,6 +439,38 @@ class FindLocalTaintFlowTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    static Stream<TestCase> fileProvider() {
+        try (ScanResult scanResult = new ClassGraph().acceptPaths("/find-local-taint-flow-tests").scan()) {
+            return scanResult
+              .getResourcesWithExtension(".java")
+              .stream()
+              .filter(resource -> resource.getPath().endsWith(".Initial.java"))
+              .map(resource -> new TestCase(
+                  resource.getPath(),
+                  resource.getPath().replace(".Initial", ".Result")
+                )
+              );
+        }
+    }
+
+    record TestCase(String source, String after) {
+    }
+
+    @ParameterizedTest
+    @MethodSource("fileProvider")
+    void taintTrackingThroughFiles(TestCase testCase) {
+        rewriteRun(
+          java(
+            StringUtils.readFully(
+              requireNonNull(FindLocalTaintFlowTest.class.getResourceAsStream("/" + testCase.source()))
+            ),
+            StringUtils.readFully(
+              requireNonNull(FindLocalTaintFlowTest.class.getResourceAsStream("/" + testCase.after()))
+            )
           )
         );
     }

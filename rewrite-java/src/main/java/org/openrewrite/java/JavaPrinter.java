@@ -382,8 +382,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             }
 
             if (getCursor().getValue() instanceof Case) {
-                Object aSwitch = getCursor().dropParentUntil(c -> c instanceof Switch || c instanceof SwitchExpression)
-                        .getValue();
+                Object aSwitch =
+                        getCursor()
+                                .dropParentUntil(
+                                        c -> c instanceof Switch ||
+                                                c instanceof SwitchExpression ||
+                                                c == Cursor.ROOT_VALUE
+                                )
+                                .getValue();
                 if (aSwitch instanceof J.SwitchExpression) {
                     Case aCase = getCursor().getValue();
                     if (!(aCase.getBody() instanceof J.Block)) {

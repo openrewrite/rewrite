@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -33,6 +34,17 @@ class GuardTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+
+            @Override
+            public Statement visitStatement(Statement statement, ExecutionContext executionContext) {
+                if (statement instanceof Expression) {
+                    return statement;
+                }
+                return Guard.from(getCursor())
+                  .map(e -> SearchResult.found(statement))
+                  .orElse(statement);
+            }
+
             @Override
             public Expression visitExpression(Expression expression, ExecutionContext p) {
                 return Guard.from(getCursor())
@@ -304,6 +316,49 @@ class GuardTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EnhancedSwitchMigration")
+    void switchCase() {
+        rewriteRun(
+          java(
+            """
+            class Test {
+                void test(int x) {
+                    switch (x) {
+                        case 1:
+                            System.out.println("one");
+                            break;
+                        case 2:
+                            System.out.println("two");
+                            break;
+                        default:
+                            System.out.println("other");
+                            break;
+                    }
+                }
+            }
+            """,
+            """
+            class Test {
+                void test(int x) {
+                    switch (x) {
+                        /*~~>*/case 1:
+                            System.out.println("one");
+                            break;
+                        /*~~>*/case 2:
+                            System.out.println("two");
+                            break;
+                        /*~~>*/default:
+                            System.out.println("other");
+                            break;
+                    }
+                }
+            }
+            """
           )
         );
     }

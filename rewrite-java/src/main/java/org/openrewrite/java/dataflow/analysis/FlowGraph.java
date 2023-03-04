@@ -38,6 +38,7 @@ public class FlowGraph {
 
     /**
      * Add an edge to the graph returning the newly added {@link FlowGraph} leaf.
+     *
      * @param cursor The cursor position of the new leaf.
      * @return The newly added {@link FlowGraph} leaf.
      */
@@ -60,5 +61,10 @@ public class FlowGraph {
         }
         edges.add(edge);
         return edge;
+    }
+
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() + "{" + "edges=" + edges.size() + ", cursor=" + cursor + '}';
     }
 }

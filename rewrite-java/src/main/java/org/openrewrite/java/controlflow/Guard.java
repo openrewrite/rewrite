@@ -16,25 +16,53 @@
 package org.openrewrite.java.controlflow;
 
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
 import java.util.Optional;
+import java.util.function.Function;
 
 @Incubating(since = "7.25.0")
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
 public final class Guard {
+    @Getter(AccessLevel.PACKAGE)
     private final Cursor cursor;
 
     @Getter
+    @Nullable
     private final Expression expression;
 
+    @Getter
+    @Nullable
+    private final J.Case theCase;
+
+
+    private Guard(Cursor cursor, @Nullable Expression expression, @Nullable J.Case theCase) {
+        if (expression == null && theCase == null) {
+            throw new IllegalArgumentException("Guard must have either an expression or a case");
+        }
+        this.cursor = cursor;
+        this.expression = expression;
+        this.theCase = theCase;
+    }
+
+    public <T> T map(Function<Expression, T> whenExpression, Function<J.Case, T> whenCase) {
+        if (expression != null) {
+            return whenExpression.apply(expression);
+        } else {
+            return whenCase.apply(theCase);
+        }
+    }
+
     public static Optional<Guard> from(Cursor cursor) {
+        if (cursor.getValue() instanceof J.Case) {
+            J.Case theCase = cursor.getValue();
+            return Optional.of(new Guard(cursor, null, theCase));
+        }
         if (!(cursor.getValue() instanceof Expression)) {
-            throw new IllegalArgumentException("Cursor must be on an expression, but was on " + cursor.getValue());
+            return Optional.empty();
         }
         Expression e = cursor.getValue();
         if (e instanceof J.ControlParentheses) {
@@ -45,7 +73,7 @@ public final class Guard {
         return getTypeSafe(cursor, e)
                 .map(type -> {
                     if (TypeUtils.isAssignableTo(JavaType.Primitive.Boolean, type)) {
-                        return new Guard(cursor, e);
+                        return new Guard(cursor, e, null);
                     } else {
                         return null;
                     }
