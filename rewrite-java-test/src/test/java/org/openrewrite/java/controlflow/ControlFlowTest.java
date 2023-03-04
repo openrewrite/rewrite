@@ -2437,7 +2437,7 @@ class ControlFlowTest implements RewriteTest {
             """
               abstract class Test {
                   abstract String[] array();
-              
+                            
                   void test(boolean condition) /*~~(BB: 5 CN: 2 EX: 1 | 1L)~~>*/{
                       for (String s : /*~~(1C)~~>*/condition ? /*~~(2L)~~>*/array() : new /*~~(3L)~~>*/String[] { "Hello!" }) /*~~(4L)~~>*/{
                           System.out.println(s);
@@ -2513,39 +2513,39 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            class Test {
-                void test(int x) {
-                    switch (x) {
-                        case 1:
-                            System.out.println("one");
-                            break;
-                        case 2:
-                            System.out.println("two");
-                            break;
-                        default:
-                            System.out.println("other");
-                            break;
-                    }
-                }
-            }
-            """,
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1:
+                              System.out.println("one");
+                              break;
+                          case 2:
+                              System.out.println("two");
+                              break;
+                          default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """,
             """
-            class Test {
-                void test(int x) /*~~(BB: 5 CN: 2 EX: 3 | 1L)~~>*/{
-                    switch (x) {
-                        /*~~(1C)~~>*/case 1:
-                            /*~~(2L)~~>*/System.out.println("one");
-                            break;
-                        /*~~(3L | 2C)~~>*/case 2:
-                            /*~~(4L)~~>*/System.out.println("two");
-                            break;
-                        /*~~(5L)~~>*/default:
-                            System.out.println("other");
-                            break;
-                    }
-                }
-            }
-            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 3 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1:
+                              /*~~(2L)~~>*/System.out.println("one");
+                              break;
+                          /*~~(3L | 2C)~~>*/case 2:
+                              /*~~(4L)~~>*/System.out.println("two");
+                              break;
+                          /*~~(5L)~~>*/default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """
           )
         );
     }
@@ -2555,27 +2555,27 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            class Test {
-                void test(int x) {
-                    switch (x) {
-                        case 1 -> System.out.println("one");
-                        case 2 -> System.out.println("two");
-                        default -> System.out.println("other");
-                    }
-                }
-            }
-            """,
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1 -> System.out.println("one");
+                          case 2 -> System.out.println("two");
+                          default -> System.out.println("other");
+                      }
+                  }
+              }
+              """,
             """
-            class Test {
-                void test(int x) /*~~(BB: 5 CN: 2 EX: 3 | 1L)~~>*/{
-                    switch (x) {
-                        /*~~(1C)~~>*/case 1 -> /*~~(2L)~~>*/System.out.println("one");
-                        /*~~(3L | 2C)~~>*/case 2 -> /*~~(4L)~~>*/System.out.println("two");
-                        /*~~(5L)~~>*/default -> System.out.println("other");
-                    }
-                }
-            }
-            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 3 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1 -> /*~~(2L)~~>*/System.out.println("one");
+                          /*~~(3L | 2C)~~>*/case 2 -> /*~~(4L)~~>*/System.out.println("two");
+                          /*~~(5L)~~>*/default -> System.out.println("other");
+                      }
+                  }
+              }
+              """
           )
         );
     }
@@ -2586,35 +2586,35 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            class Test {
-                void test(int x) {
-                    switch (x) {
-                        case 1:
-                        case 2:
-                            System.out.println("one or two");
-                            break;
-                        default:
-                            System.out.println("other");
-                            break;
-                    }
-                }
-            }
-            """,
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1:
+                          case 2:
+                              System.out.println("one or two");
+                              break;
+                          default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """,
             """
-            class Test {
-                void test(int x) /*~~(BB: 5 CN: 2 EX: 2 | 1L)~~>*/{
-                    switch (x) {
-                        /*~~(1C)~~>*/case 1:
-                        /*~~(2L | 2C)~~>*/case 2:
-                            /*~~(3L)~~>*/System.out.println("one or two");
-                            break;
-                        /*~~(4L)~~>*/default:
-                            System.out.println("other");
-                            break;
-                    }
-                }
-            }
-            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 2 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1:
+                          /*~~(2L | 2C)~~>*/case 2:
+                              /*~~(3L)~~>*/System.out.println("one or two");
+                              break;
+                          /*~~(4L)~~>*/default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """
           )
         );
     }
@@ -2625,37 +2625,37 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            class Test {
-                void test(int x) {
-                    switch (x) {
-                        case 1:
-                            System.out.println("one");
-                            break;
-                        case 2:
-                            System.out.println("two");
-                        default:
-                            System.out.println("other");
-                            break;
-                    }
-                }
-            }
-            """,
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1:
+                              System.out.println("one");
+                              break;
+                          case 2:
+                              System.out.println("two");
+                          default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """,
             """
-            class Test {
-                void test(int x) /*~~(BB: 5 CN: 2 EX: 2 | 1L)~~>*/{
-                    switch (x) {
-                        /*~~(1C)~~>*/case 1:
-                            /*~~(2L)~~>*/System.out.println("one");
-                            break;
-                        /*~~(3L | 2C)~~>*/case 2:
-                            /*~~(4L)~~>*/System.out.println("two");
-                        /*~~(5L)~~>*/default:
-                            System.out.println("other");
-                            break;
-                    }
-                }
-            }
-            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 2 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1:
+                              /*~~(2L)~~>*/System.out.println("one");
+                              break;
+                          /*~~(3L | 2C)~~>*/case 2:
+                              /*~~(4L)~~>*/System.out.println("two");
+                          /*~~(5L)~~>*/default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """
           )
         );
     }
@@ -2665,25 +2665,25 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            class Test {
-                void test(int x) {
-                    switch (x) {
-                        case 1, 2 -> System.out.println("one or two");
-                        default -> System.out.println("other");
-                    }
-                }
-            }
-            """,
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1, 2 -> System.out.println("one or two");
+                          default -> System.out.println("other");
+                      }
+                  }
+              }
+              """,
             """
-            class Test {
-                void test(int x) /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
-                    switch (x) {
-                        /*~~(1C)~~>*/case 1, 2 -> /*~~(2L)~~>*/System.out.println("one or two");
-                        /*~~(3L)~~>*/default -> System.out.println("other");
-                    }
-                }
-            }
-            """
+              class Test {
+                  void test(int x) /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1, 2 -> /*~~(2L)~~>*/System.out.println("one or two");
+                          /*~~(3L)~~>*/default -> System.out.println("other");
+                      }
+                  }
+              }
+              """
           )
         );
     }
@@ -2694,45 +2694,45 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-            class Test {
-                enum E { A, B, C }
-            
-                void test(E x) {
-                    switch (x) {
-                        case A:
-                            System.out.println("A");
-                            break;
-                        case B:
-                            System.out.println("B");
-                            break;
-                        case C:
-                            System.out.println("C");
-                            break;
-                    }
-                    System.out.println("done");
-                }
-            }
-            """,
+              class Test {
+                  enum E { A, B, C }
+                          
+                  void test(E x) {
+                      switch (x) {
+                          case A:
+                              System.out.println("A");
+                              break;
+                          case B:
+                              System.out.println("B");
+                              break;
+                          case C:
+                              System.out.println("C");
+                              break;
+                      }
+                      System.out.println("done");
+                  }
+              }
+              """,
             """
-            class Test {
-                enum E { A, B, C }
-            
-                void test(E x) /*~~(BB: 7 CN: 3 EX: 1 | 1L)~~>*/{
-                    switch (x) {
-                        /*~~(1C)~~>*/case A:
-                            /*~~(2L)~~>*/System.out.println("A");
-                            break;
-                        /*~~(3L | 2C)~~>*/case B:
-                            /*~~(4L)~~>*/System.out.println("B");
-                            break;
-                        /*~~(5L | 3C)~~>*/case C:
-                            /*~~(6L)~~>*/System.out.println("C");
-                            break;
-                    }
-                    /*~~(7L)~~>*/System.out.println("done");
-                }
-            }
-            """
+              class Test {
+                  enum E { A, B, C }
+                          
+                  void test(E x) /*~~(BB: 7 CN: 3 EX: 1 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case A:
+                              /*~~(2L)~~>*/System.out.println("A");
+                              break;
+                          /*~~(3L | 2C)~~>*/case B:
+                              /*~~(4L)~~>*/System.out.println("B");
+                              break;
+                          /*~~(5L | 3C)~~>*/case C:
+                              /*~~(6L)~~>*/System.out.println("C");
+                              break;
+                      }
+                      /*~~(7L)~~>*/System.out.println("done");
+                  }
+              }
+              """
           )
         );
     }
