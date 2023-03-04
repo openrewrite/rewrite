@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -184,6 +185,75 @@ class DependencyUseMapNotationTest implements RewriteTest {
                   implementation group: 'group', name: 'artifact', version: version, {
                       exclude group: "group2", module: "artifact2"
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2805")
+    @Test
+    void withoutVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "org.openrewrite:rewrite-core"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation group: 'org.openrewrite', name: 'rewrite-core'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void withClassifierAndExtension() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation "org.openrewrite:rewrite-core:latest.release:tests@jar"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+
+              repositories {
+                mavenCentral()
+              }
+
+              dependencies {
+                implementation group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'tests', ext: 'jar'
               }
               """
           )
