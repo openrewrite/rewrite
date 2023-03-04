@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
@@ -72,13 +73,13 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     @Override
     public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false)
-              .flatMap(source -> {
-                  if (source.getPath().endsWith("settings.gradle")) {
-                      return settingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
-                  }
-                  return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
-              })
-              .collect(Collectors.toList());
+                .flatMap(source -> {
+                    if (source.getPath().endsWith("settings.gradle")) {
+                        return settingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
+                    }
+                    return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
+                })
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -99,10 +100,10 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         protected GroovyParser.Builder groovyParser = GroovyParser.builder();
 
         @Nullable
-        private Collection<Path> buildscriptClasspath = JavaParser.runtimeClasspath();
+        private Collection<Path> buildscriptClasspath = loadDefaultClasspath();
 
         @Nullable
-        private Collection<Path> settingsClasspath = JavaParser.runtimeClasspath();
+        private Collection<Path> settingsClasspath = loadDefaultClasspath();
 
         public Builder() {
             super(G.CompilationUnit.class);
@@ -136,6 +137,11 @@ public class GradleParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
+        public Builder buildscriptClasspathFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
+            this.buildscriptClasspath = JavaParser.dependenciesFromResources(ctx, artifactNamesWithVersions);
+            return this;
+        }
+
         public Builder settingsClasspath(Collection<Path> classpath) {
             this.settingsClasspath = classpath;
             return this;
@@ -146,6 +152,11 @@ public class GradleParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
+        public Builder settingsClasspathFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
+            this.settingsClasspath = JavaParser.dependenciesFromResources(ctx, artifactNamesWithVersions);
+            return this;
+        }
+
         public GradleParser build() {
             return new GradleParser(this);
         }
@@ -153,6 +164,27 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         @Override
         public String getDslName() {
             return "gradle";
+        }
+
+        private static List<Path> loadDefaultClasspath() {
+            try {
+                Class.forName("org.gradle.api.Project");
+                return JavaParser.runtimeClasspath();
+            } catch (ClassNotFoundException e) {
+                return JavaParser.dependenciesFromResources(new InMemoryExecutionContext(),
+                        "gradle-base-services",
+                        "gradle-core-api",
+                        "gradle-language-groovy",
+                        "gradle-language-java",
+                        "gradle-logging",
+                        "gradle-messaging",
+                        "gradle-native",
+                        "gradle-process-services",
+                        "gradle-resources",
+                        "gradle-testing-base",
+                        "gradle-testing-jvm",
+                        "gradle-enterprise-gradle-plugin");
+            }
         }
     }
 }
