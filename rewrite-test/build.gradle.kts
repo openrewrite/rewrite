@@ -9,6 +9,6 @@ dependencies {
     api("org.junit.jupiter:junit-jupiter-params:latest.release")
 
     implementation("org.assertj:assertj-core:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.14.0")
     implementation("org.slf4j:slf4j-api:1.7.36")
 }

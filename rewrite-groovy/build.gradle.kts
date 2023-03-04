@@ -14,7 +14,7 @@ dependencies {
 
     api("org.jetbrains:annotations:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.14.0")
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))

@@ -8,7 +8,7 @@ dependencies {
     api(project(":rewrite-xml"))
     api("org.jetbrains:annotations:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.14.0")
 
     compileOnly(project(":rewrite-test"))
 
@@ -19,10 +19,10 @@ dependencies {
     // FIXME: switch to `latest.release`
     // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
     implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
-    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.14.0")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.14.0")
+    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations:2.14.0")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.0")
 
     // needed by AddDependency
     implementation(project(":rewrite-java"))
