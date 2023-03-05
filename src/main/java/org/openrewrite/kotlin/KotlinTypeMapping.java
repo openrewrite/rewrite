@@ -703,7 +703,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                         for (FirExpression argument : ((FirAnnotationCall) annotation).getArgumentList().getArguments()) {
                             if (argument instanceof FirPropertyAccessExpression) {
                                 FirPropertyAccessExpression accessExpression = (FirPropertyAccessExpression) argument;
-                                FirBasedSymbol<?> callRefSymbol = (((FirResolvedNamedReference) accessExpression.getCalleeReference()).getResolvedSymbol());
+                                FirBasedSymbol<?> callRefSymbol = ((FirResolvedNamedReference) accessExpression.getCalleeReference()).getResolvedSymbol();
                                 if (callRefSymbol instanceof FirEnumEntrySymbol) {
                                     FirEnumEntrySymbol enumEntrySymbol = (FirEnumEntrySymbol) callRefSymbol;
                                     if ("kotlin.annotation.AnnotationRetention$SOURCE".equals(convertKotlinFqToJavaFq(enumEntrySymbol.getCallableId().toString()))) {

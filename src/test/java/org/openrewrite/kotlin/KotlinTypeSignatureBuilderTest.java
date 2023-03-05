@@ -42,7 +42,7 @@ public class KotlinTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
     private static Disposable disposable = Disposer.newDisposable();
-    private static Map<FirSession, List<CompiledKotlinSource>> cu = null;
+    private static Map<FirSession, List<CompiledKotlinSource>> cu;
 
     @BeforeAll
     public static void beforeAll() {
@@ -72,10 +72,10 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String constructorSignature() {
         return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
-          .map(it -> (FirRegularClass) it)
+          .map(FirRegularClass.class::cast)
           .flatMap(it -> it.getDeclarations().stream())
-          .filter(it -> it instanceof FirConstructor)
-          .map(it -> (FirFunction) it)
+          .filter(FirConstructor.class::isInstance)
+          .map(FirFunction.class::cast)
           .findFirst()
           .orElseThrow()
           .getSymbol());
@@ -83,10 +83,10 @@ public class KotlinTypeSignatureBuilderTest {
 
     public Object innerClassSignature(String innerClassSimpleName) {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
-                .map(it -> (FirRegularClass) it)
+                .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(it -> it instanceof FirRegularClass)
-                .map(it -> (FirRegularClass) it)
+                .filter(FirRegularClass.class::isInstance)
+                .map(FirRegularClass.class::cast)
                 .filter(it -> innerClassSimpleName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()
@@ -95,10 +95,10 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String fieldSignature(String field) {
         return signatureBuilder().variableSignature(getCompiledSource().getDeclarations().stream()
-                .map(it -> (FirRegularClass) it)
+                .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(it -> it instanceof FirProperty)
-                .map(it -> (FirProperty) it)
+                .filter(FirProperty.class::isInstance)
+                .map(FirProperty.class::cast)
                 .filter(it -> field.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()
@@ -107,10 +107,10 @@ public class KotlinTypeSignatureBuilderTest {
 
     public Object firstMethodParameterSignature(String methodName) {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
-                .map(it -> (FirRegularClass) it)
+                .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(it -> it instanceof FirSimpleFunction)
-                .map(it -> (FirSimpleFunction) it)
+                .filter(FirSimpleFunction.class::isInstance)
+                .map(FirSimpleFunction.class::cast)
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()
@@ -121,7 +121,7 @@ public class KotlinTypeSignatureBuilderTest {
 
     public Object lastClassTypeParameter() {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
-                .map(it -> (FirRegularClass) it)
+                .map(FirRegularClass.class::cast)
                 .findFirst()
                 .orElseThrow()
                 .getTypeParameters()
@@ -130,10 +130,10 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String methodSignature(String methodName) {
         return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
-                .map(it -> (FirRegularClass) it)
+                .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(it -> it instanceof FirSimpleFunction)
-                .map(it -> (FirSimpleFunction) it)
+                .filter(FirSimpleFunction.class::isInstance)
+                .map(FirSimpleFunction.class::cast)
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()

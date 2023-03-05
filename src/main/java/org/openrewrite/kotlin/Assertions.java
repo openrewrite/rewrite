@@ -24,7 +24,7 @@ import org.openrewrite.test.SourceSpecs;
 
 import java.util.function.Consumer;
 
-public class Assertions {
+public final class Assertions {
     private Assertions() {
     }
 

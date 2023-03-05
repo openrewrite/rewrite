@@ -222,7 +222,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         VirtualFileSystem fileSystem = VirtualFileManager.getInstance().getFileSystem(StandardFileSystems.FILE_PROTOCOL);
         GlobalSearchScope globalScope = GlobalSearchScope.allScope(project);
         JvmPackagePartProvider packagePartProvider = environment.createPackagePartProvider(globalScope);
-        Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = (globalSearchScope) -> packagePartProvider;
+        Function<GlobalSearchScope, JvmPackagePartProvider> packagePartProviderFunction = globalSearchScope -> packagePartProvider;
         VfsBasedProjectEnvironment projectEnvironment = new VfsBasedProjectEnvironment(
                 project,
                 fileSystem,
@@ -241,8 +241,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         List<ContentRoot> contentRoots = compilerConfiguration.get(CONTENT_ROOTS);
         List<KotlinSourceRoot> roots = contentRoots == null ? emptyList() : contentRoots.stream()
-                .filter(it -> it instanceof KotlinSourceRoot)
-                .map(it -> (KotlinSourceRoot) it).collect(toList());
+                .filter(KotlinSourceRoot.class::isInstance)
+                .map(KotlinSourceRoot.class::cast).collect(toList());
 
         Function2<VirtualFile, Boolean, Unit> sortFiles = (virtualFile, isCommon) -> {
             KtVirtualFileSourceFile file = new KtVirtualFileSourceFile(virtualFile);
@@ -363,7 +363,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         private Collection<Path> classpath = JavaParser.runtimeClasspath();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
-        private boolean logCompilationWarningsAndErrors = false;
+        private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
 

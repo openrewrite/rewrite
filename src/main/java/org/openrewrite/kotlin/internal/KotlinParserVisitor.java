@@ -78,11 +78,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final KotlinTypeMapping typeMapping;
     private final ExecutionContext ctx;
     private final FirSession firSession;
-    private int cursor = 0;
+    private int cursor;
 
     // Associate top-level function and property declarations to the file.
     @Nullable
-    private FirFile currentFile = null;
+    private FirFile currentFile;
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
@@ -169,7 +169,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
         JContainer<Expression> args = null;
-        if (annotationCall.getArgumentList().getArguments().size() > 0) {
+        if (!annotationCall.getArgumentList().getArguments().isEmpty()) {
             Space argsPrefix = sourceBefore("(");
             List<JRightPadded<Expression>> expressions;
             if (annotationCall.getArgumentList().getArguments().size() == 1) {
@@ -2328,11 +2328,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
 
                 if (!(variableAssignment.getRValue() instanceof FirFunctionCall) ||
-                        (((FirFunctionCall) variableAssignment.getRValue())).getArgumentList().getArguments().size() != 1) {
+                        ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().size() != 1) {
                     throw new IllegalArgumentException("Unexpected compound assignment.");
                 }
 
-                FirElement rhs = (((FirFunctionCall) variableAssignment.getRValue())).getArgumentList().getArguments().get(0);
+                FirElement rhs = ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().get(0);
                 return new J.AssignmentOperation(
                         randomId(),
                         prefix,
@@ -3119,31 +3119,26 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
                     char c1 = source.charAt(delimIndex);
                     char c2 = source.charAt(delimIndex + 1);
-                    switch (c1) {
-                        case '/':
-                            switch (c2) {
-                                case '/':
-                                    inSingleLineComment = true;
-                                    delimIndex++;
-                                    break;
-                                case '*':
-                                    inMultiLineComment = true;
-                                    delimIndex++;
-                                    break;
-                            }
-                            break;
-                        case '*':
-                            if (c2 == '/') {
-                                inMultiLineComment = false;
-                                delimIndex += 2;
-                            }
-                            break;
+                    if (c1 == '/') {
+                        if (c2 == '/') {
+                            inSingleLineComment = true;
+                            delimIndex++;
+                        } else if (c2 == '*') {
+                            inMultiLineComment = true;
+                            delimIndex++;
+                        }
+                    } else if (c1 == '*') {
+                        if (c2 == '/') {
+                            inMultiLineComment = false;
+                            delimIndex += 2;
+                        }
                     }
                 }
 
                 if (!inMultiLineComment && !inSingleLineComment) {
-                    if (stop != null && source.charAt(delimIndex) == stop)
-                        return -1; // reached stop word before finding the delimiter
+                    if (stop != null && source.charAt(delimIndex) == stop) {
+                        return -1;
+                    } // reached stop word before finding the delimiter
 
                     if (source.startsWith(untilDelim, delimIndex)) {
                         break; // found it!

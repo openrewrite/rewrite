@@ -70,7 +70,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         }
 
         if (type instanceof FirClass) {
-            return ((FirClass) type).getTypeParameters().size() > 0 ? parameterizedSignature(type) : classSignature(type);
+            return !((FirClass) type).getTypeParameters().isEmpty() ? parameterizedSignature(type) : classSignature(type);
         } else if (type instanceof FirFunction) {
             return methodDeclarationSignature(((FirFunction) type).getSymbol());
         } else if (type instanceof FirVariable) {

@@ -180,7 +180,7 @@ public class KotlinTypeMappingTest {
     public void enumTypeA() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
         JavaType.Method type = clazz.getMethods().stream()
-          .filter(m -> m.getName().equals("<constructor>"))
+          .filter(m -> "<constructor>".equals(m.getName()))
           .findFirst()
           .orElseThrow(() -> new IllegalStateException("No constructor found"));
         assertThat(type.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeA{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeA,parameters=[]}");
@@ -194,7 +194,7 @@ public class KotlinTypeMappingTest {
     public void enumTypeB() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
         JavaType.Method type = clazz.getMethods().stream()
-          .filter(m -> m.getName().equals("<constructor>"))
+          .filter(m -> "<constructor>".equals(m.getName()))
           .findFirst()
           .orElseThrow(() -> new IllegalStateException("No constructor found"));
         assertThat(type.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB,parameters=[org.openrewrite.kotlin.KotlinTypeGoat$TypeA]}");
