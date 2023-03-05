@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.cleanup;
 
-import lombok.var;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -48,26 +47,26 @@ public class RemoveCompileScope extends Recipe {
 
         for (SourceFile entry : before) {
 
-            var content = ((Xml.Document) entry).getRoot().getContent();
+            List<? extends Content> content = ((Xml.Document) entry).getRoot().getContent();
 
             if (content == null) {
                 continue;
             }
 
-            for (var pomTags : content) {
+            for (Content pomTags : content) {
 
-                var xmlTag = ((Xml.Tag) pomTags);
+                Xml.Tag xmlTag = ((Xml.Tag) pomTags);
 
                 if ("dependencyManagement".equalsIgnoreCase(xmlTag.getName())) {
 
-                    var xmlContent = xmlTag.getContent();
+                    List<? extends Content> xmlContent = xmlTag.getContent();
 
                     if (xmlContent == null) {
                         continue;
                     }
 
-                    for (var dependency : xmlContent) {
-                        var dependencyContent = ((Xml.Tag) dependency).getContent();
+                    for (Content dependency : xmlContent) {
+                        List<? extends Content> dependencyContent = ((Xml.Tag) dependency).getContent();
 
                         if (dependencyContent == null) {
                             continue;
@@ -80,15 +79,15 @@ public class RemoveCompileScope extends Recipe {
                             String artifactId = "";
                             String scope = "";
 
-                            var dependencyEntryContent = ee.getContent();
+                            List<? extends Content> dependencyEntryContent = ee.getContent();
 
                             if (dependencyEntryContent == null) {
                                 continue;
                             }
 
-                            for (var dep : dependencyEntryContent) {
+                            for (Content dep : dependencyEntryContent) {
 
-                                var tag = ((Xml.Tag) dep);
+                                Xml.Tag tag = ((Xml.Tag) dep);
 
                                 if (tag.getName().equalsIgnoreCase("artifactId")) {
                                     artifactId = tag.getValue().orElse(null);
