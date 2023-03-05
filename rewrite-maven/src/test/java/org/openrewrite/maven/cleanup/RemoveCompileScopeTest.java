@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.cleanup;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -273,6 +274,175 @@ public class RemoveCompileScopeTest implements RewriteTest {
                             <groupId>com.google.guava</groupId>
                             <artifactId>guava</artifactId>
                             <version>28.2-jre</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+
+    @Test
+    @DisplayName("It should remove the compile scope when the declaration in dependencyManagement is also compile")
+    void removesWhenTheScopeWithinDependencyManagementIsTheSame() {
+
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>28.2-jre</version>
+                    <scope>compile</scope>
+                  </dependency>
+                  <dependency>
+                   <groupId>org.springframework</groupId>
+                    <artifactId>spring-web</artifactId>
+                    <version>6.0.5</version>
+                    <scope>compile</scope>
+                  </dependency>
+                </dependencies>
+                
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.2-jre</version>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>28.2-jre</version>
+                  </dependency>
+                  <dependency>
+                   <groupId>org.springframework</groupId>
+                    <artifactId>spring-web</artifactId>
+                    <version>6.0.5</version>
+                  </dependency>
+                </dependencies>
+                
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.2-jre</version>
+                            <scope>compile</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void partialMatchesWithinDependencyManagement() {
+
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>28.2-jre</version>
+                    <scope>compile</scope>
+                  </dependency>
+                  <dependency>
+                   <groupId>org.springframework</groupId>
+                    <artifactId>spring-web</artifactId>
+                    <version>6.0.5</version>
+                    <scope>compile</scope>
+                  </dependency>
+                </dependencies>
+                
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.2-jre</version>
+                            <scope>compile</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.springframework</groupId>
+                            <artifactId>spring-web</artifactId>
+                             <version>6.0.5</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+              
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>28.2-jre</version>
+                  </dependency>
+                  <dependency>
+                   <groupId>org.springframework</groupId>
+                    <artifactId>spring-web</artifactId>
+                    <version>6.0.5</version>
+                    <scope>compile</scope>
+                  </dependency>
+                </dependencies>
+                
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>28.2-jre</version>
+                            <scope>compile</scope>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.springframework</groupId>
+                            <artifactId>spring-web</artifactId>
+                             <version>6.0.5</version>
                             <scope>test</scope>
                         </dependency>
                     </dependencies>

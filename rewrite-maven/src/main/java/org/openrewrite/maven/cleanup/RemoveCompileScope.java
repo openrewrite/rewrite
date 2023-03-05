@@ -15,16 +15,17 @@
  */
 package org.openrewrite.maven.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import lombok.var;
+import org.jetbrains.annotations.NotNull;
+import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.xml.RemoveContentVisitor;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class RemoveCompileScope extends Recipe {
 
@@ -39,52 +40,125 @@ public class RemoveCompileScope extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+        // First we collect all the dependencies under dependencyManagement
+        // We should not remove the compile scope for dependencies declared with a different scope within dependencyManagement
 
-        Map<String,String> seen = new HashMap<>();
+        final Map<String, String> seen = new HashMap<>();
 
-        return new MavenVisitor<ExecutionContext>() {
-            @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+        for (SourceFile entry : before) {
 
-                if (isManagedDependencyTag()){
-                    String groupId = getGroupId(tag);
-                    String artifactId = getArtifactId(tag);
-                    String scope = getScope(tag);
+            var content = ((Xml.Document) entry).getRoot().getContent();
 
-                    if (groupId != null && artifactId!= null && scope!= null){
-                        seen.put(groupId + artifactId, scope);
+            if (content == null) {
+                continue;
+            }
+
+            for (var pomTags : content) {
+
+                var xmlTag = ((Xml.Tag) pomTags);
+
+                if ("dependencyManagement".equalsIgnoreCase(xmlTag.getName())) {
+
+                    var xmlContent = xmlTag.getContent();
+
+                    if (xmlContent == null) {
+                        continue;
+                    }
+
+                    for (var dependency : xmlContent) {
+                        var dependencyContent = ((Xml.Tag) dependency).getContent();
+
+                        if (dependencyContent == null) {
+                            continue;
+                        }
+
+                        for (Content dependencyEntry : dependencyContent) {
+                            Xml.Tag ee = (Xml.Tag) dependencyEntry;
+
+                            String groupId = "";
+                            String artifactId = "";
+                            String scope = "";
+
+                            var dependencyEntryContent = ee.getContent();
+
+                            if (dependencyEntryContent == null) {
+                                continue;
+                            }
+
+                            for (var dep : dependencyEntryContent) {
+
+                                var tag = ((Xml.Tag) dep);
+
+                                if (tag.getName().equalsIgnoreCase("artifactId")) {
+                                    artifactId = tag.getValue().orElse(null);
+                                } else if (tag.getName().equalsIgnoreCase("groupId")) {
+                                    groupId = tag.getValue().orElse(null);
+                                } else if (tag.getName().equalsIgnoreCase("scope")) {
+                                    scope = tag.getValue().orElse(null);
+                                }
+                            }
+
+                            if (groupId != null && artifactId != null && scope != null) {
+                                seen.put(deriveDependencyCoordinates(groupId, artifactId), scope);
+                            }
+                        }
+
                     }
                 }
-                else if (isDependencyTag()) {
-                    String groupId = getGroupId(tag);
-                    String artifactId = getArtifactId(tag);
-                    String scope = getScope(tag);
-                    String seenScope = seen.get(groupId + artifactId);
+            }
+        }
 
-                    if ("compile".equalsIgnoreCase(seenScope) || seenScope == null && "compile".equals(scope) ){
+        return ListUtils.map(before, s -> (SourceFile) new RemoveCompileScopeVisitor(seen).visit(s, ctx));
+    }
+
+    @NotNull
+    private static String deriveDependencyCoordinates(String groupId, String artifactId) {
+        return String.format("%s:%s", groupId, artifactId);
+    }
+
+    private static class RemoveCompileScopeVisitor extends MavenVisitor<ExecutionContext> {
+        private final Map<String, String> seen;
+
+        private RemoveCompileScopeVisitor(Map<String, String> seen) {
+            this.seen = seen;
+        }
+
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+
+            if (isDependencyTag()) {
+                String groupId = getGroupId(tag);
+                String artifactId = getArtifactId(tag);
+                String scope = getScope(tag);
+
+                if (groupId != null && artifactId != null && scope != null) {
+
+                    String seenScope = seen.get(deriveDependencyCoordinates(groupId, artifactId));
+
+                    if ("compile".equalsIgnoreCase(seenScope) || seenScope == null && "compile".equals(scope)) {
                         doAfterVisit(new RemoveContentVisitor<>(tag.getChild("scope").get(), false));
                     }
-
                 }
 
-                return super.visitTag(tag, ctx);
             }
-        };
-    }
 
-    @Nullable
-    private static String getScope(Xml.Tag tag) {
-        return tag.getChild("scope").flatMap(Xml.Tag::getValue).orElse(null);
-    }
+            return super.visitTag(tag, ctx);
+        }
 
-    @Nullable
-    private static String getArtifactId(Xml.Tag tag) {
-        return tag.getChild("artifactId").flatMap(Xml.Tag::getValue).orElse(null);
-    }
+        @Nullable
+        private String getScope(Xml.Tag tag) {
+            return tag.getChild("scope").flatMap(Xml.Tag::getValue).orElse(null);
+        }
 
-    @Nullable
-    private static String getGroupId(Xml.Tag tag) {
-        return tag.getChild("groupId").flatMap(Xml.Tag::getValue).orElse(null);
+        @Nullable
+        private String getArtifactId(Xml.Tag tag) {
+            return tag.getChild("artifactId").flatMap(Xml.Tag::getValue).orElse(null);
+        }
+
+        @Nullable
+        private String getGroupId(Xml.Tag tag) {
+            return tag.getChild("groupId").flatMap(Xml.Tag::getValue).orElse(null);
+        }
     }
 }
