@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -259,6 +260,156 @@ class JavaTemplateTest implements RewriteTest {
               class T {
                   void m() {
                       for (String s : Collections.emptyList()) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    void replaceAnonymousClassObject() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if (method.getSimpleName().equals("asList")) {
+                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                          .imports("java.util.Collections").build(),
+                        method.getCoordinates().replace(), method.getArguments().get(0));
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import java.util.Arrays;
+
+              class T {
+                  void m() {
+                      Object l = Arrays.asList(new java.util.HashMap<String, String>() {
+                          void foo() {
+                          }
+                      });
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+
+              class T {
+                  void m() {
+                      Object l = Collections.singletonList(new java.util.HashMap<String, String>() {
+                          void foo() {
+                          }
+                      });
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    void replaceGenericTypedObject() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if (method.getSimpleName().equals("asList")) {
+                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                          .imports("java.util.Collections").build(),
+                        method.getCoordinates().replace(), method.getArguments().get(0));
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+                  }
+                  return method;
+              }
+          })).afterRecipe(run -> {
+              new JavaIsoVisitor<Integer>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                      JavaType.Parameterized type = (JavaType.Parameterized) method.getType();
+                      assertThat(type.getTypeParameters()).hasSize(1);
+                      assertThat(type.getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                      return method;
+                  }
+              }.visit(run.getResults().get(0).getAfter(), 0);
+          }),
+          java(
+            """
+              import java.util.Arrays;
+
+              class T<T> {
+                  void m(T o) {
+                      Object l = Arrays.asList(o);
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+
+              class T<T> {
+                  void m(T o) {
+                      Object l = Collections.singletonList(o);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    void replaceParameterizedTypeObject() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if (method.getSimpleName().equals("asList")) {
+                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                          .imports("java.util.Collections").build(),
+                        method.getCoordinates().replace(), method.getArguments().get(0));
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+                  }
+                  return method;
+              }
+          })).afterRecipe(run -> {
+              new JavaIsoVisitor<Integer>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                      JavaType.Parameterized type = (JavaType.Parameterized) method.getType();
+                      assertThat(type.getTypeParameters()).hasSize(1);
+                      assertThat(type.getTypeParameters().get(0)).isInstanceOf(JavaType.Parameterized.class);
+                      assertThat(((JavaType.Parameterized) type.getTypeParameters().get(0)).getTypeParameters()
+                        .get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                      return method;
+                  }
+              }.visit(run.getResults().get(0).getAfter(), 0);
+          }),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Collection;
+
+              class T<T> {
+                  void m(Collection<T> o) {
+                      Object l = Arrays.asList(o);
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.Collections;
+
+              class T<T> {
+                  void m(Collection<T> o) {
+                      Object l = Collections.singletonList(o);
                   }
               }
               """

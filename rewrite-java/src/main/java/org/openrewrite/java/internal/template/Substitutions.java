@@ -26,6 +26,7 @@ import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -138,12 +139,20 @@ public class Substitutions {
     }
 
     private String getTypeName(@Nullable JavaType type) {
-        if (type == null) {
-            return "java.lang.Object";
+        if (type instanceof JavaType.Parameterized) {
+            StringJoiner joiner = new StringJoiner(",", "<", ">");
+            for (JavaType parameter : ((JavaType.Parameterized) type).getTypeParameters()) {
+                joiner.add(getTypeName(parameter));
+            }
+            return ((JavaType.Parameterized) type).getFullyQualifiedName() + joiner;
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            return ((JavaType.GenericTypeVariable) type).getName();
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Primitive) {
             return ((JavaType.Primitive) type).getKeyword();
+        } else if (type instanceof JavaType.Array) {
+            return getTypeName(((JavaType.Array) type).getElemType()) + "[]";
         } else {
             return "java.lang.Object";
         }
