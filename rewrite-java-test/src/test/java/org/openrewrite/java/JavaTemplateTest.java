@@ -539,6 +539,47 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2540")
+    void replaceMemberReference() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                      return memberRef.withTemplate(
+                        JavaTemplate
+                          .builder(this::getCursor, "() -> new ArrayList<>(1)")
+                          .imports("java.util.ArrayList")
+                          .build(),
+                        memberRef.getCoordinates().replace()
+                      );
+                  }
+              })).expectedCyclesThatMakeChanges(1).cycles(1),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.function.Supplier;
+              class Test {
+                  void consumer(Supplier<?> supplier) {}
+                  void test(int i) {
+                      consumer(ArrayList::new);
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.function.Supplier;
+              class Test {
+                  void consumer(Supplier<?> supplier) {}
+                  void test(int i) {
+                      consumer(() -> new ArrayList<>(1));
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1796")
     @Test
     void replaceFieldAccessWithMethodInvocation() {
