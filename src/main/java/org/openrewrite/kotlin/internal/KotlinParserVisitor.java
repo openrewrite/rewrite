@@ -642,7 +642,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
         }
 
-        J.Identifier name = createIdentifier(firRegularClass.getName().asString(), firRegularClass);
+        J.Identifier name;
+        if (ClassKind.OBJECT == classKind && "Companion".equals(firRegularClass.getName().asString())) {
+            name = new J.Identifier(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    "Companion",
+                    null,
+                    null
+            );
+        } else {
+            name = createIdentifier(firRegularClass.getName().asString(), firRegularClass);
+        }
 
         // KotlinTypeParameters with multiple bounds are defined outside the TypeParameter container.
         // KotlinTypeGoat<T, S> where S: A, T: B, S: C, T: D.

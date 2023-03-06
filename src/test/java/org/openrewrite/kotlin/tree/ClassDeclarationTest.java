@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -220,6 +221,19 @@ class ClassDeclarationTest implements RewriteTest {
     void object() {
         rewriteRun(
           kotlin(" object Test")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/32")
+    @Test
+    void companionObject() {
+        rewriteRun(
+          kotlin(
+            """
+                class Test {
+                    companion object
+                }
+            """)
         );
     }
 

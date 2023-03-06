@@ -286,9 +286,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("object");
             } else {
                 p.append(kind);
+                visit(classDecl.getName(), p);
             }
 
-            visit(classDecl.getName(), p);
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
 
             if (classDecl.getPrimaryConstructor() != null) {
