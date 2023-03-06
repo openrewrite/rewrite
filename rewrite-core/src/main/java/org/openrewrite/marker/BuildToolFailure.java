@@ -29,10 +29,19 @@ public class BuildToolFailure implements Marker {
     @EqualsAndHashCode.Include
     UUID id;
 
-    // String allows flexibility for future build tools and wrappers like gradlew and mvnw
+    /**
+     * The name of the build tool that failed, possibly a wrapper.
+     */
     String type;
     @Nullable
     String version;
+
+    /**
+     * The command that was executed.
+     */
+    @Nullable
+    String command;
+
     @Nullable
     Integer exitCode;
 }
