@@ -20,16 +20,20 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static org.openrewrite.Tree.randomId;
+
 public class ReplaceStringBuilderWithString extends Recipe {
-    private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
+    private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(..)");
     private static final MethodMatcher STRING_BUILDER_TO_STRING = new MethodMatcher("java.lang.StringBuilder toString()");
-    private static J.Parentheses parenthesesTemplate = null;
+    private static J.Parentheses parenthesesTemplate;
+    private static J.MethodInvocation stringValueOfTemplate;
 
     @Override
     public String getDisplayName() {
@@ -50,7 +54,7 @@ public class ReplaceStringBuilderWithString extends Recipe {
 
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(STRING_BUILDER_APPEND);
+        return Applicability.and(new UsesMethod<>(STRING_BUILDER_APPEND), new UsesMethod<>(STRING_BUILDER_TO_STRING));
     }
 
     @Override
@@ -61,7 +65,6 @@ public class ReplaceStringBuilderWithString extends Recipe {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
 
                 if (STRING_BUILDER_TO_STRING.matches(method)) {
-
                     List<Expression> methodCallsChain = new ArrayList<>();
                     List<Expression> arguments = new ArrayList<>();
                     boolean isFlattenable = flatMethodInvocationChain(method, methodCallsChain, arguments);
@@ -70,6 +73,8 @@ public class ReplaceStringBuilderWithString extends Recipe {
                     }
 
                     Collections.reverse(arguments);
+                    adjustExpressions(arguments);
+
                     Expression additive = ChainStringBuilderAppendCalls.additiveExpression(arguments)
                         .withPrefix(method.getPrefix());
 
@@ -91,7 +96,41 @@ public class ReplaceStringBuilderWithString extends Recipe {
                 return ((J.MethodInvocation) parent.getValue()).getSelect() == method;
             }
         };
+    }
 
+    private J.Literal toStringLiteral(J.Literal input) {
+        if (input.getType() == JavaType.Primitive.String) {
+            return input;
+        }
+
+        String value = input.getValueSource();
+        return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value,
+            "\"" + value + "\"", null, JavaType.Primitive.String);
+    }
+
+    private void adjustExpressions(List<Expression> arguments) {
+        for (int i = 0; i < arguments.size(); i++) {
+            if (i == 0) {
+                // the first expression must be a String type to support case like `new StringBuilder().append(1)`
+                if (!arguments.isEmpty() && !TypeUtils.isString(arguments.get(0).getType())) {
+                    if (arguments.get(0) instanceof J.Literal) {
+                        // wrap by ""
+                        arguments.set(0, toStringLiteral((J.Literal) arguments.get(0)));
+                    } else {
+                        J.MethodInvocation stringValueOf = getStringValueOfMethodInvocationTemplate()
+                            .withArguments(Collections.singletonList(arguments.get(0)))
+                            .withPrefix(arguments.get(0).getPrefix());
+                        arguments.set(0, stringValueOf);
+                    }
+                }
+            } else {
+                // wrap by parentheses to support case like `.append(1+2)`
+                Expression arg = arguments.get(i);
+                if (!(arg instanceof J.Identifier || arg instanceof J.Literal || arg instanceof J.MethodInvocation)) {
+                    arguments.set(i, wrapExpression(arg));
+                }
+            }
+        }
     }
 
     /**
@@ -122,12 +161,7 @@ public class ReplaceStringBuilderWithString extends Recipe {
             if (args.size() != 1) {
                 return false;
             } else {
-                Expression arg = args.get(0);
-                if (arg instanceof J.Identifier || arg instanceof J.Literal || arg instanceof J.MethodInvocation) {
-                    arguments.add(arg);
-                } else {
-                    return false;
-                }
+                arguments.add(args.get(0));
             }
         }
 
@@ -143,12 +177,25 @@ public class ReplaceStringBuilderWithString extends Recipe {
 
     public static J.Parentheses getParenthesesTemplate() {
         if (parenthesesTemplate == null) {
-            return PartProvider.buildPart("class B { void foo() { (\"A\" + \"B\").length(); } } ", J.Parentheses.class);
+            parenthesesTemplate = PartProvider.buildPart("class B { void foo() { (\"A\" + \"B\").length(); } } ", J.Parentheses.class);
         }
         return parenthesesTemplate;
     }
 
+    public static J.MethodInvocation getStringValueOfMethodInvocationTemplate() {
+        if (stringValueOfTemplate == null) {
+            stringValueOfTemplate = PartProvider.buildPart("class C {\n" +
+                                                           "    void foo() {\n" +
+                                                           "        Object obj = 1 + 2;\n" +
+                                                           "        String.valueOf(obj);\n" +
+                                                           "    }\n" +
+                                                           "}",
+                J.MethodInvocation.class);;
+        }
+        return stringValueOfTemplate;
+    }
+
     public static <T extends J> J.Parentheses<T> wrapExpression(Expression exp) {
-        return getParenthesesTemplate().withTree(exp);
+        return getParenthesesTemplate().withTree(exp).withPrefix(exp.getPrefix());
     }
 }

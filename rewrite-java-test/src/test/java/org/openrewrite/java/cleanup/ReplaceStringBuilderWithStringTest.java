@@ -144,6 +144,7 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
                       String key1 = new StringBuilder(10).append("_").append("a").toString();
                       String key2 = new StringBuilder(name()).append("_").append("a").toString();
                       String key3 = new StringBuilder("m").append("_").append("a").toString();
+                      String key4 = new StringBuilder("A" + "B").append("C").toString();
                   }
                   String name() {
                       return "name";
@@ -156,9 +157,48 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
                       String key1 = "_" + "a";
                       String key2 = name() + "_" + "a";
                       String key3 = "m" + "_" + "a";
+                      String key4 = "A" + "B" + "C";
                   }
                   String name() {
                       return "name";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void objectsGrouping() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void method() {
+                      String key0 = new StringBuilder().append(1 + 2).append(3).toString(); // "33"
+                      String key1 = new StringBuilder().append(1.5).append(2).append(3).toString(); // "1.523"
+                      String key2 = new StringBuilder("m").append(1 + 2).append(3).toString(); // "m33"
+                      String key3 = new StringBuilder(10).append("_").append(1).toString(); // "_1"
+                      String key4 = new StringBuilder("A" + "B").append(1 + 2).append(3).toString(); // "AB33"
+                      String key5 = new StringBuilder().append(count()).append(1).toString(); // 101
+                  }
+                  int count() {
+                      return 10;
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method() {
+                      String key0 = String.valueOf(1 + 2) + 3; // "33"
+                      String key1 = "1.5" + 2 + 3; // "1.523"
+                      String key2 = "m" + (1 + 2) + 3; // "m33"
+                      String key3 = "_" + 1; // "_1"
+                      String key4 = "A" + "B" + (1 + 2) + 3; // "AB33"
+                      String key5 = String.valueOf(count()) + 1; // 101
+                  }
+                  int count() {
+                      return 10;
                   }
               }
               """
