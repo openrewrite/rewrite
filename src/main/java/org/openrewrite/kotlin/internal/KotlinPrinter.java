@@ -411,14 +411,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             if (!omitBraces) {
                 p.append('{');
             }
-            visitMarkers(lambda.getParameters().getMarkers(), p);
-            if (lambda.getParameters().isParenthesized()) {
-                p.append('(');
-                visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-                p.append(')');
-            } else {
-                visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            }
+
+            visitLambdaParameters(lambda.getParameters(), p);
             if (!lambda.getParameters().getParameters().isEmpty()) {
                 visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.append("->");
@@ -435,6 +429,32 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(lambda, p);
             return lambda;
+        }
+
+        private void visitLambdaParameters(J.Lambda.Parameters parameters, PrintOutputCapture<P> p) {
+            visitMarkers(parameters.getMarkers(), p);
+            if (parameters.isParenthesized()) {
+                visitSpace(parameters.getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
+                p.append('(');
+                visitRightPadded(parameters.getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
+                p.append(')');
+            } else {
+                List<JRightPadded<J>> params = parameters.getPadding().getParams();
+                for (int i = 0; i < params.size(); i++) {
+                    JRightPadded<J> param = params.get(i);
+                    if (param.getElement() instanceof J.Lambda.Parameters) {
+                        visitLambdaParameters((J.Lambda.Parameters) param.getElement(), p);
+                        visitSpace(param.getAfter(), JRightPadded.Location.LAMBDA_PARAM.getAfterLocation(), p);
+                    } else {
+                        visit(param.getElement(), p);
+                        visitSpace(param.getAfter(), JRightPadded.Location.LAMBDA_PARAM.getAfterLocation(), p);
+                        visitMarkers(param.getMarkers(), p);
+                        if (i < params.size() - 1) {
+                            p.append(',');
+                        }
+                    }
+                }
+            }
         }
 
         @Override

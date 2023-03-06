@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -215,6 +214,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         JavaType closureType = null;
 
+        boolean omitDestruct = false;
         List<JRightPadded<J>> paramExprs = new ArrayList<>(anonymousFunction.getValueParameters().size());
         if (!anonymousFunction.getValueParameters().isEmpty()) {
             List<FirValueParameter> parameters = anonymousFunction.getValueParameters();
@@ -224,12 +224,47 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     continue;
                 }
 
-                J expr = visitElement(p, ctx);
-                JRightPadded<J> param = JRightPadded.build(expr);
-                if (i != parameters.size() - 1) {
-                    param = param.withAfter(sourceBefore(","));
+                if ("<destruct>".equals(p.getName().asString())) {
+                    omitDestruct = true;
+                    Space destructPrefix = sourceBefore("(");
+                    int saveCursor = cursor;
+                    String params = sourceBefore(")").getWhitespace();
+                    String[] paramNames = params.split(",");
+                    List<JRightPadded<J>> destructParams = new ArrayList<>(paramNames.length);
+                    cursor(saveCursor);
+
+                    ConeTypeProjection[] typeArguments = null;
+                    if (p.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+                        FirResolvedTypeRef typeRef = (FirResolvedTypeRef) p.getReturnTypeRef();
+                        typeArguments = typeRef.getType().getTypeArguments();
+                    }
+
+                    for (int j = 0; j < paramNames.length; j++) {
+                        String paramName = paramNames[j].trim();
+                        JavaType type = typeArguments == null ? null : typeMapping.type(typeArguments[j]);
+                        J.Identifier param = createIdentifier(paramName, type, null);
+                        JRightPadded<J> paramExpr = JRightPadded.build(param);
+                        if (j != paramNames.length - 1) {
+                            paramExpr = paramExpr.withAfter(sourceBefore(","));
+                        } else {
+                            paramExpr = paramExpr.withAfter(sourceBefore(")"));
+                        }
+                        destructParams.add(paramExpr);
+                    }
+
+                    // Create a new J.Lambda.Parameters instance to represent the destructured parameters.
+                    // { (a, b), c -> ... } // a destructured pair and another parameter
+                    // { (a, b), (c, d) -> ... } // a destructured pair and another destructured pair
+                    J.Lambda.Parameters destructParamsExpr = new J.Lambda.Parameters(randomId(), destructPrefix, Markers.EMPTY, true, destructParams);
+                    paramExprs.add(JRightPadded.build(destructParamsExpr));
+                } else {
+                    J expr = visitElement(p, ctx);
+                    JRightPadded<J> param = JRightPadded.build(expr);
+                    if (i != parameters.size() - 1) {
+                        param = param.withAfter(sourceBefore(","));
+                    }
+                    paramExprs.add(param);
                 }
-                paramExprs.add(param);
             }
         }
 
@@ -250,7 +285,20 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             cursor(saveCursor);
         }
 
-        J body = anonymousFunction.getBody() == null ? null : visitElement(anonymousFunction.getBody(), ctx);
+        Set<FirElement> skip = Collections.newSetFromMap(new IdentityHashMap<>());
+        if (omitDestruct) {
+            // skip destructured property declarations.
+            for (FirStatement statement : anonymousFunction.getBody().getStatements()) {
+                if (statement instanceof FirProperty && ((FirProperty) statement).getInitializer() instanceof FirComponentCall &&
+                        ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver() instanceof FirPropertyAccessExpression &&
+                        ((FirPropertyAccessExpression) ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver()).getCalleeReference() instanceof FirResolvedNamedReference &&
+                        "<destruct>".equals(((FirResolvedNamedReference) ((FirPropertyAccessExpression) ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver()).getCalleeReference()).getName().asString())) {
+                    skip.add(statement);
+                }
+            }
+        }
+
+        J body = anonymousFunction.getBody() == null ? null : visitBlock(anonymousFunction.getBody(), skip, ctx);
         if (body instanceof J.Block && !omitBraces) {
             body = ((J.Block) body).withEnd(sourceBefore("}"));
         }

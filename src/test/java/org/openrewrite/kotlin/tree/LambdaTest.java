@@ -47,4 +47,24 @@ public class LambdaTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void destructuredLambdaParams() {
+        rewriteRun(
+          kotlin(
+            """
+                abstract class SomeClass {
+                
+                    private val defaults = emptySet < String > ( )
+                
+                    abstract fun fields ( ) : List < Pair < String , Any ? > >
+                
+                    fun inputValues ( ) : List < Pair < String , Any ? > > {
+                        return fields ( ) .filter { ( k , _ ) -> ! defaults . contains ( k ) }
+                    }
+                }
+            """
+          )
+        );
+    }
 }
