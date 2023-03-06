@@ -131,8 +131,14 @@ public class ReplaceStringBuilderWithString extends Recipe {
             }
         }
 
-        return select instanceof J.NewClass
-               && TypeUtils.isOfClassType(((J.NewClass) select).getClazz().getType(), "java.lang.StringBuilder");
+        if (select instanceof J.NewClass && TypeUtils.isOfClassType(((J.NewClass) select).getClazz().getType(), "java.lang.StringBuilder")) {
+            J.NewClass nc = (J.NewClass) select;
+            if (nc.getArguments().size() == 1 && TypeUtils.isString(nc.getArguments().get(0).getType())) {
+                arguments.add(nc.getArguments().get(0));
+            }
+            return true;
+        }
+        return false;
     }
 
     public static J.Parentheses getParenthesesTemplate() {
