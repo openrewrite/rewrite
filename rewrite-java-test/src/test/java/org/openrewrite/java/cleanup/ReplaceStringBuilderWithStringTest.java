@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -125,6 +126,39 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
               class A {
                   void foo() {
                       int len = ("A" + "B").length();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2930")
+    @Test
+    void withConstructor() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void method() {
+                      String key1 = new StringBuilder(10).append("_").append("a").toString();
+                      String key2 = new StringBuilder(name()).append("_").append("a").toString();
+                      String key3 = new StringBuilder("m").append("_").append("a").toString();
+                  }
+                  String name() {
+                      return "name";
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method() {
+                      String key1 = "_" + "a";
+                      String key2 = name() + "_" + "a";
+                      String key3 = "m" + "_" + "a";
+                  }
+                  String name() {
+                      return "name";
                   }
               }
               """
