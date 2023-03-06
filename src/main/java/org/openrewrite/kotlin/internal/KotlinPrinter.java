@@ -284,6 +284,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             KObject KObject = classDecl.getMarkers().findFirst(KObject.class).orElse(null);
             if (KObject != null) {
                 p.append("object");
+                if (classDecl.getLeadingAnnotations().stream().noneMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
+                    visit(classDecl.getName(), p);
+                }
             } else {
                 p.append(kind);
                 visit(classDecl.getName(), p);

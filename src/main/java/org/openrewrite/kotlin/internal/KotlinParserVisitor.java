@@ -643,12 +643,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         J.Identifier name;
-        if (ClassKind.OBJECT == classKind && "Companion".equals(firRegularClass.getName().asString())) {
+        if (ClassKind.OBJECT == classKind && leadingAnnotation.stream().anyMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
             name = new J.Identifier(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
-                    "Companion",
+                    firRegularClass.getName().asString(),
                     null,
                     null
             );

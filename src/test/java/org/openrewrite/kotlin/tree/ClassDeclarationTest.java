@@ -228,6 +228,7 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void companionObject() {
         rewriteRun(
+          kotlin("object Companion"),
           kotlin(
             """
                 class Test {
