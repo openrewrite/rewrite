@@ -27,9 +27,9 @@ public class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    val square = { number : Int -> number * number }
-                }
+            fun method ( ) {
+                val square = { number : Int -> number * number }
+            }
             """
           )
         );
@@ -40,9 +40,9 @@ public class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun plugins ( input : ( ) -> String ) {
-                  println ( input( ) )
-                }
+            fun plugins ( input : ( ) -> String ) {
+              println ( input( ) )
+            }
             """
           )
         );
@@ -53,16 +53,16 @@ public class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                abstract class SomeClass {
-                
-                    private val defaults = emptySet < String > ( )
-                
-                    abstract fun fields ( ) : List < Pair < String , Any ? > >
-                
-                    fun inputValues ( ) : List < Pair < String , Any ? > > {
-                        return fields ( ) .filter { ( k , _ ) -> ! defaults . contains ( k ) }
-                    }
+            abstract class SomeClass {
+            
+                private val defaults = emptySet < String > ( )
+            
+                abstract fun fields ( ) : List < Pair < String , Any ? > >
+            
+                fun inputValues ( ) : List < Pair < String , Any ? > > {
+                    return fields ( ) .filter { ( k , _ ) -> ! defaults . contains ( k ) }
                 }
+            }
             """
           )
         );

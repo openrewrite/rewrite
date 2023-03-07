@@ -27,9 +27,9 @@ public class LiteralTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val s1 = "\\\\u{U1}"
-                val s2 = "\\\\u1234"
-                val s3 = "\\\\u{00AUF}"
+            val s1 = "\\\\u{U1}"
+            val s2 = "\\\\u1234"
+            val s3 = "\\\\u{00AUF}"
             """
           )
         );
@@ -54,10 +54,10 @@ public class LiteralTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val d : Double = 1.0
-                val f : Float = 1.0F
-                val l1 : Long = 1
-                val l2 : Long = 1L
+            val d : Double = 1.0
+            val f : Float = 1.0F
+            val l1 : Long = 1
+            val l2 : Long = 1L
             """
           )
         );
@@ -68,10 +68,10 @@ public class LiteralTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val l : Long = 0b10L
-                val b : Byte = 0b10
-                val s : Short = 0b10
-                val i : Int = 0b10
+            val l : Long = 0b10L
+            val b : Byte = 0b10
+            val s : Short = 0b10
+            val i : Int = 0b10
             """
           )
         );
@@ -82,9 +82,9 @@ public class LiteralTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val l : Long = 0xA0L
-                val s : Short = 0xA0
-                val i : Int = 0xA0
+            val l : Long = 0xA0L
+            val s : Short = 0xA0
+            val i : Int = 0xA0
             """
           )
         );
@@ -95,9 +95,9 @@ public class LiteralTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val c1 : Character = '\uD800'
-                val c2 : Character = '\uDfFf'
-            """
+            val c1 : Character = ''
+  \uD800          val c2 : Character = ''
+      \uDfFf      """
           )
         );
     }
@@ -107,9 +107,9 @@ public class LiteralTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val s1 : String = "\uD800"
-                val s2 : String = "\uDfFf"
-            """
+            val s1 : String = ""
+  \uD800          val s2 : String = ""
+      \uDfFf      """
           )
         );
     }

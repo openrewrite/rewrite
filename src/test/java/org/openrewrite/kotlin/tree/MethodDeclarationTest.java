@@ -69,9 +69,9 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) : Boolean {
-                    return true
-                }
+            fun method ( ) : Boolean {
+                return true
+            }
             """
           )
         );
@@ -82,10 +82,10 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class A {
-                    fun method ( ) {
-                    }
+            class A {
+                fun method ( ) {
                 }
+            }
             """
           )
         );
@@ -96,19 +96,19 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
           """
-                class Spec {
-                    fun version ( version : String) : Spec {
-                        return this
-                    }
+            class Spec {
+                fun version ( version : String) : Spec {
+                    return this
                 }
+            }
             """
           ),
           kotlin(
             """
-                class A {
-                  fun method ( ) {
-                  }
-                }
+            class A {
+              fun method ( ) {
+              }
+            }
             """
           ),
           kotlin(
@@ -158,17 +158,17 @@ public class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test {
-                    fun build ( s : ( ) -> String ) {
-                    }
+            class Test {
+                fun build ( s : ( ) -> String ) {
                 }
+            }
             """
           ),
           kotlin(
             """
-                fun Test . method ( ) = build {
-                    "42"
-                }
+            fun Test . method ( ) = build {
+                "42"
+            }
             """)
         );
     }
@@ -177,8 +177,8 @@ public class MethodDeclarationTest implements RewriteTest {
     void nullableReturnType() {
         rewriteRun(
           kotlin("""
-              fun method() : Array<Int> ? {
-              }
+          fun method() : Array<Int> ? {
+          }
           """)
         );
     }
@@ -187,7 +187,7 @@ public class MethodDeclarationTest implements RewriteTest {
     void typeParameterAndTypeReceiver() {
         rewriteRun(
           kotlin("""
-              fun <T: Any> Array<Int>.method(t: T) = Unit
+          fun <T: Any> Array<Int>.method(t: T) = Unit
           """)
         );
     }

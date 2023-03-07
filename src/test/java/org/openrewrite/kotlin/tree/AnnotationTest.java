@@ -27,9 +27,9 @@ public class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                @file : Suppress ( "DEPRECATION_ERROR" , "RedundantUnitReturnType" )
+            @file : Suppress ( "DEPRECATION_ERROR" , "RedundantUnitReturnType" )
 
-                class A
+            class A
             """
           )
         );
@@ -40,8 +40,8 @@ public class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                @SuppressWarnings ( "ConstantConditions" , "unchecked" )
-                class A
+            @SuppressWarnings ( "ConstantConditions" , "unchecked" )
+            class A
             """
           )
         );
@@ -52,16 +52,16 @@ public class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                @Target ( AnnotationTarget . LOCAL_VARIABLE )
-                @Retention ( AnnotationRetention . SOURCE )
-                annotation class Test ( val values : Array < String > ) {
-                }
+            @Target ( AnnotationTarget . LOCAL_VARIABLE )
+            @Retention ( AnnotationRetention . SOURCE )
+            annotation class Test ( val values : Array < String > ) {
+            }
             """
           ),
           kotlin(
             """
-                @Test( values = [ "a" , "b" , "c" ] )
-                val a = 42
+            @Test( values = [ "a" , "b" , "c" ] )
+            val a = 42
             """
           )
         );

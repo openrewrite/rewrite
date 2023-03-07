@@ -33,10 +33,10 @@ public class FindKotlinSourcesTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class A
+            class A
             """,
             """
-                /*~~>*/class A
+            /*~~>*/class A
             """
           )
         );

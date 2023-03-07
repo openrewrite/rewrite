@@ -27,11 +27,11 @@ public class MethodReferenceTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test ( val answer : Int )
-                fun method ( ) {
-                    val l = listOf ( Test ( 42 ) )
-                    l . map { Test :: answer }
-                }
+            class Test ( val answer : Int )
+            fun method ( ) {
+                val l = listOf ( Test ( 42 ) )
+                l . map { Test :: answer }
+            }
             """)
         );
     }

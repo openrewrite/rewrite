@@ -27,10 +27,10 @@ class CastTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( a : Any ) {
-                    val b = a as String
-                    val c : String ? = a as? String
-                }
+            fun method ( a : Any ) {
+                val b = a as String
+                val c : String ? = a as? String
+            }
             """
           )
         );

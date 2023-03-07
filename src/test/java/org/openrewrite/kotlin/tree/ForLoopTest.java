@@ -27,12 +27,12 @@ public class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    val l = listOf ( 1 , 2 , 3 )
-                    for ( i in l ) {
-                        println ( i )
-                    }
+            fun method ( ) {
+                val l = listOf ( 1 , 2 , 3 )
+                for ( i in l ) {
+                    println ( i )
                 }
+            }
             """
           )
         );
@@ -43,14 +43,14 @@ public class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method() {
-                    val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
-                    for ( ( key , value ) in map ) {
-                        print ( key )
-                        print ( ", " )
-                        println ( value )
-                    }
+            fun method() {
+                val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+                for ( ( key , value ) in map ) {
+                    print ( key )
+                    print ( ", " )
+                    println ( value )
                 }
+            }
             """
           )
         );
@@ -61,11 +61,11 @@ public class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    for ( i in 1..42 ) {
-                        println ( i )
-                    }
+            fun method ( ) {
+                for ( i in 1..42 ) {
+                    println ( i )
                 }
+            }
             """
           )
         );
@@ -76,10 +76,10 @@ public class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( array : Array<Int> ) {
-                    for ( ( index , value ) in array.withIndex ( ) ) {
-                    }
+            fun method ( array : Array<Int> ) {
+                for ( ( index , value ) in array.withIndex ( ) ) {
                 }
+            }
             """
           )
         );
@@ -90,10 +90,10 @@ public class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    for ( i in 6 downTo 0 step 2 ) {
-                    }
+            fun method ( ) {
+                for ( i in 6 downTo 0 step 2 ) {
                 }
+            }
             """
           )
         );

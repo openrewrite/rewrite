@@ -27,8 +27,8 @@ public class MapEntryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val a = mapOf ( 1 to "one" , 2 to "two" )
-                val b = a [ 1 ]
+            val a = mapOf ( 1 to "one" , 2 to "two" )
+            val b = a [ 1 ]
             """
           )
         );

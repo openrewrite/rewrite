@@ -57,11 +57,11 @@ public class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                val latest = if (true) {
-                    "latest.release"
-                } else {
-                    "latest.integration"
-                }
+            val latest = if (true) {
+                "latest.release"
+            } else {
+                "latest.integration"
+            }
             """)
         );
     }
@@ -96,11 +96,11 @@ public class VariableDeclarationTest implements RewriteTest {
     void stringTemplate() {
         rewriteRun(
           kotlin("""
-              val a = "Hello"
-              val b = "World"
-              val c = "${a} ${b}!"
-              
-              val after = 0
+          val a = "Hello"
+          val b = "World"
+          val c = "${a} ${b}!"
+          
+          val after = 0
           """)
         );
     }
@@ -109,11 +109,11 @@ public class VariableDeclarationTest implements RewriteTest {
     void stringTemplateNoBraces() {
         rewriteRun(
           kotlin("""
-              val a = "Hello"
-              val b = "World"
-              val c = "$a $b!"
-              
-              val after = 0
+          val a = "Hello"
+          val b = "World"
+          val c = "$a $b!"
+          
+          val after = 0
           """)
         );
     }
@@ -122,13 +122,13 @@ public class VariableDeclarationTest implements RewriteTest {
     void propertyAccessor() {
         rewriteRun(
           kotlin("""
-              class Test {
-                  val value = 10
-              }
-              val a = Test ( )
-              val b = "${a.value}"
-              
-              val after = 0
+          class Test {
+              val value = 10
+          }
+          val a = Test ( )
+          val b = "${a.value}"
+          
+          val after = 0
           """)
         );
     }
@@ -137,15 +137,15 @@ public class VariableDeclarationTest implements RewriteTest {
     void multipleFieldAccess() {
         rewriteRun(
           kotlin("""
-              class Test {
-                  val testValue = Inner()
-                  class Inner {
-                      val innerValue = 10
-                  }
+          class Test {
+              val testValue = Inner()
+              class Inner {
+                  val innerValue = 10
               }
+          }
 
-              val a = Test ( )
-              val b = "${a.testValue.innerValue}"
+          val a = Test ( )
+          val b = "${a.testValue.innerValue}"
           """)
         );
     }
@@ -154,9 +154,9 @@ public class VariableDeclarationTest implements RewriteTest {
     void tripleQuotedString() {
         rewriteRun(
           kotlin("""
-              val template = \"\"\"
-                Hello world!
-              \"\"\"
+          val template = \"\"\"
+            Hello world!
+          \"\"\"
           """)
         );
     }
@@ -165,7 +165,7 @@ public class VariableDeclarationTest implements RewriteTest {
     void mapOf() {
         rewriteRun(
           kotlin("""
-              val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+          val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
           """)
         );
     }
@@ -175,8 +175,8 @@ public class VariableDeclarationTest implements RewriteTest {
     void wildcard() {
         rewriteRun(
           kotlin("""
-                import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
-                val a: KotlinCompilation<*> = null
+            import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+            val a: KotlinCompilation<*> = null
             """
           )
         );
@@ -186,7 +186,7 @@ public class VariableDeclarationTest implements RewriteTest {
     void ifElseExpression() {
         rewriteRun(
           kotlin("""
-              fun method(condition: Boolean): Unit = if (condition) Unit else Unit
+          fun method(condition: Boolean): Unit = if (condition) Unit else Unit
           """)
         );
     }

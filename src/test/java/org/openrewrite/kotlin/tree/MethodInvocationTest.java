@@ -26,17 +26,17 @@ public class MethodInvocationTest implements RewriteTest {
     void implicitFunctionCall() {
         rewriteRun(
           kotlin("""
-                fun plugins ( input : ( ) -> String ) {
-                    println ( input ( ) )
-                }
+            fun plugins ( input : ( ) -> String ) {
+                println ( input ( ) )
+            }
             """
           ),
           kotlin("""
-                fun main ( ) {
-                    plugins {
-                        "test"
-                    }
+            fun main ( ) {
+                plugins {
+                    "test"
                 }
+            }
             """
           )
         );
@@ -46,54 +46,54 @@ public class MethodInvocationTest implements RewriteTest {
     void buildGradle() {
         rewriteRun(
           kotlin("""
-                class Spec {
-                    var id = ""
-                    fun id ( arg : String) : Spec {
-                        return this
-                    }
-                    fun version ( version : String) : Spec {
-                        return this
-                    }
+            class Spec {
+                var id = ""
+                fun id ( arg : String) : Spec {
+                    return this
                 }
+                fun version ( version : String) : Spec {
+                    return this
+                }
+            }
             """
           ),
           kotlin("""
-                class SpecScope  {
-                    val delegate : Spec = Spec ( )
-                    fun id ( id : String ) : Spec = delegate . id ( id )
-                }
-                public infix fun Spec . version ( version : String ) : Spec = version ( version )
-                public inline val SpecScope . `java-library` : Spec get ( ) = id ( "org.gradle.java-library" )
+            class SpecScope  {
+                val delegate : Spec = Spec ( )
+                fun id ( id : String ) : Spec = delegate . id ( id )
+            }
+            public infix fun Spec . version ( version : String ) : Spec = version ( version )
+            public inline val SpecScope . `java-library` : Spec get ( ) = id ( "org.gradle.java-library" )
             """
           ),
           kotlin("""
-                class DSL  {
-                    fun plugins ( block : SpecScope . ( ) -> Unit ) {
-                        block ( SpecScope ( ) )
-                    }
+            class DSL  {
+                fun plugins ( block : SpecScope . ( ) -> Unit ) {
+                    block ( SpecScope ( ) )
                 }
+            }
             """
           ),
           kotlin("""
-                fun method ( ) {
-                    DSL ( ) .
-                    
-                    plugins {
-                        `java-library`
-                    
-                        id ( "nebula.release") version "16.0.0"
-                    
-                        id ( "nebula.maven-manifest" ) version "18.4.0"
-                        id ( "nebula.maven-nebula-publish" ) version "18.4.0"
-                        id ( "nebula.maven-resolved-dependencies" ) version "18.4.0"
-                    
-                        id ( "nebula.contacts" ) version "6.0.0"
-                        id ( "nebula.info" ) version "11.3.3"
-                    
-                        id ( "nebula.javadoc-jar" ) version "18.4.0"
-                        id ( "nebula.source-jar" ) version "18.4.0"
-                    }
+            fun method ( ) {
+                DSL ( ) .
+                
+                plugins {
+                    `java-library`
+                
+                    id ( "nebula.release") version "16.0.0"
+                
+                    id ( "nebula.maven-manifest" ) version "18.4.0"
+                    id ( "nebula.maven-nebula-publish" ) version "18.4.0"
+                    id ( "nebula.maven-resolved-dependencies" ) version "18.4.0"
+                
+                    id ( "nebula.contacts" ) version "6.0.0"
+                    id ( "nebula.info" ) version "11.3.3"
+                
+                    id ( "nebula.javadoc-jar" ) version "18.4.0"
+                    id ( "nebula.source-jar" ) version "18.4.0"
                 }
+            }
             """
           )
         );
@@ -105,10 +105,10 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("fun method ( arg : Any ) { }"),
           kotlin(
             """
-                fun callMethodWithLambda ( ) {
-                    method {
-                    }
+            fun callMethodWithLambda ( ) {
+                method {
                 }
+            }
             """
           )
         );
@@ -119,17 +119,17 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test {
-                    fun method ( ) {
-                    }
+            class Test {
+                fun method ( ) {
                 }
+            }
             """
           ),
           kotlin(
             """
-                fun method ( test : Test ? ) {
-                    val a = test ?. method ( )
-                }
+            fun method ( test : Test ? ) {
+                val a = test ?. method ( )
+            }
             """
           )
         );
@@ -140,19 +140,19 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test {
-                    fun method () : String ? {
-                        return ""
-                    }
+            class Test {
+                fun method () : String ? {
+                    return ""
                 }
+            }
             """
           ),
           kotlin(
             """
-                val t = Test ( )
-                fun method ( ) {
-                    val a = t . method ( ) ?: null
-                }
+            val t = Test ( )
+            fun method ( ) {
+                val a = t . method ( ) ?: null
+            }
             """
           )
         );
@@ -163,9 +163,9 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( arg : Any ) {
-                    val l = listOf ( 1 , 2 , 3 )
-                }
+            fun method ( arg : Any ) {
+                val l = listOf ( 1 , 2 , 3 )
+            }
             """
           )
         );
@@ -176,9 +176,9 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( arg : Any ) {
-                    val map = mapOf( 1 to "one" , 2 to "two" , 3 to "three")
-                }
+            fun method ( arg : Any ) {
+                val map = mapOf( 1 to "one" , 2 to "two" , 3 to "three")
+            }
             """
           )
         );
@@ -190,9 +190,9 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("fun methodA(a: String, b: Int, c: Double) {}"),
           kotlin(
             """
-                fun methodB() {
-                    methodA("a", 1, 2.0)
-                }
+            fun methodB() {
+                methodA("a", 1, 2.0)
+            }
             """
           )
         );
@@ -204,9 +204,9 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("fun apply ( plugin: String ? = null) {}"),
           kotlin(
             """
-                fun method() {
-                    apply( plugin = "something" )
-                }
+            fun method() {
+                apply( plugin = "something" )
+            }
             """
           )
         );
@@ -218,9 +218,9 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("fun < T : Number > methodA ( type : T ) {}"),
           kotlin(
             """
-                fun methodB() {
-                    methodA < Int > ( 10 )
-                }
+            fun methodB() {
+                methodA < Int > ( 10 )
+            }
             """
           )
         );
@@ -232,12 +232,12 @@ public class MethodInvocationTest implements RewriteTest {
           kotlin("open class Test"),
           kotlin(
             """
-                fun test ( a : Test ) { }
-                
-                fun method ( ) {
-                    test ( object : Test ( ) {
-                    } )
-                }
+            fun test ( a : Test ) { }
+            
+            fun method ( ) {
+                test ( object : Test ( ) {
+                } )
+            }
             """
           )
         );
@@ -248,19 +248,19 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                interface Test < in R > {
-                    public fun < B > shift ( r : R ) : B
-                    public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
-                        if ( condition ) Unit else shift( shift ( ) )
-                }
+            interface Test < in R > {
+                public fun < B > shift ( r : R ) : B
+                public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
+                    if ( condition ) Unit else shift( shift ( ) )
+            }
             """
           ),
           kotlin(
             """
-                fun Test < String > . test ( ) : Int {
-                    ensure ( false , { "failure" } )
-                    return 1
-                }
+            fun Test < String > . test ( ) : Int {
+                ensure ( false , { "failure" } )
+                return 1
+            }
             """
           )
         );
@@ -271,19 +271,19 @@ public class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                interface Test < in R > {
-                    public fun < B > shift ( r : R ) : B
-                    public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
-                        if ( condition ) Unit else shift( shift ( ) )
-                }
+            interface Test < in R > {
+                public fun < B > shift ( r : R ) : B
+                public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
+                    if ( condition ) Unit else shift( shift ( ) )
+            }
             """
           ),
           kotlin(
             """
-                fun Test < String > . test ( ) : Int {
-                    ensure ( false ) { "failure" }
-                    return 1
-                }
+            fun Test < String > . test ( ) : Int {
+                ensure ( false ) { "failure" }
+                return 1
+            }
             """
           )
         );

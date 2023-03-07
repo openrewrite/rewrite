@@ -46,14 +46,14 @@ public class AssertionsTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class A {
-                    val a = 1
-                }
+            class A {
+                val a = 1
+            }
             """,
             """
-                class A {
-                    val b = 1
-                }
+            class A {
+                val b = 1
+            }
             """
           )
         );

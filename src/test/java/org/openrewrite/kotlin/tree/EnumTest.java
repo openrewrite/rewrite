@@ -34,10 +34,10 @@ public class EnumTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                enum class A {
-                    B, C,
-                    D
-                }
+            enum class A {
+                B, C,
+                D
+            }
             """
           )
         );
@@ -48,11 +48,11 @@ public class EnumTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class A {
-                    enum class B {
-                        C
-                    }
+            class A {
+                enum class B {
+                    C
                 }
+            }
             """
           )
         );

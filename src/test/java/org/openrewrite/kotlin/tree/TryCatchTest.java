@@ -28,11 +28,11 @@ public class TryCatchTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    try {
-                    } catch (ex: Exception) {
-                    }
+            fun method ( ) {
+                try {
+                } catch (ex: Exception) {
                 }
+            }
             """)
         );
     }
@@ -42,11 +42,11 @@ public class TryCatchTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    try {
-                    } finally {
-                    }
+            fun method ( ) {
+                try {
+                } finally {
                 }
+            }
             """)
         );
     }

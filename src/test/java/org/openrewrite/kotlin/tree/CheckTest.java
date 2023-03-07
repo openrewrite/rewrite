@@ -27,12 +27,12 @@ class CheckTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( a : Any ) {
-                    if (a !is String) {
-                    }
-                    if (a is String) {
-                    }
+            fun method ( a : Any ) {
+                if (a !is String) {
                 }
+                if (a is String) {
+                }
+            }
             """
           )
         );
@@ -52,9 +52,9 @@ class CheckTest implements RewriteTest {
           ),
           kotlin(
             """
-                val a = A ( )
-                val b = a . method() !!
-                val c = b !!
+            val a = A ( )
+            val b = a . method() !!
+            val c = b !!
             """
           )
         );

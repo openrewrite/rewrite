@@ -28,12 +28,12 @@ public class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test {
-                    var id : String = ""
-                    fun setId ( id : String ) {
-                        this . id = id
-                    }
+            class Test {
+                var id : String = ""
+                fun setId ( id : String ) {
+                    this . id = id
                 }
+            }
             """
           )
         );
@@ -45,18 +45,18 @@ public class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                open class Super {
-                    val id : String = ""
-                }
+            open class Super {
+                val id : String = ""
+            }
             """
           ),
           kotlin(
             """
-                class Test : Super() {
-                    fun getId ( ) : String {
-                        return super . id
-                    }
+            class Test : Super() {
+                fun getId ( ) : String {
+                    return super . id
                 }
+            }
             """
           )
         );
@@ -67,16 +67,16 @@ public class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test {
-                    val property = 42
-                }
+            class Test {
+                val property = 42
+            }
             """
           ),
           kotlin(
             """
-                fun method ( test : Test ? ) {
-                    val a = test ?. property
-                }
+            fun method ( test : Test ? ) {
+                val a = test ?. property
+            }
             """
           )
         );
@@ -87,16 +87,16 @@ public class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                class Test {
-                    val value : Int ? = 42
-                }
+            class Test {
+                val value : Int ? = 42
+            }
             """
           ),
           kotlin(
             """
-                fun method ( test : Test ) {
-                    val a = test . value ?: null
-                }
+            fun method ( test : Test ) {
+                val a = test . value ?: null
+            }
             """
           )
         );
@@ -107,9 +107,9 @@ public class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                import java.nio.ByteBuffer
-                
-                private val crlf: ByteBuffer = ByteBuffer.wrap("\\r\\n".toByteArray())
+            import java.nio.ByteBuffer
+            
+            private val crlf: ByteBuffer = ByteBuffer.wrap("\\r\\n".toByteArray())
             """
           )
         );

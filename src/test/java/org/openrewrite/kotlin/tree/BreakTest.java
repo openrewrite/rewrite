@@ -27,9 +27,9 @@ public class BreakTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    while ( true ) break
-                }
+            fun method ( ) {
+                while ( true ) break
+            }
             """
           )
         );

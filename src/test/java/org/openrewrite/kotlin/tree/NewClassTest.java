@@ -34,19 +34,19 @@ public class NewClassTest implements RewriteTest {
     void anonymousClass() {
         rewriteRun(
           kotlin("""
-              open class Test ( val a: Int, val b: Int ) {
-                  open fun base() : Boolean {
-                      return false
-                  }
+          open class Test ( val a: Int, val b: Int ) {
+              open fun base() : Boolean {
+                  return false
               }
+          }
           """),
           kotlin(
             """
-                val t = object : Test ( 1 , 2 ) {
-                    override fun base ( ) : Boolean {
-                        return true
-                    }
+            val t = object : Test ( 1 , 2 ) {
+                override fun base ( ) : Boolean {
+                    return true
                 }
+            }
             """)
         );
     }

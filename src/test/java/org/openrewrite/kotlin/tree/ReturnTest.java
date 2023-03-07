@@ -27,9 +27,9 @@ public class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) : String {
-                    return "42"
-                }
+            fun method ( ) : String {
+                return "42"
+            }
             """
           )
         );
@@ -40,9 +40,9 @@ public class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) : String {
-                    "42"
-                }
+            fun method ( ) : String {
+                "42"
+            }
             """
           )
         );
@@ -53,9 +53,9 @@ public class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) : Unit {
-                    return
-                }
+            fun method ( ) : Unit {
+                return
+            }
             """
           )
         );
@@ -66,12 +66,12 @@ public class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method(i: Int) : String {
-                    return when {
-                        i.mod(2).equals(0) -> "even"
-                        else -> "odd"
-                    }
+            fun method(i: Int) : String {
+                return when {
+                    i.mod(2).equals(0) -> "even"
+                    else -> "odd"
                 }
+            }
             """
           )
         );
@@ -82,11 +82,11 @@ public class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) : Unit {
-                    return try {
-                    } catch (e : Exception) {
-                    }
+            fun method ( ) : Unit {
+                return try {
+                } catch (e : Exception) {
                 }
+            }
             """
           )
         );

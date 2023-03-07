@@ -27,14 +27,14 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun foo() {
-                    run loop@ {
-                        listOf ( 1 , 2 , 3 , 4 , 5 ) . forEach {
-                            if ( it == 3 ) return@loop
-                            println ( it )
-                        }
+            fun foo() {
+                run loop@ {
+                    listOf ( 1 , 2 , 3 , 4 , 5 ) . forEach {
+                        if ( it == 3 ) return@loop
+                        println ( it )
                     }
                 }
+            }
             """
           )
         );
@@ -44,11 +44,11 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun method ( ) {
-                    labeled@ while ( true ) {
-                        break@labeled
-                    }
-                }
+              fun method ( ) {
+                  labeled@ while ( true ) {
+                      break@labeled
+                  }
+              }
               """
           )
         );
@@ -74,13 +74,13 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                  fun test ( ) {
-                      var i = 0
-                      labeled@ do {
-                          i++
-                          break@labeled
-                      } while ( i < 10 )
-                  }
+              fun test ( ) {
+                  var i = 0
+                  labeled@ do {
+                      i++
+                      break@labeled
+                  } while ( i < 10 )
+              }
               """
           )
         );
@@ -91,11 +91,11 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-                fun test ( ) {
-                    labeled@ for (i in 1..10) {
-                        break@labeled
-                    }
+            fun test ( ) {
+                labeled@ for (i in 1..10) {
+                    break@labeled
                 }
+            }
             """
           )
         );
