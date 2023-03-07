@@ -32,7 +32,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
     @Option(displayName = "Fully Qualified Name of the constant",
             example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
-    String fullyQualifiedNameOfConst;
+    String fullyQualifiedConstantName;
 
     @Option(displayName = "(Optional) String literal value that needs to be replaced. Only String literal accepted.",
             example = "application/json",
