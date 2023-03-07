@@ -17,14 +17,16 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Scope;
+
+import static org.openrewrite.Validated.notBlank;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
@@ -40,11 +42,20 @@ public class DoesNotIncludeDependency extends Recipe {
             example = "guava")
     String artifactId;
 
-    @Option(displayName = "Check transitive dependencies",
-            description = "Default false. If enabled, matching transitive dependencies will also yield a false result.",
+    @Option(displayName = "Only direct dependencies",
+            description = "Default false. If enabled, transitive dependencies will not be considered.",
             required = false,
             example = "true")
-    Boolean checkTransitive;
+    @Nullable
+    Boolean onlyDirect;
+
+    @Option(displayName = "Scope",
+            description = "Default any. If specified, only the requested scope's classpaths will be checked.",
+            required = false,
+            valid = {"compile", "test", "runtime", "provided"},
+            example = "compile")
+    @Nullable
+    String scope;
 
     @Override
     public String getDisplayName() {
@@ -53,24 +64,32 @@ public class DoesNotIncludeDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "An applicability test which returns false iff visiting a Maven pom which uses the specified dependency. For multimodule projects, this should most often be applied as a single-source applicability test";
+        return "An applicability test which returns false if visiting a Maven pom which includes the specified dependency in the classpath of some scope. "
+                + "For compatibility with multimodule projects, this should most often be applied as a single-source applicability test.";
     }
 
     @Override
     public Validated validate() {
-        return Validated.notBlank("groupId", groupId)
-                .and(Validated.notBlank("artifactId", artifactId));
+        return super.validate()
+                .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)))
+                .and(Validated.test("scope", "scope is a valid Maven scope", scope,
+                        s -> Scope.fromName(s) != Scope.Invalid));
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Applicability.not(dependencySearchVisitor());
+        return Applicability.not(Applicability.or(dependencyInsightVisitors()));
     }
 
-    @NotNull
-    private TreeVisitor<?, ExecutionContext> dependencySearchVisitor() {
-        return Boolean.TRUE.equals(checkTransitive)
-                ? new DependencyInsight(groupId, artifactId, Scope.Runtime.toString()).getVisitor()
-                : new FindDependency(groupId, artifactId).getVisitor();
+    @SuppressWarnings("unchecked")
+    private TreeVisitor<?, ExecutionContext>[] dependencyInsightVisitors() {
+        if (scope == null) {
+            return new TreeVisitor[] {
+                    // anything in compile/runtime scope will also be in test classpath; no need to check individually
+                    new DependencyInsight(groupId, artifactId, Scope.Test.toString(), onlyDirect).getVisitor(),
+                    new DependencyInsight(groupId, artifactId, Scope.Provided.toString(), onlyDirect).getVisitor()
+            };
+        }
+        return new TreeVisitor[] { new DependencyInsight(groupId, artifactId, scope, onlyDirect).getVisitor() };
     }
 }
