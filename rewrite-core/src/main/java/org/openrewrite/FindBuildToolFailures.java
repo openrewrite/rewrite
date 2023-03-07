@@ -48,7 +48,8 @@ public class FindBuildToolFailures extends Recipe {
                                     failure.getType(),
                                     failure.getVersion(),
                                     failure.getCommand(),
-                                    failure.getExitCode()
+                                    failure.getExitCode(),
+                                    sourceFile.printAll()
                             ));
                             return Markup.info(sourceFile, String.format("Exit code %d", failure.getExitCode()));
                         })
