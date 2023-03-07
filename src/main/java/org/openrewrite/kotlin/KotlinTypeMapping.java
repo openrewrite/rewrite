@@ -169,6 +169,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         String classFqn = convertClassIdToFqn(sym.getClassId());
 
         JavaType.FullyQualified fq = typeCache.get(classFqn);
+        if (fq instanceof JavaType.Unknown) {
+            return fq;
+        }
+
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             clazz = new JavaType.Class(

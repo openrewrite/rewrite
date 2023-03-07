@@ -1042,13 +1042,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 j = mapBinaryOperation(functionCall);
             }
         } else {
-            j = mapFunctionalCall(functionCall, origin == FirFunctionCallOrigin.Infix);
+            j = mapFunctionCall(functionCall, origin == FirFunctionCallOrigin.Infix);
         }
 
         return j;
     }
 
-    private J mapFunctionalCall(FirFunctionCall functionCall, boolean isInfix) {
+    private J mapFunctionCall(FirFunctionCall functionCall, boolean isInfix) {
         Space prefix = whitespace();
 
         FirNamedReference namedReference = functionCall.getCalleeReference();
