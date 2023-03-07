@@ -32,7 +32,7 @@ public class ContinueTest implements RewriteTest {
                       while ( true ) continue
                   }
               }
-              """
+            """
           )
         );
     }

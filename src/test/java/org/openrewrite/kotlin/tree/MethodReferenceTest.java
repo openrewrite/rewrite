@@ -32,7 +32,8 @@ public class MethodReferenceTest implements RewriteTest {
                 val l = listOf ( Test ( 42 ) )
                 l . map { Test :: answer }
             }
-            """)
+            """
+          )
         );
     }
 

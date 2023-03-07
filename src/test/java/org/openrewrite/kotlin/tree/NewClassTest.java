@@ -33,13 +33,15 @@ public class NewClassTest implements RewriteTest {
     @Test
     void anonymousClass() {
         rewriteRun(
-          kotlin("""
-          open class Test ( val a: Int, val b: Int ) {
-              open fun base() : Boolean {
-                  return false
-              }
-          }
-          """),
+          kotlin(
+            """
+            open class Test ( val a: Int, val b: Int ) {
+                open fun base() : Boolean {
+                    return false
+                }
+            }
+            """
+          ),
           kotlin(
             """
             val t = object : Test ( 1 , 2 ) {
@@ -47,7 +49,8 @@ public class NewClassTest implements RewriteTest {
                     return true
                 }
             }
-            """)
+            """
+          )
         );
     }
 }

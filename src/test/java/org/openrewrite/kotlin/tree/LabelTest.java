@@ -44,12 +44,12 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method ( ) {
-                  labeled@ while ( true ) {
-                      break@labeled
-                  }
-              }
-              """
+            fun method ( ) {
+                labeled@ while ( true ) {
+                    break@labeled
+                }
+            }
+            """
           )
         );
     }
@@ -59,12 +59,12 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class Test {
-                  fun test ( ) {
-                      labeled@ while ( true ) continue@labeled
-                  }
-              }
-              """
+            class Test {
+                fun test ( ) {
+                    labeled@ while ( true ) continue@labeled
+                }
+            }
+            """
           )
         );
     }
@@ -74,14 +74,14 @@ public class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun test ( ) {
-                  var i = 0
-                  labeled@ do {
-                      i++
-                      break@labeled
-                  } while ( i < 10 )
-              }
-              """
+            fun test ( ) {
+                var i = 0
+                labeled@ do {
+                    i++
+                    break@labeled
+                } while ( i < 10 )
+            }
+            """
           )
         );
     }

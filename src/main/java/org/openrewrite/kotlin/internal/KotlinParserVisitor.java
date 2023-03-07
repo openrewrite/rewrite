@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -1679,7 +1680,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space exprPrefix = whitespace();
         if (property.getInitializer() != null && source.startsWith("=", cursor)) {
             skip("=");
-            expr = visitExpression(property.getInitializer(), ctx);
+            expr = visitElement(property.getInitializer(), ctx);
             if (expr instanceof Statement && !(expr instanceof Expression)) {
                 expr = new K.StatementExpression(randomId(), (Statement) expr);
             }
@@ -2315,7 +2316,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         Markers.EMPTY,
                         name,
                         dimensionsAfterName,
-                        initializer != null ? padLeft(sourceBefore("="), (Expression) visitExpression(initializer, ctx)) : null,
+                        initializer != null ? padLeft(sourceBefore("="), (Expression) visitElement(initializer, ctx)) : null,
                         typeMapping.variableType(valueParameter.getSymbol(), null, getCurrentFile())
                 )
         );

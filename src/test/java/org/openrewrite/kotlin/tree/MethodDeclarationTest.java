@@ -95,7 +95,7 @@ public class MethodDeclarationTest implements RewriteTest {
     void infix() {
         rewriteRun(
           kotlin(
-          """
+           """
             class Spec {
                 fun version ( version : String) : Spec {
                     return this
@@ -111,9 +111,7 @@ public class MethodDeclarationTest implements RewriteTest {
             }
             """
           ),
-          kotlin(
-            "infix fun Spec . version ( version : String ) : Spec = version ( version )"
-          )
+          kotlin("infix fun Spec . version ( version : String ) : Spec = version ( version )")
         );
     }
 
@@ -169,26 +167,31 @@ public class MethodDeclarationTest implements RewriteTest {
             fun Test . method ( ) = build {
                 "42"
             }
-            """)
+            """
+          )
         );
     }
 
     @Test
     void nullableReturnType() {
         rewriteRun(
-          kotlin("""
-          fun method() : Array<Int> ? {
-          }
-          """)
+          kotlin(
+            """
+            fun method() : Array<Int> ? {
+            }
+            """
+          )
         );
     }
 
     @Test
     void typeParameterAndTypeReceiver() {
         rewriteRun(
-          kotlin("""
-          fun <T: Any> Array<Int>.method(t: T) = Unit
-          """)
+          kotlin(
+            """
+            fun <T: Any> Array<Int>.method(t: T) = Unit
+            """
+          )
         );
     }
 }

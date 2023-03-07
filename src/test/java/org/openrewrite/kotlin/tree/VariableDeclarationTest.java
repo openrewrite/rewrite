@@ -62,7 +62,8 @@ public class VariableDeclarationTest implements RewriteTest {
             } else {
                 "latest.integration"
             }
-            """)
+            """
+          )
         );
     }
 
@@ -78,10 +79,12 @@ public class VariableDeclarationTest implements RewriteTest {
     void getter() {
         rewriteRun(
           kotlin("class Spec"),
-          kotlin("""
-              val isEmpty : Boolean
-                  get ( ) : Boolean = 1 == 1
-          """)
+          kotlin(
+            """
+            val isEmpty : Boolean
+                get ( ) : Boolean = 1 == 1
+            """
+          )
         );
     }
 
@@ -95,78 +98,90 @@ public class VariableDeclarationTest implements RewriteTest {
     @Test
     void stringTemplate() {
         rewriteRun(
-          kotlin("""
-          val a = "Hello"
-          val b = "World"
-          val c = "${a} ${b}!"
-          
-          val after = 0
-          """)
+          kotlin(
+            """
+            val a = "Hello"
+            val b = "World"
+            val c = "${a} ${b}!"
+            
+            val after = 0
+            """
+          )
         );
     }
 
     @Test
     void stringTemplateNoBraces() {
         rewriteRun(
-          kotlin("""
-          val a = "Hello"
-          val b = "World"
-          val c = "$a $b!"
-          
-          val after = 0
-          """)
+          kotlin(
+            """
+            val a = "Hello"
+            val b = "World"
+            val c = "$a $b!"
+            
+            val after = 0
+            """
+          )
         );
     }
 
     @Test
     void propertyAccessor() {
         rewriteRun(
-          kotlin("""
-          class Test {
-              val value = 10
-          }
-          val a = Test ( )
-          val b = "${a.value}"
-          
-          val after = 0
-          """)
+          kotlin(
+            """
+            class Test {
+                val value = 10
+            }
+            val a = Test ( )
+            val b = "${a.value}"
+            
+            val after = 0
+            """
+          )
         );
     }
 
     @Test
     void multipleFieldAccess() {
         rewriteRun(
-          kotlin("""
-          class Test {
-              val testValue = Inner()
-              class Inner {
-                  val innerValue = 10
-              }
-          }
-
-          val a = Test ( )
-          val b = "${a.testValue.innerValue}"
-          """)
+          kotlin(
+            """
+            class Test {
+                val testValue = Inner()
+                class Inner {
+                    val innerValue = 10
+                }
+            }
+            
+            val a = Test ( )
+            val b = "${a.testValue.innerValue}"
+            """
+          )
         );
     }
 
     @Test
     void tripleQuotedString() {
         rewriteRun(
-          kotlin("""
-          val template = \"\"\"
-            Hello world!
-          \"\"\"
-          """)
+          kotlin(
+            """
+            val template = \"\"\"
+              Hello world!
+            \"\"\"
+            """
+          )
         );
     }
 
     @Test
     void mapOf() {
         rewriteRun(
-          kotlin("""
-          val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
-          """)
+          kotlin(
+            """
+            val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+            """
+          )
         );
     }
 
@@ -174,7 +189,8 @@ public class VariableDeclarationTest implements RewriteTest {
     @Test
     void wildcard() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
             import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
             val a: KotlinCompilation<*> = null
             """
@@ -185,9 +201,11 @@ public class VariableDeclarationTest implements RewriteTest {
     @Test
     void ifElseExpression() {
         rewriteRun(
-          kotlin("""
-          fun method(condition: Boolean): Unit = if (condition) Unit else Unit
-          """)
+          kotlin(
+            """
+            fun method(condition: Boolean): Unit = if (condition) Unit else Unit
+            """
+          )
         );
     }
 }

@@ -25,13 +25,15 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void implicitFunctionCall() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
             fun plugins ( input : ( ) -> String ) {
                 println ( input ( ) )
             }
             """
           ),
-          kotlin("""
+          kotlin(
+            """
             fun main ( ) {
                 plugins {
                     "test"
@@ -45,7 +47,8 @@ public class MethodInvocationTest implements RewriteTest {
     @Test
     void buildGradle() {
         rewriteRun(
-          kotlin("""
+          kotlin(
+            """
             class Spec {
                 var id = ""
                 fun id ( arg : String) : Spec {
@@ -57,7 +60,8 @@ public class MethodInvocationTest implements RewriteTest {
             }
             """
           ),
-          kotlin("""
+          kotlin(
+            """
             class SpecScope  {
                 val delegate : Spec = Spec ( )
                 fun id ( id : String ) : Spec = delegate . id ( id )
@@ -66,7 +70,8 @@ public class MethodInvocationTest implements RewriteTest {
             public inline val SpecScope . `java-library` : Spec get ( ) = id ( "org.gradle.java-library" )
             """
           ),
-          kotlin("""
+          kotlin(
+            """
             class DSL  {
                 fun plugins ( block : SpecScope . ( ) -> Unit ) {
                     block ( SpecScope ( ) )
@@ -74,7 +79,8 @@ public class MethodInvocationTest implements RewriteTest {
             }
             """
           ),
-          kotlin("""
+          kotlin(
+            """
             fun method ( ) {
                 DSL ( ) .
                 

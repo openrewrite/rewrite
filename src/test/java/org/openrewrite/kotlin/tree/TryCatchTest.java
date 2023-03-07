@@ -33,7 +33,8 @@ public class TryCatchTest implements RewriteTest {
                 } catch (ex: Exception) {
                 }
             }
-            """)
+            """
+          )
         );
     }
 
@@ -47,7 +48,8 @@ public class TryCatchTest implements RewriteTest {
                 } finally {
                 }
             }
-            """)
+            """
+          )
         );
     }
 }

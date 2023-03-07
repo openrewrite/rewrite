@@ -234,7 +234,8 @@ class ClassDeclarationTest implements RewriteTest {
             class Test {
                 companion object
             }
-            """)
+            """
+          )
         );
     }
 
