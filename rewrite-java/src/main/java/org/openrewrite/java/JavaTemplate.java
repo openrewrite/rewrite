@@ -16,16 +16,15 @@
 package org.openrewrite.java;
 
 import lombok.Value;
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.java.tree.Space.Location;
+import org.openrewrite.java.internal.template.TemplateMatcher;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.template.SourceTemplate;
 
 import java.lang.reflect.InvocationTargetException;
@@ -33,8 +32,12 @@ import java.lang.reflect.Method;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
+
+import static org.openrewrite.Tree.randomId;
 
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Supplier<Cursor> parentScopeGetter;
@@ -62,10 +65,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Substitutions substitutions = new Substitutions(code, parameters);
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
-
-        Tree insertionPoint = coordinates.getTree();
-        Location loc = coordinates.getSpaceLocation();
-        JavaCoordinates.Mode mode = coordinates.getMode();
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
 
@@ -176,6 +175,91 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         public JavaTemplate build() {
             return new JavaTemplate(parentScope, javaParser, code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
+        }
+
+        @Incubating(since = "7.38.0")
+        public <T extends J> Pattern<T> buildPattern(Class<T> clazz) {
+            return build().pattern(clazz);
+        }
+    }
+
+    @Incubating(since = "7.38.0")
+    public static <T extends J> JavaVisitor<ExecutionContext> rewrite(
+            Class<T> clazz,
+            Function<TreeVisitor<J, ExecutionContext>, Builder> beforeTemplate,
+            Function<TreeVisitor<J, ExecutionContext>, Builder> afterTemplate,
+            BiFunction<Matcher<T>, JavaTemplate, J> replacer) {
+        return new JavaVisitor<ExecutionContext>() {
+            final Pattern<T> before = beforeTemplate.apply(this).buildPattern(clazz);
+            final JavaTemplate after = afterTemplate.apply(this).build();
+            @Override
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                tree = super.visit(tree, ctx);
+                if (clazz.isInstance(tree)) {
+                    @SuppressWarnings("unchecked") Matcher<T> matcher = before.matcher((T) tree);
+                    if (matcher.matches()) {
+                        return replacer.apply(matcher, after);
+                    }
+                }
+                return (J) tree;
+            }
+        };
+    }
+
+    private <T extends J> Pattern<T> pattern(Class<T> clazz) {
+        return new Pattern<>(clazz);
+    }
+
+    @Incubating(since = "7.38.0")
+    public class Pattern<T extends J> {
+
+        private final J template;
+
+        Pattern(Class<T> clazz) {
+            J.Empty[] parameters = new J.Empty[parameterCount];
+            for (int i = 0; i < parameters.length; i++) {
+                parameters[i] = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
+            }
+            Substitutions substitutions = new Substitutions(code, parameters);
+            String substitutedTemplate = substitutions.substitute();
+            onAfterVariableSubstitution.accept(substitutedTemplate);
+
+            boolean maybeExpression = Expression.class.isAssignableFrom(clazz);
+            // TODO should we solve this by requiring a Space.Location parameter?
+            if (Statement.class.isAssignableFrom(clazz) && (!maybeExpression || substitutedTemplate.trim().endsWith(";"))) {
+                template = templateParser.parseStandaloneStatement(substitutedTemplate);
+            } else if (maybeExpression) {
+                template = templateParser.parseStandaloneExpression(substitutedTemplate);
+            } else {
+                throw new IllegalArgumentException("Unsupported type for pattern matching: " + clazz);
+            }
+        }
+
+        public Matcher<T> matcher(T tree) {
+            return new Matcher<>(template, tree);
+        }
+    }
+
+    @Incubating(since = "7.38.0")
+    public static class Matcher<T extends J> {
+        TemplateMatcher templateMatcher;
+        T tree;
+
+        Matcher(J template, T tree) {
+            this.templateMatcher = new TemplateMatcher(template);
+            this.tree = tree;
+        }
+
+        public boolean matches() {
+            return templateMatcher.matches(tree);
+        }
+
+        public T match() {
+            return tree;
+        }
+
+        public J parameter(int i) {
+            return templateMatcher.getParameter(i);
         }
     }
 

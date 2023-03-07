@@ -30,6 +30,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import static java.util.Collections.singletonList;
+import static org.openrewrite.java.internal.template.BlockStatementTemplateGenerator.EXPR_STATEMENT_PARAM;
 
 public class JavaTemplateParser {
     private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("#{", "}", null);
@@ -47,6 +48,7 @@ public class JavaTemplateParser {
     private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
     private static final String LAMBDA_PARAMETER_STUB = "class $Template { { Object o = (#{}) -> {}; } }";
     private static final String EXPRESSION_STUB = "class $Template { { Object o = #{}; } }";
+    private static final String STATEMENT_STUB = "class $Template { { #{} } }";
     private static final String EXTENDS_STUB = "class $Template extends #{} {}";
     private static final String IMPLEMENTS_STUB = "class $Template implements #{} {}";
     private static final String THROWS_STUB = "abstract class $Template { abstract void $template() throws #{}; }";
@@ -101,6 +103,30 @@ public class JavaTemplateParser {
         onBeforeParseTemplate.accept(stub);
         JavaSourceFile cu = compileTemplate(stub);
         return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class).get(0);
+    }
+
+    public J parseStandaloneExpression(String template) {
+        @Language("java") String stub = addImports(substitute(EXPRESSION_STUB, template));
+        onBeforeParseTemplate.accept(stub);
+
+        return cache(stub, () -> {
+            JavaSourceFile cu = compileTemplate(stub + EXPR_STATEMENT_PARAM);
+            J.Block b = (J.Block) cu.getClasses().get(0).getBody().getStatements().get(0);
+            J.VariableDeclarations v = (J.VariableDeclarations) b.getStatements().get(0);
+            return singletonList(v.getVariables().get(0).getInitializer());
+        }).get(0);
+    }
+
+    public J parseStandaloneStatement(String template) {
+        @Language("java") String stub = addImports(substitute(STATEMENT_STUB, template));
+        onBeforeParseTemplate.accept(stub);
+
+        return cache(stub, () -> {
+            JavaSourceFile cu = compileTemplate(stub + EXPR_STATEMENT_PARAM);
+            J.Block b = (J.Block) cu.getClasses().get(0).getBody().getStatements().get(0);
+            Statement s = b.getStatements().get(0);
+            return singletonList(s);
+        }).get(0);
     }
 
     public TypeTree parseExtends(String template) {
