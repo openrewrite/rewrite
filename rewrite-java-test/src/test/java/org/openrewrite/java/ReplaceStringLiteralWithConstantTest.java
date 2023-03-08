@@ -47,6 +47,20 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     }
 
     @Test
+    void doNotReplaceDefinition() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("someValue", "com.constant.B.VAR")),
+          java(
+            """
+              package com.constant;
+              public class B {
+                  public static final String VAR = "someValue";
+              }
+              """
+          ));
+    }
+
+    @Test
     void replaceStringLiteralWithConstant() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant("UTF_8", "com.google.common.base.Charsets.UTF_8")),

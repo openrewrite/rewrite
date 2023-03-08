@@ -57,8 +57,8 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
 
         public ReplaceStringLiteralVisitor(String literalValue, String fullyQualifiedConstantName) {
             this.literalValue = literalValue;
-            owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
-            template = fullyQualifiedConstantName.substring(owningType.lastIndexOf('.') + 1);
+            this.owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
+            this.template = fullyQualifiedConstantName.substring(owningType.lastIndexOf('.') + 1);
         }
 
         @Override
@@ -66,6 +66,14 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             // Only handle String literals
             if (!TypeUtils.isString(literal.getType()) ||
                 !literalValue.equals(literal.getValue())) {
+                return super.visitLiteral(literal, executionContext);
+            }
+
+            // Prevent changing constant definition
+            J.ClassDeclaration classDeclaration = getCursor().firstEnclosing(J.ClassDeclaration.class);
+            if (classDeclaration != null &&
+                classDeclaration.getType() != null &&
+                owningType.equals(classDeclaration.getType().getFullyQualifiedName())) {
                 return super.visitLiteral(literal, executionContext);
             }
 
