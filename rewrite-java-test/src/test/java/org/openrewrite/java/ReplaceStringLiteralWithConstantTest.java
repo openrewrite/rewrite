@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ReplaceStringLiteralWithConstantTest implements RewriteTest {
+class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
@@ -33,7 +33,7 @@ public class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void doNothingIfStringLiteralNotFound() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets.UTF_8", "UTF_8")),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("UTF_8", "com.google.common.base.Charsets.UTF_8")),
           java(
             """
               class Test {
@@ -49,7 +49,7 @@ public class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void replaceStringLiteralWithConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets.UTF_8", "UTF_8")),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("UTF_8", "com.google.common.base.Charsets.UTF_8")),
           java(
             """
               class Test {
@@ -70,15 +70,12 @@ public class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void replaceLiteralWithUserDefinedConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.constant.B.VAR", "newValue")),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("newValue", "com.constant.B.VAR")),
           java(
             """
               package com.constant;
               public class B {
                   public static final String VAR = "default";
-                  void method() {
-                      String VAR = "";
-                  }
               }
               """
           ),
@@ -102,27 +99,6 @@ public class ReplaceStringLiteralWithConstantTest implements RewriteTest {
                   private String method() {
                       return B.VAR;
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void replaceStringLiteralWithConstantWithSingleArgument() {
-        rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("com.google.common.base.Charsets.UTF_8")),
-          java(
-            """
-              class Test {
-                  Object o = "UTF_8";
-              }
-              """,
-            """
-              import com.google.common.base.Charsets;
-
-              class Test {
-                  Object o = Charsets.UTF_8;
               }
               """
           )

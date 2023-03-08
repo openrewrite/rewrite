@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,9 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -27,66 +28,53 @@ import org.openrewrite.java.tree.TypeUtils;
 @EqualsAndHashCode(callSuper = false)
 public class ReplaceStringLiteralWithConstant extends Recipe {
 
-    @Option(displayName = "Fully Qualified Name of the constant",
-            example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
-    String fullyQualifiedConstantName;
-
-    @Option(displayName = "(Optional) String literal value that needs to be replaced. Only String literal accepted.",
-            example = "application/json",
-            required = false )
-    @Nullable
+    @Option(displayName = "String literal value to replace", example = "application/json")
     String literalValue;
 
-    public ReplaceStringLiteralWithConstant(String fullyQualifiedConstantName) {
-        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
-        this.literalValue = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf(".")+1);
-    }
-
-    public ReplaceStringLiteralWithConstant(String fullyQualifiedConstantName, String literalValue) {
-        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
-        this.literalValue = literalValue;
-    }
+    @Option(displayName = "Fully qualified name of the constant to use in place of String literal", example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
+    String fullyQualifiedConstantName;
 
     @Override
     public String getDisplayName() {
-        return "Replace String Literal with Constant";
+        return "Replace String literal with constant";
     }
 
     @Override
     public String getDescription() {
-        return "Replace a String Literal with named constant. If String literal value no provided, the recipe will use constant's Name in place of literal value.";
+        return "Replace String literal with constant, adding import on class if needed.";
     }
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+        return new ReplaceStringLiteralVisitor(literalValue, fullyQualifiedConstantName);
+    }
 
-            @Override
-            public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-                if(isStringLiteral(literal)) {
-                    String owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf("."));
-                    String constantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf(".")+1);
-                    String className = owningType.substring(owningType.lastIndexOf(".")+1);
+    private static class ReplaceStringLiteralVisitor extends JavaVisitor<ExecutionContext> {
 
-                    maybeAddImport(owningType,false);
+        private final String literalValue;
+        private final String owningType;
+        private final String template;
 
-                    String template = String.join(".",className,constantName);
-                    J j = literal.withTemplate(JavaTemplate.builder(this::getCursor,template).imports(owningType).build(),literal.getCoordinates().replace());
+        public ReplaceStringLiteralVisitor(String literalValue, String fullyQualifiedConstantName) {
+            this.literalValue = literalValue;
+            owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
+            template = fullyQualifiedConstantName.substring(owningType.lastIndexOf('.') + 1);
+        }
 
-                    if (!(j instanceof J.FieldAccess)) {
-                        throw new IllegalArgumentException("Invalid FQN : " + fullyQualifiedConstantName);
-                    }
-
-                    return j.withPrefix(literal.getPrefix());
-                }
+        @Override
+        public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+            // Only handle String literals
+            if (!TypeUtils.isString(literal.getType()) ||
+                !literalValue.equals(literal.getValue())) {
                 return super.visitLiteral(literal, executionContext);
             }
 
-            private boolean isStringLiteral(@Nullable J.Literal literal) {
-                return literal!=null && TypeUtils.isString(literal.getType()) &&
-                        ((String) literal.getValue()).equals(literalValue);
-            }
-
-        };
+            maybeAddImport(owningType, false);
+            return literal
+                    .withTemplate(
+                            JavaTemplate.builder(this::getCursor, template).imports(owningType).build(),
+                            literal.getCoordinates().replace())
+                    .withPrefix(literal.getPrefix());
+        }
     }
 }
