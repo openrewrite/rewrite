@@ -87,8 +87,7 @@ public class AppendToSequence extends Recipe {
                 String entryTrailingCommaPrefix = "";
                 String itemPrefix = "";
                 if (!entries.isEmpty()) {
-                    final int index = entries.size() - 1;
-                    Yaml.Sequence.Entry existingEntry = entries.get(index);
+                    Yaml.Sequence.Entry existingEntry = entries.get(entries.size() - 1);
                     hasDash = existingEntry.isDash();
                     entryPrefix = existingEntry.getPrefix();
                     entryTrailingCommaPrefix = existingEntry.getTrailingCommaPrefix();
