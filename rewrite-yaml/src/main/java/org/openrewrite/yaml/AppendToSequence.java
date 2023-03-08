@@ -77,8 +77,9 @@ public class AppendToSequence extends Recipe {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext ec) {
+                Yaml.Sequence s = super.visitSequence(sequence, ec);
                 if (!matcher.matches(getCursor().getParent())) {
-                    return super.visitSequence(sequence, ec);
+                    return s;
                 }
                 List<Yaml.Sequence.Entry> entries = sequence.getEntries();
                 boolean hasDash = true;
@@ -100,7 +101,7 @@ public class AppendToSequence extends Recipe {
                 Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, AppendToSequence.this.value);
                 Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
                 entries.add(newEntry);
-                return maybeAutoFormat(sequence, sequence.withEntries(entries), ec);
+                return maybeAutoFormat(sequence, s.withEntries(entries), ec);
             }
         };
     }
