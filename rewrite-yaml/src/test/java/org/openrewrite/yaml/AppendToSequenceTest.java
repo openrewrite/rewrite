@@ -82,6 +82,27 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
+    void appendToEmptySequence() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence(
+            "$.things.fruit",
+            "strawberry",
+            null
+          )),
+          yaml(
+            """
+                  things:
+                    fruit: []
+              """,
+            """
+                  things:
+                    fruit: [strawberry]
+              """
+          )
+        );
+    }
+
+    @Test
     void modifyOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(new AppendToSequence(".list", "newThing", "**/a.yml")),
