@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -124,6 +125,40 @@ public class AddDependency extends Recipe {
     @With
     String familyPattern;
 
+    @Option(displayName = "Accept transitive",
+            description = "Default false. If enabled, the dependency will not be added if it is already on the classpath as a transitive dependency.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean acceptTransitive;
+
+    @JsonCreator
+    public AddDependency(String groupId, String artifactId, String version, @Nullable String versionPattern,
+            @Nullable String scope, @Nullable Boolean releasesOnly, String onlyIfUsing, @Nullable String type,
+            @Nullable String classifier, @Nullable Boolean optional, @Nullable String familyPattern,
+            @Nullable Boolean acceptTransitive) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.versionPattern = versionPattern;
+        this.scope = scope;
+        this.releasesOnly = releasesOnly;
+        this.onlyIfUsing = onlyIfUsing;
+        this.type = type;
+        this.classifier = classifier;
+        this.optional = optional;
+        this.familyPattern = familyPattern;
+        this.acceptTransitive = acceptTransitive;
+    }
+
+    @Deprecated
+    public AddDependency(String groupId, String artifactId, String version, @Nullable String versionPattern,
+            @Nullable String scope, @Nullable Boolean releasesOnly, String onlyIfUsing, @Nullable String type,
+            @Nullable String classifier, @Nullable Boolean optional, @Nullable String familyPattern) {
+        this(groupId, artifactId, version, versionPattern, scope, releasesOnly, onlyIfUsing, type, classifier, optional,
+                familyPattern, null);
+    }
+
     @Override
     public Validated validate() {
         Validated validated = super.validate();
@@ -145,18 +180,18 @@ public class AddDependency extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
+    public TreeVisitor<?, ExecutionContext> getApplicableTest() {
         return new UsesType<>(onlyIfUsing);
     }
 
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    public List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         Map<JavaProject, String> scopeByProject = new HashMap<>();
         for (SourceFile source : before) {
             source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                     source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
                         if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
                             scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                    scope /* a compile scope dependency will also be available in test source set */ :
+                                    scope /* a `compile` scope dependency will also be available in test source set */ :
                                     "test".equals(sourceSet.getName()) ? "test" : "compile"
                             );
                         }
@@ -182,7 +217,8 @@ public class AddDependency extends Recipe {
 
                         // If the dependency is already in compile scope it will be available everywhere, no need to continue
                         for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
-                            if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                            if (hasAcceptableTransitivity(d)
+                                    && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                 return maven;
                             }
                         }
@@ -191,7 +227,8 @@ public class AddDependency extends Recipe {
                         Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
                         if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
                             for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
-                                if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                                if (hasAcceptableTransitivity(d)
+                                        && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                     return maven;
                                 }
                             }
@@ -205,5 +242,9 @@ public class AddDependency extends Recipe {
                 .map(SourceFile.class::cast)
                 .orElse(s)
         );
+    }
+
+    private boolean hasAcceptableTransitivity(ResolvedDependency d) {
+        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive);
     }
 }
