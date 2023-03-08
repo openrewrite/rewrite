@@ -87,11 +87,12 @@ public class AppendToSequence extends Recipe {
                 String entryTrailingCommaPrefix = "";
                 String itemPrefix = "";
                 if (!entries.isEmpty()) {
-                    Yaml.Sequence.Entry first = entries.get(0);
-                    hasDash = first.isDash();
-                    entryPrefix = first.getPrefix();
-                    entryTrailingCommaPrefix = first.getTrailingCommaPrefix();
-                    Yaml.Sequence.Block block = first.getBlock();
+                    final int index = entries.size() - 1;
+                    Yaml.Sequence.Entry existingEntry = entries.get(index);
+                    hasDash = existingEntry.isDash();
+                    entryPrefix = existingEntry.getPrefix();
+                    entryTrailingCommaPrefix = existingEntry.getTrailingCommaPrefix();
+                    Yaml.Sequence.Block block = existingEntry.getBlock();
                     itemPrefix = block.getPrefix();
                     if (block instanceof Yaml.Sequence.Scalar) {
                         style = ((Yaml.Sequence.Scalar)block).getStyle();
@@ -100,7 +101,7 @@ public class AppendToSequence extends Recipe {
                 Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, AppendToSequence.this.value);
                 Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
                 entries.add(newEntry);
-                return sequence.withEntries(entries);
+                return maybeAutoFormat(sequence, sequence.withEntries(entries), ec);
             }
         };
     }
