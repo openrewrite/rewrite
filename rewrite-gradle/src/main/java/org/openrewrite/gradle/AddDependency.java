@@ -23,6 +23,7 @@ import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
@@ -148,14 +149,14 @@ public class AddDependency extends Recipe {
         }
 
         MethodMatcher dependencyDslMatcher = new MethodMatcher("DependencyHandlerSpec *(..)");
-        Pattern familyPatternCompiled = familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"));
+        Pattern familyPatternCompiled = StringUtils.isBlank(familyPattern) ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
                 .map(javaProject -> (Tree) new GroovyIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-                        if (dependencyDslMatcher.matches(m) && (configuration == null || configuration.equals(m.getSimpleName()))) {
+                        if (dependencyDslMatcher.matches(m) && (StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName()))) {
                             if (m.getArguments().get(0) instanceof J.Literal) {
                                 //noinspection ConstantConditions
                                 Dependency dependency = new DependencyStringNotationConverter().parse((String) ((J.Literal) m.getArguments().get(0)).getValue());
@@ -217,10 +218,10 @@ public class AddDependency extends Recipe {
                             return g;
                         }
 
-                        String resolvedConfiguration = configuration == null ? maybeConfiguration : configuration;
+                        String resolvedConfiguration = StringUtils.isBlank(configuration) ? maybeConfiguration : configuration;
 
-                        return (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                classifier, extension, familyPatternCompiled).visitNonNull(g, ctx);
+                        return (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, StringUtils.isBlank(versionPattern) ? null : versionPattern, resolvedConfiguration,
+                                StringUtils.isBlank(classifier) ? null : classifier, StringUtils.isBlank(extension) ? null : extension, familyPatternCompiled).visitNonNull(g, ctx);
                     }
                 }.visit(s, ctx))
                 .map(SourceFile.class::cast)
