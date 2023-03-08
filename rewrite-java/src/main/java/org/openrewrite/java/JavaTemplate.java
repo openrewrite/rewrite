@@ -17,12 +17,14 @@ package org.openrewrite.java;
 
 import lombok.Value;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
+import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.Space.Location;
@@ -50,6 +52,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
         this.templateParser = new JavaTemplateParser(parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
+    }
+
+    public String getCode() {
+        return code;
     }
 
     @Override
@@ -105,6 +111,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates, parentCursorRef, parentScope)
                 .getMixin()
                 .visit(changing, 0, parentCursor);
+    }
+
+    @Incubating(since = "7.38.0")
+    public boolean matches(J tree) {
+        return SemanticallyEqual.matchesTemplate(this, tree);
     }
 
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
