@@ -23,9 +23,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
 
-import java.util.List;
-
-
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ReplaceStringLiteralWithConstant extends Recipe {
@@ -40,13 +37,13 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     @Nullable
     String literalValue;
 
-    public ReplaceStringLiteralWithConstant(String fullyQualifiedNameOfConst) {
-        this.fullyQualifiedNameOfConst = fullyQualifiedNameOfConst;
-        this.literalValue = fullyQualifiedNameOfConst.substring(fullyQualifiedNameOfConst.lastIndexOf(".")+1);
+    public ReplaceStringLiteralWithConstant(String fullyQualifiedConstantName) {
+        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
+        this.literalValue = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf(".")+1);
     }
 
-    public ReplaceStringLiteralWithConstant(String fullyQualifiedNameOfConst, String literalValue) {
-        this.fullyQualifiedNameOfConst = fullyQualifiedNameOfConst;
+    public ReplaceStringLiteralWithConstant(String fullyQualifiedConstantName, String literalValue) {
+        this.fullyQualifiedConstantName = fullyQualifiedConstantName;
         this.literalValue = literalValue;
     }
 
@@ -64,15 +61,23 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
 
-            @Nullable
-            J.FieldAccess constant;
-
             @Override
             public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                 if(isStringLiteral(literal)) {
-                    String owningType = fullyQualifiedNameOfConst.substring(0,fullyQualifiedNameOfConst.lastIndexOf("."));
+                    String owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf("."));
+                    String constantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf(".")+1);
+                    String className = owningType.substring(owningType.lastIndexOf(".")+1);
+
                     maybeAddImport(owningType,false);
-                    return buildConstant().withPrefix(literal.getPrefix());
+
+                    String template = String.join(".",className,constantName);
+                    J j = literal.withTemplate(JavaTemplate.builder(this::getCursor,template).imports(owningType).build(),literal.getCoordinates().replace());
+
+                    if (!(j instanceof J.FieldAccess)) {
+                        throw new IllegalArgumentException("Invalid FQN : " + fullyQualifiedConstantName);
+                    }
+
+                    return j.withPrefix(literal.getPrefix());
                 }
                 return super.visitLiteral(literal, executionContext);
             }
@@ -82,33 +87,6 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
                         ((String) literal.getValue()).equals(literalValue);
             }
 
-            private J.FieldAccess buildConstant() {
-                if(constant == null) {
-                    //split fqn into owning type and constant name
-                    String constantName = fullyQualifiedNameOfConst.substring(fullyQualifiedNameOfConst.lastIndexOf(".")+1);
-                    String owningType = fullyQualifiedNameOfConst.substring(0,fullyQualifiedNameOfConst.lastIndexOf("."));
-                    String className = owningType.substring(owningType.lastIndexOf(".")+1);
-
-                    // Instead of creating new FieldAccess using constructor, parsing code snippet to create Field Access using JavaParser.
-                    JavaParser parser = JavaParser.fromJavaVersion().build();
-                    List<J.CompilationUnit> result = parser.parse(
-                            "import "+ owningType +";\n" +
-                                    "class Test {\n" +
-                                    "   Object o = "+String.join(".",className,constantName)+";\n" +
-                                    "}"
-                    );
-
-                    // Retrieving FieldAccess from Compilation Unit
-                    J j = ((J.VariableDeclarations) result.get(0).getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0).getInitializer();
-                    if (!(j instanceof J.FieldAccess)) {
-                        throw new IllegalArgumentException("Invalid FQN : " + fullyQualifiedNameOfConst);
-                    }
-
-                    J.FieldAccess parsedFieldAccess = (J.FieldAccess) j;
-                    constant = parsedFieldAccess.withId(Tree.randomId());
-                }
-                return constant;
-            }
         };
     }
 }
