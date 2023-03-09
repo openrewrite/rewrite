@@ -42,6 +42,17 @@ public class JavaVersion implements Marker {
         }
     }
 
+    /**
+     * @return The major --release version.
+     */
+    public int getMajorReleaseVersion() {
+        try {
+            return Integer.parseInt(normalize(targetCompatibility));
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
+
     private String normalize(String version) {
         if (!version.contains(".")) {
             return version;

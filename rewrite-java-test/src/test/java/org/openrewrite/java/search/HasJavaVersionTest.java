@@ -28,7 +28,7 @@ class HasJavaVersionTest implements RewriteTest {
     @ValueSource(strings = {"[8,17)", "11", "11.x"})
     void matches(String version) {
         rewriteRun(
-          spec -> spec.recipe(new HasJavaVersion(version)),
+          spec -> spec.recipe(new HasJavaVersion(version, false)),
           version(
             java(
               """
@@ -49,7 +49,7 @@ class HasJavaVersionTest implements RewriteTest {
     @ValueSource(strings = {"[8,17)", "11"})
     void noMatch(String version) {
         rewriteRun(
-          spec -> spec.recipe(new HasJavaVersion(version)),
+          spec -> spec.recipe(new HasJavaVersion(version, false)),
           version(
             java(
               """
