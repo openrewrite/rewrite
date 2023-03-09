@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class TreeVisitorAdapterTest {
+class TreeVisitorAdapterTest {
 
     @Test
     void adapter() {

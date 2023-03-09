@@ -32,7 +32,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
-public class JavaTemplateTest6Test implements RewriteTest {
+class JavaTemplateTest6Test implements RewriteTest {
 
     @Test
     void addVariableAnnotationsToVariableNotAnnotated() {

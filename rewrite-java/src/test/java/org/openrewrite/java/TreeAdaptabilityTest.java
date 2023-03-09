@@ -26,7 +26,7 @@ import org.openrewrite.text.PlainTextVisitor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SuppressWarnings("unchecked")
-public class TreeAdaptabilityTest implements RewriteTest {
+class TreeAdaptabilityTest implements RewriteTest {
 
     @Test
     void adaptParameterizedPlainTextTreeVisitor() {

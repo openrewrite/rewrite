@@ -27,7 +27,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class UpdateOwaspSuppressionDateTest implements RewriteTest {
+class UpdateOwaspSuppressionDateTest implements RewriteTest {
 
     @Test
     void noUpdateIfCveDoesNotExist() {

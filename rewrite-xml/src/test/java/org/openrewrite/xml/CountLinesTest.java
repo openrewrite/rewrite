@@ -22,10 +22,10 @@ import org.openrewrite.xml.tree.Xml;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class CountLinesTest implements RewriteTest {
+class CountLinesTest implements RewriteTest {
 
     @Test
-    public void testLineCount() {
+    void testLineCount() {
         rewriteRun(
           xml(
             """
