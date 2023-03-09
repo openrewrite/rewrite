@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
 @SuppressWarnings("ALL")
 class FinalizeLocalVariablesTest implements RewriteTest {
@@ -336,6 +337,34 @@ class FinalizeLocalVariablesTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2956")
+    void recordShouldNotIntroduceExtraClosingParenthesis() {
+        rewriteRun(
+          version(
+          java(
+            """
+            public class Main {
+                public static void test() {
+                    var myVar = "";
+                }
+                public record EmptyRecord() {
+                }
+            }
+              """,
+            """
+            public class Main {
+                public static void test() {
+                    final var myVar = "";
+                }
+                public record EmptyRecord() {
+                }
+            }
+              """
+          ), 17)
         );
     }
 }

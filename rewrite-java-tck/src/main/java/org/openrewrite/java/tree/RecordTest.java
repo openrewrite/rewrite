@@ -26,6 +26,18 @@ import static org.openrewrite.java.Assertions.java;
 class RecordTest implements RewriteTest {
 
     @Test
+    void emptyRecord() {
+        rewriteRun(
+          java(
+            """
+              public record JavaRecord() {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void javaRecord() {
         rewriteRun(
           java(

@@ -442,7 +442,9 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             }
             primaryConstructor = JContainer.build(
                     sourceBefore("("),
-                    convertAll(stateVector, commaDelim, t -> sourceBefore(")")),
+                    stateVector.isEmpty() ?
+                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                            convertAll(stateVector, commaDelim, t -> sourceBefore(")")),
                     Markers.EMPTY
             );
         }
