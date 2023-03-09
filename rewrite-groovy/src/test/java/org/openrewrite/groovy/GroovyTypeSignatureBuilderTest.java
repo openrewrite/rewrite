@@ -36,14 +36,15 @@ public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
     private static final String goat = StringUtils.readFully(GroovyTypeSignatureBuilderTest.class.getResourceAsStream("/GroovyTypeGoat.groovy"));
 
     private static final CompiledGroovySource cu = GroovyParser.builder()
-            .logCompilationWarningsAndErrors(true)
-            .build()
-            .parseInputsToCompilerAst(
-                    singletonList(new Parser.Input(Paths.get("GroovyTypeGoat.groovy"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
-                    null,
-                    new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)))
-            .iterator()
-            .next();
+      .logCompilationWarningsAndErrors(true)
+      .build()
+      .parseInputsToCompilerAst(
+        singletonList(new Parser.Input(Paths.get("GroovyTypeGoat.groovy"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
+        null,
+        new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)))
+      .keySet()
+      .iterator()
+      .next();
 
     @Override
     public String fieldSignature(String field) {

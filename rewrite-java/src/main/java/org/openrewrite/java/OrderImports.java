@@ -48,8 +48,7 @@ public class OrderImports extends Recipe {
 
     @Option(displayName = "Remove unused",
             description = "Remove unnecessary imports.",
-            required = false,
-            example = "true")
+            required = false)
     @Nullable
     Boolean removeUnused;
 

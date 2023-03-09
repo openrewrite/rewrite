@@ -16,10 +16,7 @@
 package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
@@ -27,6 +24,7 @@ import org.openrewrite.text.PlainText;
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 
@@ -34,6 +32,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class EnvironmentTest implements RewriteTest {
+
+    @Test
+    void declarativeRecipesDontAddToEstimatedTimeFixed() {
+        rewriteRun(
+          spec -> spec
+            .recipeFromYaml(
+              """
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.ChangeTextToHello
+                displayName: Change text to hello
+                recipeList:
+                    - org.openrewrite.text.ChangeText:
+                        toText: Hello
+                """,
+              "test.ChangeTextToHello"
+            )
+            .afterRecipe(run -> {
+                for (Result result : run.getResults()) {
+                    assertThat(result.getTimeSavings()).isEqualTo(Duration.ofMinutes(5));
+                }
+            }),
+          text(
+            "Hi",
+            "Hello"
+          )
+        );
+    }
+
     @Test
     void listRecipes() {
         var env = Environment.builder()

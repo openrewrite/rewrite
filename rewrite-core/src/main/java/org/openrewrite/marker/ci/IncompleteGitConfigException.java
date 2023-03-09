@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,12 @@
  */
 package org.openrewrite.marker.ci;
 
-import com.sun.jna.LastErrorException;
-import com.sun.jna.Library;
-import com.sun.jna.Native;
+public class IncompleteGitConfigException extends Exception {
 
-public final class POSIXUtil {
-    private static final C c = Native.load("c", C.class);
-
-    private interface C extends Library {
-        @SuppressWarnings("UnusedReturnValue")
-        int gethostname(byte[] name, int size_t) throws LastErrorException;
+    public IncompleteGitConfigException(){
+        super();
     }
-
-    public static String getHostName() {
-        byte[] hostname = new byte[256];
-        c.gethostname(hostname, hostname.length);
-        return Native.toString(hostname);
+    public IncompleteGitConfigException(String format) {
+        super(format);
     }
 }

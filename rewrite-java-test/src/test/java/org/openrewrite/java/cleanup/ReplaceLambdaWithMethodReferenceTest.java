@@ -16,6 +16,8 @@
 
 package org.openrewrite.java.cleanup;
 
+
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -160,6 +162,34 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                     return memberRef;
                 }
             }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2875")
+    @Test
+    void instanceOfLeftHandIsNotLambdaParameter() {
+        rewriteRun(
+          java(
+            """
+              package org.test;
+              public class CheckType {
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.List;
+              import java.util.stream.Collectors;
+
+              import org.test.CheckType;
+
+              class Test {
+                  List<Optional<Object>> method(List<Optional<Object>> input) {
+                      return input.stream().filter(n -> n.get() instanceof CheckType).collect(Collectors.toList());
+                  }
+              }
+              """
           )
         );
     }
@@ -478,6 +508,70 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2897")
+    @Test
+    void notNullToObjectsNonNullError() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+
+              public class A {
+                  private static Class<?> determineCommonAncestor(Class<?> clazz1, Class<?> clazz2) {
+                      return clazz1;
+                  }
+
+                  private static String forClass(Class<?> clazz) {
+                      return clazz.getName();
+                  }
+
+                  private static String deriveElementType(Collection<?> elements, String fallbackType) {
+
+                      if (elements.isEmpty()) {
+                          return fallbackType;
+                      }
+
+                      return elements.stream()
+                          .filter(it -> it != null)
+                          .<Class<?>> map(Object::getClass)
+                          .reduce(A::determineCommonAncestor)
+                          .map(A::forClass)
+                          .orElse(fallbackType);
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.Objects;
+
+              public class A {
+                  private static Class<?> determineCommonAncestor(Class<?> clazz1, Class<?> clazz2) {
+                      return clazz1;
+                  }
+
+                  private static String forClass(Class<?> clazz) {
+                      return clazz.getName();
+                  }
+
+                  private static String deriveElementType(Collection<?> elements, String fallbackType) {
+
+                      if (elements.isEmpty()) {
+                          return fallbackType;
+                      }
+
+                      return elements.stream()
+                          .filter(Objects::nonNull)
+                          .<Class<?>> map(Object::getClass)
+                          .reduce(A::determineCommonAncestor)
+                          .map(A::forClass)
+                          .orElse(fallbackType);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("Convert2MethodRef")
     @Test
     void isEqualToNull() {
@@ -515,20 +609,20 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      Runnable r = () -> {
-                          this.execute();
-                      };
+              class Test {
+                  Runnable r = () -> {
+                      this.execute();
+                  };
 
-                      void execute() {}
-                  }
+                  void execute() {}
+              }
               """,
             """
-                  class Test {
-                      Runnable r = this::execute;
+              class Test {
+                  Runnable r = this::execute;
 
-                      void execute() {}
-                  }
+                  void execute() {}
+              }
               """
           )
         );
@@ -701,6 +795,64 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
                       Object o;
                       o = i -> new ArrayList(i);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
+    @Disabled("To be fixed")
+    @Test
+    void multipleConstructors() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Predicate;
+
+              class B {
+                  B () {}
+                  B (Predicate<String> predicate) {}
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              class A {
+                  void method(Supplier<B> supplier) {}
+                  void method(Function<B, B> function) {}
+
+                  void test() {
+                      method(() -> new B());
+                      // method(B::new); // doesn't compile
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
+    @Disabled("To be fixed")
+    @Test
+    void anotherSimplerMultipleConstructorsCase() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              public class A {
+                  void method(Supplier<String> visitor) {}
+                  void method(Function<String, String> visitor) {}
+
+                  void test() {
+                      method(() -> new String());
+                      // method(String::new); doesn't compile
                   }
               }
               """

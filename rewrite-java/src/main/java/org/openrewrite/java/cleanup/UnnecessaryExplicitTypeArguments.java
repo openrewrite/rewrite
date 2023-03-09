@@ -68,6 +68,12 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
                     } else if (enclosing instanceof Expression) {
                         enclosingType = ((Expression) enclosing).getType();
                     } else if (enclosing instanceof NameTree) {
+                        if (enclosing instanceof J.VariableDeclarations.NamedVariable) {
+                            J.VariableDeclarations decl = getCursor().getParentTreeCursor().getParentTreeCursor().getValue();
+                            if (decl.getTypeExpression() instanceof J.Identifier && "var".equals(((J.Identifier) decl.getTypeExpression()).getSimpleName())) {
+                                return m;
+                            }
+                        }
                         enclosingType = ((NameTree) enclosing).getType();
                     } else if (enclosing instanceof J.Return) {
                         Object e = getCursor().dropParentUntil(p -> p instanceof J.MethodDeclaration || p instanceof J.Lambda).getValue();

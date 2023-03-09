@@ -56,14 +56,14 @@ class ImportTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import static java.util.Map.Entry;
-                  import java.util.Map.Entry;
-                  
-                  import java.util.List;
-                  import java.util.*;
-                  
-                  import static java.nio.charset.StandardCharsets.UTF_8;
-                  import static java.util.Collections.emptyList;
+              import static java.util.Map.Entry;
+              import java.util.Map.Entry;
+              
+              import java.util.List;
+              import java.util.*;
+              
+              import static java.nio.charset.StandardCharsets.UTF_8;
+              import static java.util.Collections.emptyList;
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.getImports().stream().map(J.Import::getPackageName))
               .containsExactly(
@@ -125,8 +125,8 @@ class ImportTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import org.springframework.context.annotation.Bean;
-                  import org.springframework.context.annotation.Configuration;
+              import org.springframework.context.annotation.Bean;
+              import org.springframework.context.annotation.Configuration;
               """,
             spec -> spec.afterRecipe(cu -> {
                 var b = cu.getImports().get(0);
@@ -145,12 +145,12 @@ class ImportTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package org.openrewrite.BadPackage;
-                  
-                  public class Foo {
-                      public static class Bar {
-                      }
+              package org.openrewrite.BadPackage;
+              
+              public class Foo {
+                  public static class Bar {
                   }
+              }
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.getPackageDeclaration().getPackageName())
               .isEqualTo("org.openrewrite.BadPackage"))

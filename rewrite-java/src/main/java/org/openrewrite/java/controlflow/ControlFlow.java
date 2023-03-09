@@ -21,17 +21,21 @@ import lombok.Value;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.SelfLoathing;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.VariableNameUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.*;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.exceptionMessageBuilder;
 
 @Incubating(since = "7.25.0")
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -100,17 +104,17 @@ public final class ControlFlow {
         /**
          * Flows that terminate in a {@link J.Return} or {@link J.Throw} statement.
          */
-        private final Set<ControlFlowNode> exitFlow = new HashSet<>();
+        protected final Set<ControlFlowNode> exitFlow = new HashSet<>();
 
         /**
          * Flows that terminate in a {@link J.Continue} statement.
          */
-        private final Set<ControlFlowNode> continueFlow = new HashSet<>();
+        protected final Set<ControlFlowNode> continueFlow = new HashSet<>();
 
         /**
          * Flows that terminate in a {@link J.Break} statement.
          */
-        private final Set<ControlFlowNode> breakFlow = new HashSet<>();
+        protected final Set<ControlFlowNode> breakFlow = new HashSet<>();
 
         ControlFlowAnalysis(ControlFlowNode.Start start, boolean methodEntryPoint) {
             this.current = Collections.singleton(Objects.requireNonNull(start, "start cannot be null"));
@@ -128,7 +132,6 @@ public final class ControlFlow {
             if (current.isEmpty()) {
                 throw new ControlFlowIllegalStateException(exceptionMessageBuilder("No current node!").addCursor(getCursor()));
             }
-            assert !current.isEmpty() : "No current node!";
             if (current.size() == 1 && current.iterator().next() instanceof ControlFlowNode.BasicBlock) {
                 return (ControlFlowNode.BasicBlock) current.iterator().next();
             } else {
@@ -162,33 +165,49 @@ public final class ControlFlow {
             current = Collections.singleton(node);
         }
 
-        private void addCursorToBasicBlock() {
+        void addCursorToBasicBlock() {
             currentAsBasicBlock().addCursorToBasicBlock(getCursor());
         }
 
+        ControlFlowAnalysis<P> createAnalysisForRecursion(Set<? extends ControlFlowNode> start) {
+            return new ControlFlowAnalysis<>(start, graphType);
+        }
+
         ControlFlowAnalysis<P> visitRecursive(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
-            ControlFlowAnalysis<P> analysis = new ControlFlowAnalysis<>(start, graphType);
+            ControlFlowAnalysis<P> analysis = createAnalysisForRecursion(start);
             analysis.visit(toVisit, param, getCursor());
             return analysis;
         }
 
         ControlFlowAnalysis<P> visitRecursiveTransferringExit(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
             ControlFlowAnalysis<P> analysis = visitRecursive(start, toVisit, param);
-            if (!analysis.exitFlow.isEmpty()) {
-                this.exitFlow.addAll(analysis.exitFlow);
-            }
+            transferExit(analysis);
             return analysis;
         }
 
         ControlFlowAnalysis<P> visitRecursiveTransferringAll(Set<? extends ControlFlowNode> start, Tree toVisit, P param) {
             ControlFlowAnalysis<P> analysis = visitRecursiveTransferringExit(start, toVisit, param);
+            transferContinueFlow(analysis);
+            transferBreakFlow(analysis);
+            return analysis;
+        }
+
+        void transferExit(ControlFlowAnalysis<P> analysis) {
+            if (!analysis.exitFlow.isEmpty()) {
+                this.exitFlow.addAll(analysis.exitFlow);
+            }
+        }
+
+        void transferContinueFlow(ControlFlowAnalysis<P> analysis) {
             if (!analysis.continueFlow.isEmpty()) {
                 this.continueFlow.addAll(analysis.continueFlow);
             }
+        }
+
+        void transferBreakFlow(ControlFlowAnalysis<P> analysis) {
             if (!analysis.breakFlow.isEmpty()) {
                 this.breakFlow.addAll(analysis.breakFlow);
             }
-            return analysis;
         }
 
         @Override
@@ -199,10 +218,8 @@ public final class ControlFlow {
             return assignment;
         }
 
-        @Override
-        public J.Block visitBlock(J.Block block, P p) {
-            addCursorToBasicBlock();
-            for (Statement statement : block.getStatements()) {
+        void visitStatementList(List<Statement> statements, P p) {
+            for (Statement statement : statements) {
                 ControlFlowAnalysis<P> analysis = visitRecursive(current, statement, p);
                 current = analysis.current;
                 continueFlow.addAll(analysis.continueFlow);
@@ -215,6 +232,12 @@ public final class ControlFlow {
                     break;
                 }
             }
+        }
+
+        @Override
+        public J.Block visitBlock(J.Block block, P p) {
+            addCursorToBasicBlock();
+            visitStatementList(block.getStatements(), p);
             if (methodEntryPoint) {
                 ControlFlowNode end = ControlFlowNode.End.create(this.graphType);
                 addSuccessorToCurrent(end);
@@ -312,6 +335,75 @@ public final class ControlFlow {
             return unary;
         }
 
+        @Override
+        @SelfLoathing(name = "Jonathan Leitschuh")
+        public J.Switch visitSwitch(J.Switch _switch, P p) {
+            addCursorToBasicBlock();
+            visit(_switch.getSelector(), p);
+            ControlFlowAnalysis<P> analysis = new ControlFlowAnalysis<P>(current, graphType) {
+
+                /**
+                 * Flows that exit a {@link J.Case} and don't complete with a {@link J.Break}.
+                 */
+                private final Set<ControlFlowNode> caseFlow = new HashSet<>();
+
+                @Override
+                @SelfLoathing(name = "Jonathan Leitschuh")
+                ControlFlowAnalysis<P> createAnalysisForRecursion(Set<? extends ControlFlowNode> start) {
+                    return new ControlFlowAnalysis<P>(start, graphType) {
+
+                        @Override
+                        public J.Case visitCase(J.Case _case, P p) {
+                            if (isDefaultCase(_case)) {
+                                // The default case is not a conditional node, there can be no `false` on a `default` case.
+                                // It's just like an `else` case.
+                                current = Stream.concat(current.stream(), caseFlow.stream()).collect(Collectors.toSet());
+                                addCursorToBasicBlock();
+                                return super.visitCase(_case, p);
+                            }
+                            // TODO: Handle complex conditional expressions in case statements (ie. Java 17 pattern matching)
+                            // visit(_case.getExpressions(), p);
+                            addCursorToBasicBlock();
+                            ControlFlowNode.ConditionNode conditionNode = currentAsBasicBlock().addConditionNodeTruthFirst();
+                            current = Stream.concat(Stream.of(conditionNode), caseFlow.stream()).collect(Collectors.toSet());
+                            caseFlow.clear();
+                            switch (_case.getType()) {
+                                case Statement:
+                                    if (_case.getStatements().isEmpty()) {
+                                        // Visit a fake empty statement to ensure that the ConditionNode has a true successor
+                                        visit(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), p);
+                                    } else {
+                                        visitStatementList(_case.getStatements(), p);
+                                    }
+                                    break;
+                                case Rule:
+                                    visit(_case.getBody(), p);
+                                    breakFlow.add(currentAsBasicBlock());
+                                    current = Collections.emptySet();
+                                    break;
+                            }
+                            caseFlow.addAll(current);
+                            current = Collections.singleton(conditionNode);
+                            return _case;
+                        }
+                    };
+                }
+            };
+            analysis.visit(_switch.getCases(), p, getCursor());
+            transferContinueFlow(analysis);
+            transferExit(analysis);
+            current = Stream.concat(analysis.current.stream(), analysis.breakFlow.stream()).collect(Collectors.toSet());
+            return _switch;
+        }
+
+        @Override
+        public J.Case visitCase(J.Case _case, P p) {
+            if (!isDefaultCase(_case)) {
+                throw new ControlFlowIllegalStateException(exceptionMessageBuilder("Case statements should be visited by the switch statement").addCursor(getCursor()));
+            }
+            return super.visitCase(_case, p);
+        }
+
         private static Set<ControlFlowNode.ConditionNode> allAsConditionNodesMissingTruthFirst(Set<? extends ControlFlowNode> nodes) {
             return nodes.stream().map(controlFlowNode -> {
                 if (controlFlowNode instanceof ControlFlowNode.ConditionNode) {
@@ -402,7 +494,6 @@ public final class ControlFlow {
 
             // First the condition is invoked
             ControlFlowAnalysis<P> conditionAnalysis = visitRecursiveTransferringAll(current, branching.getCondition(), p);
-            J truePart = branching.getTruePart();
 
             Set<ControlFlowNode.ConditionNode> conditionNodes = allAsConditionNodesMissingTruthFirst(conditionAnalysis.current);
             // Then the then block is visited
@@ -572,7 +663,7 @@ public final class ControlFlow {
 
         private static J.Literal trueLiteral() {
             return new J.Literal(
-                    Tree.randomId(),
+                    randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
                     true,
@@ -582,26 +673,58 @@ public final class ControlFlow {
             );
         }
 
+        /**
+         * Generate the control flow graph for {@link J.ForEachLoop}.
+         * </p>
+         * Unlike normal graph generation, because {@link J.ForEachLoop} are heavy syntactic sugar, "fake" AST nodes need to be generated.
+         * These "fake" AST nodes allows us to preserve some fundamental assumptions about the ControlFlowNode graph,
+         * in particular that a given {@link ControlFlowNode.BasicBlock} only has one successor.
+         *
+         * @implNote Creates a fake initialization of an {@link Iterator} before the for-each loop, and assigns that to a fake variable.
+         * Then the looping {@link ControlFlowNode.ConditionNode} is a fake call to {@link Iterator#hasNext()} on that iterator.
+         */
         @Override
+        @SelfLoathing(name = "Jonathan Leitschuh")
         public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, P p) {
-            // We treat the for each loop as if there is a fake conditional call to
-            // `#{any(java.lang.Iterable)}.iterator().hasNext()` before every loop.
-            // This "fake" allows us to preserve some fundamental assumptions about the ControlFlowNode graph,
-            // in particular that a given BasicBlock only has one successor
+            String iteratorVariableNumber =
+                    VariableNameUtils.generateVariableName(
+                            forLoop.getControl().getVariable().getVariables().get(0).getSimpleName() + "Iterator",
+                            this.getCursor(),
+                            VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER
+                    );
+
+            JavaType controlLoopType = forLoop.getControl().getVariable().getVariables().get(0).getType();
+            if (controlLoopType == null) {
+                throw new ControlFlowIllegalStateException(
+                        exceptionMessageBuilder("No type for for loop control variable")
+                                .addCursor(getCursor())
+                );
+            }
+            J.VariableDeclarations fakeIteratorAssignment = createFakeIteratorVariableDeclarations(
+                    iteratorVariableNumber,
+                    controlLoopType,
+                    forLoop
+            );
+            visit(fakeIteratorAssignment, p, getCursor());
+
             addCursorToBasicBlock();
-            visit(forLoop.getControl(), p);
+
+            // NOTE: Don't move this line into the `visitForEachControl`, it will break. The cursor at this scope is important.
+            J.MethodInvocation fakeConditionalMethod = createFakeConditionalMethod(
+                    fakeIteratorAssignment.getVariables().get(0).getName(),
+                    forLoop.getControl().getIterable()
+            );
+
             ControlFlowAnalysis<P> controlAnalysis = new ControlFlowAnalysis<P>(current, graphType) {
                 @Override
                 public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
-                    visit(control.getIterable(), p);
+                    addCursorToBasicBlock();
                     visit(control.getVariable(), p);
-                    addBasicBlockToCurrent();
+                    visit(fakeConditionalMethod, p);
                     return control;
                 }
             };
-
-            J.MethodInvocation fakeConditionalMethod = createFakeConditionalMethod(forLoop.getControl().getIterable());
-            visit(fakeConditionalMethod, p);
+            controlAnalysis.visit(forLoop.getControl(), p, getCursor());
 
             ControlFlowNode.ConditionNode conditionalEntry = controlAnalysis.currentAsBasicBlock().addConditionNodeTruthFirst();
             ControlFlowAnalysis<P> bodyAnalysis = visitRecursiveTransferringExit(Collections.singleton(conditionalEntry), forLoop.getBody(), p);
@@ -613,14 +736,88 @@ public final class ControlFlow {
             return forLoop;
         }
 
-        private J.MethodInvocation createFakeConditionalMethod(Expression iterable) {
-            JavaTemplate fakeConditionalTemplate = iterable.getType() instanceof JavaType.Array ?
-                    JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any()}).iterator().hasNext()")
-                            .imports("java.util.Arrays")
-                            .build() :
-                    JavaTemplate.builder(this::getCursor, "#{any(java.lang.Iterable)}.iterator().hasNext()").build();
+        /**
+         * Part of the de-sugaring process to create a cleaner control flow graph for {@link J.ForEachLoop}.
+         * </p>
+         * Generates a fake iterable assigned to a variable from the {@link J.ForEachLoop}'s iterable.
+         * </p>
+         * Example 1:
+         * <pre>{@code
+         * for (String s : new String[] {"Hello", "Goodbye"}) {
+         *     System.out.println(s);
+         * }
+         * }</pre>
+         * Will become:
+         * <pre>{@code
+         * final Iterator<String> sIterator = Arrays.stream(new String[] {"Hello", "Goodbye"}).iterator();
+         * for (String s : ...) {
+         *      System.out.println(s);
+         * }
+         * }</pre>
+         * </p>
+         * Example 2:
+         * <pre>{@code
+         * for (String s : Collections.singletonList("Hello")) {
+         *     System.out.println(s);
+         * }
+         * }</pre>
+         * Will become:
+         * <pre>{@code
+         * final Iterator<String> sIterator = Collections.singletonList("Hello").iterator();
+         * for (String s : ...) {
+         *      System.out.println(s);
+         * }
+         * }</pre>
+         */
+        @SelfLoathing(name = "Jonathan Leitschuh")
+        private J.VariableDeclarations createFakeIteratorVariableDeclarations(String variableName, JavaType iteratorType, J.ForEachLoop forLoop) {
+            Expression iterable = forLoop.getControl().getIterable();
+            String type = iteratorType instanceof JavaType.Primitive ? ((JavaType.Primitive) iteratorType).getClassName() : iteratorType.toString();
+            Supplier<Cursor> cursorSupplier = () -> getCursor().dropParentUntil(J.Block.class::isInstance);
+            JavaTemplate fakeIterableVariableTemplate = iterable.getType() instanceof JavaType.Array ?
+                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = Arrays.stream(#{anyArray()}).iterator()").imports("java.util.Arrays").build() :
+                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = #{any(java.lang.Iterable)}.iterator()").build();
+            // Unfortunately, because J.NewArray isn't a statement, we have to find a place in the AST where a statement could be placed. This way a statement will always be generated.
+            // Find the closes outer block to place our statement.
+            J.Block block = getCursor().firstEnclosing(J.Block.class);
+            if (block == null) {
+                throw new ControlFlowIllegalStateException(
+                        exceptionMessageBuilder("Unable to create new J.VariableDeclarations, couldn't find an outer J.Block")
+                                .addCursor(getCursor())
+                );
+            }
+            // If the for loop is within a label, then get the coordinates for it instead.
+            // TODO: Support labeled labels 🤦‍
+            J.Label maybeParentLabel = getCursor().firstEnclosing(J.Label.class);
+            JavaCoordinates coordinates;
+            if (maybeParentLabel != null && maybeParentLabel.getStatement() == forLoop) {
+                coordinates = maybeParentLabel.getCoordinates().before();
+            } else {
+                coordinates = forLoop.getCoordinates().before();
+            }
+            // Use the template within the scope of the parent block
+            J.Block newFakeBlock = block.withTemplate(fakeIterableVariableTemplate, coordinates, iterable);
+            // Find the newly generated statement within the block
+            for (Statement statement : newFakeBlock.getStatements()) {
+                if (!(statement instanceof J.VariableDeclarations)) {
+                    continue;
+                }
+                J.VariableDeclarations maybeNewDeclaration = (J.VariableDeclarations) statement;
+                if (maybeNewDeclaration.getVariables().stream().map(J.VariableDeclarations.NamedVariable::getSimpleName).anyMatch(name -> name.equals(variableName))) {
+                    return maybeNewDeclaration;
+                }
+            }
+            throw new ControlFlowIllegalStateException(
+                    exceptionMessageBuilder("Unable to create new J.VariableDeclarations with name `" + variableName + "`")
+                            .addCursor(getCursor())
+            );
+        }
+
+        @SelfLoathing(name = "Jonathan Leitschuh")
+        protected J.MethodInvocation createFakeConditionalMethod(J.Identifier iteratorIdentifier, Expression iterable) {
+            JavaTemplate fakeConditionalTemplate = JavaTemplate.builder(this::getCursor, "#{any(java.util.Iterator)}.hasNext()").build();
             JavaCoordinates coordinates = iterable.getCoordinates().replace();
-            J.MethodInvocation fakeConditional = iterable.withTemplate(fakeConditionalTemplate, coordinates, iterable);
+            J.MethodInvocation fakeConditional = iterable.withTemplate(fakeConditionalTemplate, coordinates, iteratorIdentifier);
             if (iterable == fakeConditional) {
                 throw new IllegalStateException("Failed to create a fake conditional!");
             }
@@ -716,12 +913,6 @@ public final class ControlFlow {
         }
 
         @Override
-        public J.Switch visitSwitch(J.Switch _switch, P p) {
-            addCursorToBasicBlock();
-            return _switch;
-        }
-
-        @Override
         public J.Empty visitEmpty(J.Empty empty, P p) {
             J.MethodInvocation parent = getCursor().firstEnclosing(J.MethodInvocation.class);
             if (parent != null && parent.getArguments().contains(empty)) {
@@ -775,6 +966,16 @@ public final class ControlFlow {
                 cfnIterator.next().addSuccessor(basicBlock);
             }
             return basicBlock;
+        }
+
+        /**
+         * @return true if this case is the default case.
+         */
+        private static boolean isDefaultCase(J.Case _case) {
+            List<Expression> expressions = _case.getExpressions();
+            return expressions.size() == 1 &&
+                    expressions.get(0) instanceof J.Identifier &&
+                    "default".equals(((J.Identifier) expressions.get(0)).getSimpleName());
         }
     }
 }

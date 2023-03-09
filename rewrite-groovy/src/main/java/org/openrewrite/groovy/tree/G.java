@@ -412,7 +412,6 @@ public interface G extends J {
         }
     }
 
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -630,7 +629,7 @@ public interface G extends J {
 
         @Nullable
         @NonFinal
-        transient WeakReference<G.Binary.Padding> padding;
+        transient WeakReference<Padding> padding;
 
         @With
         @EqualsAndHashCode.Include
@@ -679,19 +678,19 @@ public interface G extends J {
         public enum Type {
             Find,
             Match,
-
+            In,
             Access
         }
 
-        public G.Binary.Padding getPadding() {
-            G.Binary.Padding p;
+        public Padding getPadding() {
+            Padding p;
             if (this.padding == null) {
-                p = new G.Binary.Padding(this);
+                p = new Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new G.Binary.Padding(this);
+                    p = new Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -708,6 +707,94 @@ public interface G extends J {
 
             public G.Binary withOperator(JLeftPadded<G.Binary.Type> operator) {
                 return t.operator == operator ? t : new G.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.after, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class Range implements G, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Expression from;
+
+        JLeftPadded<Boolean> inclusive;
+
+        public boolean getInclusive() {
+            return inclusive.getElement();
+        }
+
+        public Range withInclusive(boolean inclusive) {
+            return getPadding().withInclusive(this.inclusive.withElement(inclusive));
+        }
+
+        @With
+        Expression to;
+
+        @Override
+        public JavaType getType() {
+            return from.getType();
+        }
+
+        @Override
+        public Range withType(@Nullable JavaType type) {
+            return new Range(null, id, prefix, markers, from.withType(type), inclusive,
+                    to.withType(type));
+        }
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitRange(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Range t;
+
+            public JLeftPadded<Boolean> getInclusive() {
+                return t.inclusive;
+            }
+
+            public Range withInclusive(JLeftPadded<Boolean> inclusive) {
+                return t.inclusive == inclusive ? t : new Range(t.id, t.prefix, t.markers, t.from, inclusive, t.to);
             }
         }
     }

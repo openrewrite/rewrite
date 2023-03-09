@@ -141,6 +141,23 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return b;
     }
 
+    public J visitRange(G.Range range, P p) {
+        G.Range r = range;
+        r = r.withPrefix(visitSpace(r.getPrefix(), GSpace.Location.RANGE_PREFIX, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(r, p);
+        if (!(temp instanceof G.Range)) {
+            return temp;
+        } else {
+            r = (G.Range) temp;
+        }
+        r = r.withFrom(visitAndCast(r.getFrom(), p));
+        r = r.getPadding().withInclusive(visitLeftPadded(r.getPadding().getInclusive(), GLeftPadded.Location.RANGE_INCLUSION, p));
+        r = r.withTo(visitAndCast(r.getTo(), p));
+        r = r.withType(visitType(r.getType(), p));
+        return r;
+    }
+
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }

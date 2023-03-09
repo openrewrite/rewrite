@@ -59,26 +59,26 @@ class IndexOfReplaceableByContainsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.List;
+              import java.util.List;
 
-                  class Test {
-                      static boolean hasIndex(List<String> strList, String str) {
-                          if (strList.indexOf(str) > -1) {
-                          }
-                          return strList.indexOf(str) >= 0;
+              class Test {
+                  static boolean hasIndex(List<String> strList, String str) {
+                      if (strList.indexOf(str) > -1) {
                       }
+                      return strList.indexOf(str) >= 0;
                   }
+              }
               """,
             """
-                  import java.util.List;
+              import java.util.List;
 
-                  class Test {
-                      static boolean hasIndex(List<String> strList, String str) {
-                          if (strList.contains(str)) {
-                          }
-                          return strList.contains(str);
+              class Test {
+                  static boolean hasIndex(List<String> strList, String str) {
+                      if (strList.contains(str)) {
                       }
+                      return strList.contains(str);
                   }
+              }
               """
           )
         );

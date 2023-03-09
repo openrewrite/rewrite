@@ -39,8 +39,7 @@ public class AddProperty extends Recipe {
     String property;
 
     @Option(displayName = "Property value",
-            description = "The value of the new property key.",
-            example = "true")
+            description = "The value of the new property key.")
     String value;
 
     @Option(displayName = "Optional delimiter",

@@ -40,8 +40,7 @@ public class AddProperty extends Recipe {
     String key;
 
     @Option(displayName = "Property value",
-            description = "The value of the property to add.",
-            example = "true")
+            description = "The value of the property to add.")
     String value;
 
     @Option(displayName = "Overwrite if exists",

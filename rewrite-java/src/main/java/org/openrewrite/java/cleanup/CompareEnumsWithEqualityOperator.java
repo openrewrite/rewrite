@@ -88,7 +88,7 @@ public class CompareEnumsWithEqualityOperator extends Recipe {
                 J.Unary asUnary = (J.Unary) j;
                 if (executionContext.getMessage("REMOVE_UNARY_NOT") instanceof J.Unary &&
                         asUnary.equals(executionContext.getMessage("REMOVE_UNARY_NOT"))) {
-                    j = asUnary.getExpression();
+                    return asUnary.getExpression().unwrap();
                 }
                 return j;
             }

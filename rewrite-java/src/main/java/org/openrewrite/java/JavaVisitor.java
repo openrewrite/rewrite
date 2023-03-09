@@ -761,6 +761,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.MemberReference m = memberRef;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MEMBER_REFERENCE_PREFIX, p));
         m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(m, p);
+        if (!(temp instanceof J.MemberReference)) {
+            return temp;
+        } else {
+            m = (J.MemberReference) temp;
+        }
         m = m.getPadding().withContaining(visitRightPadded(m.getPadding().getContaining(), JRightPadded.Location.MEMBER_REFERENCE_CONTAINING, p));
         if (m.getPadding().getTypeParameters() != null) {
             m = m.getPadding().withTypeParameters(visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
@@ -1070,6 +1076,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             return temp;
         } else {
             t = (J.Ternary) temp;
+        }
+        Statement tempStat = (Statement) visitStatement(t, p);
+        if (!(tempStat instanceof J.Ternary)) {
+            return tempStat;
+        } else {
+            t = (J.Ternary) tempStat;
         }
         t = t.withCondition(visitAndCast(t.getCondition(), p));
         t = t.getPadding().withTruePart(visitLeftPadded(t.getPadding().getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p));

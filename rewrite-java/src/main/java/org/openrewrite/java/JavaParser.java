@@ -109,13 +109,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
-        List<String> missingArtifactNames = new ArrayList<>(artifactNamesWithVersions.length);
+        Set<String> missingArtifactNames = new LinkedHashSet<>(artifactNamesWithVersions.length);
         File resourceTarget = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget();
 
         nextArtifact:
         for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile(artifactName + "\\.jar$");
+            Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
@@ -128,42 +128,49 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             missingArtifactNames.add(artifactName);
         }
 
-        for (String artifactName : new ArrayList<>(missingArtifactNames)) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
-            try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath").scan()) {
-                ResourceList resources = result.getResourcesWithExtension(".jar");
+        if (missingArtifactNames.isEmpty()) {
+            return artifacts;
+        }
+
+        Class<?> caller;
+        try {
+            // StackWalker is only available in Java 15+, but right now we only use classloader isolated
+            // recipe instances in Java 17 environments, so we can safely use StackWalker there.
+            Class<?> options = Class.forName("java.lang.StackWalker$Option");
+            Object retainOption = options.getDeclaredField("RETAIN_CLASS_REFERENCE").get(null);
+
+            Class<?> walkerClass = Class.forName("java.lang.StackWalker");
+            Method getInstance = walkerClass.getDeclaredMethod("getInstance", options);
+            Object walker = getInstance.invoke(null, retainOption);
+            Method getDeclaringClass = Class.forName("java.lang.StackWalker$StackFrame").getDeclaredMethod("getDeclaringClass");
+            caller = (Class<?>) walkerClass.getMethod("walk", Function.class).invoke(walker, (Function<Stream<Object>, Object>) s -> s
+                    .map(f -> {
+                        try {
+                            return (Class<?>) getDeclaringClass.invoke(f);
+                        } catch (IllegalAccessException | InvocationTargetException e) {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .filter(c -> !c.getName().equals(JavaParser.class.getName()) &&
+                                 !c.getName().equals(JavaParser.Builder.class.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Unable to find caller of JavaParser.dependenciesFromResources(..)")));
+        } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException |
+                 NoSuchMethodException | InvocationTargetException e) {
+            caller = JavaParser.class;
+        }
+
+        try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath")
+                .addClassLoader(caller.getClassLoader())
+                .scan()) {
+            ResourceList resources = result.getResourcesWithExtension(".jar");
+
+            for (String artifactName : new ArrayList<>(missingArtifactNames)) {
+                Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
                 for (Resource resource : resources) {
                     if (jarPattern.matcher(resource.getPath()).find()) {
                         try {
                             Path artifact = resourceTarget.toPath().resolve(Paths.get(resource.getPath()).getFileName());
-
-                            Class<?> caller;
-                            try {
-                                // StackWalker is only available in Java 15+, but right now we only use classloader isolated
-                                // recipe instances in Java 17 environments, so we can safely use StackWalker there.
-                                Class<?> options = Class.forName("java.lang.StackWalker$Option");
-                                Object retainOption = options.getDeclaredField("RETAIN_CLASS_REFERENCE").get(null);
-
-                                Class<?> walkerClass = Class.forName("java.lang.StackWalker");
-                                Method getInstance = walkerClass.getDeclaredMethod("getInstance", options);
-                                Object walker = getInstance.invoke(null, retainOption);
-                                Method getDeclaringClass = Class.forName("java.lang.StackWalker$StackFrame").getDeclaredMethod("getDeclaringClass");
-                                caller = (Class<?>) walkerClass.getMethod("walk", Function.class).invoke(walker, (Function<Stream<Object>, Object>) s -> s
-                                        .map(f -> {
-                                            try {
-                                                return (Class<?>) getDeclaringClass.invoke(f);
-                                            } catch (IllegalAccessException | InvocationTargetException e) {
-                                                throw new RuntimeException(e);
-                                            }
-                                        })
-                                        .filter(c -> !c.getName().equals(JavaParser.class.getName()) &&
-                                                     !c.getName().equals(JavaParser.Builder.class.getName()))
-                                        .findFirst()
-                                        .orElseThrow(() -> new IllegalStateException("Unable to find caller of JavaParser.dependenciesFromResources(..)")));
-                            } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException |
-                                     NoSuchMethodException | InvocationTargetException e) {
-                                caller = JavaParser.class;
-                            }
 
                             Files.copy(
                                     requireNonNull(caller.getResourceAsStream("/" + resource.getPath())),
@@ -178,11 +185,15 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                     }
                 }
             }
-        }
 
-        if (!missingArtifactNames.isEmpty()) {
-            throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
-                                               missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
+            if (!missingArtifactNames.isEmpty()) {
+                throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
+                                                   missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
+                                                   "The caller is of type " + (caller == null ? "NO CALLER IDENTIFIED" : caller.getName()) + ".\n" +
+                                                   "The resources resolvable from the caller's classpath are: " +
+                                                   resources.stream().map(Resource::getPath).sorted().collect(joining(", "))
+                );
+            }
         }
 
         return artifacts;
@@ -265,6 +276,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      * different rounds
      */
     JavaParser reset();
+
+    JavaParser reset(Collection<URI> uris);
 
     /**
      * Changes the classpath on the parser. Intended for use in multiple pass parsing, where we want to keep the

@@ -146,7 +146,8 @@ public class Result {
             if (recipesStack != null) {
                 Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
                 if (perOccurrence != null) {
-                    timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
+                    timeSavings = perOccurrence;
+                    break;
                 }
             }
         }
@@ -205,8 +206,8 @@ public class Result {
                 new PrintOutputCapture<>(0) :
                 new PrintOutputCapture<>(0, markerPrinter);
 
-        FileMode beforeMode = before != null  && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-        FileMode afterMode = after != null  && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+        FileMode beforeMode = before != null && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+        FileMode afterMode = after != null && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
 
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 beforePath,
@@ -316,24 +317,24 @@ public class Result {
             AtomicBoolean addedComment = new AtomicBoolean(false);
             // NOTE: String.lines() would remove empty lines which we don't want
             return Arrays.stream(diff.split("\n"))
-                    .map(l -> {
-                        if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
-                            addedComment.set(true);
+                           .map(l -> {
+                               if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
+                                   addedComment.set(true);
 
-                            Set<String> sortedRecipeNames = new LinkedHashSet<>();
-                            for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
-                                sortedRecipeNames.add(recipesThatMadeChange.getName());
-                            }
-                            StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
-                            for (String name : sortedRecipeNames) {
-                                joinedRecipeNames.add(name);
-                            }
+                                   Set<String> sortedRecipeNames = new LinkedHashSet<>();
+                                   for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
+                                       sortedRecipeNames.add(recipesThatMadeChange.getName());
+                                   }
+                                   StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
+                                   for (String name : sortedRecipeNames) {
+                                       joinedRecipeNames.add(name);
+                                   }
 
-                            return l + joinedRecipeNames;
-                        }
-                        return l;
-                    })
-                    .collect(Collectors.joining("\n")) + "\n";
+                                   return l + joinedRecipeNames;
+                               }
+                               return l;
+                           })
+                           .collect(Collectors.joining("\n")) + "\n";
         }
 
         @Override

@@ -21,6 +21,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
 @SuppressWarnings("ALL")
 class FinalizeLocalVariablesTest implements RewriteTest {
@@ -122,28 +123,28 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      public static void testA() {
-                          int a = 0;
-                          a = 1;
-                      }
-
-                      public static void testB() {
-                          int a = 0;
-                      }
+              class Test {
+                  public static void testA() {
+                      int a = 0;
+                      a = 1;
                   }
+
+                  public static void testB() {
+                      int a = 0;
+                  }
+              }
               """,
             """
-                  class Test {
-                      public static void testA() {
-                          int a = 0;
-                          a = 1;
-                      }
-
-                      public static void testB() {
-                          final int a = 0;
-                      }
+              class Test {
+                  public static void testA() {
+                      int a = 0;
+                      a = 1;
                   }
+
+                  public static void testB() {
+                      final int a = 0;
+                  }
+              }
               """
           )
         );
@@ -155,17 +156,17 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.IOException;
-                  
-                  class Test {
-                      static {
-                          try {
-                              throw new IOException();
-                          } catch (RuntimeException | IOException e) {
-                              System.out.println("oops");
-                          }
+              import java.io.IOException;
+              
+              class Test {
+                  static {
+                      try {
+                          throw new IOException();
+                      } catch (RuntimeException | IOException e) {
+                          System.out.println("oops");
                       }
                   }
+              }
               """
           )
         );
@@ -205,22 +206,22 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      static {
-                          int n = 1;
-                          for(int i = 0; i < n; i++) {
-                          }
-                      }
-                  }
-              """,
-            """
               class Test {
                   static {
-                      final int n = 1;
+                      int n = 1;
                       for(int i = 0; i < n; i++) {
                       }
                   }
               }
+              """,
+            """
+            class Test {
+                static {
+                    final int n = 1;
+                    for(int i = 0; i < n; i++) {
+                    }
+                }
+            }
             """
           )
         );
@@ -231,15 +232,15 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      private static int testMath(int x, int y) {
-                          y = y + y;
-                          return x + y;
-                      }
-
-                      public static void main(String[] args) {
-                      }
+              class Test {
+                  private static int testMath(int x, int y) {
+                      y = y + y;
+                      return x + y;
                   }
+
+                  public static void main(String[] args) {
+                  }
+              }
               """
           )
         );
@@ -250,12 +251,12 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.stream.Stream;
-                  class A {
-                      public boolean hasFoo(Stream<String> input) {
-                          return input.anyMatch(word -> word.equalsIgnoreCase("foo"));
-                      }
+              import java.util.stream.Stream;
+              class A {
+                  public boolean hasFoo(Stream<String> input) {
+                      return input.anyMatch(word -> word.equalsIgnoreCase("foo"));
                   }
+              }
               """
           )
         );
@@ -267,13 +268,13 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.util.concurrent.FutureTask;
-                  
-                  class A {
-                      void f() {
-                          for(FutureTask<?> future; (future = new FutureTask<>(() -> "hello world")) != null;) { }
-                      }
+              import java.util.concurrent.FutureTask;
+              
+              class A {
+                  void f() {
+                      for(FutureTask<?> future; (future = new FutureTask<>(() -> "hello world")) != null;) { }
                   }
+              }
               """
           )
         );
@@ -284,24 +285,24 @@ class FinalizeLocalVariablesTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void test() {
-                          int i = 1;
-                          int j = -i;
-                          int k = +j;
-                          int l = ~k;
-                      }
+              class Test {
+                  void test() {
+                      int i = 1;
+                      int j = -i;
+                      int k = +j;
+                      int l = ~k;
                   }
+              }
               """,
             """
-                  class Test {
-                      void test() {
-                          final int i = 1;
-                          final int j = -i;
-                          final int k = +j;
-                          final int l = ~k;
-                      }
+              class Test {
+                  void test() {
+                      final int i = 1;
+                      final int j = -i;
+                      final int k = +j;
+                      final int l = ~k;
                   }
+              }
               """
           )
         );
@@ -336,6 +337,34 @@ class FinalizeLocalVariablesTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2956")
+    void recordShouldNotIntroduceExtraClosingParenthesis() {
+        rewriteRun(
+          version(
+          java(
+            """
+            public class Main {
+                public static void test() {
+                    var myVar = "";
+                }
+                public record EmptyRecord() {
+                }
+            }
+              """,
+            """
+            public class Main {
+                public static void test() {
+                    final var myVar = "";
+                }
+                public record EmptyRecord() {
+                }
+            }
+              """
+          ), 17)
         );
     }
 }

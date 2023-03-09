@@ -15,9 +15,9 @@
  */
 package org.openrewrite.xml.format;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
@@ -38,7 +38,7 @@ public class NormalizeTabsOrSpacesVisitor<P> extends XmlIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
-    @NotNull
+    @NonNull
     private String normalizeAfterFirstNewline(String text) {
         int firstNewline = text.indexOf('\n');
         if (firstNewline >= 0 && firstNewline != text.length() - 1) {

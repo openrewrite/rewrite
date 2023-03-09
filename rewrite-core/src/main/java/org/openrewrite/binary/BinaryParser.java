@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StreamUtils.readAllBytes;
 
 /**
  * Doesn't actually _parse_ anything, but if you want to wrap binary data into a SourceFile, this will do the trick
@@ -63,19 +64,5 @@ public class BinaryParser implements Parser<Binary> {
     @Override
     public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
         return prefix.resolve("file");
-    }
-
-    private byte[] readAllBytes(InputStream is) {
-        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        int byteCount;
-        byte[] data = new byte[4096];
-        try {
-            while ((byteCount = is.read(data, 0, data.length)) != -1) {
-                buffer.write(data, 0, byteCount);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        return buffer.toByteArray();
     }
 }

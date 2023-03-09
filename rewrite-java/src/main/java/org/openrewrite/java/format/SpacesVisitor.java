@@ -49,9 +49,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     public SpacesVisitor(SpacesStyle style, @Nullable EmptyForInitializerPadStyle emptyForInitializerPadStyle, @Nullable EmptyForIteratorPadStyle emptyForIteratorPadStyle, @Nullable Tree stopAfter) {
         this.style = style;
-        this.stopAfter = stopAfter;
         this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
         this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
+        this.stopAfter = stopAfter;
     }
 
     <T extends J> T spaceBefore(T j, boolean spaceBefore) {
@@ -1206,7 +1206,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J postVisit(J tree, P p) {
         if (stopAfter != null && stopAfter.isScope(tree)) {
-            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
+            getCursor().getRoot().putMessage("stop", true);
         }
         return super.postVisit(tree, p);
     }

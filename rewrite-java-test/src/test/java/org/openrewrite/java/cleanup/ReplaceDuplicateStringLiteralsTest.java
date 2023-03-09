@@ -239,11 +239,11 @@ class ReplaceDuplicateStringLiteralsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class A {
-                      final String val1 = "An example,, of a :: String with `` special __ characters.";
-                      final String val2 = "An example,, of a :: String with `` special __ characters.";
-                      final String val3 = "An example,, of a :: String with `` special __ characters.";
-                  }
+              class A {
+                  final String val1 = "An example,, of a :: String with `` special __ characters.";
+                  final String val2 = "An example,, of a :: String with `` special __ characters.";
+                  final String val3 = "An example,, of a :: String with `` special __ characters.";
+              }
               """,
             """
               class A {

@@ -30,6 +30,8 @@ public class GSpace {
         MAP_LITERAL,
         MAP_LITERAL_ELEMENT_SUFFIX,
         MAP_LITERAL_ELEMENTS,
+        RANGE_PREFIX,
+        RANGE_INCLUSION,
         TOP_LEVEL_STATEMENT,
     }
 }

@@ -61,13 +61,6 @@ public class DeclarativeRecipe extends CompositeRecipe {
     private final boolean causesAnotherCycle;
 
     @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return estimatedEffortPerOccurrence == null ?
-                super.getEstimatedEffortPerOccurrence() :
-                estimatedEffortPerOccurrence;
-    }
-
-    @Override
     public boolean causesAnotherCycle() {
         return causesAnotherCycle || super.causesAnotherCycle();
     }
@@ -118,25 +111,14 @@ public class DeclarativeRecipe extends CompositeRecipe {
     private void configureByUse(RecipeUse use, Recipe recipe) {
         switch(use) {
             case SingleSourceApplicability:
-                addSingleSourceApplicableTest(getVisitor(recipe));
+                addSingleSourceApplicableTest(recipe);
                 break;
             case AnySourceApplicability:
-                addApplicableTest(getVisitor(recipe));
+                addApplicableTest(recipe);
                 break;
             case Recipe:
                 doNext(recipe);
                 break;
-        }
-    }
-
-    private TreeVisitor<?, ExecutionContext> getVisitor(Recipe recipe) {
-        try {
-            Method getVisitor = recipe.getClass().getDeclaredMethod("getVisitor");
-            getVisitor.setAccessible(true);
-            //noinspection unchecked
-            return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
-        } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException(e);
         }
     }
 

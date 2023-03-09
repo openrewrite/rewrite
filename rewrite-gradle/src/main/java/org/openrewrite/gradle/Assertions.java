@@ -41,7 +41,7 @@ public class Assertions {
     }
 
     private static final Parser.Builder gradleParser = GradleParser.builder()
-            .setGroovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
+            .groovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
 
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {
         return buildGradle(before, s -> {

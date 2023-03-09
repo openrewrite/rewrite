@@ -22,6 +22,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 
 import java.lang.reflect.Constructor;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.Collection;
@@ -42,6 +43,12 @@ public class Java11Parser implements JavaParser {
     @Override
     public JavaParser reset() {
         delegate.reset();
+        return this;
+    }
+
+    @Override
+    public JavaParser reset(Collection<URI> cus) {
+        delegate.reset(cus);
         return this;
     }
 

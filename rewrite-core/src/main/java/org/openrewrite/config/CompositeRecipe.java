@@ -38,22 +38,7 @@ public class CompositeRecipe extends Recipe {
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
-        if (estimatedEffortPerOccurrence == null) {
-            long total = 0;
-            for (Recipe recipe : getRecipeList()) {
-                if (isNonzero(recipe.getEstimatedEffortPerOccurrence())) {
-                    // Duration arithmetic has poor performance, and this code gets hit a lot with deeply-nested recipes
-                    total += recipe.getEstimatedEffortPerOccurrence().toMillis();
-                }
-            }
-
-            if (total == 0) {
-                return DEFAULT_ESTIMATED_EFFORT;
-            }
-
-            estimatedEffortPerOccurrence = Duration.ofMillis(total);
-        }
-        return estimatedEffortPerOccurrence;
+        return null;
     }
 
     private static boolean isNonzero(@Nullable Duration estimatedEffortPerOccurrence) {
@@ -64,12 +49,16 @@ public class CompositeRecipe extends Recipe {
     public List<DataTableDescriptor> getDataTableDescriptors() {
         List<DataTableDescriptor> dataTableDescriptors = null;
         for (Recipe recipe : getRecipeList()) {
-            List<DataTableDescriptor> dtd = recipe.getDataTableDescriptors();
-            if (!dtd.isEmpty()) {
+            List<DataTableDescriptor> dtds = recipe.getDataTableDescriptors();
+            if (!dtds.isEmpty()) {
                 if (dataTableDescriptors == null) {
                     dataTableDescriptors = new ArrayList<>();
                 }
-                dataTableDescriptors.addAll(dtd);
+                for (DataTableDescriptor dtd : dtds) {
+                    if (!dataTableDescriptors.contains(dtd)) {
+                        dataTableDescriptors.add(dtd);
+                    }
+                }
             }
         }
         return dataTableDescriptors == null ? super.getDataTableDescriptors() : dataTableDescriptors;

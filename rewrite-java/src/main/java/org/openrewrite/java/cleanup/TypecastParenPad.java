@@ -18,12 +18,13 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+
+import java.util.Optional;
 
 public class TypecastParenPad extends Recipe {
     @Override
@@ -46,19 +47,11 @@ public class TypecastParenPad extends Recipe {
         SpacesStyle spacesStyle;
         TypecastParenPadStyle typecastParenPadStyle;
 
-        @Nullable
-        EmptyForInitializerPadStyle emptyForInitializerPadStyle;
-
-        @Nullable
-        EmptyForIteratorPadStyle emptyForIteratorPadStyle;
-
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
             SourceFile cu = (SourceFile)javaSourceFile;
-            spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
-            typecastParenPadStyle = cu.getStyle(TypecastParenPadStyle.class) == null ? Checkstyle.typecastParenPadStyle() : cu.getStyle(TypecastParenPadStyle.class);
-            emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
-            emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
+            spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
+            typecastParenPadStyle = Optional.ofNullable(cu.getStyle(TypecastParenPadStyle.class)).orElse(Checkstyle.typecastParenPadStyle());
 
             spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
             return super.visitJavaSourceFile((JavaSourceFile)cu, ctx);
@@ -67,7 +60,8 @@ public class TypecastParenPad extends Recipe {
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast tc = super.visitTypeCast(typeCast, ctx);
-            doAfterVisit(new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle, tc));
+            tc = (J.TypeCast) new SpacesVisitor<>(spacesStyle, null, null, tc)
+                    .visitNonNull(tc, ctx, getCursor().getParentTreeCursor().fork());
             return tc;
         }
     }

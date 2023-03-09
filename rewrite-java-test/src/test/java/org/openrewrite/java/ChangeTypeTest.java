@@ -635,18 +635,18 @@ class ChangeTypeTest implements RewriteTest {
           java(a2),
           java(
             """
-                  import a.A1;
-                  
-                  public class B {
-                     A1 a = (A1) null;
-                  }
+              import a.A1;
+              
+              public class B {
+                 A1 a = (A1) null;
+              }
               """,
             """
-                  import a.A2;
-                  
-                  public class B {
-                     A2 a = (A2) null;
-                  }
+              import a.A2;
+              
+              public class B {
+                 A2 a = (A2) null;
+              }
               """
           )
         );
@@ -1580,22 +1580,22 @@ class ChangeTypeTest implements RewriteTest {
           java(a2),
           java(
             """
-                  import a.A1;
+              import a.A1;
 
-                  public class Test {
-                      <T extends A1> T method(T t) {
-                          return t;
-                      }
+              public class Test {
+                  <T extends A1> T method(T t) {
+                      return t;
                   }
+              }
               """,
             """
-                  import a.A2;
+              import a.A2;
 
-                  public class Test {
-                      <T extends A2> T method(T t) {
-                          return t;
-                      }
+              public class Test {
+                  <T extends A2> T method(T t) {
+                      return t;
                   }
+              }
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("a.A1")).isEmpty();
@@ -1703,42 +1703,42 @@ class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType("org.openrewrite.MyEnum1", "org.openrewrite.MyEnum2", false)),
           java(
             """
-                  package org.openrewrite;
-                  public enum MyEnum1 {
-                      A,
-                      B
-                  }
+              package org.openrewrite;
+              public enum MyEnum1 {
+                  A,
+                  B
+              }
               """,
             """
-                  package org.openrewrite;
-                  public enum MyEnum2 {
-                      A,
-                      B
-                  }
+              package org.openrewrite;
+              public enum MyEnum2 {
+                  A,
+                  B
+              }
               """
           ),
           java(
             """
-                  package org.openrewrite;
-                  import static org.openrewrite.MyEnum1.A;
-                  import static org.openrewrite.MyEnum1.B;
-                  public class App {
-                      public void test(String s) {
-                          if (s.equals(" " + A + B)) {
-                          }
+              package org.openrewrite;
+              import static org.openrewrite.MyEnum1.A;
+              import static org.openrewrite.MyEnum1.B;
+              public class App {
+                  public void test(String s) {
+                      if (s.equals(" " + A + B)) {
                       }
                   }
+              }
               """,
             """
-                  package org.openrewrite;
-                  import static org.openrewrite.MyEnum2.A;
-                  import static org.openrewrite.MyEnum2.B;
-                  public class App {
-                      public void test(String s) {
-                          if (s.equals(" " + A + B)) {
-                          }
+              package org.openrewrite;
+              import static org.openrewrite.MyEnum2.A;
+              import static org.openrewrite.MyEnum2.B;
+              public class App {
+                  public void test(String s) {
+                      if (s.equals(" " + A + B)) {
                       }
                   }
+              }
               """,
             spec ->
               spec.afterRecipe(cu -> {

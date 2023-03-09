@@ -16,7 +16,7 @@
 package org.openrewrite.java.controlflow;
 
 import lombok.Value;
-import org.jetbrains.annotations.NotNull;
+import org.openrewrite.internal.lang.NonNull;
 
 import java.util.Comparator;
 import java.util.IdentityHashMap;
@@ -112,7 +112,7 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
                 .comparingInt(NodeToNodeText::comparingType)
                 .thenComparing(NodeToNodeText::getNodeText);
 
-        @NotNull ControlFlowNode node;
+        @NonNull ControlFlowNode node;
         String nodeText;
 
         NodeToNodeText(ControlFlowNode node) {
@@ -132,7 +132,7 @@ final class ControlFlowSummaryDotVisualizer implements ControlFlowDotFileGenerat
          * This makes the test output consistent, even if the order of the nodes changes.
          */
         @Override
-        public int compareTo(@NotNull NodeToNodeText o) {
+        public int compareTo(@NonNull NodeToNodeText o) {
             if (this.equals(o)) {
                 return 0;
             }

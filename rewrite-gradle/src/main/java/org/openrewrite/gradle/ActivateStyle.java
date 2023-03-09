@@ -62,8 +62,7 @@ public class ActivateStyle extends Recipe {
     @Option(displayName = "Overwrite existing styles",
             description = "When set to `true` this Recipe will clear all existing active styles. " +
                     "When `false` the new style will be added after existing styles.",
-            required = false,
-            example = "false")
+            required = false)
     boolean overwriteExistingStyles;
 
     private static final String STYLE_PRESENT = "org.openrewrite.gradle.ActivateStyle.STYLE_PRESENT";

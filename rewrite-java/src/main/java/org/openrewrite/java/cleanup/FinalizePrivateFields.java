@@ -70,6 +70,11 @@ public class FinalizePrivateFields extends Recipe {
                     return classDecl;
                 }
 
+                // skip if a class has multi constructor methods
+                if (getConstructorCount(classDecl) > 1) {
+                    return classDecl;
+                }
+
                 List<J.VariableDeclarations.NamedVariable> privateFields = collectPrivateFields(classDecl);
                 Map<JavaType.Variable, Integer> privateFieldAssignCountMap = privateFields.stream()
                     .filter(v -> v.getVariableType() != null)
@@ -131,6 +136,16 @@ public class FinalizePrivateFields extends Recipe {
             .map(J.VariableDeclarations::getVariables)
             .flatMap(Collection::stream)
             .collect(Collectors.toList());
+    }
+
+    private static int getConstructorCount(J.ClassDeclaration classDecl) {
+        return (int) classDecl.getBody()
+            .getStatements()
+            .stream()
+            .filter(statement -> statement instanceof J.MethodDeclaration)
+            .map(J.MethodDeclaration.class::cast)
+            .filter(J.MethodDeclaration::isConstructor)
+            .count();
     }
 
     private static class CollectPrivateFieldsAssignmentCounts extends JavaIsoVisitor<Map<JavaType.Variable, Integer>> {

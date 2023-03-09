@@ -45,7 +45,8 @@ public class FindDeprecatedUses extends Recipe {
         this.typePattern = typePattern;
         this.matchInherited = matchInherited;
         this.ignoreDeprecatedScopes = ignoreDeprecatedScopes;
-        doNext(new FindDeprecatedMethods((typePattern == null ? "*..*" : typePattern) + " *(..)", ignoreDeprecatedScopes));
+
+        doNext(new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes));
         doNext(new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes));
         doNext(new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes));
     }

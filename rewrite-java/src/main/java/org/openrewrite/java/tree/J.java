@@ -2556,12 +2556,38 @@ public interface J extends Tree {
         @Getter
         FieldAccess qualid;
 
+        @Nullable
+        JLeftPadded<J.Identifier> alias;
+
         public boolean isStatic() {
             return statik.getElement();
         }
 
         public Import withStatic(boolean statik) {
             return getPadding().withStatic(this.statik.withElement(statik));
+        }
+
+        @Nullable
+        public J.Identifier getAlias() {
+            if(alias == null) {
+                return null;
+            }
+            return alias.getElement();
+        }
+
+        public J.Import withAlias(@Nullable J.Identifier alias) {
+            if(this.alias == null) {
+                if(alias == null) {
+                    return this;
+                }
+                return new J.Import(null, id, prefix, markers, statik, qualid, JLeftPadded
+                        .build(alias)
+                        .withBefore(Space.format(" ")));
+            }
+            if(alias == null) {
+                return new J.Import(null, id, prefix, markers, statik, qualid, null);
+            }
+            return getPadding().withAlias(this.alias.withElement(alias));
         }
 
         @Override
@@ -2710,7 +2736,16 @@ public interface J extends Tree {
             }
 
             public Import withStatic(JLeftPadded<Boolean> statik) {
-                return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid);
+                return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid, t.alias);
+            }
+
+            @Nullable
+            public JLeftPadded<J.Identifier> getAlias() {
+                return t.alias;
+            }
+
+            public Import withAlias(@Nullable JLeftPadded<J.Identifier> alias) {
+                return t.alias == alias ? t : new Import(t.id, t.prefix, t.markers, t.statik, t.qualid, alias);
             }
         }
 
@@ -2821,7 +2856,6 @@ public interface J extends Tree {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
             }
         }
-
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3789,6 +3823,7 @@ public interface J extends Tree {
             Synchronized,
             Native,
             Strictfp,
+            Async
         }
     }
 

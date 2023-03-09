@@ -28,7 +28,23 @@ import java.util.Objects;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"FunctionName", "UnnecessaryLocalVariable", "StringOperationCanBeSimplified", "ResultOfMethodCallIgnored", "RedundantCast", "UnusedAssignment", "SillyAssignment", "ReassignedVariable", "ConstantConditions", "ObviousNullCheck", "EnhancedSwitchMigration", "RedundantOperationOnEmptyContainer", "IdempotentLoopBody", "LoopConditionNotUpdatedInsideLoop"})
+@SuppressWarnings({
+  "ConstantConditions",
+  "EnhancedSwitchMigration",
+  "FunctionName",
+  "IdempotentLoopBody",
+  "LoopConditionNotUpdatedInsideLoop",
+  "ObviousNullCheck",
+  "ReassignedVariable",
+  "RedundantCast",
+  "RedundantOperationOnEmptyContainer",
+  "ResultOfMethodCallIgnored",
+  "SillyAssignment",
+  "StringOperationCanBeSimplified",
+  "UnnecessaryLocalVariable",
+  "UnusedAssignment",
+  "MismatchedReadAndWriteOfArray"
+})
 class FindLocalFlowPathsStringTest implements RewriteTest {
 
     @Override
@@ -447,7 +463,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                   String source() {
                       return null;
                   }
-                  @SuppressWarnings("SillyAssignment")
+                  
                   void test() {
                       String a;
                       a = a;
@@ -462,7 +478,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                   String source() {
                       return null;
                   }
-                  @SuppressWarnings("SillyAssignment")
+                  
                   void test() {
                       String a;
                       a = a;
@@ -486,7 +502,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                   String source() {
                       return null;
                   }
-                  @SuppressWarnings("SillyAssignment")
+                  
                   void test() {
                       String a = null;
                       a = a;
@@ -501,7 +517,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                   String source() {
                       return null;
                   }
-                  @SuppressWarnings("SillyAssignment")
+                  
                   void test() {
                       String a = null;
                       a = a;
@@ -525,7 +541,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                   String source(int i) {
                       return null;
                   }
-                  @SuppressWarnings("SillyAssignment")
+                  
                   void test() {
                       String a = null;
                       a = a;
@@ -540,7 +556,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                   String source(int i) {
                       return null;
                   }
-                  @SuppressWarnings("SillyAssignment")
+                  
                   void test() {
                       String a = null;
                       a = a;
@@ -1282,9 +1298,9 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
 
                   void test() {
                       String n = /*~~>*/"42";
-                      switch (n) {
+                      switch (/*~~>*/n) {
                           case "1":
-                              System.out.println(n);
+                              System.out.println(/*~~>*/n);
                               break;
                           case "42":
                               System.out.println("Correct");
@@ -1292,7 +1308,7 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
                           default:
                               break;
                       }
-                      String o = n + "";
+                      String o = /*~~>*/n + "";
                       System.out.println(o);
                       String p = o;
                   }

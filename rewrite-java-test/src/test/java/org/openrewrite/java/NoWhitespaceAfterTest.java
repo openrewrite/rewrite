@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.cleanup.NoWhitespaceAfter;
 import org.openrewrite.java.format.AutoFormatVisitor;
@@ -71,11 +73,11 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      static void method(int[] n) {
-                          int m = n[0];
-                      }
+              class Test {
+                  static void method(int[] n) {
+                      int m = n[0];
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -88,22 +90,22 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      static void method() {
-                          int [] [] a;
-                          int [] b;
-                          int c, d = 0;
-                      }
+              class Test {
+                  static void method() {
+                      int [] [] a;
+                      int [] b;
+                      int c, d = 0;
                   }
+              }
               """,
             """
-                  class Test {
-                      static void method() {
-                          int[][] a;
-                          int[] b;
-                          int c, d = 0;
-                      }
+              class Test {
+                  static void method() {
+                      int[][] a;
+                      int[] b;
+                      int c, d = 0;
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -116,20 +118,20 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      static void method() {
-                          int[] n = { 1, 2};
-                          int[] p = {1, 2 };
-                      }
+              class Test {
+                  static void method() {
+                      int[] n = { 1, 2};
+                      int[] p = {1, 2 };
                   }
+              }
               """,
             """
-                  class Test {
-                      static void method() {
-                          int[] n = {1, 2};
-                          int[] p = {1, 2};
-                      }
+              class Test {
+                  static void method() {
+                      int[] n = {1, 2};
+                      int[] p = {1, 2};
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -142,18 +144,18 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      static void method(int m) {
-                          long o = - m;
-                      }
+              class Test {
+                  static void method(int m) {
+                      long o = - m;
                   }
+              }
               """,
             """
-                  class Test {
-                      static void method(int m) {
-                          long o = -m;
-                      }
+              class Test {
+                  static void method(int m) {
+                      long o = -m;
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -166,28 +168,28 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      static void method(int m) {
-                          ++ m;
-                          -- m;
-                          int o = + m;
-                          o = ~ m;
-                          boolean b = false;
-                          b = ! b;
-                      }
+              class Test {
+                  static void method(int m) {
+                      ++ m;
+                      -- m;
+                      int o = + m;
+                      o = ~ m;
+                      boolean b = false;
+                      b = ! b;
                   }
+              }
               """,
             """
-                  class Test {
-                      static void method(int m) {
-                          ++m;
-                          --m;
-                          int o = +m;
-                          o = ~m;
-                          boolean b = false;
-                          b = !b;
-                      }
+              class Test {
+                  static void method(int m) {
+                      ++m;
+                      --m;
+                      int o = +m;
+                      o = ~m;
+                      boolean b = false;
+                      b = !b;
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -201,20 +203,20 @@ class NoWhitespaceAfterTest implements RewriteTest {
             style.withTypecast(true)))),
           java(
             """
-                  class Test {
-                      static void method(int m) {
-                          long o = - m;
-                          m = (int) o;
-                      }
+              class Test {
+                  static void method(int m) {
+                      long o = - m;
+                      m = (int) o;
                   }
+              }
               """,
             """
-                  class Test {
-                      static void method(int m) {
-                          long o = -m;
-                          m = (int)o;
-                      }
+              class Test {
+                  static void method(int m) {
+                      long o = -m;
+                      m = (int)o;
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -228,22 +230,22 @@ class NoWhitespaceAfterTest implements RewriteTest {
             style.withMethodRef(true)))),
           java(
             """
-                  import java.util.stream.Stream;
+              import java.util.stream.Stream;
 
-                  class Test {
-                      static void method(Stream<Object> stream) {
-                          stream.forEach(System.out:: println);
-                      }
+              class Test {
+                  static void method(Stream<Object> stream) {
+                      stream.forEach(System.out:: println);
                   }
+              }
               """,
             """
-                  import java.util.stream.Stream;
+              import java.util.stream.Stream;
 
-                  class Test {
-                      static void method(Stream<Object> stream) {
-                          stream.forEach(System.out::println);
-                      }
+              class Test {
+                  static void method(Stream<Object> stream) {
+                      stream.forEach(System.out::println);
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -256,18 +258,18 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      static int [] [] methodArr() {
-                          return null;
-                      }
+              class Test {
+                  static int [] [] methodArr() {
+                      return null;
                   }
+              }
               """,
             """
-                  class Test {
-                      static int[][] methodArr() {
-                          return null;
-                      }
+              class Test {
+                  static int[][] methodArr() {
+                      return null;
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -281,32 +283,32 @@ class NoWhitespaceAfterTest implements RewriteTest {
             style.withDot(true)))),
           java(
             """
-                  class Test {
-                      int m = 0;
+              class Test {
+                  int m = 0;
 
-                      void method0() {
-                          int n = this. m;
-                      }
-
-                      static void method1() {
-                          new Test()
-                                  .m = 2;
-                      }
+                  void method0() {
+                      int n = this. m;
                   }
+
+                  static void method1() {
+                      new Test()
+                              .m = 2;
+                  }
+              }
               """,
             """
-                  class Test {
-                      int m = 0;
+              class Test {
+                  int m = 0;
 
-                      void method0() {
-                          int n = this.m;
-                      }
-
-                      static void method1() {
-                          new Test()
-                                  .m = 2;
-                      }
+                  void method0() {
+                      int n = this.m;
                   }
+
+                  static void method1() {
+                      new Test()
+                              .m = 2;
+                  }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -319,20 +321,20 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      @ Override
-                      public boolean equals(Object o) {
-                          return false;
-                      }
+              class Test {
+                  @ Override
+                  public boolean equals(Object o) {
+                      return false;
                   }
+              }
               """,
             """
-                  class Test {
-                      @Override
-                      public boolean equals(Object o) {
-                          return false;
-                      }
+              class Test {
+                  @Override
+                  public boolean equals(Object o) {
+                      return false;
                   }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -346,40 +348,40 @@ class NoWhitespaceAfterTest implements RewriteTest {
             style.withAllowLineBreaks(false).withDot(true)))),
           java(
             """
-                  class Test {
-                      int m;
+              class Test {
+                  int m;
 
-                      static void fieldAccess() {
-                          new Test().
-                                  m = 2;
-                      }
-
-                      void methodInvocationChain() {
-                          test().
-                                  test();
-                      }
-
-                      Test test() {
-                          return this;
-                      }
+                  static void fieldAccess() {
+                      new Test().
+                              m = 2;
                   }
+
+                  void methodInvocationChain() {
+                      test().
+                              test();
+                  }
+
+                  Test test() {
+                      return this;
+                  }
+              }
               """,
             """
-                  class Test {
-                      int m;
+              class Test {
+                  int m;
 
-                      static void fieldAccess() {
-                          new Test().m = 2;
-                      }
-
-                      void methodInvocationChain() {
-                          test().test();
-                      }
-
-                      Test test() {
-                          return this;
-                      }
+                  static void fieldAccess() {
+                      new Test().m = 2;
                   }
+
+                  void methodInvocationChain() {
+                      test().test();
+                  }
+
+                  Test test() {
+                      return this;
+                  }
+              }
               """,
             autoFormatIsIdempotent()
           )
@@ -392,12 +394,12 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  @SuppressWarnings(value = {
-                          "all",
-                          "unchecked"
-                  })
-                  class Test {
-                  }
+              @SuppressWarnings(value = {
+                      "all",
+                      "unchecked"
+              })
+              class Test {
+              }
               """
           )
         );
@@ -409,13 +411,79 @@ class NoWhitespaceAfterTest implements RewriteTest {
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
           java(
             """
-                  class Test {
-                      int[] ns = {
-                              0,
-                              1
-                      };
-                  }
+              class Test {
+                  int[] ns = {
+                          0,
+                          1
+                  };
+              }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2911")
+    @Disabled
+    @Test
+    void dontWronglyHandleArray() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceAfterStyle())),
+          java(
+            """
+            package sample;
+            
+            import org.jetbrains.annotations.NotNull;
+            
+            public class ArrayNotNull {
+            
+                byte[] bytes = new byte[0];
+            
+                public byte @NotNull [] getBytes() {
+                    return bytes;
+                }
+            
+                int[] ints = new int[0];
+            
+                public int @NotNull [] getInts() {
+                    return ints;
+                }
+            
+                Object[] objects = new Object[0];
+            
+                public Object @NotNull [] getObjects() {
+                    return objects;
+                }
+            
+            }
+              """,
+            """
+            package sample;
+            
+            import org.jetbrains.annotations.NotNull;
+            
+            public class ArrayNotNull {
+            
+                byte[] bytes = new byte[0];
+            
+                public byte @NotNull [] getBytes() {
+                    return bytes;
+                }
+            
+                int[] ints = new int[0];
+            
+                public int @NotNull [] getInts() {
+                    return ints;
+                }
+            
+                Object[] objects = new Object[0];
+            
+                public Object @NotNull [] getObjects() {
+                    return objects;
+                }
+            
+            }
+              """,
+            autoFormatIsIdempotent()
           )
         );
     }

@@ -369,4 +369,46 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2128")
+    @Test
+    void arrayTernaryToMethodAccess() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitTernary(J.Ternary ternary, ExecutionContext executionContext) {
+                  var t = JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any()})")
+                    .imports("java.util.Arrays")
+                    .javaParser(() -> JavaParser.fromJavaVersion()
+                      .logCompilationWarningsAndErrors(true)
+                      .build()
+                    ).build();
+                  maybeAddImport("java.util.Arrays");
+                  return ternary.withTemplate(t, ternary.getCoordinates().replace(), ternary);
+              }
+          })).cycles(1).expectedCyclesThatMakeChanges(1),
+          java(
+            """
+              abstract class Test {
+                  abstract String[] array();
+
+                  void test(boolean condition) {
+                      Object any = condition ? array() : new String[]{"Hello!"};
+                  }
+              }
+              """,
+            """
+              import java.util.Arrays;
+              
+              abstract class Test {
+                  abstract String[] array();
+                  
+                  void test(boolean condition) {
+                      Object any = Arrays.asList(condition ? array() : new String[]{"Hello!"});
+                  }
+              }
+              """
+          )
+        );
+    }
 }

@@ -70,7 +70,6 @@ public class ReorderMethodArguments extends Recipe {
     @Option(displayName = "Ignore type definition",
             description = "When set to `true` the definition of the old type will be left untouched. " +
                     "This is useful when you're replacing usage of a class but don't want to rename it.",
-            example = "true",
             required = false)
     @Nullable
     Boolean ignoreDefinition;

@@ -73,13 +73,13 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     public J visitGString(G.GString gString, PrintOutputCapture<P> p) {
         beforeSyntax(gString, GSpace.Location.GSTRING, p);
         String delimiter = gString.getDelimiter();
-        if(delimiter == null) {
+        if (delimiter == null) {
             // For backwards compatibility with ASTs before we collected this field
             delimiter = "\"";
         }
         p.out.append(delimiter);
         visit(gString.getStrings(), p);
-        if("$/".equals(delimiter)) {
+        if ("$/".equals(delimiter)) {
             p.out.append("/$");
         } else {
             p.out.append(delimiter);
@@ -144,6 +144,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             case Access:
                 keyword = "[";
                 break;
+            case In:
+                keyword = "in";
+                break;
         }
         beforeSyntax(binary, GSpace.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);
@@ -156,6 +159,17 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
         afterSyntax(binary, p);
         return binary;
+    }
+
+    @Override
+    public J visitRange(G.Range range, PrintOutputCapture<P> p) {
+        beforeSyntax(range, GSpace.Location.RANGE_PREFIX, p);
+        visit(range.getFrom(), p);
+        visitSpace(range.getPadding().getInclusive().getBefore(), GSpace.Location.RANGE_INCLUSION, p);
+        p.append(range.getInclusive() ? ".." : "..>");
+        visit(range.getTo(), p);
+        afterSyntax(range, p);
+        return range;
     }
 
     @Override
@@ -204,6 +218,20 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             } else {
                 return super.visit(tree, p);
             }
+        }
+
+        @Override
+        public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
+            J.Import i = (J.Import) super.visitImport(impoort, p);
+            JLeftPadded<J.Identifier> alias = i.getPadding().getAlias();
+            if (alias == null) {
+                return i;
+            }
+
+            visitSpace(alias.getBefore(), Space.Location.IMPORT_ALIAS_PREFIX, p);
+            p.out.append("as");
+            visitIdentifier(alias.getElement(), p);
+            return i;
         }
 
         @Override

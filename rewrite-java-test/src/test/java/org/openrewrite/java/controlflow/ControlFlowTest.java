@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.controlflow;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
@@ -29,7 +28,7 @@ class ControlFlowTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ControlFlowVisualization(false, false))
+        spec.recipe(new ControlFlowVisualization(false, true))
           .expectedCyclesThatMakeChanges(1).cycles(1);
     }
 
@@ -170,7 +169,7 @@ class ControlFlowTest implements RewriteTest {
     }
 
     @Test
-    void nestedBranchAndstatementsAfterwards() {
+    void nestedBranchAndStatementsAfterwards() {
         rewriteRun(
           java(
             """
@@ -413,7 +412,7 @@ class ControlFlowTest implements RewriteTest {
 
     @SuppressWarnings({"ConditionCoveredByFurtherCondition", "ExcessiveRangeCheck"})
     @Test
-    void ifStatementWithmultipleAndOperatorInControl() {
+    void ifStatementWithMultipleAndOperatorInControl() {
         rewriteRun(
           java(
             """
@@ -1469,61 +1468,61 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.lang.StringBuffer;
-                  import java.nio.ByteBuffer;
+              import java.lang.StringBuffer;
+              import java.nio.ByteBuffer;
 
-                  class Test {
-                      /**
-                       * Decodes the specified URL as per RFC 3986, i.e. transforms
-                       * percent-encoded octets to characters by decodingWiththe UTF-8 character
-                       * set. This function is primarily intended for usage with
-                       * {@link java.net.URL} which unfortunately does not enforce proper URLs. As
-                       * such, this method will leniently accept invalid characters or malformed
-                       * percent-encoded octetsAndsimply pass them literally through to the
-                       * result string. Except for rare edge cases, this will make unencoded URLs
-                       * pass through unaltered.
-                       *
-                       * @param url  The URL to decode, may be <code>null</code>.
-                       * @return The decoded URL or <code>null</code> if the input was
-                       *         <code>null</code>.
-                       */
-                      static String test(String url) {
-                          String decoded = url;
-                          if (url != null && url.indexOf('%') >= 0) {
-                              int n = url.length();
-                              StringBuffer buffer = new StringBuffer();
-                              ByteBuffer bytes = ByteBuffer.allocate(n);
-                              for (int i = 0; i < n;) {
-                                  if (url.charAt(i) == '%') {
-                                      try {
-                                          do {
-                                              byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
-                                              bytes.put(octet);
-                                              i += 3;
-                                          } while (i < n && url.charAt(i) == '%');
-                                          continue;
-                                      } catch (RuntimeException e) {
-                                          // malformed percent-encoded octet, fall through and
-                                          // append characters literally
-                                      } finally {
-                                          if (bytes.position() > 0) {
-                                              bytes.flip();
-                                              buffer.append(utf8Decode(bytes));
-                                              bytes.clear();
-                                          }
+              class Test {
+                  /**
+                   * Decodes the specified URL as per RFC 3986, i.e. transforms
+                   * percent-encoded octets to characters by decodingWiththe UTF-8 character
+                   * set. This function is primarily intended for usage with
+                   * {@link java.net.URL} which unfortunately does not enforce proper URLs. As
+                   * such, this method will leniently accept invalid characters or malformed
+                   * percent-encoded octetsAndsimply pass them literally through to the
+                   * result string. Except for rare edge cases, this will make unencoded URLs
+                   * pass through unaltered.
+                   *
+                   * @param url  The URL to decode, may be <code>null</code>.
+                   * @return The decoded URL or <code>null</code> if the input was
+                   *         <code>null</code>.
+                   */
+                  static String test(String url) {
+                      String decoded = url;
+                      if (url != null && url.indexOf('%') >= 0) {
+                          int n = url.length();
+                          StringBuffer buffer = new StringBuffer();
+                          ByteBuffer bytes = ByteBuffer.allocate(n);
+                          for (int i = 0; i < n;) {
+                              if (url.charAt(i) == '%') {
+                                  try {
+                                      do {
+                                          byte octet = (byte) Integer.parseInt(url.substring(i + 1, i + 3), 16);
+                                          bytes.put(octet);
+                                          i += 3;
+                                      } while (i < n && url.charAt(i) == '%');
+                                      continue;
+                                  } catch (RuntimeException e) {
+                                      // malformed percent-encoded octet, fall through and
+                                      // append characters literally
+                                  } finally {
+                                      if (bytes.position() > 0) {
+                                          bytes.flip();
+                                          buffer.append(utf8Decode(bytes));
+                                          bytes.clear();
                                       }
                                   }
-                                  buffer.append(url.charAt(i++));
                               }
-                              decoded = buffer.toString();
+                              buffer.append(url.charAt(i++));
                           }
-                          return decoded;
+                          decoded = buffer.toString();
                       }
-
-                      private static String utf8Decode(ByteBuffer buff) {
-                          return null;
-                      }
+                      return decoded;
                   }
+
+                  private static String utf8Decode(ByteBuffer buff) {
+                      return null;
+                  }
+              }
               """,
             """
               import java.lang.StringBuffer;
@@ -1592,20 +1591,20 @@ class ControlFlowTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      void test() {
-                          Integer i = new Integer(1);
-                          System.out.println(i);
-                      }
+              class Test {
+                  void test() {
+                      Integer i = new Integer(1);
+                      System.out.println(i);
                   }
+              }
               """,
             """
-                  class Test {
-                      void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
-                          Integer i = new Integer(1);
-                          System.out.println(i);
-                      }
+              class Test {
+                  void test() /*~~(BB: 1 CN: 0 EX: 1 | 1L)~~>*/{
+                      Integer i = new Integer(1);
+                      System.out.println(i);
                   }
+              }
               """
           )
         );
@@ -2421,7 +2420,6 @@ class ControlFlowTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2128")
-    @Disabled("This test is broken")
     void ternaryWithinTheIteratorForAForEachLoop() {
         rewriteRun(
           java(
@@ -2433,6 +2431,305 @@ class ControlFlowTest implements RewriteTest {
                       for (String s : condition ? array() : new String[] { "Hello!" }) {
                           System.out.println(s);
                       }
+                  }
+              }
+              """,
+            """
+              abstract class Test {
+                  abstract String[] array();
+                            
+                  void test(boolean condition) /*~~(BB: 5 CN: 2 EX: 1 | 1L)~~>*/{
+                      for (String s : /*~~(1C)~~>*/condition ? /*~~(2L)~~>*/array() : new /*~~(3L)~~>*/String[] { "Hello!" }) /*~~(4L)~~>*/{
+                          System.out.println(s);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternary() {
+        rewriteRun(
+          java(
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  void test(boolean condition) {
+                      int x = condition ? start1() : start2();
+                      x++;
+                  }
+              }
+              """,
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  void test(boolean condition) /*~~(BB: 4 CN: 1 EX: 1 | 1L)~~>*/{
+                      int /*~~(2L)~~>*/x = /*~~(1C)~~>*/condition ? /*~~(3L)~~>*/start1() : /*~~(4L)~~>*/start2();
+                      x++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void ternaryWithinMethodCall() {
+        rewriteRun(
+          java(
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  abstract int identity(int value);
+                  void test(boolean condition) {
+                      int x = identity(condition ? start1() : start2());
+                      x++;
+                  }
+              }
+              """,
+            """
+              abstract class Test {
+                  abstract int start1();
+                  abstract int start2();
+                  abstract int identity(int value);
+                  void test(boolean condition) /*~~(BB: 4 CN: 1 EX: 1 | 1L)~~>*/{
+                      int x = /*~~(2L)~~>*/identity(/*~~(1C)~~>*/condition ? /*~~(3L)~~>*/start1() : /*~~(4L)~~>*/start2());
+                      x++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EnhancedSwitchMigration")
+    void switchCase() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1:
+                              System.out.println("one");
+                              break;
+                          case 2:
+                              System.out.println("two");
+                              break;
+                          default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 3 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1:
+                              /*~~(2L)~~>*/System.out.println("one");
+                              break;
+                          /*~~(3L | 2C)~~>*/case 2:
+                              /*~~(4L)~~>*/System.out.println("two");
+                              break;
+                          /*~~(5L)~~>*/default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void switchCaseEnhanced() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1 -> System.out.println("one");
+                          case 2 -> System.out.println("two");
+                          default -> System.out.println("other");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 3 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1 -> /*~~(2L)~~>*/System.out.println("one");
+                          /*~~(3L | 2C)~~>*/case 2 -> /*~~(4L)~~>*/System.out.println("two");
+                          /*~~(5L)~~>*/default -> System.out.println("other");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EnhancedSwitchMigration")
+    void switchCaseTwoMatches() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1:
+                          case 2:
+                              System.out.println("one or two");
+                              break;
+                          default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 2 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1:
+                          /*~~(2L | 2C)~~>*/case 2:
+                              /*~~(3L)~~>*/System.out.println("one or two");
+                              break;
+                          /*~~(4L)~~>*/default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EnhancedSwitchMigration")
+    void switchCaseFallthroughToDefault() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1:
+                              System.out.println("one");
+                              break;
+                          case 2:
+                              System.out.println("two");
+                          default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int x) /*~~(BB: 5 CN: 2 EX: 2 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1:
+                              /*~~(2L)~~>*/System.out.println("one");
+                              break;
+                          /*~~(3L | 2C)~~>*/case 2:
+                              /*~~(4L)~~>*/System.out.println("two");
+                          /*~~(5L)~~>*/default:
+                              System.out.println("other");
+                              break;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void switchCaseTwoMatchesEnhanced() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(int x) {
+                      switch (x) {
+                          case 1, 2 -> System.out.println("one or two");
+                          default -> System.out.println("other");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(int x) /*~~(BB: 3 CN: 1 EX: 2 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case 1, 2 -> /*~~(2L)~~>*/System.out.println("one or two");
+                          /*~~(3L)~~>*/default -> System.out.println("other");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EnhancedSwitchMigration")
+    void switchCaseNoDefault() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  enum E { A, B, C }
+                          
+                  void test(E x) {
+                      switch (x) {
+                          case A:
+                              System.out.println("A");
+                              break;
+                          case B:
+                              System.out.println("B");
+                              break;
+                          case C:
+                              System.out.println("C");
+                              break;
+                      }
+                      System.out.println("done");
+                  }
+              }
+              """,
+            """
+              class Test {
+                  enum E { A, B, C }
+                          
+                  void test(E x) /*~~(BB: 7 CN: 3 EX: 1 | 1L)~~>*/{
+                      switch (x) {
+                          /*~~(1C)~~>*/case A:
+                              /*~~(2L)~~>*/System.out.println("A");
+                              break;
+                          /*~~(3L | 2C)~~>*/case B:
+                              /*~~(4L)~~>*/System.out.println("B");
+                              break;
+                          /*~~(5L | 3C)~~>*/case C:
+                              /*~~(6L)~~>*/System.out.println("C");
+                              break;
+                      }
+                      /*~~(7L)~~>*/System.out.println("done");
                   }
               }
               """

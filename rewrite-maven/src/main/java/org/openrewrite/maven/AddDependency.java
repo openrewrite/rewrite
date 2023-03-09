@@ -82,7 +82,6 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration when using a semver selector",
-            example = "true",
             required = false)
     @Nullable
     Boolean releasesOnly;
@@ -109,7 +108,6 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Optional",
             description = "Set the value of the `<optional>` tag. No `<optional>` tag will be added when this is `null`.",
-            example = "true",
             required = false)
     @Nullable
     Boolean optional;
@@ -174,17 +172,6 @@ public class AddDependency extends Recipe {
         return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
                 .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
                     @Override
-                    public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                        if(isDependencyTag() &&
-                           groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
-                           artifactId.equals(tag.getChildValue("artifactId").orElse(null)) &&
-                           (scope == null || scope.equals(tag.getChildValue("scope").orElse(null)))) {
-                            getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "alreadyHasDependency", true);
-                        }
-                        return super.visitTag(tag, executionContext);
-                    }
-
-                    @Override
                     public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                         Xml maven = super.visitDocument(document, executionContext);
 
@@ -193,11 +180,7 @@ public class AddDependency extends Recipe {
                             return maven;
                         }
 
-                        if(getCursor().getMessage("alreadyHasDependency", false)) {
-                            return maven;
-                        }
-
-                        //If the dependency is already in scope, no need to continue.
+                        // If the dependency is already in compile scope it will be available everywhere, no need to continue
                         for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
                             if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
                                 return maven;

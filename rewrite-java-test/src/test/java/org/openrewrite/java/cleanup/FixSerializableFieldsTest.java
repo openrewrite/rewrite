@@ -83,26 +83,26 @@ class FixSerializableFieldsTest implements RewriteTest {
           java(models),
           java(
             """
-                  import java.io.Serializable;
-                  import java.io.DataInputStream;
+              import java.io.Serializable;
+              import java.io.DataInputStream;
 
-                  class Example implements Serializable {
-                      private DataInputStream[] nonSerializable;
-                      C cValue;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private DataInputStream[] nonSerializable;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """,
             """
-                  import java.io.Serializable;
-                  import java.io.DataInputStream;
+              import java.io.Serializable;
+              import java.io.DataInputStream;
 
-                  class Example implements Serializable {
-                      private transient DataInputStream[] nonSerializable;
-                      C cValue;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private transient DataInputStream[] nonSerializable;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """
           )
         );
@@ -114,28 +114,28 @@ class FixSerializableFieldsTest implements RewriteTest {
           java(models),
           java(
             """
-                  import java.io.DataInputStream;
-                  import java.io.Serializable;
-                  import java.util.List;
+              import java.io.DataInputStream;
+              import java.io.Serializable;
+              import java.util.List;
 
-                  class Example implements Serializable {
-                      private List<DataInputStream> aValue;
-                      private List<C> cValue;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private List<DataInputStream> aValue;
+                  private List<C> cValue;
+                  public void test() {
                   }
+              }
               """,
             """
-                  import java.io.DataInputStream;
-                  import java.io.Serializable;
-                  import java.util.List;
+              import java.io.DataInputStream;
+              import java.io.Serializable;
+              import java.util.List;
 
-                  class Example implements Serializable {
-                      private transient List<DataInputStream> aValue;
-                      private List<C> cValue;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private transient List<DataInputStream> aValue;
+                  private List<C> cValue;
+                  public void test() {
                   }
+              }
               """
           )
         );
@@ -147,28 +147,28 @@ class FixSerializableFieldsTest implements RewriteTest {
           java(models),
           java(
             """
-                  import java.io.DataInputStream;
-                  import java.io.Serializable;
-                  import java.util.Map;
+              import java.io.DataInputStream;
+              import java.io.Serializable;
+              import java.util.Map;
 
-                  class Example implements Serializable {
-                      private Map<String, DataInputStream> aMap;
-                      private Map<String, C> cMap;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private Map<String, DataInputStream> aMap;
+                  private Map<String, C> cMap;
+                  public void test() {
                   }
+              }
               """,
             """
-                  import java.io.DataInputStream;
-                  import java.io.Serializable;
-                  import java.util.Map;
+              import java.io.DataInputStream;
+              import java.io.Serializable;
+              import java.util.Map;
 
-                  class Example implements Serializable {
-                      private transient Map<String, DataInputStream> aMap;
-                      private Map<String, C> cMap;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private transient Map<String, DataInputStream> aMap;
+                  private Map<String, C> cMap;
+                  public void test() {
                   }
+              }
               """
           )
         );
@@ -180,14 +180,14 @@ class FixSerializableFieldsTest implements RewriteTest {
           java(models),
           java(
             """
-                  import java.io.Serializable;
+              import java.io.Serializable;
 
-                  class Example implements Serializable {
-                      private static A aValue;
-                      C cValue;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private static A aValue;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """
           )
         );
@@ -199,12 +199,12 @@ class FixSerializableFieldsTest implements RewriteTest {
           java(models),
           java(
             """
-                  class Example {
-                      private A aValue;
-                      C cValue;
-                      public void test() {
-                      }
+              class Example {
+                  private A aValue;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """
           )
         );
@@ -216,26 +216,26 @@ class FixSerializableFieldsTest implements RewriteTest {
           java(models),
           java(
             """
-                  import java.io.DataInputStream;
-                  import java.io.Serializable;
-                  
-                  class Example implements Serializable {
-                      private DataInputStream nonSerializable;
-                      C cValue;
-                      public void test() {
-                      }
+              import java.io.DataInputStream;
+              import java.io.Serializable;
+              
+              class Example implements Serializable {
+                  private DataInputStream nonSerializable;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """,
             """
-                  import java.io.DataInputStream;
-                  import java.io.Serializable;
+              import java.io.DataInputStream;
+              import java.io.Serializable;
 
-                  class Example implements Serializable {
-                      private transient DataInputStream nonSerializable;
-                      C cValue;
-                      public void test() {
-                      }
+              class Example implements Serializable {
+                  private transient DataInputStream nonSerializable;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """
           )
         );
@@ -246,32 +246,32 @@ class FixSerializableFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                  import java.io.DataInputStream;
-                  
-                  class Example implements Serializable {
-                      private A[] nonSerializable;
-                      C cValue;
-                      public void test() {
-                      }
+              import java.io.Serializable;
+              import java.io.DataInputStream;
+              
+              class Example implements Serializable {
+                  private A[] nonSerializable;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """
           ),
           java(
             models,
             """
-                  import java.io.Serializable;
+              import java.io.Serializable;
 
-                  public class A implements Serializable {
-                      int value1;
-                  }
-                  public class B {
-                      A aValue;
-                  }
-                  public class C implements Serializable {
-                      int intValue;
-                      String stringValue;
-                  }
+              public class A implements Serializable {
+                  int value1;
+              }
+              public class B {
+                  A aValue;
+              }
+              public class C implements Serializable {
+                  int intValue;
+                  String stringValue;
+              }
               """
           )
         );
@@ -282,33 +282,33 @@ class FixSerializableFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                  import java.io.DataInputStream;
-                  import java.util.List;
-                  
-                  class Example implements Serializable {
-                      private List<A> nonSerializable;
-                      C cValue;
-                      public void test() {
-                      }
+              import java.io.Serializable;
+              import java.io.DataInputStream;
+              import java.util.List;
+              
+              class Example implements Serializable {
+                  private List<A> nonSerializable;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """
           ),
           java(
             models,
             """
-                  import java.io.Serializable;
+              import java.io.Serializable;
 
-                  public class A implements Serializable {
-                      int value1;
-                  }
-                  public class B {
-                      A aValue;
-                  }
-                  public class C implements Serializable {
-                      int intValue;
-                      String stringValue;
-                  }
+              public class A implements Serializable {
+                  int value1;
+              }
+              public class B {
+                  A aValue;
+              }
+              public class C implements Serializable {
+                  int intValue;
+                  String stringValue;
+              }
               """
           )
         );
@@ -319,33 +319,33 @@ class FixSerializableFieldsTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.Serializable;
-                  import java.io.DataInputStream;
-                  import java.util.Map;
-                  
-                  class Example implements Serializable {
-                      private Map<String,A> nonSerializable;
-                      C cValue;
-                      public void test() {
-                      }
+              import java.io.Serializable;
+              import java.io.DataInputStream;
+              import java.util.Map;
+              
+              class Example implements Serializable {
+                  private Map<String,A> nonSerializable;
+                  C cValue;
+                  public void test() {
                   }
+              }
               """
           ),
           java(
             models,
             """
-                  import java.io.Serializable;
+              import java.io.Serializable;
 
-                  public class A implements Serializable {
-                      int value1;
-                  }
-                  public class B {
-                      A aValue;
-                  }
-                  public class C implements Serializable {
-                      int intValue;
-                      String stringValue;
-                  }
+              public class A implements Serializable {
+                  int value1;
+              }
+              public class B {
+                  A aValue;
+              }
+              public class C implements Serializable {
+                  int intValue;
+                  String stringValue;
+              }
               """
           )
         );
@@ -358,24 +358,24 @@ class FixSerializableFieldsTest implements RewriteTest {
             java(models),
             java(
               """
-                    import java.io.Serializable;
-                    
-                    class Example implements Serializable {
-                        private A nonSerializable;
-                        C cValue;
-                        public void test() {
-                        }
+                import java.io.Serializable;
+                
+                class Example implements Serializable {
+                    private A nonSerializable;
+                    C cValue;
+                    public void test() {
                     }
+                }
                 """,
               """
-                    import java.io.Serializable;
-                    
-                    class Example implements Serializable {
-                        private transient A nonSerializable;
-                        C cValue;
-                        public void test() {
-                        }
+                import java.io.Serializable;
+                
+                class Example implements Serializable {
+                    private transient A nonSerializable;
+                    C cValue;
+                    public void test() {
                     }
+                }
                 """
             )
           );

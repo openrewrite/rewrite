@@ -63,7 +63,7 @@ public class RemoveOwaspSuppressions extends Recipe {
             if (!new XPathMatcher("/suppressions").matches(getCursor()) || t.getContent() == null) {
                 return t;
             }
-            return t.withContent(ListUtils.flatMap(t.getContent(), (i, c) -> isPastDueSuppression(c) ? null : c));
+            return t.withContent(ListUtils.map(t.getContent(), c -> isPastDueSuppression(c) ? null : c));
         }
 
         private boolean isPastDueSuppression(Content content) {
@@ -91,6 +91,4 @@ public class RemoveOwaspSuppressions extends Recipe {
             return false;
         }
     }
-
-
 }

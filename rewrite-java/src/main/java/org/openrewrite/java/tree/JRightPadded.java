@@ -21,10 +21,7 @@ import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -100,9 +97,15 @@ public class JRightPadded<T> {
         }
     }
 
-    public static <T> List<T> getElements(List<JRightPadded<T>> ls) {
+    public static <T> List<T> getElements(@Nullable List<JRightPadded<T>> ls) {
+        if(ls == null) {
+            return Collections.emptyList();
+        }
         List<T> list = new ArrayList<>();
         for (JRightPadded<T> l : ls) {
+            if(l == null) {
+                continue;
+            }
             T elem = l.getElement();
             list.add(elem);
         }

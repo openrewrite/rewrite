@@ -17,7 +17,6 @@ package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.xml.tree.Xml;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;

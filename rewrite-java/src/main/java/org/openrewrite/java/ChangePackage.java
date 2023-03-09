@@ -55,8 +55,7 @@ public class ChangePackage extends Recipe {
     @With
     @Option(displayName = "Recursive",
             description = "Recursively change subpackage names",
-            required = false,
-            example = "true")
+            required = false)
     @Nullable
     Boolean recursive;
 

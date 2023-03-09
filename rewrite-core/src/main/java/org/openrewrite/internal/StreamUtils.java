@@ -15,6 +15,10 @@
  */
 package org.openrewrite.internal;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Function;
@@ -31,5 +35,19 @@ public class StreamUtils {
             seen.add(it);
             return !alreadySeen;
         };
+    }
+
+    public static byte[] readAllBytes(InputStream is) {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        int byteCount;
+        byte[] data = new byte[4096];
+        try {
+            while ((byteCount = is.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, byteCount);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return buffer.toByteArray();
     }
 }

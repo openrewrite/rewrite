@@ -62,30 +62,30 @@ class UnnecessaryCatchTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  import java.io.IOException;
-                  
-                  public class AnExample {
-                      public void method() {
-                          try {
-                              java.util.Base64.getDecoder().decode("abc".getBytes());
-                          } catch (IOException e1) {
-                              System.out.println("an exception!");
-                          } catch (IllegalStateException e2) {
-                              System.out.println("another exception!");
-                          }
+              import java.io.IOException;
+              
+              public class AnExample {
+                  public void method() {
+                      try {
+                          java.util.Base64.getDecoder().decode("abc".getBytes());
+                      } catch (IOException e1) {
+                          System.out.println("an exception!");
+                      } catch (IllegalStateException e2) {
+                          System.out.println("another exception!");
                       }
                   }
+              }
               """,
             """
-                  public class AnExample {
-                      public void method() {
-                          try {
-                              java.util.Base64.getDecoder().decode("abc".getBytes());
-                          } catch (IllegalStateException e2) {
-                              System.out.println("another exception!");
-                          }
+              public class AnExample {
+                  public void method() {
+                      try {
+                          java.util.Base64.getDecoder().decode("abc".getBytes());
+                      } catch (IllegalStateException e2) {
+                          System.out.println("another exception!");
                       }
                   }
+              }
               """
           )
         );

@@ -19,11 +19,13 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.cleanup.IndexOfReplaceableByContains;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -114,7 +116,7 @@ class JavaTemplateTest implements RewriteTest {
 
     @SuppressWarnings({"RedundantOperationOnEmptyContainer"})
     @Test
-    void replaceForEachControlVariable() {
+    void replaceForEachControlVariableType() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
@@ -145,6 +147,80 @@ class JavaTemplateTest implements RewriteTest {
               class T {
                   void m() {
                       for (Object s : new ArrayList<String>()) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceForEachControlIterable() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, ExecutionContext executionContext) {
+                  control = super.visitForEachControl(control, executionContext);
+                  Expression iterable = control.getIterable();
+                  if ( !TypeUtils.isOfClassType(iterable.getType(), "java.lang.String"))
+                      return control;
+                  iterable = iterable.withTemplate(
+                    JavaTemplate.builder(this::getCursor, "new Object[0]")
+                      .build(),
+                    iterable.getCoordinates().replace()
+                  );
+                  return control.withIterable(iterable);
+              }
+          })),
+          java(
+            """
+              class T {
+                  void m() {
+                      for (Object o : new String[0]) {}
+                  }
+              }
+              """,
+            """
+              class T {
+                  void m() {
+                      for (Object o : new Object[0]) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceBinaryExpression() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Binary visitBinary(J.Binary binary, ExecutionContext executionContext) {
+                  binary = super.visitBinary(binary, executionContext);
+                  if (binary.getLeft() instanceof J.Literal lit && lit.getValue().equals(42)) {
+                      lit = lit.withTemplate(
+                        JavaTemplate.builder(this::getCursor, "43")
+                          .build(),
+                        lit.getCoordinates().replace()
+                      );
+                      return binary.withLeft(lit);
+                  }
+                  return binary;
+              }
+          })),
+          java(
+            """
+              class T {
+                  boolean m() {
+                      return 42 == 0x2A;
+                  }
+              }
+              """,
+            """
+              class T {
+                  boolean m() {
+                      return 43 == 0x2A;
                   }
               }
               """
@@ -191,6 +267,156 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    void replaceAnonymousClassObject() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if (method.getSimpleName().equals("asList")) {
+                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                          .imports("java.util.Collections").build(),
+                        method.getCoordinates().replace(), method.getArguments().get(0));
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+                  }
+                  return method;
+              }
+          })),
+          java(
+            """
+              import java.util.Arrays;
+
+              class T {
+                  void m() {
+                      Object l = Arrays.asList(new java.util.HashMap<String, String>() {
+                          void foo() {
+                          }
+                      });
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+
+              class T {
+                  void m() {
+                      Object l = Collections.singletonList(new java.util.HashMap<String, String>() {
+                          void foo() {
+                          }
+                      });
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    void replaceGenericTypedObject() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if (method.getSimpleName().equals("asList")) {
+                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                          .imports("java.util.Collections").build(),
+                        method.getCoordinates().replace(), method.getArguments().get(0));
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+                  }
+                  return method;
+              }
+          })).afterRecipe(run -> {
+              new JavaIsoVisitor<Integer>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                      JavaType.Parameterized type = (JavaType.Parameterized) method.getType();
+                      assertThat(type.getTypeParameters()).hasSize(1);
+                      assertThat(type.getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                      return method;
+                  }
+              }.visit(run.getResults().get(0).getAfter(), 0);
+          }),
+          java(
+            """
+              import java.util.Arrays;
+
+              class T<T> {
+                  void m(T o) {
+                      Object l = Arrays.asList(o);
+                  }
+              }
+              """,
+            """
+              import java.util.Collections;
+
+              class T<T> {
+                  void m(T o) {
+                      Object l = Collections.singletonList(o);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
+    void replaceParameterizedTypeObject() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                  if (method.getSimpleName().equals("asList")) {
+                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                          .imports("java.util.Collections").build(),
+                        method.getCoordinates().replace(), method.getArguments().get(0));
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+                  }
+                  return method;
+              }
+          })).afterRecipe(run -> {
+              new JavaIsoVisitor<Integer>() {
+                  @Override
+                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                      JavaType.Parameterized type = (JavaType.Parameterized) method.getType();
+                      assertThat(type.getTypeParameters()).hasSize(1);
+                      assertThat(type.getTypeParameters().get(0)).isInstanceOf(JavaType.Parameterized.class);
+                      assertThat(((JavaType.Parameterized) type.getTypeParameters().get(0)).getTypeParameters()
+                        .get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
+                      return method;
+                  }
+              }.visit(run.getResults().get(0).getAfter(), 0);
+          }),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Collection;
+
+              class T<T> {
+                  void m(Collection<T> o) {
+                      Object l = Arrays.asList(o);
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.Collections;
+
+              class T<T> {
+                  void m(Collection<T> o) {
+                      Object l = Collections.singletonList(o);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("LoopConditionNotUpdatedInsideLoop")
     @Test
     void templatingWhileLoopCondition() {
@@ -212,20 +438,20 @@ class JavaTemplateTest implements RewriteTest {
           })).expectedCyclesThatMakeChanges(2),
           java(
             """
-                  import java.util.List;
-                  class T {
-                      void m(List<?> l) {
-                          while (l.size() != 0) {}
-                      }
+              import java.util.List;
+              class T {
+                  void m(List<?> l) {
+                      while (l.size() != 0) {}
                   }
+              }
               """,
             """
-                  import java.util.List;
-                  class T {
-                      void m(List<?> l) {
-                          while (!l.isEmpty()) {}
-                      }
+              import java.util.List;
+              class T {
+                  void m(List<?> l) {
+                      while (!l.isEmpty()) {}
                   }
+              }
               """
           )
         );
@@ -306,6 +532,47 @@ class JavaTemplateTest implements RewriteTest {
               class Test {
                   void test(int i) {
                       int n = i++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2540")
+    void replaceMemberReference() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
+                      return memberRef.withTemplate(
+                        JavaTemplate
+                          .builder(this::getCursor, "() -> new ArrayList<>(1)")
+                          .imports("java.util.ArrayList")
+                          .build(),
+                        memberRef.getCoordinates().replace()
+                      );
+                  }
+              })).expectedCyclesThatMakeChanges(1).cycles(1),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.function.Supplier;
+              class Test {
+                  void consumer(Supplier<?> supplier) {}
+                  void test(int i) {
+                      consumer(ArrayList::new);
+                  }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.function.Supplier;
+              class Test {
+                  void consumer(Supplier<?> supplier) {}
+                  void test(int i) {
+                      consumer(() -> new ArrayList<>(1));
                   }
               }
               """

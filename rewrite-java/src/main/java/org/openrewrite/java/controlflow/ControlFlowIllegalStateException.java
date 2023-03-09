@@ -35,6 +35,7 @@ final class ControlFlowIllegalStateException extends IllegalStateException {
     static Message.MessageBuilder exceptionMessageBuilder(String message) {
         return new Message.MessageBuilder(message);
     }
+
     @Value
     static class Message {
         String message;

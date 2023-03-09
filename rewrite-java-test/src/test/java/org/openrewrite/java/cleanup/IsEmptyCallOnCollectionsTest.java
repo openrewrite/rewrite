@@ -45,17 +45,25 @@ class IsEmptyCallOnCollectionsTest implements RewriteTest {
           java(
             """
               import java.util.ArrayList;
-              class Test extends ArrayList<String> {
+              class Test {
                   public boolean isZeroSize() {
-                      return size() == 0;
+                      return new ArrayList<String>() {
+                          boolean test() {
+                              return size() == 0;
+                          }
+                      }.test();
                   }
               }
               """,
             """
               import java.util.ArrayList;
-              class Test extends ArrayList<String> {
+              class Test {
                   public boolean isZeroSize() {
-                      return isEmpty();
+                      return new ArrayList<String>() {
+                          boolean test() {
+                              return isEmpty();
+                          }
+                      }.test();
                   }
               }
               """
@@ -139,6 +147,41 @@ class IsEmptyCallOnCollectionsTest implements RewriteTest {
                   static <T> Stream<List<T>> method(Stream<List<T>> stream) {
                       return stream.filter(s -> s.isEmpty());
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2813")
+    @Test
+    void forLoop() {
+        rewriteRun(
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Test extends ArrayList<String> {
+                void method() {
+                    List<String> lines = new ArrayList<>();
+                    for (int i = lines.size() - 1; lines.size() > 0 && size() > 0; i--) {
+                        lines.remove(0);
+                    }
+                }
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class Test extends ArrayList<String> {
+                void method() {
+                    List<String> lines = new ArrayList<>();
+                    for (int i = lines.size() - 1; !lines.isEmpty() && !isEmpty(); i--) {
+                        lines.remove(0);
+                    }
+                }
               }
               """
           )

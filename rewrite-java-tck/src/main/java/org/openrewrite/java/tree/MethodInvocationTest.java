@@ -51,11 +51,11 @@ class MethodInvocationTest implements RewriteTest {
           })),
           java(
             """
-                  public class A {
-                      Integer m = foo ( 0, 1, 2 );
-                  
-                      public Integer foo(Integer n, Integer... ns) { return n; }
-                  }
+              public class A {
+                  Integer m = foo ( 0, 1, 2 );
+              
+                  public Integer foo(Integer n, Integer... ns) { return n; }
+              }
               """
           )
         );

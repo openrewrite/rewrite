@@ -29,40 +29,40 @@ class SetDefaultEstimatedEffortPerOccurrenceTest implements RewriteTest {
           spec -> spec.recipe(new SetDefaultEstimatedEffortPerOccurrence()),
           java(
             """
-                  package org.openrewrite;
-                  import java.time.Duration;
+              package org.openrewrite;
+              import java.time.Duration;
 
-                  public class Recipe {
-                      public Duration getEstimatedEffortPerOccurrence() {
-                          return null;
-                      }
+              public class Recipe {
+                  public Duration getEstimatedEffortPerOccurrence() {
+                      return null;
                   }
+              }
               """
           ),
           java(
             """
-                  import org.openrewrite.Recipe;
-                  class SampleRecipe extends Recipe {
-                      public String getDisplayName() { return null; }
-                  
-                      public Object getVisitor() { return null; }
-                  }
+              import org.openrewrite.Recipe;
+              class SampleRecipe extends Recipe {
+                  public String getDisplayName() { return null; }
+              
+                  public Object getVisitor() { return null; }
+              }
               """,
             """
-                  import org.openrewrite.Recipe;
-                  
-                  import java.time.Duration;
-                  
-                  class SampleRecipe extends Recipe {
-                      public String getDisplayName() { return null; }
-                  
-                      @Override
-                      public Duration getEstimatedEffortPerOccurrence() {
-                          return Duration.ofMinutes(5);
-                      }
-                  
-                      public Object getVisitor() { return null; }
+              import org.openrewrite.Recipe;
+              
+              import java.time.Duration;
+              
+              class SampleRecipe extends Recipe {
+                  public String getDisplayName() { return null; }
+              
+                  @Override
+                  public Duration getEstimatedEffortPerOccurrence() {
+                      return Duration.ofMinutes(5);
                   }
+              
+                  public Object getVisitor() { return null; }
+              }
               """
           )
         );
