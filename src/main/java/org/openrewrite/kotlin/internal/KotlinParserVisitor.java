@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
@@ -103,19 +102,36 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> annotations = mapAnnotations(file.getAnnotations());
 
-        JRightPadded<J.Package> pkg = null;
+        JRightPadded<J.Package> paddedPkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
-            pkg = maybeSemicolon((J.Package) visitPackageDirective(file.getPackageDirective(), ctx));
+            J.Package pkg;
+            try {
+                pkg = (J.Package) visitPackageDirective(file.getPackageDirective(), ctx);
+            } catch (Exception e) {
+                throw new KotlinParsingException("Failed to parse package directive", e);
+            }
+            paddedPkg = maybeSemicolon(pkg);
         }
 
         List<JRightPadded<J.Import>> imports = new ArrayList<>(file.getImports().size());
         for (FirImport anImport : file.getImports()) {
-            imports.add(maybeSemicolon((J.Import) visitImport(anImport, ctx)));
+            J.Import importStatement;
+            try {
+                importStatement = (J.Import) visitImport(anImport, ctx);
+            } catch (Exception e) {
+                throw new KotlinParsingException("Failed to parse import", e);
+            }
+            imports.add(maybeSemicolon(importStatement));
         }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(file.getDeclarations().size());
         for (FirDeclaration declaration : file.getDeclarations()) {
-            Statement statement = (Statement) visitElement(declaration, ctx);
+            Statement statement;
+            try {
+                statement = (Statement) visitElement(declaration, ctx);
+            } catch (Exception e) {
+                throw new KotlinParsingException("Failed to parse declaration", e);
+            }
             statements.add(maybeSemicolon(statement));
         }
 
@@ -129,7 +145,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 charsetBomMarked,
                 null,
                 annotations,
-                pkg,
+                paddedPkg,
                 imports,
                 statements,
                 format(source.substring(cursor)));
