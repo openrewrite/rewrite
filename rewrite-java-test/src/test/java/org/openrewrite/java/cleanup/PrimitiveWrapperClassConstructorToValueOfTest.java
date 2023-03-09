@@ -32,6 +32,35 @@ class PrimitiveWrapperClassConstructorToValueOfTest implements RewriteTest {
         spec.recipe(new PrimitiveWrapperClassConstructorToValueOf());
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2945")
+    @Test
+    void ternaryWithBinary() {
+        rewriteRun(
+          java(
+            """
+              import java.util.concurrent.TimeUnit;
+              class A {
+                  void method(Long time) {
+                      Long timeoutValue = (time == null)
+                          ? new Long(0)
+                          : time + TimeUnit.MICROSECONDS.convert(60, TimeUnit.MINUTES);
+                  }
+              }
+              """,
+            """
+              import java.util.concurrent.TimeUnit;
+              class A {
+                  void method(Long time) {
+                      Long timeoutValue = (time == null)
+                          ? Long.valueOf(0)
+                          : time + TimeUnit.MICROSECONDS.convert(60, TimeUnit.MINUTES);
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void integerValueOf() {
         rewriteRun(
