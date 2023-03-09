@@ -16,6 +16,8 @@
 
 package org.openrewrite.java.cleanup;
 
+
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -793,6 +795,64 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
                       Object o;
                       o = i -> new ArrayList(i);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
+    @Disabled("To be fixed")
+    @Test
+    void multipleConstructors() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Predicate;
+
+              class B {
+                  B () {}
+                  B (Predicate<String> predicate) {}
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              class A {
+                  void method(Supplier<B> supplier) {}
+                  void method(Function<B, B> function) {}
+
+                  void test() {
+                      method(() -> new B());
+                      // method(B::new); // doesn't compile
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
+    @Disabled("To be fixed")
+    @Test
+    void anotherSimplerMultipleConstructorsCase() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              public class A {
+                  void method(Supplier<String> visitor) {}
+                  void method(Function<String, String> visitor) {}
+
+                  void test() {
+                      method(() -> new String());
+                      // method(String::new); doesn't compile
                   }
               }
               """
