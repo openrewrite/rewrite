@@ -1686,7 +1686,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void ciFriendlyVersionWithoutExplicitProperty() {
+    void ciFriendlyVersionWithoutExplicitProperty() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1703,7 +1703,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void ciFriendlyVersionWithParent() {
+    void ciFriendlyVersionWithParent() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1742,7 +1742,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
+    void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1863,7 +1863,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
+    void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.1", null, null, null)),
           pomXml("""
