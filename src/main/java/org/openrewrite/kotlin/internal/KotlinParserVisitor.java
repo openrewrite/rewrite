@@ -216,7 +216,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
 
         J.Label label = null;
-        if (anonymousFunction.getLabel() != null &&
+        if (anonymousFunction.getLabel() != null && anonymousFunction.getLabel().getSource() != null &&
                 anonymousFunction.getLabel().getSource().getKind() != KtFakeSourceElementKind.GeneratedLambdaLabel.INSTANCE) {
             label = (J.Label) visitElement(anonymousFunction.getLabel(),ctx);
         }
@@ -237,7 +237,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             List<FirValueParameter> parameters = anonymousFunction.getValueParameters();
             for (int i = 0; i < parameters.size(); i++) {
                 FirValueParameter p = parameters.get(i);
-                if (p.getSource().getKind() instanceof KtFakeSourceElementKind.ItLambdaParameter) {
+                if (p.getSource() != null && p.getSource().getKind() instanceof KtFakeSourceElementKind.ItLambdaParameter) {
                     continue;
                 }
 
@@ -303,7 +303,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         Set<FirElement> skip = Collections.newSetFromMap(new IdentityHashMap<>());
-        if (omitDestruct) {
+        if (omitDestruct && anonymousFunction.getBody() != null) {
             // skip destructured property declarations.
             for (FirStatement statement : anonymousFunction.getBody().getStatements()) {
                 if (statement instanceof FirProperty && ((FirProperty) statement).getInitializer() instanceof FirComponentCall &&
@@ -391,7 +391,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip("{");
             List<FirElement> declarations = new ArrayList<>(anonymousObject.getDeclarations().size());
             for (FirDeclaration declaration : anonymousObject.getDeclarations()) {
-                if (declaration.getSource().getKind() instanceof KtFakeSourceElementKind) {
+                if (declaration.getSource() != null && declaration.getSource().getKind() instanceof KtFakeSourceElementKind) {
                     continue;
                 }
                 declarations.add(declaration);
@@ -542,7 +542,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
         for (FirElement firElement : firStatements) {
             // Skip receiver of the unary post increment or decrement.
-            if (firElement.getSource().getKind() instanceof KtFakeSourceElementKind.DesugaredIncrementOrDecrement &&
+            if (firElement.getSource() != null && firElement.getSource().getKind() instanceof KtFakeSourceElementKind.DesugaredIncrementOrDecrement &&
                     !(firElement instanceof FirVariableAssignment)) {
                 continue;
             }
@@ -855,9 +855,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             for (FirElement firElement : membersMultiVariablesSeparated) {
                 if (!(firElement instanceof FirEnumEntry)) {
-                    if (ClassKind.ENUM_CLASS == classKind && firElement.getSource() != null &&
+                    if (firElement.getSource() != null && (ClassKind.ENUM_CLASS == classKind &&
                             firElement.getSource().getKind() instanceof KtFakeSourceElementKind.EnumGeneratedDeclaration ||
-                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
+                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter)) {
                         continue;
                     }
                     members.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));
@@ -1552,7 +1552,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
 
         Space space = whitespace();
-        String packageName = firImport.isAllUnder() ?
+        String packageName = firImport.getImportedFqName() == null ? "" : firImport.isAllUnder() ?
                 firImport.getImportedFqName().asString() + ".*" :
                 firImport.getImportedFqName().asString();
         J.FieldAccess qualid = TypeTree.build(packageName).withPrefix(space);
