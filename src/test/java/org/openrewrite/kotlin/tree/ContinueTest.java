@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class ContinueTest implements RewriteTest {
+class ContinueTest implements RewriteTest {
 
     @Test
     void continueFromWhileLoop() {

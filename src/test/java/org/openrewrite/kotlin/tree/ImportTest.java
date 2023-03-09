@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class ImportTest implements RewriteTest {
+class ImportTest implements RewriteTest {
 
     @Test
     void jdkImport() {

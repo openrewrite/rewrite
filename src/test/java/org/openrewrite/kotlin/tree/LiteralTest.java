@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class LiteralTest implements RewriteTest {
+class LiteralTest implements RewriteTest {
 
     @Test
     void intentionallyBadUnicodeCharacter() {

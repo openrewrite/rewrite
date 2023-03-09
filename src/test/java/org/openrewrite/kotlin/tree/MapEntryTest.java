@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class MapEntryTest implements RewriteTest {
+class MapEntryTest implements RewriteTest {
 
     @Test
     void mapAccess() {

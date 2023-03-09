@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class AssertTest implements RewriteTest {
+class AssertTest implements RewriteTest {
 
     @Test
     void annotationWithDefaultArgument() {

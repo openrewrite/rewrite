@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class LambdaTest implements RewriteTest {
+class LambdaTest implements RewriteTest {
 
     @Test
     void binaryExpressionAsBody() {

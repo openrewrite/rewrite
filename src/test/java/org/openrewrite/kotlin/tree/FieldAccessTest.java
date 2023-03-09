@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class FieldAccessTest implements RewriteTest {
+class FieldAccessTest implements RewriteTest {
 
     @Test
     void thisAccess() {

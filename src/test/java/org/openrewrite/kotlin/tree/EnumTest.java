@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class EnumTest implements RewriteTest {
+class EnumTest implements RewriteTest {
 
     @Test
     void enumEmptyBody() {

@@ -21,7 +21,7 @@ import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class CompilationUnitTest implements RewriteTest {
+class CompilationUnitTest implements RewriteTest {
 
     @Test
     void emptyFile() {

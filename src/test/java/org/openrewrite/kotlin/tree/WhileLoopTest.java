@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class WhileLoopTest implements RewriteTest {
+class WhileLoopTest implements RewriteTest {
 
     @SuppressWarnings("ControlFlowWithEmptyBody")
     @Test

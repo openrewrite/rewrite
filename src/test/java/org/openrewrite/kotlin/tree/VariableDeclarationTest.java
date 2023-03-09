@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class VariableDeclarationTest implements RewriteTest {
+class VariableDeclarationTest implements RewriteTest {
 
     @Test
     void singleVariableDeclaration() {

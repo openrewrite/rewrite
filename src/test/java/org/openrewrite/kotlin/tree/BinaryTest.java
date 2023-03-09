@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class BinaryTest implements RewriteTest {
+class BinaryTest implements RewriteTest {
 
     @Test
     void equals() {

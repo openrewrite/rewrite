@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class MethodReferenceTest implements RewriteTest {
+class MethodReferenceTest implements RewriteTest {
 
     @Test
     void fieldReference() {

@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
-public class TryCatchTest implements RewriteTest {
+class TryCatchTest implements RewriteTest {
 
     @SuppressWarnings("CatchMayIgnoreException")
     @Test
