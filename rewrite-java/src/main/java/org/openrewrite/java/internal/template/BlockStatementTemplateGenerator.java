@@ -110,6 +110,18 @@ public class BlockStatementTemplateGenerator {
                     return (J) tree;
                 }
 
+                if (getCursor().getValue() instanceof JLeftPadded) {
+                    JLeftPadded lp = (JLeftPadded) getCursor().getValue();
+                    if (lp.getBefore() != null && lp.getBefore().getComments() != null) {
+                        for (Comment comment : lp.getBefore().getComments()) {
+                            if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                                done = true;
+                                return (J) tree;
+                            }
+                        }
+                    }
+                }
+
                 if (expected.isInstance(tree)) {
                     @SuppressWarnings("unchecked") J2 t = (J2) tree;
 
