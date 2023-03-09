@@ -132,33 +132,6 @@ public class AddDependency extends Recipe {
     @Nullable
     Boolean acceptTransitive;
 
-    @JsonCreator
-    public AddDependency(String groupId, String artifactId, String version, @Nullable String versionPattern,
-            @Nullable String scope, @Nullable Boolean releasesOnly, String onlyIfUsing, @Nullable String type,
-            @Nullable String classifier, @Nullable Boolean optional, @Nullable String familyPattern,
-            @Nullable Boolean acceptTransitive) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.version = version;
-        this.versionPattern = versionPattern;
-        this.scope = scope;
-        this.releasesOnly = releasesOnly;
-        this.onlyIfUsing = onlyIfUsing;
-        this.type = type;
-        this.classifier = classifier;
-        this.optional = optional;
-        this.familyPattern = familyPattern;
-        this.acceptTransitive = acceptTransitive;
-    }
-
-    @Deprecated
-    public AddDependency(String groupId, String artifactId, String version, @Nullable String versionPattern,
-            @Nullable String scope, @Nullable Boolean releasesOnly, String onlyIfUsing, @Nullable String type,
-            @Nullable String classifier, @Nullable Boolean optional, @Nullable String familyPattern) {
-        this(groupId, artifactId, version, versionPattern, scope, releasesOnly, onlyIfUsing, type, classifier, optional,
-                familyPattern, null);
-    }
-
     @Override
     public Validated validate() {
         Validated validated = super.validate();
