@@ -16,62 +16,118 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.cleanup.ModifierOrder.sortModifiers;
-import static org.openrewrite.java.tree.J.ClassDeclaration.Kind.Type.Interface;
 
 public class FinalClassVisitor extends JavaIsoVisitor<ExecutionContext> {
-    @Override
-    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext executionContext) {
-        if(classDeclaration.getKind() == Interface || classDeclaration.hasModifier(J.Modifier.Type.Abstract)) {
-            return classDeclaration;
-        }
-        J.ClassDeclaration cd = super.visitClassDeclaration(classDeclaration, executionContext);
 
-        if(cd.hasModifier(J.Modifier.Type.Final) || cd.getKind() != J.ClassDeclaration.Kind.Type.Class) {
+    Tree visitRoot;
+
+    final Set<String> typesToFinalize = new HashSet<>();
+    final Set<String> typesToNotFinalize = new HashSet<>();
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+        boolean root = false;
+        if (visitRoot == null && tree != null) {
+            visitRoot = tree;
+            root = true;
+        }
+        J result = super.visit(tree, ctx);
+        if (root) {
+            visitRoot = null;
+            typesToFinalize.removeAll(typesToNotFinalize);
+            if (!typesToFinalize.isEmpty()) {
+                result = new FinalizingVisitor(typesToFinalize).visit(tree, ctx);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext ctx) {
+        J.ClassDeclaration cd = super.visitClassDeclaration(classDeclaration, ctx);
+
+        if (cd.getKind() != J.ClassDeclaration.Kind.Type.Class || cd.hasModifier(J.Modifier.Type.Abstract)
+                || cd.hasModifier(J.Modifier.Type.Final) || cd.getType() == null) {
             return cd;
         }
 
+        excludeSupertypes(cd.getType());
+
         boolean allPrivate = true;
         int constructorCount = 0;
-        for(Statement s : cd.getBody().getStatements()) {
-            if(s instanceof J.MethodDeclaration && ((J.MethodDeclaration)s).isConstructor()) {
-                J.MethodDeclaration constructor = (J.MethodDeclaration)s;
+        for (Statement s : cd.getBody().getStatements()) {
+            if (s instanceof J.MethodDeclaration && ((J.MethodDeclaration) s).isConstructor()) {
+                J.MethodDeclaration constructor = (J.MethodDeclaration) s;
                 constructorCount++;
-                if(!constructor.hasModifier(J.Modifier.Type.Private)) {
+                if (!constructor.hasModifier(J.Modifier.Type.Private)) {
                     allPrivate = false;
                 }
             }
-            if(constructorCount > 0 && !allPrivate) {
+            if (constructorCount > 0 && !allPrivate) {
                 return cd;
             }
         }
 
-        if(constructorCount > 0) {
-            List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
-            modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY,  J.Modifier.Type.Final, emptyList()));
-            modifiers = sortModifiers(modifiers);
-            cd = cd.withModifiers(modifiers);
-
-            // Temporary work around until issue https://github.com/openrewrite/rewrite/issues/2348 is implemented.
-            if (!cd.getLeadingAnnotations().isEmpty()) {
-                // Setting the prefix to empty will cause the `Spaces` visitor to fix the formatting.
-                cd = cd.getAnnotations().withKind(cd.getAnnotations().getKind().withPrefix(Space.EMPTY));
-            }
-
-            assert getCursor().getParent() != null;
-            cd = autoFormat(cd, cd.getName(), executionContext, getCursor().getParent());
+        if (constructorCount > 0) {
+            typesToFinalize.add(cd.getType().getFullyQualifiedName());
         }
+
         return cd;
+    }
+
+    private void excludeSupertypes(JavaType.FullyQualified type) {
+        if (type.getSupertype() != null) {
+            typesToNotFinalize.add(type.getSupertype().getFullyQualifiedName());
+            excludeSupertypes(type.getSupertype());
+        }
+    }
+
+    /**
+     * Adding the `final` modifier is performed in a second phase, because we first need to check if any of the
+     * classes need to remain non-final due to inheritance.
+     */
+    private static class FinalizingVisitor extends JavaIsoVisitor<ExecutionContext> {
+        private final Set<String> typesToFinalize;
+
+        public FinalizingVisitor(Set<String> typesToFinalize) {
+            this.typesToFinalize = typesToFinalize;
+        }
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+            if (cd.getType() != null && typesToFinalize.remove(cd.getType().getFullyQualifiedName())) {
+                List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
+                modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Final, emptyList()));
+                modifiers = sortModifiers(modifiers);
+                cd = cd.withModifiers(modifiers);
+                if (cd.getType() instanceof JavaType.Class && !cd.getType().hasFlags(Flag.Final)) {
+                    Set<Flag> flags = new HashSet<>(cd.getType().getFlags());
+                    flags.add(Flag.Final);
+                    cd = cd.withType(((JavaType.Class) cd.getType()).withFlags(flags));
+                }
+
+                // Temporary work around until issue https://github.com/openrewrite/rewrite/issues/2348 is implemented.
+                if (!cd.getLeadingAnnotations().isEmpty()) {
+                    // Setting the prefix to empty will cause the `Spaces` visitor to fix the formatting.
+                    cd = cd.getAnnotations().withKind(cd.getAnnotations().getKind().withPrefix(Space.EMPTY));
+                }
+
+                assert getCursor().getParent() != null;
+                cd = autoFormat(cd, cd.getName(), ctx, getCursor().getParent());
+            }
+            return cd;
+        }
     }
 }
