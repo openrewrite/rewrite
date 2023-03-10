@@ -113,8 +113,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                 return signature(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType(), ownerSymbol);
             } else if (resolvedSymbol instanceof FirFieldSymbol) {
                 return signature(((FirFieldSymbol) resolvedSymbol).getResolvedReturnType(), ownerSymbol);
-            } else {
-                throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
             }
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = ((FirResolvedTypeRef) type).getType();
@@ -137,7 +135,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirOuterClassTypeParameterRef) type).getSymbol());
         }
 
-        throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
+        return "{undefined}";
     }
 
     /**

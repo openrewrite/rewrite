@@ -104,6 +104,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         return resolveType(type, signature, ownerFallBack);
     }
 
+    @Nullable
     private JavaType resolveType(Object type, String signature, @Nullable FirBasedSymbol<?> ownerFallBack) {
         if (type instanceof ConeTypeProjection) {
             return resolveConeTypeProjection((ConeTypeProjection) type, signature, ownerFallBack);
@@ -128,8 +129,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                 return type(((FirValueParameterSymbol) resolvedSymbol).getResolvedReturnType(), ownerFallBack);
             } else if (resolvedSymbol instanceof FirFieldSymbol) {
                 return type(((FirFieldSymbol) resolvedSymbol).getResolvedReturnType(), ownerFallBack);
-            } else {
-                throw new IllegalArgumentException("Unsupported FirResolvedNamedReference: " + type.getClass().getName());
             }
         } else if (type instanceof FirResolvedTypeRef) {
             ConeKotlinType coneKotlinType = FirTypeUtilsKt.getConeType((FirResolvedTypeRef) type);
@@ -146,7 +145,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             return type(((FirVariableAssignment) type).getCalleeReference(), ownerFallBack);
         }
 
-        throw new IllegalArgumentException("Unsupported type " + type.getClass().getName());
+        return null;
     }
 
     private JavaType.FullyQualified classType(Object classType, String signature, @Nullable FirBasedSymbol<?> ownerFallBack) {
