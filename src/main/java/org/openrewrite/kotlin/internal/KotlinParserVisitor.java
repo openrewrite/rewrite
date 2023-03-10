@@ -1475,6 +1475,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
                 }
                 typeExpression = (TypeTree) visitElement(typeRef.getDelegatedTypeRef(), ctx);
+                typeExpression = typeExpression.withType(typeMapping.type(typeRef.getType()));
             }
         } else {
             throw new IllegalStateException("Implement me.");
@@ -2110,6 +2111,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 } else {
                     typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null);
                 }
+                typeExpression = typeExpression.withType(typeMapping.type(typeRef.getType()));
             }
         }
 
@@ -2878,7 +2880,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitThrowExpression(FirThrowExpression throwExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirThrowExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        Space prefix = whitespace();
+        skip("throw");
+        return new J.Throw(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                (Expression) visitElement(throwExpression.getException(), ctx)
+        );
     }
 
     @Override
