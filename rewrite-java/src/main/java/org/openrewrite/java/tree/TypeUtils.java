@@ -220,7 +220,7 @@ public class TypeUtils {
                 JavaType.Primitive toPrimitive = JavaType.Primitive.fromKeyword(to);
                 if (fromPrimitive == toPrimitive) {
                     return true;
-                } else if (fromPrimitive == JavaType.Primitive.Boolean) {
+                } else if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
                     return false;
                 } else if (toPrimitive != null) {
                     switch (toPrimitive) {
