@@ -891,4 +891,25 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2958")
+    @Disabled("to be fixed")
+    @Test
+    void stringIndexOutOfBoundsException() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              class A {
+                  Collection<?> test(Object value) {
+                      if (value instanceof Collection<?> values && values.stream().allMatch(it -> it instanceof Class)) {
+                          return values;
+                      }
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
