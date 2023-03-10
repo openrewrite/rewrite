@@ -18,7 +18,6 @@ package org.openrewrite.java.cleanup;
 
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -893,9 +892,8 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2958")
-    @ExpectedToFail
     @Test
-    void stringIndexOutOfBoundsException() {
+    void insideIfConditionAfterInstanceOfPatternVariable() {
         rewriteRun(
           java(
             """
@@ -903,6 +901,17 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
               class A {
                   Collection<?> test(Object value) {
                       if (value instanceof Collection<?> values && values.stream().allMatch(it -> it instanceof Class)) {
+                          return values;
+                      }
+                      return null;
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              class A {
+                  Collection<?> test(Object value) {
+                      if (value instanceof Collection<?> values && values.stream().allMatch(Class.class::isInstance)) {
                           return values;
                       }
                       return null;

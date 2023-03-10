@@ -17,10 +17,8 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Tree;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
@@ -79,6 +77,28 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     Object m(Object o) {
                         if (true || (o instanceof String s && 42 != 1)) {
                             return /*invalid*/ 42;
+                        }
+                        return /*invalid*/ 42;
+                    }
+                }
+              """
+          )
+        );
+    }
+
+    @Test
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/2958")
+    @SuppressWarnings({"ConstantValue", "IfStatementWithIdenticalBranches"})
+    void referenceFromWithinLambdaInIfCondition() {
+        rewriteRun(
+          templatedJava17(
+            """
+                import java.util.stream.Stream;
+                class T {
+                    Object m(Object o) {
+                        if (o instanceof String s && Stream.of("x").anyMatch(e -> 42 == e.length())) {
+                            return 42;
                         }
                         return /*invalid*/ 42;
                     }

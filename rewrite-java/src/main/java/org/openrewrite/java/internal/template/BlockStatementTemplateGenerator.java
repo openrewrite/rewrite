@@ -57,6 +57,7 @@ public class BlockStatementTemplateGenerator {
                                                "}";
     private static final String METHOD_INVOCATION_STUBS = "class __M__ {" +
                                                           "  static native Object any(Object o);" +
+                                                          "  static native Object any(java.util.function.Predicate<Boolean> o);" +
                                                           "  static native <T> Object anyT();" +
                                                           "}";
 
@@ -403,10 +404,10 @@ public class BlockStatementTemplateGenerator {
             J.If iff = (J.If) j;
             if (referToSameElement(prior, iff.getIfCondition())) {
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), toReplace);
-                if (condition != null) {
-                    int splitIdx = condition.indexOf('§');
-                    before.insert(0, "if (" + condition.substring(0, splitIdx) + '(');
-                    after.append(')').append(condition.substring(splitIdx + 1)).append(") {}");
+                int toReplaceIdx;
+                if (condition != null && (toReplaceIdx = condition.indexOf('§')) != -1) {
+                    before.insert(0, "if (" + condition.substring(0, toReplaceIdx) + '(');
+                    after.append(')').append(condition.substring(toReplaceIdx + 1)).append(") {}");
                 } else {
                     insertControlWithBlock(iff.getThenPart(), before, after, () -> {
                         before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
