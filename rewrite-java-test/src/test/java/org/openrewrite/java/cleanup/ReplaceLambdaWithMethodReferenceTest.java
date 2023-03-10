@@ -17,8 +17,8 @@
 package org.openrewrite.java.cleanup;
 
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -893,7 +893,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2958")
-    @Disabled("to be fixed")
+    @ExpectedToFail
     @Test
     void stringIndexOutOfBoundsException() {
         rewriteRun(
