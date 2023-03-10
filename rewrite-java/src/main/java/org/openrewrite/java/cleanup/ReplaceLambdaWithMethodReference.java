@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaParser;
@@ -124,8 +125,22 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     }
                 } else if (body instanceof MethodCall) {
                     MethodCall method = (MethodCall) body;
-                    if (method instanceof J.NewClass && ((J.NewClass) method).getBody() != null ||
-                            multipleMethodInvocations(method) ||
+                    if (method instanceof J.NewClass) {
+                        J.NewClass nc = (J.NewClass) method;
+                        if (nc.getBody() != null) {
+                            return l;
+                        } else {
+                            if (isAMethodInvocationArgument(l, getCursor()) && nc.getType() instanceof JavaType.Class) {
+                                JavaType.Class clazz = (JavaType.Class) nc.getType();
+                                boolean hasMultipleConstructors = clazz.getMethods().stream().filter(JavaType.Method::isConstructor).count() > 1;
+                                if (hasMultipleConstructors) {
+                                    return l;
+                                }
+                            }
+                        }
+                    }
+
+                    if (multipleMethodInvocations(method) ||
                             !methodArgumentsMatchLambdaParameters(method, lambda)) {
                         return l;
                     }
@@ -220,5 +235,15 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                         "null".equals(((J.Literal) j2).getValueSource());
             }
         };
+
+    }
+
+    private static boolean isAMethodInvocationArgument(J.Lambda lambda, Cursor cursor) {
+        Cursor parent = cursor.dropParentUntil(p -> p instanceof J.MethodInvocation || p instanceof J.CompilationUnit);
+        if (parent.getValue() instanceof J.MethodInvocation) {
+            J.MethodInvocation m = (J.MethodInvocation) parent.getValue();
+            return m.getArguments().stream().anyMatch(arg -> arg == lambda);
+        }
+        return false;
     }
 }
