@@ -803,7 +803,6 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2949")
-    @Disabled("To be fixed")
     @Test
     void multipleConstructors() {
         rewriteRun(
@@ -827,8 +826,10 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                   void method(Function<B, B> function) {}
 
                   void test() {
-                      method(() -> new B());
-                      // method(B::new); // doesn't compile
+                      method(() -> new B());            // OK
+                      method(() -> new B(t -> false));  // OK
+                      method((x) -> new B(t -> false)); // OK
+                      // method(B::new);                // Error
                   }
               }
               """
@@ -837,7 +838,38 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2949")
-    @Disabled("To be fixed")
+    @Test
+    void anotherMultipleConstructorsCaseEasyUnderstanding() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  B () {}
+                  B (String name) {}
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              class A {
+                  void method(Supplier<B> supplier) {}
+                  void method(Function<String, B> function) {}
+
+                  void test() {
+                      method(() -> new B());         // OK
+                      method(name -> new B(name));   // OK
+                      // method(B::new);             // Error
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
     @Test
     void anotherSimplerMultipleConstructorsCase() {
         rewriteRun(
@@ -852,7 +884,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
                   void test() {
                       method(() -> new String());
-                      // method(String::new); doesn't compile
+                      // method(String::new); // Error
                   }
               }
               """
