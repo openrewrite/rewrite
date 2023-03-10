@@ -2480,7 +2480,117 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitConstructor(FirConstructor constructor, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirConstructor is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
+        List<J> modifiers = emptyList();
+        List<J.Annotation> annotations = mapModifiers(constructor.getAnnotations(), "constructor");
+
+        J.TypeParameters typeParameters = constructor.getTypeParameters().isEmpty() ? null :
+                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
+                        emptyList(),
+                        convertAll(constructor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
+
+        JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
+        if (constructor.getReceiverTypeRef() != null) {
+            // Infix functions are de-sugared during the backend phase of the compiler.
+            // The de-sugaring process moves the infix receiver to the first position of the method declaration.
+            // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
+            markers = markers.addIfAbsent(new ReceiverType(randomId()));
+            Expression receiver = (Expression) visitElement(constructor.getReceiverTypeRef(), ctx);
+            infixReceiver = JRightPadded.build(new J.VariableDeclarations.NamedVariable(
+                            randomId(),
+                            EMPTY,
+                            Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "<receiverType>", null, null),
+                            emptyList(),
+                            padLeft(EMPTY, receiver),
+                            null))
+                    .withAfter(sourceBefore("."));
+        }
+
+        String methodName = "constructor";
+
+        J.Identifier name = createIdentifier(methodName, constructor);
+
+        JContainer<Statement> params;
+        Space before = sourceBefore("(");
+        params = !constructor.getValueParameters().isEmpty() ?
+                JContainer.build(before, convertAll(constructor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
+                JContainer.build(before, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+
+        if (constructor.getReceiverTypeRef() != null) {
+            // Insert the infix receiver to the list of parameters.
+            J.VariableDeclarations implicitParam = new J.VariableDeclarations(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                    emptyList(),
+                    emptyList(),
+                    null,
+                    null,
+                    emptyList(),
+                    singletonList(infixReceiver));
+            implicitParam = implicitParam.withMarkers(implicitParam.getMarkers().addIfAbsent(new TypeReferencePrefix(randomId(), EMPTY)));
+            List<JRightPadded<Statement>> newStatements = new ArrayList<>(params.getElements().size() + 1);
+            newStatements.add(JRightPadded.build(implicitParam));
+            newStatements.addAll(params.getPadding().getElements());
+            params = params.getPadding().withElements(newStatements);
+        }
+
+        int saveCursor = cursor;
+        TypeTree returnTypeExpression = null;
+        before = whitespace();
+        if (source.startsWith(":", cursor)) {
+            skip(":");
+            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
+
+            returnTypeExpression = (TypeTree) visitElement(constructor.getReturnTypeRef(), ctx);
+
+            saveCursor = cursor;
+            before = whitespace();
+            if (source.startsWith("?", cursor)) {
+                returnTypeExpression = returnTypeExpression.withMarkers(
+                        returnTypeExpression.getMarkers().addIfAbsent(new IsNullable(randomId(), before)));
+            } else {
+                cursor(saveCursor);
+            }
+        } else {
+            cursor(saveCursor);
+        }
+
+        J.Block body;
+        saveCursor = cursor;
+        before = whitespace();
+        if (constructor.getBody() instanceof FirSingleExpressionBlock) {
+            if (source.startsWith("=", cursor)) {
+                skip("=");
+                SingleExpressionBlock singleExpressionBlock = new SingleExpressionBlock(randomId());
+
+                body = convertOrNull(constructor.getBody(), ctx);
+                body = body.withPrefix(before);
+                body = body.withMarkers(body.getMarkers().addIfAbsent(singleExpressionBlock));
+            } else {
+                throw new IllegalStateException("Unexpected single block expression.");
+            }
+        } else {
+            cursor(saveCursor);
+            body = convertOrNull(constructor.getBody(), ctx);
+        }
+
+        return new J.MethodDeclaration(
+                randomId(),
+                prefix,
+                markers,
+                annotations,
+                emptyList(),
+                typeParameters,
+                returnTypeExpression,
+                new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
+                params,
+                null,
+                body,
+                null,
+                typeMapping.methodDeclarationType(constructor, null, getCurrentFile()));
     }
 
     @Override

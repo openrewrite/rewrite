@@ -173,9 +173,22 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void implicitConstructor() {
+    void primaryConstructor() {
         rewriteRun(
           kotlin("class Test ( val answer : Int )")
+        );
+    }
+
+    @Test
+    void secondaryConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test {
+                constructor ( val answer : Int )
+            }
+            """
+          )
         );
     }
 
