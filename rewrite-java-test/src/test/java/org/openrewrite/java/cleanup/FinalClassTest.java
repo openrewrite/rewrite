@@ -62,6 +62,9 @@ class FinalClassTest implements RewriteTest {
           java(
             """
               class A {
+                  private A() {
+                  }
+
                   private static class C extends B {
                       private C() {
                       }
@@ -70,7 +73,7 @@ class FinalClassTest implements RewriteTest {
                       }
                   }
 
-                  private static class B {
+                  private static class B extends A {
                       private B() {
                       }
                   }
