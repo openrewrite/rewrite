@@ -426,6 +426,15 @@ public interface JavaType {
             return Flag.bitMapToFlags(flagsBitMap);
         }
 
+        public JavaType withFlags(Set<Flag> flags) {
+            long flagsBitMap = Flag.flagsToBitMap(flags);
+            if (flagsBitMap == this.flagsBitMap) {
+                return this;
+            }
+            return new Class(this.managedReference, flagsBitMap, this.fullyQualifiedName, this.kind, this.typeParameters,
+                    this.supertype, this.owningClass, this.annotations, this.interfaces, this.members, this.methods);
+        }
+
         @Override
         public List<JavaType> getTypeParameters() {
             return typeParameters == null ? emptyList() : typeParameters;
