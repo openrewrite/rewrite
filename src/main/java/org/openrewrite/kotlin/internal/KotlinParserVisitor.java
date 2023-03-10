@@ -218,7 +218,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Label label = null;
         if (anonymousFunction.getLabel() != null && anonymousFunction.getLabel().getSource() != null &&
                 anonymousFunction.getLabel().getSource().getKind() != KtFakeSourceElementKind.GeneratedLambdaLabel.INSTANCE) {
-            label = (J.Label) visitElement(anonymousFunction.getLabel(),ctx);
+            label = (J.Label) visitElement(anonymousFunction.getLabel(), ctx);
         }
 
         Space prefix = whitespace();
@@ -507,7 +507,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     /**
      * Map a FirBlock to a J.Block.
-     * @param block target FirBlock.
+     *
+     * @param block          target FirBlock.
      * @param skipStatements must use a {@link Set} constructed by {@link IdentityHashMap}. Kotlin uses FirBlocks to
      *                       represented certain AST elements. When an AST element is represented as a block, we need
      *                       to filter out statements that should not be processed.
@@ -672,217 +673,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitCheckNotNullCall(FirCheckNotNullCall checkNotNullCall, ExecutionContext ctx) {
         J j = visitElement(checkNotNullCall.getArgumentList().getArguments().get(0), ctx);
         return j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), sourceBefore("!!"))));
-    }
-
-    @Override
-    public J visitClass(FirClass klass, ExecutionContext ctx) {
-        FirRegularClass firRegularClass = (FirRegularClass) klass;
-        Space prefix = whitespace();
-        Markers markers = Markers.EMPTY;
-
-        // Not used until it's possible to handle K.Modifiers.
-        List<J> modifiers = emptyList();
-
-        ClassKind classKind = klass.getClassKind();
-        String stopWord;
-        if (ClassKind.INTERFACE == classKind) {
-            stopWord = "interface";
-        } else if (ClassKind.OBJECT == classKind) {
-            stopWord = "object";
-        } else {
-            stopWord = "class";
-        }
-
-        List<J.Annotation> leadingAnnotation = mapModifiers(firRegularClass.getAnnotations(), stopWord);
-        List<J.Annotation> kindAnnotations = emptyList();
-
-        J.ClassDeclaration.Kind kind;
-        if (ClassKind.INTERFACE == classKind) {
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Interface);
-        } else if (ClassKind.OBJECT == classKind) {
-            markers = markers.addIfAbsent(new KObject(randomId(), EMPTY));
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("object"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
-        } else {
-            // Enums and Interfaces are modifiers in kotlin and require the modifier prefix to preserve source code.
-            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
-        }
-
-        J.Identifier name;
-        if (ClassKind.OBJECT == classKind && leadingAnnotation.stream().anyMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
-            name = new J.Identifier(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    firRegularClass.getName().asString(),
-                    null,
-                    null
-            );
-        } else {
-            name = createIdentifier(firRegularClass.getName().asString(), firRegularClass);
-        }
-
-        // KotlinTypeParameters with multiple bounds are defined outside the TypeParameter container.
-        // KotlinTypeGoat<T, S> where S: A, T: B, S: C, T: D.
-        // The order the bounds exist in T and S will be based on the declaration order.
-        // However, each bound may be declared in any order T -> S -> T -> S.
-        JContainer<J.TypeParameter> typeParams = firRegularClass.getTypeParameters().isEmpty() ? null : JContainer.build(
-                sourceBefore("<"),
-                convertAll(firRegularClass.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx),
-                Markers.EMPTY);
-
-        List<FirElement> membersMultiVariablesSeparated = new ArrayList<>(firRegularClass.getDeclarations().size());
-        List<FirDeclaration> jcEnums = new ArrayList<>(klass.getDeclarations().size());
-        FirPrimaryConstructor firPrimaryConstructor = null;
-        for (FirDeclaration declaration : firRegularClass.getDeclarations()) {
-            if (declaration instanceof FirEnumEntry) {
-                jcEnums.add(declaration);
-            } else if (declaration instanceof FirPrimaryConstructor) {
-                firPrimaryConstructor = (FirPrimaryConstructor) declaration;
-            } else {
-                // We aren't interested in the generated values.
-                if (ClassKind.ENUM_CLASS == classKind && declaration.getSource() != null &&
-                        declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
-                    continue;
-                }
-                membersMultiVariablesSeparated.add(declaration);
-            }
-        }
-
-        int saveCursor = cursor;
-        Space before = whitespace();
-        JContainer<Statement> primaryConstructor = null;
-        boolean inlineConstructor = source.startsWith("(", cursor) && firPrimaryConstructor != null;
-        if (inlineConstructor) {
-            skip("(");
-            primaryConstructor = JContainer.build(before,
-                    firPrimaryConstructor.getValueParameters().isEmpty() ?
-                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                            convertAll(firPrimaryConstructor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
-        } else {
-            cursor(saveCursor);
-        }
-
-        JContainer<TypeTree> implementings = null;
-        List<JRightPadded<TypeTree>> superTypes = null;
-
-        saveCursor = cursor;
-        before = whitespace();
-        if (source.startsWith(":", cursor)) {
-            skip(":");
-        }
-
-        // Kotlin declared super class and interfaces differently than java. All types declared after the `:` are added into implementings.
-        // This should probably exist on a K.ClassDeclaration view where the getters return the appropriate types.
-        // The J.ClassDeclaration should have the super type set in extending and the J.NewClass should be unwrapped.
-        for (int i = 0; i < firRegularClass.getSuperTypeRefs().size(); i++) {
-            FirTypeRef typeRef = firRegularClass.getSuperTypeRefs().get(i);
-            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(typeRef), firSession);
-            // Filter out generated types.
-            if (typeRef.getSource() != null && !(typeRef.getSource().getKind() instanceof KtFakeSourceElementKind)) {
-                if (superTypes == null) {
-                    superTypes = new ArrayList<>(firRegularClass.getSuperTypeRefs().size());
-                }
-
-                TypeTree element = (TypeTree) visitElement(typeRef, ctx);
-                if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
-                    // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
-                    J.NewClass newClass = new J.NewClass(
-                            randomId(),
-                            element.getPrefix(),
-                            Markers.EMPTY,
-                            null,
-                            EMPTY,
-                            element.withPrefix(EMPTY),
-                            JContainer.build(sourceBefore("("),
-                                    singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
-                                    Markers.EMPTY),
-                            null,
-                            null
-                    );
-                    element = new K.FunctionType(randomId(), newClass, null);
-                }
-                superTypes.add(JRightPadded.build(element)
-                        .withAfter(i == firRegularClass.getSuperTypeRefs().size() - 1 ? EMPTY : sourceBefore(",")));
-            }
-        }
-
-        if (superTypes == null) {
-            cursor(saveCursor);
-        } else {
-            implementings = JContainer.build(before, superTypes, Markers.EMPTY);
-        }
-
-        saveCursor = cursor;
-        Space bodyPrefix = whitespace();
-
-        OmitBraces omitBraces;
-        J.Block body;
-        if (source.substring(cursor).isEmpty() || !source.substring(cursor).startsWith("{")) {
-            cursor(saveCursor);
-            omitBraces = new OmitBraces(randomId());
-            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY), emptyList(), Space.EMPTY);
-            body = body.withMarkers(body.getMarkers().addIfAbsent(omitBraces));
-        } else {
-            skip("{");
-
-            JRightPadded<Statement> enumSet = null;
-            if (!jcEnums.isEmpty()) {
-                AtomicBoolean semicolonPresent = new AtomicBoolean(false);
-
-                List<JRightPadded<J.EnumValue>> enumValues = convertAll(jcEnums, commaDelim, t -> {
-                    // this semicolon is required when there are non-value members, but can still
-                    // be present when there are not
-                    semicolonPresent.set(positionOfNext(";", '}') > 0);
-                    return semicolonPresent.get() ? sourceBefore(";", '}') : EMPTY;
-                }, ctx);
-
-                enumSet = padRight(
-                        new J.EnumValueSet(
-                                randomId(),
-                                enumValues.get(0).getElement().getPrefix(),
-                                Markers.EMPTY,
-                                ListUtils.map(enumValues, (i, ev) -> i == 0 ? ev.withElement(ev.getElement().withPrefix(EMPTY)) : ev),
-                                semicolonPresent.get()
-                        ),
-                        EMPTY
-                );
-            }
-
-            List<JRightPadded<Statement>> members = new ArrayList<>(
-                    membersMultiVariablesSeparated.size() + (enumSet == null ? 0 : 1));
-            if (enumSet != null) {
-                members.add(enumSet);
-            }
-            for (FirElement firElement : membersMultiVariablesSeparated) {
-                if (!(firElement instanceof FirEnumEntry)) {
-                    if (firElement.getSource() != null && (ClassKind.ENUM_CLASS == classKind &&
-                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.EnumGeneratedDeclaration ||
-                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter)) {
-                        continue;
-                    }
-                    members.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));
-                }
-            }
-
-            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
-                    members, sourceBefore("}"));
-        }
-
-        return new J.ClassDeclaration(
-                randomId(),
-                prefix,
-                markers,
-                leadingAnnotation,
-                emptyList(), // Requires a K view to add K specific modifiers. Modifiers specific to Kotlin are added as annotations for now.
-                kind,
-                name,
-                typeParams,
-                primaryConstructor,
-                null,
-                implementings,
-                null,
-                body,
-                (JavaType.FullyQualified) typeMapping.type(firRegularClass));
     }
 
     @Override
@@ -1512,7 +1302,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, parenthesized, paramExprs);
         if (parenthesized && functionTypeRef.getValueParameters().isEmpty()) {
             params = params.getPadding().withParams(singletonList(JRightPadded
-                    .build((J)new J.Empty(randomId(), EMPTY, Markers.EMPTY))
+                    .build((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY))
                     .withAfter(sourceBefore(")"))));
         }
 
@@ -1531,7 +1321,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             body = body.withMarkers(body.getMarkers().removeByType(OmitBraces.class));
         }
 
-        J.Lambda lambda =  new J.Lambda(
+        J.Lambda lambda = new J.Lambda(
                 randomId(),
                 prefix,
                 omitBraces ? Markers.EMPTY.addIfAbsent(new OmitBraces(randomId())) : Markers.EMPTY,
@@ -1558,7 +1348,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.FieldAccess qualid = TypeTree.build(packageName).withPrefix(space);
         skip(qualid.toString());
         JLeftPadded<J.Identifier> alias = null;
-        if(firImport.getAliasName() != null) {
+        if (firImport.getAliasName() != null) {
             Space asPrefix = sourceBefore("as");
             Space aliasPrefix = whitespace();
             String aliasText = firImport.getAliasName().asString();
@@ -1706,7 +1496,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
-            expr =  visitElement(property.getGetter(), ctx);
+            expr = visitElement(property.getGetter(), ctx);
             if (expr instanceof Statement && !(expr instanceof Expression)) {
                 expr = new K.StatementExpression(randomId(), (Statement) expr);
             }
@@ -1907,13 +1697,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
             Expression receiver = (Expression) visitElement(simpleFunction.getReceiverTypeRef(), ctx);
             infixReceiver = JRightPadded.build(new J.VariableDeclarations.NamedVariable(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
-                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "<receiverType>", null, null),
-                    emptyList(),
-                    padLeft(EMPTY, receiver),
-                    null))
+                            randomId(),
+                            EMPTY,
+                            Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "<receiverType>", null, null),
+                            emptyList(),
+                            padLeft(EMPTY, receiver),
+                            null))
                     .withAfter(sourceBefore("."));
         }
 
@@ -2251,10 +2041,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 FirTypeProjection typeArgument = typeArguments.get(i);
                 parameters.add(JRightPadded.build((Expression) visitElement(typeArgument, ctx))
                         .withAfter(
-                        i < typeArguments.size() - 1 ?
-                                sourceBefore(",") :
-                                sourceBefore(">")
-                ));
+                                i < typeArguments.size() - 1 ?
+                                        sourceBefore(",") :
+                                        sourceBefore(">")
+                        ));
             }
 
             if (userTypeRef.isMarkedNullable()) {
@@ -2274,7 +2064,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             return nameTree.withPrefix(prefix)
-                        .withMarkers(markers);
+                    .withMarkers(markers);
         }
     }
 
@@ -2473,7 +2263,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             J.ControlParentheses<Expression> controlParentheses = null;
             if (whenExpression.getSubject() != null) {
-                controlParentheses =  new J.ControlParentheses<>(
+                controlParentheses = new J.ControlParentheses<>(
                         randomId(),
                         sourceBefore("("),
                         Markers.EMPTY,
@@ -2634,10 +2424,585 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return label != null ? label.withStatement(statement) : statement;
     }
 
+    @Override
+    public J visitArgumentList(FirArgumentList argumentList, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirArgumentList is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitAugmentedArraySetCall(FirAugmentedArraySetCall augmentedArraySetCall, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirAugmentedArraySetCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitAssignmentOperatorStatement(FirAssignmentOperatorStatement assignmentOperatorStatement, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirAssignmentOperatorStatement is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitAnonymousInitializer(FirAnonymousInitializer anonymousInitializer, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirAnonymousInitializer is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitAnnotation(FirAnnotation annotation, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirAnnotation is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitAnnotationContainer(FirAnnotationContainer annotationContainer, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirAnnotationContainer is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitAnnotationArgumentMapping(FirAnnotationArgumentMapping annotationArgumentMapping, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirAnnotationArgumentMapping is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitBackingField(FirBackingField backingField, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirBackingField is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitBackingFieldReference(FirBackingFieldReference backingFieldReference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirBackingFieldReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitContextReceiver(FirContextReceiver contextReceiver, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirContextReceiver is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitConstructor(FirConstructor constructor, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirConstructor is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitComponentCall(FirComponentCall componentCall, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirComponentCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitContractDescriptionOwner(FirContractDescriptionOwner contractDescriptionOwner, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirContractDescriptionOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitContextReceiverArgumentListOwner(FirContextReceiverArgumentListOwner contextReceiverArgumentListOwner, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirContextReceiverArgumentListOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitClassReferenceExpression(FirClassReferenceExpression classReferenceExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirClassReferenceExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitClassLikeDeclaration(FirClassLikeDeclaration classLikeDeclaration, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirClassLikeDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitCall(FirCall call, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitCallableDeclaration(FirCallableDeclaration callableDeclaration, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirCallableDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitDelegatedConstructorCall(FirDelegatedConstructorCall delegatedConstructorCall, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirDelegatedConstructorCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitDeclaration(FirDeclaration declaration, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitDynamicTypeRef(FirDynamicTypeRef dynamicTypeRef, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirDynamicTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitDelegateFieldReference(FirDelegateFieldReference delegateFieldReference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirDelegateFieldReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitDeclarationStatus(FirDeclarationStatus declarationStatus, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirDeclarationStatus is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitField(FirField field, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirField is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitFunction(FirFunction function, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirFunction is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitImplicitInvokeCall(FirImplicitInvokeCall implicitInvokeCall, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirImplicitInvokeCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitImplicitTypeRef(FirImplicitTypeRef implicitTypeRef, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirImplicitTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitIntegerLiteralOperatorCall(FirIntegerLiteralOperatorCall integerLiteralOperatorCall, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirIntegerLiteralOperatorCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitIntersectionTypeRef(FirIntersectionTypeRef intersectionTypeRef, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirIntersectionTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public <E extends FirTargetElement> J visitJump(FirJump<E> jump, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirJump is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitLoop(FirLoop loop, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirLoop is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitLoopJump(FirLoopJump loopJump, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirLoopJump is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitMemberDeclaration(FirMemberDeclaration memberDeclaration, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirMemberDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitNamedReference(FirNamedReference namedReference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirNamedReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitPlaceholderProjection(FirPlaceholderProjection placeholderProjection, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirPlaceholderProjection is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitQualifiedAccess(FirQualifiedAccess qualifiedAccess, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirQualifiedAccess is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitQualifiedAccessExpression(FirQualifiedAccessExpression qualifiedAccessExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirQualifiedAccessExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitReference(FirReference reference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitRegularClass(FirRegularClass regularClass, ExecutionContext ctx) {
+        Space prefix = whitespace();
+        Markers markers = Markers.EMPTY;
+
+        // Not used until it's possible to handle K.Modifiers.
+        List<J> modifiers = emptyList();
+
+        ClassKind classKind = regularClass.getClassKind();
+        String stopWord;
+        if (ClassKind.INTERFACE == classKind) {
+            stopWord = "interface";
+        } else if (ClassKind.OBJECT == classKind) {
+            stopWord = "object";
+        } else {
+            stopWord = "class";
+        }
+
+        List<J.Annotation> leadingAnnotation = mapModifiers(regularClass.getAnnotations(), stopWord);
+        List<J.Annotation> kindAnnotations = emptyList();
+
+        J.ClassDeclaration.Kind kind;
+        if (ClassKind.INTERFACE == classKind) {
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("interface"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Interface);
+        } else if (ClassKind.OBJECT == classKind) {
+            markers = markers.addIfAbsent(new KObject(randomId(), EMPTY));
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("object"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+        } else {
+            // Enums and Interfaces are modifiers in kotlin and require the modifier prefix to preserve source code.
+            kind = new J.ClassDeclaration.Kind(randomId(), sourceBefore("class"), Markers.EMPTY, kindAnnotations, J.ClassDeclaration.Kind.Type.Class);
+        }
+
+        J.Identifier name;
+        if (ClassKind.OBJECT == classKind && leadingAnnotation.stream().anyMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
+            name = new J.Identifier(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    regularClass.getName().asString(),
+                    null,
+                    null
+            );
+        } else {
+            name = createIdentifier(regularClass.getName().asString(), regularClass);
+        }
+
+        // KotlinTypeParameters with multiple bounds are defined outside the TypeParameter container.
+        // KotlinTypeGoat<T, S> where S: A, T: B, S: C, T: D.
+        // The order the bounds exist in T and S will be based on the declaration order.
+        // However, each bound may be declared in any order T -> S -> T -> S.
+        JContainer<J.TypeParameter> typeParams = regularClass.getTypeParameters().isEmpty() ? null : JContainer.build(
+                sourceBefore("<"),
+                convertAll(regularClass.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx),
+                Markers.EMPTY);
+
+        List<FirElement> membersMultiVariablesSeparated = new ArrayList<>(regularClass.getDeclarations().size());
+        List<FirDeclaration> jcEnums = new ArrayList<>(regularClass.getDeclarations().size());
+        FirPrimaryConstructor firPrimaryConstructor = null;
+        for (FirDeclaration declaration : regularClass.getDeclarations()) {
+            if (declaration instanceof FirEnumEntry) {
+                jcEnums.add(declaration);
+            } else if (declaration instanceof FirPrimaryConstructor) {
+                firPrimaryConstructor = (FirPrimaryConstructor) declaration;
+            } else {
+                // We aren't interested in the generated values.
+                if (ClassKind.ENUM_CLASS == classKind && declaration.getSource() != null &&
+                        declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
+                    continue;
+                }
+                membersMultiVariablesSeparated.add(declaration);
+            }
+        }
+
+        int saveCursor = cursor;
+        Space before = whitespace();
+        JContainer<Statement> primaryConstructor = null;
+        boolean inlineConstructor = source.startsWith("(", cursor) && firPrimaryConstructor != null;
+        if (inlineConstructor) {
+            skip("(");
+            primaryConstructor = JContainer.build(before,
+                    firPrimaryConstructor.getValueParameters().isEmpty() ?
+                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                            convertAll(firPrimaryConstructor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
+        } else {
+            cursor(saveCursor);
+        }
+
+        JContainer<TypeTree> implementings = null;
+        List<JRightPadded<TypeTree>> superTypes = null;
+
+        saveCursor = cursor;
+        before = whitespace();
+        if (source.startsWith(":", cursor)) {
+            skip(":");
+        }
+
+        // Kotlin declared super class and interfaces differently than java. All types declared after the `:` are added into implementings.
+        // This should probably exist on a K.ClassDeclaration view where the getters return the appropriate types.
+        // The J.ClassDeclaration should have the super type set in extending and the J.NewClass should be unwrapped.
+        for (int i = 0; i < regularClass.getSuperTypeRefs().size(); i++) {
+            FirTypeRef typeRef = regularClass.getSuperTypeRefs().get(i);
+            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(typeRef), firSession);
+            // Filter out generated types.
+            if (typeRef.getSource() != null && !(typeRef.getSource().getKind() instanceof KtFakeSourceElementKind)) {
+                if (superTypes == null) {
+                    superTypes = new ArrayList<>(regularClass.getSuperTypeRefs().size());
+                }
+
+                TypeTree element = (TypeTree) visitElement(typeRef, ctx);
+                if (symbol != null && ClassKind.CLASS == symbol.getFir().getClassKind()) {
+                    // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
+                    J.NewClass newClass = new J.NewClass(
+                            randomId(),
+                            element.getPrefix(),
+                            Markers.EMPTY,
+                            null,
+                            EMPTY,
+                            element.withPrefix(EMPTY),
+                            JContainer.build(sourceBefore("("),
+                                    singletonList(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
+                                    Markers.EMPTY),
+                            null,
+                            null
+                    );
+                    element = new K.FunctionType(randomId(), newClass, null);
+                }
+                superTypes.add(JRightPadded.build(element)
+                        .withAfter(i == regularClass.getSuperTypeRefs().size() - 1 ? EMPTY : sourceBefore(",")));
+            }
+        }
+
+        if (superTypes == null) {
+            cursor(saveCursor);
+        } else {
+            implementings = JContainer.build(before, superTypes, Markers.EMPTY);
+        }
+
+        saveCursor = cursor;
+        Space bodyPrefix = whitespace();
+
+        OmitBraces omitBraces;
+        J.Block body;
+        if (source.substring(cursor).isEmpty() || !source.substring(cursor).startsWith("{")) {
+            cursor(saveCursor);
+            omitBraces = new OmitBraces(randomId());
+            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY), emptyList(), Space.EMPTY);
+            body = body.withMarkers(body.getMarkers().addIfAbsent(omitBraces));
+        } else {
+            skip("{");
+
+            JRightPadded<Statement> enumSet = null;
+            if (!jcEnums.isEmpty()) {
+                AtomicBoolean semicolonPresent = new AtomicBoolean(false);
+
+                List<JRightPadded<J.EnumValue>> enumValues = convertAll(jcEnums, commaDelim, t -> {
+                    // this semicolon is required when there are non-value members, but can still
+                    // be present when there are not
+                    semicolonPresent.set(positionOfNext(";", '}') > 0);
+                    return semicolonPresent.get() ? sourceBefore(";", '}') : EMPTY;
+                }, ctx);
+
+                enumSet = padRight(
+                        new J.EnumValueSet(
+                                randomId(),
+                                enumValues.get(0).getElement().getPrefix(),
+                                Markers.EMPTY,
+                                ListUtils.map(enumValues, (i, ev) -> i == 0 ? ev.withElement(ev.getElement().withPrefix(EMPTY)) : ev),
+                                semicolonPresent.get()
+                        ),
+                        EMPTY
+                );
+            }
+
+            List<JRightPadded<Statement>> members = new ArrayList<>(
+                    membersMultiVariablesSeparated.size() + (enumSet == null ? 0 : 1));
+            if (enumSet != null) {
+                members.add(enumSet);
+            }
+            for (FirElement firElement : membersMultiVariablesSeparated) {
+                if (!(firElement instanceof FirEnumEntry)) {
+                    if (firElement.getSource() != null && (ClassKind.ENUM_CLASS == classKind &&
+                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.EnumGeneratedDeclaration ||
+                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter)) {
+                        continue;
+                    }
+                    members.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));
+                }
+            }
+
+            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                    members, sourceBefore("}"));
+        }
+
+        return new J.ClassDeclaration(
+                randomId(),
+                prefix,
+                markers,
+                leadingAnnotation,
+                emptyList(), // Requires a K view to add K specific modifiers. Modifiers specific to Kotlin are added as annotations for now.
+                kind,
+                name,
+                typeParams,
+                primaryConstructor,
+                null,
+                implementings,
+                null,
+                body,
+                (JavaType.FullyQualified) typeMapping.type(regularClass));
+    }
+
+    @Override
+    public J visitResolvable(FirResolvable resolvable, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirResolvable is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitResolvedCallableReference(FirResolvedCallableReference resolvedCallableReference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirResolvedCallableReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitResolvedDeclarationStatus(FirResolvedDeclarationStatus resolvedDeclarationStatus, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirResolvedDeclarationStatus is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitResolvedImport(FirResolvedImport resolvedImport, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirResolvedImport is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitResolvedReifiedParameterReference(FirResolvedReifiedParameterReference resolvedReifiedParameterReference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirResolvedReifiedParameterReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitSmartCastExpression(FirSmartCastExpression smartCastExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirSmartCastExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitSpreadArgumentExpression(FirSpreadArgumentExpression spreadArgumentExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirSpreadArgumentExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTypeRef(FirTypeRef typeRef, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTargetElement(FirTargetElement targetElement, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTargetElement is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitThisReference(FirThisReference thisReference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirThisReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitThrowExpression(FirThrowExpression throwExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirThrowExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTypeAlias(FirTypeAlias typeAlias, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTypeAlias is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTypeParameterRef(FirTypeParameterRef typeParameterRef, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTypeParameterRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTypeParameterRefsOwner(FirTypeParameterRefsOwner typeParameterRefsOwner, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTypeParameterRefsOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTypeParametersOwner(FirTypeParametersOwner typeParametersOwner, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTypeParametersOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTypeProjection(FirTypeProjection typeProjection, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTypeProjection is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitTypeRefWithNullability(FirTypeRefWithNullability typeRefWithNullability, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirTypeRefWithNullability is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitVarargArgumentsExpression(FirVarargArgumentsExpression varargArgumentsExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirVarargArgumentsExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitWhenSubjectExpression(FirWhenSubjectExpression whenSubjectExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirWhenSubjectExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitWrappedArgumentExpression(FirWrappedArgumentExpression wrappedArgumentExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirWrappedArgumentExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitWrappedDelegateExpression(FirWrappedDelegateExpression wrappedDelegateExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirWrappedDelegateExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitWrappedExpression(FirWrappedExpression wrappedExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirWrappedExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    /* Error element visits */
+
+    @Override
+    public J visitErrorExpression(FirErrorExpression errorExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirErrorExpression should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitErrorFunction(FirErrorFunction errorFunction, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirErrorFunction should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitErrorImport(FirErrorImport errorImport, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirErrorImport should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitErrorLoop(FirErrorLoop errorLoop, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirErrorLoop should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitErrorProperty(FirErrorProperty errorProperty, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirErrorProperty should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitErrorResolvedQualifier(FirErrorResolvedQualifier errorResolvedQualifier, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirErrorResolvedQualifier should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    @Override
+    public J visitErrorTypeRef(FirErrorTypeRef errorTypeRef, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("FirErrorTypeRef should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+    }
+
+    /* Visits to parent classes ... these should never be called */
+    @Override
+    public J visitExpression(FirExpression expression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("visitExpression should not be called.");
+    }
+
+    @Override
+    public J visitStatement(FirStatement statement, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("visitStatement should not be called.");
+    }
+
+    @Override
+    public J visitVariable(FirVariable variable, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("visitVariable should not be called.");
+    }
+
+    /* Visits to control flow ... these should never be called */
+    @Override
+    public J visitControlFlowGraphOwner(FirControlFlowGraphOwner controlFlowGraphOwner, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("visitControlFlowGraphOwner should not be called.");
+    }
+
+    @Override
+    public J visitControlFlowGraphReference(FirControlFlowGraphReference controlFlowGraphReference, ExecutionContext ctx) {
+        throw new UnsupportedOperationException("visitControlFlowGraphReference should not be called.");
+    }
+
     /**
      * Delegate {@link FirElement} to the appropriate visit.
+     *
      * @param firElement visited element.
-     * @param ctx N/A. The FirVisitor requires a second parameter that is generally used for DataFlow analysis.
+     * @param ctx        N/A. The FirVisitor requires a second parameter that is generally used for DataFlow analysis.
      * @return {@link J}
      */
     @Override
@@ -2668,8 +3033,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitCatch((FirCatch) firElement, ctx);
         } else if (firElement instanceof FirCheckNotNullCall) {
             return visitCheckNotNullCall((FirCheckNotNullCall) firElement, ctx);
-        } else if (firElement instanceof FirClass) {
-            return visitClass((FirClass) firElement, ctx);
+        } else if (firElement instanceof FirRegularClass) {
+            return visitRegularClass((FirRegularClass) firElement, ctx);
         } else if (firElement instanceof FirComparisonExpression) {
             return visitComparisonExpression((FirComparisonExpression) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
@@ -2738,7 +3103,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitValueParameter((FirValueParameter) firElement, ctx);
         } else if (firElement instanceof FirVariableAssignment) {
             return visitVariableAssignment((FirVariableAssignment) firElement, ctx);
-        }  else if (firElement instanceof FirWhenBranch) {
+        } else if (firElement instanceof FirWhenBranch) {
             return visitWhenBranch((FirWhenBranch) firElement, ctx);
         } else if (firElement instanceof FirWhenExpression) {
             return visitWhenExpression((FirWhenExpression) firElement, ctx);
@@ -2751,8 +3116,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         throw new IllegalArgumentException("Unsupported FirElement.");
     }
 
-    private J.Identifier createIdentifier(String name) {
-        return createIdentifier(name, null, null);
+    private J.Identifier createIdentifier(@Nullable String name) {
+        return createIdentifier(name == null ? "" : name, null, null);
     }
 
     private J.Identifier createIdentifier(String name, FirElement firElement) {
@@ -2937,7 +3302,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             int saveCursor = cursor;
             Space prefix = whitespace();
 
-            if (cursor == source.length() -1 ||
+            if (cursor == source.length() - 1 ||
                     // Matched stop word.
                     (source.startsWith(stopWord, cursor) && (source.length() - 1 == cursor + stopWord.length() ||
                             (Character.isWhitespace(source.charAt(cursor + stopWord.length())) ||
