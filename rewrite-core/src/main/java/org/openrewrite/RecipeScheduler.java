@@ -178,6 +178,11 @@ public interface RecipeScheduler {
                     }
                 }
                 for (S s : before) {
+                    if (singleSourceApplicableTestResult.containsKey(s.getId()) &&
+                        !singleSourceApplicableTestResult.get(s.getId())) {
+                        continue;
+                    }
+
                     singleSourceApplicableTestResult.put(
                             s.getId(),
                             RecipeSchedulerUtils.testAllApplicableTestsMatchSourceFile(
