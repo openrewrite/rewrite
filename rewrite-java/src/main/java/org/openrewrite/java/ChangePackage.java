@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
@@ -119,7 +118,8 @@ public class ChangePackage extends Recipe {
 
                 for (J.Import anImport : c.getImports()) {
                     if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
-                        c = new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visitJavaSourceFile(c, ctx);
+                        c = (JavaSourceFile) new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visit(c, ctx, getCursor());
+                        assert c != null;
                     }
                 }
             }
