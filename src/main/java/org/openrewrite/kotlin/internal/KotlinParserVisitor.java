@@ -3009,9 +3009,26 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
      */
     @Override
     public J visitElement(FirElement firElement, ExecutionContext ctx) {
+        // FIR error elements
         if (firElement instanceof FirErrorNamedReference) {
             return visitErrorNamedReference((FirErrorNamedReference) firElement, ctx);
-        } else if (firElement instanceof FirAnnotationCall) {
+        } else if (firElement instanceof FirErrorExpression) {
+            return visitErrorExpression((FirErrorExpression) firElement, ctx);
+        } else if (firElement instanceof FirErrorFunction) {
+            return visitErrorFunction((FirErrorFunction) firElement, ctx);
+        } else if (firElement instanceof FirErrorImport) {
+            return visitErrorImport((FirErrorImport) firElement, ctx);
+        } else if (firElement instanceof FirErrorLoop) {
+            return visitErrorLoop((FirErrorLoop) firElement, ctx);
+        } else if (firElement instanceof FirErrorProperty) {
+            return visitErrorProperty((FirErrorProperty) firElement, ctx);
+        } else if (firElement instanceof FirErrorResolvedQualifier) {
+            return visitErrorResolvedQualifier((FirErrorResolvedQualifier) firElement, ctx);
+        } else if (firElement instanceof FirErrorTypeRef) {
+            return visitErrorTypeRef((FirErrorTypeRef) firElement, ctx);
+        }
+
+        else if (firElement instanceof FirAnnotationCall) {
             return visitAnnotationCall((FirAnnotationCall) firElement, ctx);
         } else if (firElement instanceof FirAnonymousFunction) {
             return visitAnonymousFunction((FirAnonymousFunction) firElement, ctx);
