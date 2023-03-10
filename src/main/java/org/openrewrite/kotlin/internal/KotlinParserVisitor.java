@@ -21,10 +21,12 @@ import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget;
 import org.jetbrains.kotlin.fir.*;
+import org.jetbrains.kotlin.fir.contracts.*;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
+import org.jetbrains.kotlin.fir.diagnostics.FirDiagnosticHolder;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.expressions.impl.*;
 import org.jetbrains.kotlin.fir.references.*;
@@ -3111,6 +3113,132 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitWhenSubjectExpression((FirWhenSubjectExpression) firElement, ctx);
         } else if (firElement instanceof FirWhileLoop) {
             return visitWhileLoop((FirWhileLoop) firElement, ctx);
+        }
+
+        // Not implemented yet.
+        else if (firElement instanceof FirArgumentList) {
+            return visitArgumentList((FirArgumentList) firElement, ctx);
+        } else if (firElement instanceof FirAugmentedArraySetCall) {
+            return visitAugmentedArraySetCall((FirAugmentedArraySetCall) firElement, ctx);
+        } else if (firElement instanceof FirAssignmentOperatorStatement) {
+            return visitAssignmentOperatorStatement((FirAssignmentOperatorStatement) firElement, ctx);
+        } else if (firElement instanceof FirAnonymousInitializer) {
+            return visitAnonymousInitializer((FirAnonymousInitializer) firElement, ctx);
+        } else if (firElement instanceof FirAnnotationArgumentMapping) {
+            return visitAnnotationArgumentMapping((FirAnnotationArgumentMapping) firElement, ctx);
+        } else if (firElement instanceof FirBackingField) {
+            return visitBackingField((FirBackingField) firElement, ctx);
+        } else if (firElement instanceof FirLegacyRawContractDescription) {
+            return visitLegacyRawContractDescription((FirLegacyRawContractDescription) firElement, ctx);
+        } else if (firElement instanceof FirRawContractDescription) {
+            return visitRawContractDescription((FirRawContractDescription) firElement, ctx);
+        } else if (firElement instanceof FirResolvedContractDescription) {
+            return visitResolvedContractDescription((FirResolvedContractDescription) firElement, ctx);
+        } else if (firElement instanceof FirContractDescription) {
+            return visitContractDescription((FirContractDescription) firElement, ctx);
+        } else if (firElement instanceof FirContextReceiver) {
+            return visitContextReceiver((FirContextReceiver) firElement, ctx);
+        } else if (firElement instanceof FirConstructor) {
+            return visitConstructor((FirConstructor) firElement, ctx);
+        } else if (firElement instanceof FirContractDescriptionOwner) {
+            return visitContractDescriptionOwner((FirContractDescriptionOwner) firElement, ctx);
+        } else if (firElement instanceof FirQualifiedAccessExpression) {
+            return visitQualifiedAccessExpression((FirQualifiedAccessExpression) firElement, ctx);
+        } else if (firElement instanceof FirQualifiedAccess) {
+            return visitQualifiedAccess((FirQualifiedAccess) firElement, ctx);
+        } else if (firElement instanceof FirContextReceiverArgumentListOwner) {
+            return visitContextReceiverArgumentListOwner((FirContextReceiverArgumentListOwner) firElement, ctx);
+        } else if (firElement instanceof FirClassReferenceExpression) {
+            return visitClassReferenceExpression((FirClassReferenceExpression) firElement, ctx);
+        } else if (firElement instanceof FirTypeAlias) {
+            return visitTypeAlias((FirTypeAlias) firElement, ctx);
+        } else if (firElement instanceof FirClassLikeDeclaration) {
+            return visitClassLikeDeclaration((FirClassLikeDeclaration) firElement, ctx);
+        } else if (firElement instanceof FirCall) {
+            return visitCall((FirCall) firElement, ctx);
+        } else if (firElement instanceof FirDynamicTypeRef) {
+            return visitDynamicTypeRef((FirDynamicTypeRef) firElement, ctx);
+        } else if (firElement instanceof FirResolvedDeclarationStatus) {
+            return visitResolvedDeclarationStatus((FirResolvedDeclarationStatus) firElement, ctx);
+        } else if (firElement instanceof FirDeclarationStatus) {
+            return visitDeclarationStatus((FirDeclarationStatus) firElement, ctx);
+        } else if (firElement instanceof FirEffectDeclaration) {
+            return visitEffectDeclaration((FirEffectDeclaration) firElement, ctx);
+        } else if (firElement instanceof FirField) {
+            return visitField((FirField) firElement, ctx);
+        } else if (firElement instanceof FirFunction) {
+            return visitFunction((FirFunction) firElement, ctx);
+        } else if (firElement instanceof FirImplicitTypeRef) {
+            return visitImplicitTypeRef((FirImplicitTypeRef) firElement, ctx);
+        } else if (firElement instanceof FirIntersectionTypeRef) {
+            return visitIntersectionTypeRef((FirIntersectionTypeRef) firElement, ctx);
+        } else if (firElement instanceof FirLoopJump) {
+            return visitLoopJump((FirLoopJump) firElement, ctx);
+        } else if (firElement instanceof FirJump) {
+            return visitJump((FirJump<? extends FirTargetElement>) firElement, ctx);
+        } else if (firElement instanceof FirNamedReference) {
+            return visitNamedReference((FirNamedReference) firElement, ctx);
+        } else if (firElement instanceof FirPlaceholderProjection) {
+            return visitPlaceholderProjection((FirPlaceholderProjection) firElement, ctx);
+        } else if (firElement instanceof FirThisReference) {
+            return visitThisReference((FirThisReference) firElement, ctx);
+        } else if (firElement instanceof FirReference) {
+            return visitReference((FirReference) firElement, ctx);
+        } else if (firElement instanceof FirResolvable) {
+            return visitResolvable((FirResolvable) firElement, ctx);
+        } else if (firElement instanceof FirResolvedImport) {
+            return visitResolvedImport((FirResolvedImport) firElement, ctx);
+        } else if (firElement instanceof FirResolvedReifiedParameterReference) {
+            return visitResolvedReifiedParameterReference((FirResolvedReifiedParameterReference) firElement, ctx);
+        } else if (firElement instanceof FirSmartCastExpression) {
+            return visitSmartCastExpression((FirSmartCastExpression) firElement, ctx);
+        } else if (firElement instanceof FirSpreadArgumentExpression) {
+            return visitSpreadArgumentExpression((FirSpreadArgumentExpression) firElement, ctx);
+        } else if (firElement instanceof FirTypeRefWithNullability) {
+            return visitTypeRefWithNullability((FirTypeRefWithNullability) firElement, ctx);
+        } else if (firElement instanceof FirTypeRef) {
+            return visitTypeRef((FirTypeRef) firElement, ctx);
+        } else if (firElement instanceof FirThrowExpression) {
+            return visitThrowExpression((FirThrowExpression) firElement, ctx);
+        } else if (firElement instanceof FirTypeParameterRef) {
+            return visitTypeParameterRef((FirTypeParameterRef) firElement, ctx);
+        } else if (firElement instanceof FirTypeParametersOwner) {
+            return visitTypeParametersOwner((FirTypeParametersOwner) firElement, ctx);
+        } else if (firElement instanceof FirTypeProjection) {
+            return visitTypeProjection((FirTypeProjection) firElement, ctx);
+        } else if (firElement instanceof FirVarargArgumentsExpression) {
+            return visitVarargArgumentsExpression((FirVarargArgumentsExpression) firElement, ctx);
+        } else if (firElement instanceof FirWrappedArgumentExpression) {
+            return visitWrappedArgumentExpression((FirWrappedArgumentExpression) firElement, ctx);
+        } else if (firElement instanceof FirWrappedExpression) {
+            return visitWrappedExpression((FirWrappedExpression) firElement, ctx);
+        }
+
+        // Visits to parent classes that should not occur.
+        else if (firElement instanceof FirAnnotation) {
+            return visitAnnotation((FirAnnotation) firElement, ctx);
+        } else if (firElement instanceof FirExpression) {
+            return visitExpression((FirExpression) firElement, ctx);
+        } else if (firElement instanceof FirVariable) {
+            return visitVariable((FirVariable) firElement, ctx);
+        } else if (firElement instanceof FirCallableDeclaration) {
+            return visitCallableDeclaration((FirCallableDeclaration) firElement, ctx);
+        } else if (firElement instanceof FirMemberDeclaration) {
+            return visitMemberDeclaration((FirMemberDeclaration) firElement, ctx);
+        } else if (firElement instanceof FirTypeParameterRefsOwner) {
+            return visitTypeParameterRefsOwner((FirTypeParameterRefsOwner) firElement, ctx);
+        } else if (firElement instanceof FirLoop) {
+            return visitLoop((FirLoop) firElement, ctx);
+        } else if (firElement instanceof FirTargetElement) {
+            return visitTargetElement((FirTargetElement) firElement, ctx);
+        } else if (firElement instanceof FirDeclaration) {
+            return visitDeclaration((FirDeclaration) firElement, ctx);
+        } else if (firElement instanceof FirStatement) {
+            return visitStatement((FirStatement) firElement, ctx);
+        } else if (firElement instanceof FirAnnotationContainer) {
+            return visitAnnotationContainer((FirAnnotationContainer) firElement, ctx);
+        } else if (firElement instanceof FirDiagnosticHolder) {
+            return visitDiagnosticHolder((FirDiagnosticHolder) firElement, ctx);
         }
 
         throw new IllegalArgumentException("Unsupported FirElement.");
