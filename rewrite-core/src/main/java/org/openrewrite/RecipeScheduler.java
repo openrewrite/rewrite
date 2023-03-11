@@ -103,8 +103,10 @@ public interface RecipeScheduler {
             Stack<Recipe> recipeStack = new Stack<>();
             recipeStack.push(recipe);
 
+            // skip collecting last cycle run stat to avoid double counting run time.
+            RecipeRunStats cycleRunStats = (i != maxCycles - 1) ? runStats : new RecipeRunStats(recipe);
             after = scheduleVisit(
-                    runStats,
+                    cycleRunStats,
                     recipeStack,
                     acc,
                     ctxWithWatch,
