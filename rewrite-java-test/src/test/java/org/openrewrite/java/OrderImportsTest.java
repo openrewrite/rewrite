@@ -28,6 +28,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
 class OrderImportsTest implements RewriteTest {
 
@@ -619,6 +620,23 @@ class OrderImportsTest implements RewriteTest {
               import java.util.TreeMap;
               """
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2965")
+    @Test
+    void importReferencedByRecordComponentOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true)),
+          version(java(
+            """
+              import java.util.List;
+              import java.util.UUID;
+              
+              record T(List<UUID> uuids) {
+              }
+              """
+          ), 17)
         );
     }
 
