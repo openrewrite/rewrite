@@ -71,8 +71,10 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            md = (J.MethodDeclaration)new SpacesVisitor<>(spacesStyle, null, null, md.getParameters().get(0))
-                    .visitNonNull(md, ctx, getCursor().getParentTreeCursor().fork());
+            if (!md.getParameters().isEmpty()) {
+                md = (J.MethodDeclaration) new SpacesVisitor<>(spacesStyle, null, null, md.getParameters().get(0))
+                        .visitNonNull(md, ctx, getCursor().getParentTreeCursor().fork());
+            }
             return md;
         }
 
