@@ -31,6 +31,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
 class HideUtilityClassConstructorTest implements RewriteTest {
 
@@ -618,6 +619,21 @@ class HideUtilityClassConstructorTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1058")
+    @Test
+    void emptyRecord() {
+        rewriteRun(
+          version(java(
+            """
+              public record SomeRecord(String component) {
+                  static void utility() {
+                  }
+              }
+              """
+          ), 17)
         );
     }
 }

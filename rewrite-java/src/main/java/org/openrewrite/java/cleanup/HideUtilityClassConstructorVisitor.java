@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Statement;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumSet;
 
 /**
  * HideUtilityClassConstructorVisitor will perform the following operations on a Utility Class:
@@ -51,6 +52,10 @@ import java.util.Collection;
  */
 @Incubating(since = "7.0.0")
 public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
+
+    private static final EnumSet<J.ClassDeclaration.Kind.Type> EXCLUDE_CLASS_TYPES =
+            EnumSet.of(J.ClassDeclaration.Kind.Type.Interface, J.ClassDeclaration.Kind.Type.Record);
+
     private final UtilityClassMatcher utilityClassMatcher;
 
     public HideUtilityClassConstructorVisitor(HideUtilityClassConstructorStyle style) {
@@ -61,7 +66,7 @@ public class HideUtilityClassConstructorVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        if (c.getKind() != J.ClassDeclaration.Kind.Type.Interface && !c.hasModifier(J.Modifier.Type.Abstract) && utilityClassMatcher.isRefactorableUtilityClass(c)) {
+        if (!EXCLUDE_CLASS_TYPES.contains(c.getKind()) && !c.hasModifier(J.Modifier.Type.Abstract) && utilityClassMatcher.isRefactorableUtilityClass(c)) {
             /*
              * Note, it's a deliberate choice to have these be their own respective visitors rather than putting
              * all the logic in one visitor. It's conceptually easier to distinguish what each are doing.
