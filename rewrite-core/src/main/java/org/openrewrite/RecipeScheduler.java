@@ -119,7 +119,7 @@ public interface RecipeScheduler {
         }
 
         if (after == before) {
-            runStatsTable.record(ctx, recipe, runStats);
+            runStatsTable.record(ctx, runStats);
             return recipeRun.withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
         }
 
@@ -130,7 +130,7 @@ public interface RecipeScheduler {
                 recipeThatAddedOrDeletedSourceFile
         );
 
-        runStatsTable.record(ctx, recipe, runStats);
+        runStatsTable.record(ctx, runStats);
         return recipeRun
                 .withResults(results)
                 .withDataTables(ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap()));
@@ -304,6 +304,7 @@ public interface RecipeScheduler {
             if (hasSingleSourceApplicableTest) {
                 // If no files passed the single source applicable test, skip the recipe
                 if (singleSourceApplicableTestResult.values().stream().noneMatch(b -> b)) {
+                    runStats.recipeVisitCompleted(startTime);
                     return after;
                 }
             }
@@ -335,6 +336,7 @@ public interface RecipeScheduler {
 
             runStats.ownVisitCompleted(ownVisitStartTime);
         } catch (Throwable t) {
+            runStats.recipeVisitCompleted(startTime);
             return handleUncaughtException(recipeStack, recipeThatAddedOrDeletedSourceFile, before, ctx, recipe, t);
         }
 
@@ -367,8 +369,7 @@ public interface RecipeScheduler {
 
         for (Recipe r : recipe.getRecipeList()) {
             if (ctx.getMessage(PANIC) != null) {
-                //noinspection unchecked
-                return (List<S>) afterWidened;
+                break;
             }
 
             Stack<Recipe> nextStack = new Stack<>();
@@ -542,8 +543,8 @@ class RecipeSchedulerUtils {
     ) {
         List<S> sList = singletonList(s);
         boolean allMatch = true;
+        long applicabilityStart = System.nanoTime();
         for (Recipe applicableTest : applicableTests) {
-            RecipeRunStats nextStats = runStats.addCalledRecipe(applicableTest);
             // We still need the stack to be accurate for the applicable test, so that ExecutionContext.getRecipeStack() is correct.
             Stack<Recipe> stack = new Stack<>();
             stack.addAll(recipeStack);
@@ -551,7 +552,7 @@ class RecipeSchedulerUtils {
             Recipe previousParent = ctx.putParentRecipe(recipeStack.peek());
             // Recursively schedule the recipe to visit the applicable tests
             List<S> next = recipeScheduler.scheduleVisit(
-                    nextStats,
+                    new RecipeRunStats(applicableTest),
                     stack,
                     sList,
                     ctx,
@@ -574,6 +575,7 @@ class RecipeSchedulerUtils {
                 });
             }
         }
+        runStats.applicabilityCompleted(applicabilityStart);
         return allMatch;
     }
 }
