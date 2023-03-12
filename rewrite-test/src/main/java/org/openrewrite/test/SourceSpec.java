@@ -25,6 +25,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.internal.ThrowingUnaryOperator;
 
 import java.nio.file.Path;
@@ -87,7 +88,11 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     @Nullable
     protected Path sourcePath;
 
-    protected final List<Marker> markers = new ArrayList<>();
+    protected Markers markers = Markers.EMPTY;
+
+    public List<Marker> getMarkers() {
+        return markers.getMarkers();
+    }
 
     @Nullable
     Path getSourcePath() {
@@ -122,7 +127,9 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     }
 
     public SourceSpec<T> markers(Marker... markers) {
-        Collections.addAll(this.markers, markers);
+        for (Marker marker : markers) {
+            this.markers = this.markers.computeByType(marker, (existing, replacement) -> existing);
+        }
         return this;
     }
 

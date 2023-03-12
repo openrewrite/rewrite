@@ -24,7 +24,6 @@ import org.openrewrite.*;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.quark.QuarkParser;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -87,14 +86,14 @@ public class RecipeSpec {
 
     List<UncheckedConsumer<RecipeRun>> afterRecipes = new ArrayList<>();
 
-    // The before and after here don't mean anything
-    SourceSpec<SourceFile> allSources = new SourceSpec<>(SourceFile.class, null, QuarkParser.builder(), "", null);
+    List<UncheckedConsumer<SourceSpec<?>>> allSources = new ArrayList<>();
 
     /**
      * Configuration that applies to all source file inputs.
      */
-    public SourceSpec<SourceFile> allSources() {
-        return allSources;
+    public RecipeSpec allSources(UncheckedConsumer<SourceSpec<?>> allSources) {
+        this.allSources.add(allSources);
+        return this;
     }
 
     public RecipeSpec recipe(Recipe recipe) {
