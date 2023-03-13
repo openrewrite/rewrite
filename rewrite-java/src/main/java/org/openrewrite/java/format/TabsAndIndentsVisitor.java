@@ -208,7 +208,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         break;
                     }
-                    case METHOD_DECLARATION_PARAMETER: {
+                    case METHOD_DECLARATION_PARAMETER:
+                    case RECORD_STATE_VECTOR: {
                         JContainer<J> container = getCursor().getParentOrThrow().getValue();
                         J firstArg = container.getElements().iterator().next();
                         if (style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
