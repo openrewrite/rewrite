@@ -232,20 +232,8 @@ public class RemoveUnusedLocalVariables extends Recipe {
     }
 
     private static class References {
-        private static final J.Unary.Type[] incrementKinds = {
-                J.Unary.Type.PreIncrement,
-                J.Unary.Type.PreDecrement,
-                J.Unary.Type.PostIncrement,
-                J.Unary.Type.PostDecrement
-        };
-        private static final Predicate<Cursor> isUnaryIncrementKind = t -> t.getValue() instanceof J.Unary && isIncrementKind(t);
-
         private static boolean isIncrementKind(Cursor tree) {
-            if (tree.getValue() instanceof J.Unary) {
-                J.Unary unary = tree.getValue();
-                return Arrays.stream(incrementKinds).anyMatch(kind -> kind == unary.getOperator());
-            }
-            return false;
+            return tree.getValue() instanceof J.Unary && ((J.Unary) tree.getValue()).getOperator().isModifying();
         }
 
         private static @Nullable Cursor dropParentWhile(Predicate<Object> valuePredicate, Cursor cursor) {
@@ -290,7 +278,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
                 }
             }
 
-            return !(isUnaryIncrementKind.test(parent) && parent.getParentTreeCursor().getValue() instanceof J.Block);
+            return !(isIncrementKind(parent) && parent.getParentTreeCursor().getValue() instanceof J.Block);
         }
 
         /**
