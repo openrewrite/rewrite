@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.test.RecipeSpec;
@@ -822,6 +823,32 @@ class UseCollectionInterfacesTest implements RewriteTest {
               class Test {
                   Set<Integer> method() {
                       return new HashSet<>();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2973")
+    @Test
+    @ExpectedToFail
+    void testExplicitImplementationClassInApi() {
+        rewriteRun(
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              class Test {
+                  List<Integer> m() {
+                      List<Integer> result = new ArrayList<>();
+                      m2(result);
+                      return result;
+                  }
+
+                  void m2(ArrayList<Integer> l) {
+                      l.ensureCapacity(1);
                   }
               }
               """
