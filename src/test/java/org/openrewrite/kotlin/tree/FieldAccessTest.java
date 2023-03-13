@@ -109,7 +109,7 @@ class FieldAccessTest implements RewriteTest {
             """
             import java.nio.ByteBuffer
             
-            private val crlf: ByteBuffer = ByteBuffer.wrap("\\r\\n".toByteArray())
+            private val crlf : ByteBuffer = ByteBuffer . wrap( "\\r\\n" . toByteArray ( ) )
             """
           )
         );

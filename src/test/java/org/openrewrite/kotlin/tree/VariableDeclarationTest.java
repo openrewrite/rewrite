@@ -57,7 +57,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val latest = if (true) {
+            val latest = if ( true ) {
                 "latest.release"
             } else {
                 "latest.integration"
@@ -148,7 +148,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
             class Test {
-                val testValue = Inner()
+                val testValue = Inner ( )
                 class Inner {
                     val innerValue = 10
                 }
@@ -192,7 +192,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
             import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
-            val a: KotlinCompilation<*> = null
+            val a: KotlinCompilation < * > = null
             """
           )
         );
@@ -203,7 +203,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method(condition: Boolean): Unit = if (condition) Unit else Unit
+            fun method ( condition : Boolean ) : Unit = if ( condition ) Unit else Unit
             """
           )
         );

@@ -53,4 +53,40 @@ class NewClassTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fullyQualified() {
+        rewriteRun(
+          kotlin(
+            """
+            package a.b
+            class Test
+            """
+          ),
+          kotlin(
+            """
+            val type : a . b . Test = a . b . Test ( )
+            """
+          )
+        );
+    }
+
+    @Test
+    void innerClass() {
+        rewriteRun(
+          kotlin(
+            """
+            package a.b
+            class Test {
+                class Inner
+            }
+            """
+          ),
+          kotlin(
+            """
+            val type : a . b . Test . Inner = a . b . Test . Inner ( )
+            """
+          )
+        );
+    }
 }

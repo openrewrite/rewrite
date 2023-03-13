@@ -101,7 +101,7 @@ class BinaryTest implements RewriteTest {
             """
             fun method ( ) {
               val a = 0
-              val b = a.inv()
+              val b = a . inv ( )
             }
             """
           )

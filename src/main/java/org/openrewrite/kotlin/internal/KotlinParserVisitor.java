@@ -867,7 +867,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         if (namedReference instanceof FirResolvedNamedReference &&
                 ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
-            TypeTree name = (J.Identifier) visitElement(namedReference, null);
+            TypeTree name;
+            if (functionCall.getExplicitReceiver() != null) {
+                J j = visitElement(functionCall.getExplicitReceiver(), null);
+                name = new J.FieldAccess(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        (Expression) j,
+                        padLeft(sourceBefore("."), createIdentifier(namedReference.getName().asString(), namedReference)),
+                        typeMapping.type(functionCall, getCurrentFile()));
+            } else {
+                name = (J.Identifier) visitElement(namedReference, null);
+            }
 
             int saveCursor = cursor;
             whitespace();
@@ -1667,7 +1679,31 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitResolvedQualifier(FirResolvedQualifier resolvedQualifier, ExecutionContext ctx) {
-        return createIdentifier(resolvedQualifier.getRelativeClassFqName().asString(), resolvedQualifier);
+        String fieldAccess = resolvedQualifier.getPackageFqName().asString();
+        String resolvedName = resolvedQualifier.getRelativeClassFqName() == null ? "" : "." + resolvedQualifier.getRelativeClassFqName().asString();
+        String[] split = (fieldAccess + resolvedName).split("\\.");
+        StringBuilder name = new StringBuilder();
+        for (int i = 0; i < split.length; i++) {
+            String part = split[i];
+            name.append(whitespace().getWhitespace());
+            if (source.startsWith(part, cursor)) {
+                skip(part);
+                name.append(part);
+            }
+            if (i < split.length - 1) {
+                name.append(whitespace().getWhitespace());
+                if (source.startsWith(".", cursor)) {
+                    skip(".");
+                    name.append(".");
+                }
+            }
+        }
+
+        TypeTree typeTree = TypeTree.build(name.toString());
+        if (resolvedQualifier.getRelativeClassFqName() != null) {
+            typeTree = typeTree.withType(typeMapping.type(resolvedQualifier));
+        }
+        return typeTree;
     }
 
     @Override
@@ -2018,23 +2054,27 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitUserTypeRef(FirUserTypeRef userTypeRef, ExecutionContext ctx) {
+        Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
         StringBuilder name = new StringBuilder();
         List<FirQualifierPart> qualifier = userTypeRef.getQualifier();
         for (int i = 0; i < qualifier.size(); i++) {
             FirQualifierPart part = qualifier.get(i);
+            Space whitespace = whitespace();
+            name.append(whitespace.getWhitespace());
             name.append(part.getName().asString());
+            skip(part.getName().asString());
             if (i < qualifier.size() - 1) {
                 if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
                     throw new IllegalArgumentException("Unsupported type parameters in user part " + part.getName());
                 }
+                name.append(whitespace().getWhitespace());
                 name.append(".");
+                skip(".");
             }
         }
 
-        Space prefix = whitespace();
         NameTree nameTree = TypeTree.build(name.toString());
-        skip(name.toString());
         FirQualifierPart part = userTypeRef.getQualifier().get(userTypeRef.getQualifier().size() - 1);
         if (!part.getTypeArgumentList().getTypeArguments().isEmpty()) {
             Space typeArgPrefix = sourceBefore("<");

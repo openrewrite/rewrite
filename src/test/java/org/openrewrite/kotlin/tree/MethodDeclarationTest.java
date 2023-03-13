@@ -177,7 +177,7 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method() : Array<Int> ? {
+            fun method ( ) : Array < Int > ? {
             }
             """
           )
@@ -189,7 +189,7 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun <T: Any> Array<Int>.method(t: T) = Unit
+            fun < T : Any > Array < Int > . method ( t : T ) = Unit
             """
           )
         );

@@ -30,7 +30,7 @@ class TryCatchTest implements RewriteTest {
             """
             fun method ( ) {
                 try {
-                } catch (ex: Exception) {
+                } catch ( ex : Exception ) {
                 }
             }
             """

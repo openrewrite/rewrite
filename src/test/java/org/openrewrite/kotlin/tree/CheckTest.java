@@ -28,9 +28,9 @@ class CheckTest implements RewriteTest {
           kotlin(
             """
             fun method ( a : Any ) {
-                if (a !is String) {
+                if ( a !is String ) {
                 }
-                if (a is String) {
+                if ( a is String ) {
                 }
             }
             """
@@ -53,7 +53,7 @@ class CheckTest implements RewriteTest {
           kotlin(
             """
             val a = A ( )
-            val b = a . method() !!
+            val b = a . method ( ) !!
             val c = b !!
             """
           )

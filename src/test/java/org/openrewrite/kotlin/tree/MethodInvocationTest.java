@@ -183,7 +183,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
             fun method ( arg : Any ) {
-                val map = mapOf( 1 to "one" , 2 to "two" , 3 to "three")
+                val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
             }
             """
           )
@@ -193,11 +193,11 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void multipleTypesOfMethodArguments() {
         rewriteRun(
-          kotlin("fun methodA(a: String, b: Int, c: Double) {}"),
+          kotlin("fun methodA ( a : String , b : Int , c : Double ) { }"),
           kotlin(
             """
-            fun methodB() {
-                methodA("a", 1, 2.0)
+            fun methodB ( ) {
+                methodA ( "a" , 1 , 2.0 )
             }
             """
           )
@@ -207,11 +207,11 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void parameterAssignment() {
         rewriteRun(
-          kotlin("fun apply ( plugin: String ? = null) {}"),
+          kotlin("fun apply ( plugin : String ? = null) { }"),
           kotlin(
             """
-            fun method() {
-                apply( plugin = "something" )
+            fun method ( ) {
+                apply ( plugin = "something" )
             }
             """
           )
@@ -221,10 +221,10 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void typeParameters() {
         rewriteRun(
-          kotlin("fun < T : Number > methodA ( type : T ) {}"),
+          kotlin("fun < T : Number > methodA ( type : T ) { }"),
           kotlin(
             """
-            fun methodB() {
+            fun methodB ( ) {
                 methodA < Int > ( 10 )
             }
             """
@@ -256,8 +256,8 @@ class MethodInvocationTest implements RewriteTest {
             """
             interface Test < in R > {
                 public fun < B > shift ( r : R ) : B
-                public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
-                    if ( condition ) Unit else shift( shift ( ) )
+                public fun ensure ( condition : Boolean , shift : ( ) -> R ) : Unit =
+                    if ( condition ) Unit else shift ( shift ( ) )
             }
             """
           ),
@@ -279,8 +279,8 @@ class MethodInvocationTest implements RewriteTest {
             """
             interface Test < in R > {
                 public fun < B > shift ( r : R ) : B
-                public fun ensure( condition : Boolean , shift : ( ) -> R ) : Unit =
-                    if ( condition ) Unit else shift( shift ( ) )
+                public fun ensure ( condition : Boolean , shift : ( ) -> R ) : Unit =
+                    if ( condition ) Unit else shift ( shift ( ) )
             }
             """
           ),

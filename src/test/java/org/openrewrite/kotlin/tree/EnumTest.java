@@ -35,7 +35,7 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
             enum class A {
-                B, C,
+                B , C ,
                 D
             }
             """

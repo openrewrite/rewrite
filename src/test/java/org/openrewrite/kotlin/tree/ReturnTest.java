@@ -66,9 +66,9 @@ class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method(i: Int) : String {
+            fun method ( i : Int ) : String {
                 return when {
-                    i.mod(2).equals(0) -> "even"
+                    i . mod ( 2 ) . equals ( 0 ) -> "even"
                     else -> "odd"
                 }
             }
@@ -84,7 +84,7 @@ class ReturnTest implements RewriteTest {
             """
             fun method ( ) : Unit {
                 return try {
-                } catch (e : Exception) {
+                } catch ( e : Exception ) {
                 }
             }
             """

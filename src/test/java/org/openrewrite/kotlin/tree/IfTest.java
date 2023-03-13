@@ -82,7 +82,7 @@ class IfTest implements RewriteTest {
           kotlin(
             """
             fun method ( n : Int ) {
-                if ( n in 1..4 ) {
+                if ( n in 1 .. 4 ) {
                 }
             }
             """
