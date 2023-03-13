@@ -78,7 +78,7 @@ public class DataTable<Row> {
         if (enabled) {
             ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
                 //noinspection unchecked
-                List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
+                List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this.getName(), c -> new ArrayList<>());
                 dataTablesOfType.add(row);
                 return allDataTables;
             });

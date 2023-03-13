@@ -456,8 +456,8 @@ class RecipeSchedulerUtils {
         }
 
         // Process the Result and add to the results table
+        SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
         for (Result result : results) {
-            SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
             Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
 
             for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
