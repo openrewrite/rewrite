@@ -190,7 +190,7 @@ public class ReplaceStringBuilderWithString extends Recipe {
                                                            "        String.valueOf(obj);\n" +
                                                            "    }\n" +
                                                            "}",
-                J.MethodInvocation.class);;
+                J.MethodInvocation.class);
         }
         return stringValueOfTemplate;
     }

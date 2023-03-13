@@ -45,5 +45,10 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
         @Column(displayName = "Recipe that made changes",
                 description = "The specific recipe that made a change.")
         String recipe;
+
+        @Column(displayName = "Estimated time saving",
+                description = "An estimated effort that a developer to fix manually instead of using this recipe," +
+                              " in unit of seconds.")
+        Long estimatedTimeSaving;
     }
 }
