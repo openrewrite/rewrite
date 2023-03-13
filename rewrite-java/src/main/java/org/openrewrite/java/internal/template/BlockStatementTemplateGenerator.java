@@ -104,6 +104,21 @@ public class BlockStatementTemplateGenerator {
                 return b;
             }
 
+            @Override
+            public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, Integer integer) {
+                right = super.visitRightPadded(right, loc, integer);
+                //noinspection ConstantValue
+                if (right != null) {
+                    for (Comment comment : right.getAfter().getComments()) {
+                        if (isTemplateStopComment(comment)) {
+                            done = true;
+                            break;
+                        }
+                    }
+                }
+                return right;
+            }
+
             @Nullable
             @Override
             public J visit(@Nullable Tree tree, Integer p) {
@@ -112,10 +127,10 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 if (getCursor().getValue() instanceof JLeftPadded) {
-                    JLeftPadded lp = (JLeftPadded) getCursor().getValue();
+                    JLeftPadded<?> lp = getCursor().getValue();
                     if (lp.getBefore() != null && lp.getBefore().getComments() != null) {
                         for (Comment comment : lp.getBefore().getComments()) {
-                            if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
+                            if (isTemplateStopComment(comment)) {
                                 done = true;
                                 return (J) tree;
                             }
@@ -127,25 +142,20 @@ public class BlockStatementTemplateGenerator {
                     @SuppressWarnings("unchecked") J2 t = (J2) tree;
 
                     if (blockEnclosingTemplateComment != null) {
-                        boolean caughtStopComment = false;
                         if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof JContainer) {
-                            JContainer container = getCursor().getParent().getValue();
-                            if (container.getBefore() != null && container.getBefore().getComments() != null) {
-                                for (Comment comment : container.getBefore().getComments()) {
-                                    if (comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT)) {
-                                        caughtStopComment  =true;
-                                        break;
-                                    }
+                            JContainer<?> container = getCursor().getParent().getValue();
+                            for (Comment comment : container.getBefore().getComments()) {
+                                if (isTemplateStopComment(comment)) {
+                                    done = true;
+                                    break;
                                 }
                             }
                         }
 
                         //noinspection unchecked
-                        J2 trimmed = caughtStopComment ? null : (J2) TemplatedTreeTrimmer.trimTree(t);
+                        J2 trimmed = done ? null : (J2) TemplatedTreeTrimmer.trimTree(t);
                         if (trimmed != null) {
                             js.add(trimmed);
-                        } else {
-                            done = true;
                         }
                         return t;
                     }
@@ -177,6 +187,10 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 return super.visit(tree, p);
+            }
+
+            private boolean isTemplateStopComment(Comment comment) {
+                return comment instanceof TextComment && ((TextComment) comment).getText().equals(STOP_COMMENT);
             }
         }.visit(cu, 0);
 
@@ -428,8 +442,8 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) j;
-            if (referToSameElement(prior, ternary.getCondition())) {
-                String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
+            String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
+            if (condition != null && referToSameElement(prior, ternary.getCondition())) {
                 if (condition != null) {
                     int splitIdx = condition.indexOf('§');
                     before.insert(0, condition.substring(0, splitIdx) + '(');
@@ -437,13 +451,13 @@ public class BlockStatementTemplateGenerator {
                             .append(" ? ").append(ternary.getTruePart().printTrimmed(cursor).trim())
                             .append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
                 }
-            } else if (referToSameElement(prior, ternary.getTruePart())) {
-                String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
-                before.insert(0, condition + " ? ");
-                after.append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
-            } else if (referToSameElement(prior, ternary.getFalsePart())) {
-                String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
-                before.insert(0, condition + " ? " + ternary.getTruePart().printTrimmed(cursor).trim() + " : ");
+            } else if (condition != null && referToSameElement(prior, ternary.getTruePart())) {
+                if (condition != null) {
+                    before.insert(0, (condition == null ? "true" : condition) + " ? ");
+                    after.append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
+                }
+            } else if (condition != null && referToSameElement(prior, ternary.getFalsePart())) {
+                before.insert(0, (condition == null ? "true" : condition) + " ? " + ternary.getTruePart().printTrimmed(cursor).trim() + " : ");
             }
         } else if (j instanceof J.WhileLoop) {
             J.WhileLoop wl = (J.WhileLoop) j;

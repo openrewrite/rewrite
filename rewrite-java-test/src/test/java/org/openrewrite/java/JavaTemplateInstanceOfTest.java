@@ -19,8 +19,10 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.test.RecipeSpec;
@@ -28,10 +30,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.fail;
@@ -67,7 +66,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           .afterRecipe(run -> run.getResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
-    @SuppressWarnings("PointlessBooleanExpression")
+    @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches"})
     @Test
     void replaceExpressionInNestedIfCondition() {
         rewriteRun(
@@ -457,6 +456,59 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     }
                 }
               """
+          )
+        );
+    }
+
+
+    @Test
+    void replaceNestedMethodInvocationInTernaryTrue() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
+                    if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
+                        return mi;
+                    }
+
+                    List<Expression> arguments = mi.getArguments();
+                    mi = mi.withTemplate(
+                      JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}.formatted(#{any()})")
+                        .build(),
+                      mi.getCoordinates().replace(),
+                      arguments.toArray());
+
+                    mi = maybeAutoFormat(mi, mi.withArguments(
+                      ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), p);
+                    return mi;
+                }
+            }
+          )),
+          version(
+            java(
+              """
+                class A {
+                    String foo(String s) { return s; }
+                    void bar(Object o) {
+                        String s = (o instanceof String s2) ?
+                            foo(String.format("%s", "sam")) :
+                            "";
+                    }
+                }
+                """,
+              """
+                class A {
+                    String foo(String s) { return s; }
+                    void bar(Object o) {
+                        String s = (o instanceof String s2) ?
+                            foo("%s".formatted("sam")) :
+                            "";
+                    }
+                }
+                """
+            ),
+            17
           )
         );
     }
