@@ -119,23 +119,27 @@ public class BlockStatementTemplateGenerator {
                 return right;
             }
 
+            @Override
+            public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc,
+                                                      Integer integer) {
+                left = super.visitLeftPadded(left, loc, integer);
+                //noinspection ConstantValue
+                if (left != null) {
+                    for (Comment comment : left.getBefore().getComments()) {
+                        if (isTemplateStopComment(comment)) {
+                            done = true;
+                            break;
+                        }
+                    }
+                }
+                return left;
+            }
+
             @Nullable
             @Override
             public J visit(@Nullable Tree tree, Integer p) {
                 if (done) {
                     return (J) tree;
-                }
-
-                if (getCursor().getValue() instanceof JLeftPadded) {
-                    JLeftPadded<?> lp = getCursor().getValue();
-                    if (lp.getBefore() != null && lp.getBefore().getComments() != null) {
-                        for (Comment comment : lp.getBefore().getComments()) {
-                            if (isTemplateStopComment(comment)) {
-                                done = true;
-                                return (J) tree;
-                            }
-                        }
-                    }
                 }
 
                 if (expected.isInstance(tree)) {
