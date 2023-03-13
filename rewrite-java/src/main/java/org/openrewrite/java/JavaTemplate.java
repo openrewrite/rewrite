@@ -190,47 +190,91 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F0 f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P0 p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F1<?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P1<?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F2<?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P2<?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F3<?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P3<?, ?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F4<?, ?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P4<?, ?, ?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F5<?, ?, ?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P5<?, ?, ?, ?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F6<?, ?, ?, ?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P6<?, ?, ?, ?, ?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F7<?, ?, ?, ?, ?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P7<?, ?, ?, ?, ?, ?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F8<?, ?, ?, ?, ?, ?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P8<?, ?, ?, ?, ?, ?, ?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F9<?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P9<?, ?, ?, ?, ?, ?, ?, ?, ?> p) {
         return new PatternBuilder(name).build(owner);
     }
 
-    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, P10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> p) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F0<?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F1<?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F2<?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F3<?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F4<?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F5<?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F6<?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F7<?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F8<?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F9<?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
+        return new PatternBuilder(name).build(owner);
+    }
+
+    public static JavaTemplate.Builder compile(JavaVisitor<?> owner, String name, F10<?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?> f) {
         return new PatternBuilder(name).build(owner);
     }
 
@@ -252,47 +296,91 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
-    public interface F0 {
+    public interface P0 {
         void accept() throws Exception;
     }
 
-    public interface F1<P1> {
-        void accept(P1 p) throws Exception;
+    public interface P1<P1> {
+        void accept(P1 p1) throws Exception;
     }
 
-    public interface F2<P1, P2> {
-        void accept(P1 p, P2 p2) throws Exception;
+    public interface P2<P1, P2> {
+        void accept(P1 p1, P2 p2) throws Exception;
     }
 
-    public interface F3<P1, P2, P3> {
-        void accept(P1 p, P2 p2, P3 p3) throws Exception;
+    public interface P3<P1, P2, P3> {
+        void accept(P1 p1, P2 p2, P3 p3) throws Exception;
     }
 
-    public interface F4<P1, P2, P3, P4> {
-        void accept(P1 p, P2 p2, P3 p3, P4 p4) throws Exception;
+    public interface P4<P1, P2, P3, P4> {
+        void accept(P1 p1, P2 p2, P3 p3, P4 p4) throws Exception;
     }
 
-    public interface F5<P1, P2, P3, P4, P5> {
-        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5) throws Exception;
+    public interface P5<P1, P2, P3, P4, P5> {
+        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5) throws Exception;
     }
 
-    public interface F6<P1, P2, P3, P4, P5, P6> {
-        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6) throws Exception;
+    public interface P6<P1, P2, P3, P4, P5, P6> {
+        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6) throws Exception;
     }
 
-    public interface F7<P1, P2, P3, P4, P5, P6, P7> {
-        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7) throws Exception;
+    public interface P7<P1, P2, P3, P4, P5, P6, P7> {
+        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7) throws Exception;
     }
 
-    public interface F8<P1, P2, P3, P4, P5, P6, P7, P8> {
-        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8) throws Exception;
+    public interface P8<P1, P2, P3, P4, P5, P6, P7, P8> {
+        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8) throws Exception;
     }
 
-    public interface F9<P1, P2, P3, P4, P5, P6, P7, P8, P9> {
-        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9) throws Exception;
+    public interface P9<P1, P2, P3, P4, P5, P6, P7, P8, P9> {
+        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9) throws Exception;
     }
 
-    public interface F10<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10> {
-        void accept(P1 p, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9, P10 p10) throws Exception;
+    public interface P10<P1, P2, P3, P4, P5, P6, P7, P8, P9, P10> {
+        void accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9, P10 p10) throws Exception;
+    }
+
+    public interface F0<R> {
+        R accept() throws Exception;
+    }
+
+    public interface F1<R, P1> {
+        R accept(P1 p1) throws Exception;
+    }
+
+    public interface F2<R, P1, P2> {
+        R accept(P1 p1, P2 p2) throws Exception;
+    }
+
+    public interface F3<R, P1, P2, P3> {
+        R accept(P1 p1, P2 p2, P3 p3) throws Exception;
+    }
+
+    public interface F4<R, P1, P2, P3, P4> {
+        R accept(P1 p1, P2 p2, P3 p3, P4 p4) throws Exception;
+    }
+
+    public interface F5<R, P1, P2, P3, P4, P5> {
+        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5) throws Exception;
+    }
+
+    public interface F6<R, P1, P2, P3, P4, P5, P6> {
+        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6) throws Exception;
+    }
+
+    public interface F7<R, P1, P2, P3, P4, P5, P6, P7> {
+        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7) throws Exception;
+    }
+
+    public interface F8<R, P1, P2, P3, P4, P5, P6, P7, P8> {
+        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8) throws Exception;
+    }
+
+    public interface F9<R, P1, P2, P3, P4, P5, P6, P7, P8, P9> {
+        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9) throws Exception;
+    }
+
+    public interface F10<R, P1, P2, P3, P4, P5, P6, P7, P8, P9, P10> {
+        R accept(P1 p1, P2 p2, P3 p3, P4 p4, P5 p5, P6 p6, P7 p7, P8 p8, P9 p9, P10 p10) throws Exception;
     }
 }
