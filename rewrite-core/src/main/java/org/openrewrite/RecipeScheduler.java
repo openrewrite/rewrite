@@ -466,11 +466,13 @@ class RecipeSchedulerUtils {
 
             while (!recipeStack.isEmpty()) {
                 RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
+
                 resultsTable.insertRow(ctx, new SourcesFileResults.Row(
                         result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
                         recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
-                        recipeThatMadeChange[1].getName()
+                        recipeThatMadeChange[1].getName(),
+                        result.getTimeSavings().getSeconds()
                 ));
                 for (RecipeDescriptor rd : recipeThatMadeChange[1].getRecipeList()) {
                     recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
