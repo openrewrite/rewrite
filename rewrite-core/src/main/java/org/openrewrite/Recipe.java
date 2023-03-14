@@ -104,7 +104,7 @@ public abstract class Recipe implements Cloneable {
 
     @Value
     @EqualsAndHashCode(callSuper = true)
-    private static class ApplicableTestRecipe extends Recipe {
+    private static class AdHocRecipe extends Recipe {
         @Language("markdown")
         String displayName;
         @Language("markdown")
@@ -126,18 +126,13 @@ public abstract class Recipe implements Cloneable {
             return visitor;
         }
 
-        @Override
-        public boolean isApplicableTest() {
-            return true;
-        }
-
         @Nullable
-        static ApplicableTestRecipe fromNullableVisitor(
-            @Language("markdown") String displayName,
-            @Language("markdown") String description,
-            @Nullable TreeVisitor<?, ExecutionContext> visitor
+        static AdHocRecipe fromNullableVisitor(
+                @Language("markdown") String displayName,
+                @Language("markdown") String description,
+                @Nullable TreeVisitor<?, ExecutionContext> visitor
         ) {
-            return visitor == null ? null : new ApplicableTestRecipe(displayName, description, visitor);
+            return visitor == null ? null : new AdHocRecipe(displayName, description, visitor);
         }
     }
 
@@ -186,13 +181,6 @@ public abstract class Recipe implements Cloneable {
     @Nullable
     public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
-    }
-
-    /**
-     * @return true if the recipe is an applicability test recipe
-     */
-    public boolean isApplicableTest() {
-        return false;
     }
 
     public final RecipeDescriptor getDescriptor() {
@@ -295,7 +283,7 @@ public abstract class Recipe implements Cloneable {
      */
     @SuppressWarnings("unused")
     public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        return addApplicableTest(ApplicableTestRecipe.fromNullableVisitor(
+        return addApplicableTest(AdHocRecipe.fromNullableVisitor(
                 "Add applicable test for: " + getDisplayName(),
                 "Add applicable test for: " + getDescription(),
                 test
@@ -330,7 +318,7 @@ public abstract class Recipe implements Cloneable {
 
     public List<Recipe> getApplicableTests() {
         List<Recipe> tests = ListUtils.concat(
-                ApplicableTestRecipe.fromNullableVisitor(
+                AdHocRecipe.fromNullableVisitor(
                         "Applicable test for: " + getDisplayName(),
                         "Applicable test for: " + getDescription(),
                         getApplicableTest()
@@ -366,7 +354,7 @@ public abstract class Recipe implements Cloneable {
      */
     @SuppressWarnings("unused")
     public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        return addSingleSourceApplicableTest(ApplicableTestRecipe.fromNullableVisitor(
+        return addSingleSourceApplicableTest(AdHocRecipe.fromNullableVisitor(
                 "Add single source applicable test for: " + getDisplayName(),
                 "Add single source applicable test for: " + getDescription(),
                 test
@@ -393,7 +381,7 @@ public abstract class Recipe implements Cloneable {
 
     public List<Recipe> getSingleSourceApplicableTests() {
         List<Recipe> tests = ListUtils.concat(
-                ApplicableTestRecipe.fromNullableVisitor(
+                AdHocRecipe.fromNullableVisitor(
                         "Single Source Applicable test for: " + getDisplayName(),
                         "Single Source Applicable test for: " + getDescription(),
                         getSingleSourceApplicableTest()

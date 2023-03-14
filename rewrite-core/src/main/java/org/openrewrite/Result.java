@@ -123,10 +123,6 @@ public class Result {
                 index = rootDescriptor;
             }
 
-            if (currentStack.peek().isApplicableTest()) {
-                continue;
-            }
-
             for (int i = 2; i < currentStack.size(); i++) {
                 RecipeDescriptor nextDescriptor = currentStack.get(i).getDescriptor().withRecipeList(new ArrayList<>());
                 if (index.getRecipeList().contains(nextDescriptor)) {
