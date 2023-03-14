@@ -31,14 +31,14 @@ class DataTableTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.fromRuntimeClasspath("org.openrewrite.java.cleanup.CommonStaticAnalysis"))
             .dataTable(SourcesFileResults.Row.class, rows -> {
                 assertThat(rows)
-                  .as("Running recipe CommonStaticAnalysis on a two source files, if each file is changed " +
-                      "by recipe ReplaceStringBuilderWithString, so it should produce 4 rows in the SourcesFileResults " +
+                  .as("Running recipe CommonStaticAnalysis on two source files, if each file is changed " +
+                      "by recipe ReplaceStringBuilderWithString only, so it should produce 4 rows in the SourcesFileResults " +
                       "table, and they are : " +
-                      "row0 : file1 is changed by CommonStaticAnalysis" +
-                      "row1 : file1 is changed by ReplaceStringBuilderWithString" +
-                      "row2 : file2 is changed by CommonStaticAnalysis" +
-                      "row3 : file2 is changed by ReplaceStringBuilderWithString" +
-                      "file1,file2 order can be random."
+                      "row0 : file1 is changed by `CommonStaticAnalysis`" +
+                      "row1 : file1 is changed by `ReplaceStringBuilderWithString`" +
+                      "row2 : file2 is changed by `CommonStaticAnalysis`" +
+                      "row3 : file2 is changed by `ReplaceStringBuilderWithString`" +
+                      "file1,file2 order can be random in the results."
                       )
                   .hasSize(4);
 
