@@ -16,30 +16,38 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.nio.file.Paths;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.java.Assertions.java;
 
-public class ChangeTypeTest implements RewriteTest {
+public class ChangePackageTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
+        spec.recipe(new ChangePackage("a.b", "x.y", true));
     }
 
     @SuppressWarnings("GrPackage")
     @Test
-    void changeImport() {
+    void changePackage() {
         rewriteRun(
           groovy(
             """
             package a.b
             class Original {}
-            """),
+            """,
+            """
+            package x.y
+            class Original {}
+            """
+          ),
           groovy(
             """
             import a.b.Original
@@ -49,10 +57,10 @@ public class ChangeTypeTest implements RewriteTest {
             }
             """,
             """
-            import x.y.Target
+            import x.y.Original
             
             class A {
-                Target type
+                Original type
             }
             """
           )
@@ -61,13 +69,18 @@ public class ChangeTypeTest implements RewriteTest {
 
     @SuppressWarnings("GrPackage")
     @Test
-    void changeType() {
+    void fullyQualified() {
         rewriteRun(
           groovy(
             """
             package a.b
             class Original {}
-            """),
+            """,
+            """
+            package x.y
+            class Original {}
+            """
+          ),
           groovy(
             """
             class A {
@@ -76,7 +89,7 @@ public class ChangeTypeTest implements RewriteTest {
             """,
             """
             class A {
-                x.y.Target type
+                x.y.Original type
             }
             """
           )
@@ -84,21 +97,47 @@ public class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void renamePackageRecursive() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
+          java(
+            """
+              package org.openrewrite.internal;
+              class Test {
+              }
+              """,
+            """
+              package org.openrewrite.test.internal;
+              class Test {
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getSourcePath()).isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"));
+                assertThat(cu.findType("org.openrewrite.internal.Test")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.internal.Test")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
     void changeDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeType("file", "newFile", false)),
+          spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
           groovy(
             """
+            package org.foo
             class file {
             }
             """,
             """
-            class newFile {
+            package x.y.z
+            class file {
             }
             """,
-            spec -> spec.path("file.groovy").afterRecipe(cu -> {
-              assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
+            spec -> spec.path("org/foo/file.groovy").afterRecipe(cu -> {
+              assertThat("x/y/z/file.groovy").isEqualTo(cu.getSourcePath().toString());
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.file")).isTrue();
             })
           )
         );
