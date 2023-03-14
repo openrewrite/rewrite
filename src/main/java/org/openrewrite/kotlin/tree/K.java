@@ -173,6 +173,11 @@ public interface K extends J {
                     .collect(Collectors.toList());
         }
 
+        @Override
+        public K.CompilationUnit withClasses(List<ClassDeclaration> classes) {
+            return getPadding().withClasses(JRightPadded.withElements(this.getPadding().getClasses(), classes));
+        }
+
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitJavaSourceFile(this, p);
         }
@@ -225,6 +230,28 @@ public interface K extends J {
             public K.CompilationUnit withPackageDeclaration(@Nullable JRightPadded<Package> packageDeclaration) {
                 return t.packageDeclaration == packageDeclaration ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, null,
                         t.annotations, packageDeclaration, t.imports, t.statements, t.eof);
+            }
+
+            @Transient
+            public List<JRightPadded<J.ClassDeclaration>> getClasses() {
+                //noinspection unchecked
+                return t.statements.stream()
+                        .filter(s -> s.getElement() instanceof J.ClassDeclaration)
+                        .map(s -> (JRightPadded<J.ClassDeclaration>) (Object) s)
+                        .collect(Collectors.toList());
+            }
+
+            public K.CompilationUnit withClasses(List<JRightPadded<ClassDeclaration>> classes) {
+                List<JRightPadded<Statement>> statements = t.statements.stream()
+                        .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
+                        .collect(Collectors.toList());
+
+                //noinspection unchecked
+                statements.addAll(0, classes.stream()
+                        .map(i -> (JRightPadded<Statement>) (Object) i)
+                        .collect(Collectors.toList()));
+
+                return t.getPadding().getClasses() == classes ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
 
             @Override
