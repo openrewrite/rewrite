@@ -15,12 +15,12 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
@@ -35,7 +35,8 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
-@AllArgsConstructor
+@Value
+@EqualsAndHashCode(callSuper = true)
 class RemoveGradleDependency extends Recipe {
 
     @Option(displayName = "The dependency configuration", description = "The dependency configuration to remove from.", example = "api", required = false)
