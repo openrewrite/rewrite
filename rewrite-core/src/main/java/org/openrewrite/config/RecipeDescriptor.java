@@ -18,6 +18,8 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.Maintainer;
+import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
@@ -51,6 +53,8 @@ public class RecipeDescriptor {
 
     @With
     List<DataTableDescriptor> dataTables;
+
+    List<Maintainer> maintainers;
 
     URI source;
 }

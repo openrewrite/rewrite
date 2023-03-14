@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Maintainer;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.Validated;
@@ -210,8 +211,10 @@ public class YamlResourceLoader implements ResourceLoader {
                 estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
             }
 
+            List<Maintainer> maintainers = (List<Maintainer>) r.getOrDefault("maintainers", emptyList());
+
             DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
-                    estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false));
+                    estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false), maintainers);
 
             List<Object> recipeList = (List<Object>) r.get("recipeList");
             if (recipeList == null) {
