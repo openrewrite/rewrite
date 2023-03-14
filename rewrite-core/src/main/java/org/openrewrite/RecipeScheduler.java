@@ -456,8 +456,8 @@ class RecipeSchedulerUtils {
         }
 
         // Process the Result and add to the results table
+        SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
         for (Result result : results) {
-            SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
             Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
 
             for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
@@ -474,7 +474,9 @@ class RecipeSchedulerUtils {
                         recipeThatMadeChange[1].getName(),
                         result.getTimeSavings().getSeconds()
                 ));
-                for (RecipeDescriptor rd : recipeThatMadeChange[1].getRecipeList()) {
+
+                for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >=0 ; i--) {
+                    RecipeDescriptor rd = recipeThatMadeChange[1].getRecipeList().get(i);
                     recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
                 }
             }
