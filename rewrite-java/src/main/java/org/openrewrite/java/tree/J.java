@@ -547,7 +547,23 @@ public interface J extends Tree {
             BitOr,
             BitXor,
             Division,
+            /**
+             * Raises the left operand to the power of the right operand.
+             * Unused in Java, used in Python
+             */
+            Exponentiation,
+            /**
+             * Division of the left operand by the right operand, rounding down to the nearest integer.
+             * Unused in Java, used in Python.
+             */
+            FloorDivision,
             LeftShift,
+
+            /**
+             * Matrix multiplication of the left operand by the right operand.
+             * Unused in Java, used in Python
+             */
+            MatrixMultiplication,
             Modulo,
             Multiplication,
             RightShift,
