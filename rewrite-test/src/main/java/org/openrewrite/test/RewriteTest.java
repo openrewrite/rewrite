@@ -24,6 +24,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SourceSet;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
@@ -241,6 +243,12 @@ public interface RewriteTest extends SourceSpecs {
                 } else {
                     sourcePath = parser.sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
                 }
+                for (UncheckedConsumer<SourceSpec<?>> consumer : testMethodSpec.allSources) {
+                    consumer.accept(sourceSpec);
+                }
+                for (UncheckedConsumer<SourceSpec<?>> consumer : testClassSpec.allSources) {
+                    consumer.accept(sourceSpec);
+                }
                 inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(executionContext)))));
             }
 
@@ -256,18 +264,17 @@ public interface RewriteTest extends SourceSpecs {
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);
-                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
-                        sourceFile.getMarkers().getMarkers(), testClassSpec.allSources.markers)));
-                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
-                        sourceFile.getMarkers().getMarkers(), testMethodSpec.allSources.markers)));
+                Markers markers = sourceFile.getMarkers();
 
                 SourceSpec<?> nextSpec = sourceSpecIter.next();
-                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
-                        sourceFile.getMarkers().getMarkers(), nextSpec.markers)));
+                for (Marker marker : nextSpec.getMarkers()) {
+                    markers = markers.setByType(marker);
+                }
+                sourceFile = sourceFile.withMarkers(markers);
 
                 // Update the default 'main' SourceSet Marker added by the JavaParser with the specs sourceSetName
                 if (nextSpec.sourceSetName != null) {
-                    sourceFile = sourceFile.withMarkers((sourceFile.getMarkers().withMarkers(ListUtils.map(sourceFile.getMarkers().getMarkers(), m -> {
+                    sourceFile = sourceFile.withMarkers((markers.withMarkers(ListUtils.map(markers.getMarkers(), m -> {
                         if (m instanceof SourceSet) {
                             m = ((SourceSet) m).withName(nextSpec.sourceSetName);
                         }
