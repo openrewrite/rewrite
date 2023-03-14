@@ -467,6 +467,11 @@ class RecipeSchedulerUtils {
             while (!recipeStack.isEmpty()) {
                 RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
 
+                // skip applicability test recipes
+                if (recipeThatMadeChange[1].getDisplayName().startsWith("Single Source Applicable test for")) {
+                    continue;
+                }
+
                 resultsTable.insertRow(ctx, new SourcesFileResults.Row(
                         result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
@@ -474,7 +479,9 @@ class RecipeSchedulerUtils {
                         recipeThatMadeChange[1].getName(),
                         result.getTimeSavings().getSeconds()
                 ));
-                for (RecipeDescriptor rd : recipeThatMadeChange[1].getRecipeList()) {
+
+                for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >=0 ; i--) {
+                    RecipeDescriptor rd = recipeThatMadeChange[1].getRecipeList().get(i);
                     recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
                 }
             }
