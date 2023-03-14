@@ -47,7 +47,9 @@ class SourcesFileResultsTest implements RewriteTest {
           spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.AppendAndChangeText")
             .dataTable(SourcesFileResults.Row.class, rows -> {
                 assertThat(rows)
-                  .as("Running a list of two recipes on a single source should produce 2 rows in the SourcesFileResults table")
+                  .as("This example runs a list of two recipes on a single source and expects to produce 3 " +
+                      "rows in the SourcesFileResults table, one is for the declarative recipe, another two are for two " +
+                      "recipes in the list.")
                   .hasSize(3);
 
                 SourcesFileResults.Row row0 = rows.get(0);
@@ -57,7 +59,6 @@ class SourcesFileResultsTest implements RewriteTest {
                 SourcesFileResults.Row row2 = rows.get(2);
                 assertThat(row2.getRecipe()).isEqualTo("org.openrewrite.text.FindAndReplace");
             }),
-            // .dataTable(),
           text(
             "0",
             "1 -> 2",
