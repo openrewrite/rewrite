@@ -21,14 +21,9 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.time.Duration;
 import java.util.*;
@@ -64,6 +59,9 @@ public class DeclarativeRecipe extends CompositeRecipe {
     public boolean causesAnotherCycle() {
         return causesAnotherCycle || super.causesAnotherCycle();
     }
+
+    @Getter
+    private final List<Maintainer> maintainers;
 
     @JsonIgnore
     private Validated validation = Validated.test("initialization",

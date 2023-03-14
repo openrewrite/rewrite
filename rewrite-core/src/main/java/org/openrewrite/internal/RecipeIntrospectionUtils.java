@@ -100,7 +100,7 @@ public class RecipeIntrospectionUtils {
         //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
                 recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                emptyList(), recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), source);
+                emptyList(), recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), recipe.getMaintainers(), source);
     }
 
     public static Constructor<?> getPrimaryConstructor(Class<?> recipeClass) {
@@ -149,7 +149,7 @@ public class RecipeIntrospectionUtils {
         //noinspection deprecation
         return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(),
                 recipe.getDescription(), recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                options, recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), recipeSource);
+                options, recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), recipe.getMaintainers(), recipeSource);
     }
 
     public static Recipe constructRecipe(Class<?> recipeClass) {

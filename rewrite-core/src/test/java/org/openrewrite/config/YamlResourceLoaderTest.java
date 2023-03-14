@@ -44,6 +44,9 @@ class YamlResourceLoaderTest implements RewriteTest {
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
+              maintainers:
+                  - name: Sam
+                    logo: https://sam.com/logo.svg
               """.getBytes()
           ), URI.create("rewrite.yml"), new Properties()))
           .build();

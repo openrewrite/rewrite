@@ -447,21 +447,19 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) j;
             String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
-            if (condition != null && referToSameElement(prior, ternary.getCondition())) {
-                if (condition != null) {
+            if(condition != null) {
+                if (referToSameElement(prior, ternary.getCondition())) {
                     int splitIdx = condition.indexOf('§');
                     before.insert(0, condition.substring(0, splitIdx) + '(');
                     after.append(')').append(condition.substring(splitIdx + 1))
                             .append(" ? ").append(ternary.getTruePart().printTrimmed(cursor).trim())
                             .append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
-                }
-            } else if (condition != null && referToSameElement(prior, ternary.getTruePart())) {
-                if (condition != null) {
+                } else if (referToSameElement(prior, ternary.getTruePart())) {
                     before.insert(0, (condition == null ? "true" : condition) + " ? ");
                     after.append(" : ").append(ternary.getFalsePart().printTrimmed(cursor).trim());
+                } else if (referToSameElement(prior, ternary.getFalsePart())) {
+                    before.insert(0, (condition == null ? "true" : condition) + " ? " + ternary.getTruePart().printTrimmed(cursor).trim() + " : ");
                 }
-            } else if (condition != null && referToSameElement(prior, ternary.getFalsePart())) {
-                before.insert(0, (condition == null ? "true" : condition) + " ? " + ternary.getTruePart().printTrimmed(cursor).trim() + " : ");
             }
         } else if (j instanceof J.WhileLoop) {
             J.WhileLoop wl = (J.WhileLoop) j;

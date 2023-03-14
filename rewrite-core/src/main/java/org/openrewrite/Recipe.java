@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
+import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -216,6 +217,14 @@ public abstract class Recipe implements Cloneable {
     public List<String> getLanguages() {
         return emptyList();
     }
+
+    /**
+     * @return a list of the organization(s) responsible for maintaining this recipe.
+     */
+    public List<Maintainer> getMaintainers() {
+        return emptyList();
+    }
+
 
     /**
      * @return Determines if another cycle is run when this recipe makes a change. In some cases, like changing method declaration names,
