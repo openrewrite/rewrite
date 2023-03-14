@@ -16,6 +16,7 @@
 package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Maintainer;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -44,9 +45,6 @@ class YamlResourceLoaderTest implements RewriteTest {
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
-              maintainers:
-                  - name: Sam
-                    logo: https://sam.com/logo.svg
               """.getBytes()
           ), URI.create("rewrite.yml"), new Properties()))
           .build();
@@ -54,6 +52,40 @@ class YamlResourceLoaderTest implements RewriteTest {
         Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
         assertThat(recipeDescriptors).hasSize(1);
         assertThat(recipeDescriptors.iterator().next().getDataTables()).isNotEmpty();
+    }
+
+    @Test
+    void maintainers() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              maintainers:
+                  - maintainer: Sam
+                    logo: https://sam.com/logo.svg
+                  - maintainer: Jon
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+
+        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
+        assertThat(recipeDescriptors).hasSize(1);
+        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
+        assertThat(descriptor.getDataTables()).isNotEmpty();
+        assertThat(descriptor.getMaintainers().size()).isEqualTo(2);
+        Maintainer sam = descriptor.getMaintainers().get(0);
+        assertThat(sam.getMaintainer()).isEqualTo("Sam");
+        assertThat(sam.getLogo()).isNotNull();
+        assertThat(sam.getLogo().toString()).isEqualTo("https://sam.com/logo.svg");
+        Maintainer jon = descriptor.getMaintainers().get(1);
+        assertThat(jon.getMaintainer()).isEqualTo("Jon");
+        assertThat(jon.getLogo()).isNull();
     }
 
     @Test

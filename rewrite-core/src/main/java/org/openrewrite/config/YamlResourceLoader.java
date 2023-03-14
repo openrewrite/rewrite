@@ -211,8 +211,22 @@ public class YamlResourceLoader implements ResourceLoader {
                 estimatedEffortPerOccurrence = Duration.parse(estimatedEffortPerOccurrenceStr);
             }
 
-            List<Maintainer> maintainers = (List<Maintainer>) r.getOrDefault("maintainers", emptyList());
-
+            List<Object> rawMaintainers = (List<Object>) r.getOrDefault("maintainers", emptyList());
+            List<Maintainer> maintainers;
+            if(rawMaintainers.isEmpty()) {
+                maintainers = emptyList();
+            } else {
+                maintainers = new ArrayList<>(rawMaintainers.size());
+                for (Object rawMaintainer : rawMaintainers) {
+                    if (rawMaintainer instanceof Map) {
+                        Map<String, Object> maintainerMap = (Map<String, Object>) rawMaintainer;
+                        String maintainerName = (String) maintainerMap.get("maintainer");
+                        String logoString = (String) maintainerMap.get("logo");
+                        URI logo = (logoString == null) ? null :  URI.create(logoString);
+                        maintainers.add(new Maintainer(maintainerName, logo));
+                    }
+                }
+            }
             DeclarativeRecipe recipe = new DeclarativeRecipe(name, displayName, description, tags,
                     estimatedEffortPerOccurrence, source, (boolean) r.getOrDefault("causesAnotherCycle", false), maintainers);
 
