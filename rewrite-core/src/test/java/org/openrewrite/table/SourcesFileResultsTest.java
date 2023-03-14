@@ -48,8 +48,10 @@ class SourcesFileResultsTest implements RewriteTest {
             .dataTable(SourcesFileResults.Row.class, rows -> {
                 assertThat(rows)
                   .as("This example runs a list of two recipes on a single source and expects to produce 3 " +
-                      "rows in the SourcesFileResults table, one is for the declarative recipe, another two are for two " +
-                      "recipes in the list.")
+                      "rows in the SourcesFileResults table, they are :" +
+                      "change #1 : the declarative recipe `AppendAndChangeText`" +
+                      "change #2 : `AppendToTextFile` recipe changes \"0\" to \"0 -> 2\"" +
+                      "change #3 : `FindAndReplace` recipe changes \"0 -> 2\" to \"1 -> 2\"")
                   .hasSize(3);
 
                 SourcesFileResults.Row row0 = rows.get(0);

@@ -31,16 +31,21 @@ class DataTableTest implements RewriteTest {
           spec -> spec.recipe(RewriteTest.fromRuntimeClasspath("org.openrewrite.java.cleanup.CommonStaticAnalysis"))
             .dataTable(SourcesFileResults.Row.class, rows -> {
                 assertThat(rows)
-                  .as("Running recipe CommonStaticAnalysis on a two source files, if each file is changed only by " +
-                      "one recipe, so it should produce 4 rows in the SourcesFileResults table")
+                  .as("Running recipe CommonStaticAnalysis on a two source files, if each file is changed " +
+                      "by recipe ReplaceStringBuilderWithString, so it should produce 4 rows in the SourcesFileResults " +
+                      "table, and they are : " +
+                      "row0 : file1 is changed by CommonStaticAnalysis" +
+                      "row1 : file1 is changed by ReplaceStringBuilderWithString" +
+                      "row2 : file2 is changed by CommonStaticAnalysis" +
+                      "row3 : file2 is changed by ReplaceStringBuilderWithString" +
+                      "file1,file2 order can be random."
+                      )
                   .hasSize(4);
 
                 SourcesFileResults.Row row0 = rows.get(0);
                 assertThat(row0.getRecipe()).isEqualTo("org.openrewrite.java.cleanup.CommonStaticAnalysis");
                 SourcesFileResults.Row row1 = rows.get(1);
-
                 assertThat(row1.getRecipe()).isEqualTo("org.openrewrite.java.cleanup.ReplaceStringBuilderWithString");
-
                 SourcesFileResults.Row row2 = rows.get(2);
                 assertThat(row2.getRecipe()).isEqualTo("org.openrewrite.java.cleanup.CommonStaticAnalysis");
                 SourcesFileResults.Row row3 = rows.get(3);
@@ -89,5 +94,4 @@ class DataTableTest implements RewriteTest {
           )
         );
     }
-
 }
