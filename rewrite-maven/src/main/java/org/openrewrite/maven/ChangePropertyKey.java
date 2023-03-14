@@ -22,6 +22,8 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.ChangeTagNameVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -61,11 +63,15 @@ public class ChangePropertyKey extends Recipe {
                 if (pom.getProperties().containsKey(oldKey)) {
                     return SearchResult.found(document);
                 }
-                if (pom.getRequestedDependencies().stream().anyMatch(d -> d.getVersion().contains(oldKeyAsProperty))) {
-                    return SearchResult.found(document);
+                for (Dependency dependency : pom.getRequestedDependencies()) {
+                    if (dependency.getVersion().contains(oldKeyAsProperty)) {
+                        return SearchResult.found(document);
+                    }
                 }
-                if (pom.getDependencyManagement().stream().anyMatch(d -> d.getVersion().contains(oldKeyAsProperty))) {
-                    return SearchResult.found(document);
+                for (ResolvedManagedDependency dependency : pom.getDependencyManagement()) {
+                    if (dependency.getVersion().contains(oldKeyAsProperty)) {
+                        return SearchResult.found(document);
+                    }
                 }
                 return document;
             }
