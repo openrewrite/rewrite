@@ -109,7 +109,8 @@ public interface RecipeScheduler {
                     acc,
                     ctxWithWatch,
                     null,
-                    recipeThatAddedOrDeletedSourceFile
+                    recipeThatAddedOrDeletedSourceFile,
+                    false
             );
             if (i + 1 >= minCycles && ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 break;
@@ -142,7 +143,8 @@ public interface RecipeScheduler {
             List<S> before,
             ExecutionContext ctx,
             @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
-            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile
+            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile,
+            boolean isApplicableTest
     ) {
         runStats.markCall();
         long startTime = System.nanoTime();
@@ -278,7 +280,7 @@ public interface RecipeScheduler {
                     }
                 }
 
-                if (afterFile != null && afterFile != s) {
+                if (afterFile != null && afterFile != s && !isApplicableTest) {
                     afterFile = addRecipesThatMadeChanges(recipeStack, afterFile);
                     sample.stop(MetricsHelper.successTags(timer, "changed").register(Metrics.globalRegistry));
                 } else if (afterFile == null) {
@@ -350,7 +352,7 @@ public interface RecipeScheduler {
                 if (original == null) {
                     // a new source file generated
                     recipeThatAddedOrDeletedSourceFile.put(s.getId(), recipeStack);
-                } else if (s != original) {
+                } else if (s != original && !isApplicableTest) {
                     return RecipeSchedulerUtils.addRecipesThatMadeChanges(
                             recipeStack,
                             s
@@ -396,7 +398,8 @@ public interface RecipeScheduler {
                     afterWidened,
                     ctx,
                     newMap,
-                    recipeThatAddedOrDeletedSourceFile
+                    recipeThatAddedOrDeletedSourceFile,
+                    isApplicableTest
             );
         }
 
@@ -456,8 +459,8 @@ class RecipeSchedulerUtils {
         }
 
         // Process the Result and add to the results table
+        SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
         for (Result result : results) {
-            SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
             Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
 
             for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
@@ -474,7 +477,8 @@ class RecipeSchedulerUtils {
                         recipeThatMadeChange[1].getName(),
                         result.getTimeSavings().getSeconds()
                 ));
-                for (RecipeDescriptor rd : recipeThatMadeChange[1].getRecipeList()) {
+                for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >=0 ; i--) {
+                    RecipeDescriptor rd = recipeThatMadeChange[1].getRecipeList().get(i);
                     recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
                 }
             }
@@ -559,7 +563,8 @@ class RecipeSchedulerUtils {
                     sList,
                     ctx,
                     null,
-                    new HashMap<>()
+                    new HashMap<>(),
+                    true
             );
             ctx.putParentRecipe(previousParent);
             if (sList == next) {
