@@ -104,7 +104,7 @@ public abstract class Recipe implements Cloneable {
 
     @Value
     @EqualsAndHashCode(callSuper = true)
-    private static class ApplicableTestRecipe extends Recipe {
+    static class ApplicableTestRecipe extends Recipe {
         @Language("markdown")
         String displayName;
         @Language("markdown")
@@ -124,11 +124,6 @@ public abstract class Recipe implements Cloneable {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return visitor;
-        }
-
-        @Override
-        public boolean isApplicableTest() {
-            return true;
         }
 
         @Nullable
@@ -186,13 +181,6 @@ public abstract class Recipe implements Cloneable {
     @Nullable
     public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(5);
-    }
-
-    /**
-     * @return true if the recipe is an applicability test recipe
-     */
-    public boolean isApplicableTest() {
-        return false;
     }
 
     public final RecipeDescriptor getDescriptor() {

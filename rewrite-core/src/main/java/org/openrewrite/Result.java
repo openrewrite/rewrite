@@ -123,7 +123,7 @@ public class Result {
                 index = rootDescriptor;
             }
 
-            if (currentStack.peek().isApplicableTest()) {
+            if (currentStack.peek() instanceof Recipe.ApplicableTestRecipe) {
                 continue;
             }
 
