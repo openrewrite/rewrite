@@ -159,6 +159,10 @@ public interface G extends J {
                     .collect(Collectors.toList());
         }
 
+        public G.CompilationUnit withImports(List<Import> imports) {
+            return getPadding().withImports(JRightPadded.withElements(this.getPadding().getImports(), imports));
+        }
+
         @Transient
         public List<ClassDeclaration> getClasses() {
             return statements.stream()
@@ -166,6 +170,11 @@ public interface G extends J {
                     .filter(J.ClassDeclaration.class::isInstance)
                     .map(J.ClassDeclaration.class::cast)
                     .collect(Collectors.toList());
+        }
+
+        @Override
+        public JavaSourceFile withClasses(List<ClassDeclaration> classes) {
+            return getPadding().withClasses(JRightPadded.withElements(this.getPadding().getClasses(), classes));
         }
 
         @Override
@@ -226,6 +235,28 @@ public interface G extends J {
             }
 
             @Transient
+            public List<JRightPadded<J.ClassDeclaration>> getClasses() {
+                //noinspection unchecked
+                return t.statements.stream()
+                        .filter(s -> s.getElement() instanceof J.ClassDeclaration)
+                        .map(s -> (JRightPadded<J.ClassDeclaration>) (Object) s)
+                        .collect(Collectors.toList());
+            }
+
+            public G.CompilationUnit withClasses(List<JRightPadded<ClassDeclaration>> classes) {
+                List<JRightPadded<Statement>> statements = t.statements.stream()
+                        .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
+                        .collect(Collectors.toList());
+
+                //noinspection unchecked
+                statements.addAll(0, classes.stream()
+                        .map(i -> (JRightPadded<Statement>) (Object) i)
+                        .collect(Collectors.toList()));
+
+                return t.getPadding().getClasses() == classes ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+            }
+
+            @Transient
             @Override
             public List<JRightPadded<Import>> getImports() {
                 //noinspection unchecked
@@ -237,9 +268,15 @@ public interface G extends J {
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
-                // TODO implement me!
-                return t;
-//                return t.imports == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
+                List<JRightPadded<Statement>> statements = t.statements.stream()
+                        .filter(s -> !(s.getElement() instanceof J.Import))
+                        .collect(Collectors.toList());
+                //noinspection unchecked
+                statements.addAll(0, imports.stream()
+                        .map(i -> (JRightPadded<Statement>) (Object) i)
+                        .collect(Collectors.toList()));
+
+                return t.getPadding().getImports() == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
             }
 
             public List<JRightPadded<Statement>> getStatements() {
@@ -257,7 +294,7 @@ public interface G extends J {
      * Unlike Java, Groovy allows expressions to appear anywhere Statements do.
      * Rather than re-define versions of the many J types that implement Expression to also implement Statement,
      * just wrap such expressions.
-     *
+     * <p>
      * Has no state or behavior of its own aside from the Expression it wraps.
      */
     @SuppressWarnings("unchecked")

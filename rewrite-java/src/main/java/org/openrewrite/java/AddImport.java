@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -69,93 +70,98 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        if (JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
-            return cu;
-        }
-
-        int dotIndex = classType.getFullyQualifiedName().lastIndexOf('.');
-        if (dotIndex >= 0) {
-            String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
-            // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
-            if (("java.lang".equals(packageName) && StringUtils.isBlank(statik)) || (cu.getPackageDeclaration() != null &&
-                    packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
+    public @Nullable J preVisit(J tree, P p) {
+        J j = tree;
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) tree;
+            if (JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
                 return cu;
             }
-        }
 
-        if (onlyIfReferenced && !hasReference(cu)) {
-            return cu;
-        }
-
-        if (classType.getPackageName().isEmpty()) {
-            return cu;
-        }
-
-        if (cu.getImports().stream().anyMatch(i -> {
-            String ending = i.getQualid().getSimpleName();
-            if (statik == null) {
-                return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
-                        (ending.equals(classType.getClassName()) || "*".equals(ending));
+            int dotIndex = classType.getFullyQualifiedName().lastIndexOf('.');
+            if (dotIndex >= 0) {
+                String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
+                // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
+                if (("java.lang".equals(packageName) && StringUtils.isBlank(statik)) || (cu.getPackageDeclaration() != null &&
+                        packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
+                    return cu;
+                }
             }
-            return i.isStatic() && i.getTypeName().equals(classType.getFullyQualifiedName()) &&
-                    (ending.equals(statik) || "*".equals(ending));
-        })) {
-            return cu;
-        }
 
-        J.Import importToAdd = new J.Import(randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                new JLeftPadded<>(statik == null ? Space.EMPTY : Space.format(" "),
-                        statik != null, Markers.EMPTY),
-                TypeTree.build(classType.getFullyQualifiedName() +
-                        (statik == null ? "" : "." + statik)).withPrefix(Space.format(" ")),
-                null);
-
-        List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
-
-        if (imports.isEmpty() && !cu.getClasses().isEmpty()) {
-            if (cu.getPackageDeclaration() == null) {
-                // leave javadocs on the class and move other comments up to the import
-                // (which could include license headers and the like)
-                Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
-                importToAdd = importToAdd.withPrefix(firstClassPrefix
-                        .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
-                        .withWhitespace(""));
-
-                cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
-                    Space prefix = clazz.getPrefix();
-                    return i == 0 ?
-                            clazz.withPrefix(prefix.withComments(ListUtils.map(prefix.getComments(),
-                                    comment -> comment instanceof Javadoc ? comment : null))) :
-                            clazz;
-                }));
-            } else {
-                importToAdd = importToAdd.withPrefix(Space.format("\n\n"));
+            if (onlyIfReferenced && !hasReference(cu)) {
+                return cu;
             }
-        }
 
-        ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
-                .orElse(IntelliJ.importLayout());
-
-        List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
-                .map(JavaSourceSet::getClasspath)
-                .orElse(Collections.emptyList());
-
-        cu = cu.getPadding().withImports(layoutStyle.addImport(cu.getPadding().getImports(), importToAdd,
-                cu.getPackageDeclaration(), classpath));
-
-        J.CompilationUnit c = cu;
-        cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
-            if (i == 0) {
-                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
-                clazz = clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
+            if (classType.getPackageName().isEmpty()) {
+                return cu;
             }
-            return clazz;
-        }));
 
-        return cu;
+            if (cu.getImports().stream().anyMatch(i -> {
+                String ending = i.getQualid().getSimpleName();
+                if (statik == null) {
+                    return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
+                            (ending.equals(classType.getClassName()) || "*".equals(ending));
+                }
+                return i.isStatic() && i.getTypeName().equals(classType.getFullyQualifiedName()) &&
+                        (ending.equals(statik) || "*".equals(ending));
+            })) {
+                return cu;
+            }
+
+            J.Import importToAdd = new J.Import(randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    new JLeftPadded<>(statik == null ? Space.EMPTY : Space.format(" "),
+                            statik != null, Markers.EMPTY),
+                    TypeTree.build(classType.getFullyQualifiedName() +
+                            (statik == null ? "" : "." + statik)).withPrefix(Space.format(" ")),
+                    null);
+
+            List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
+
+            if (imports.isEmpty() && !cu.getClasses().isEmpty()) {
+                if (cu.getPackageDeclaration() == null) {
+                    // leave javadocs on the class and move other comments up to the import
+                    // (which could include license headers and the like)
+                    Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
+                    importToAdd = importToAdd.withPrefix(firstClassPrefix
+                            .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                            .withWhitespace(""));
+
+                    cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
+                        Space prefix = clazz.getPrefix();
+                        return i == 0 ?
+                                clazz.withPrefix(prefix.withComments(ListUtils.map(prefix.getComments(),
+                                        comment -> comment instanceof Javadoc ? comment : null))) :
+                                clazz;
+                    }));
+                } else {
+                    importToAdd = importToAdd.withPrefix(Space.format("\n\n"));
+                }
+            }
+
+            ImportLayoutStyle layoutStyle = Optional.ofNullable(((SourceFile) cu).getStyle(ImportLayoutStyle.class))
+                    .orElse(IntelliJ.importLayout());
+
+            List<JavaType.FullyQualified> classpath = cu.getMarkers().findFirst(JavaSourceSet.class)
+                    .map(JavaSourceSet::getClasspath)
+                    .orElse(Collections.emptyList());
+
+            cu = cu.getPadding().withImports(layoutStyle.addImport(cu.getPadding().getImports(), importToAdd,
+                    cu.getPackageDeclaration(), classpath));
+
+            JavaSourceFile c = cu;
+            cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
+                if (i == 0) {
+                    J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
+                    clazz = clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
+                }
+                return clazz;
+            }));
+
+            j = cu;
+        }
+        return j;
     }
 
     private boolean isTypeReference(NameTree t) {
@@ -177,7 +183,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
      * @return true if the import is referenced by the class either explicitly or through a method reference.
      */
     //Note that using anyMatch when a stream is empty ends up returning true, which is not the behavior needed here!
-    private boolean hasReference(J.CompilationUnit compilationUnit) {
+    private boolean hasReference(JavaSourceFile compilationUnit) {
         if (statik == null) {
             //Non-static imports, we just look for field accesses.
             for (NameTree t : FindTypes.find(compilationUnit, type)) {
