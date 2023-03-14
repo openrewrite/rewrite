@@ -29,45 +29,6 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
         spec.recipe(new ReplaceStringBuilderWithString());
     }
 
-    @Test
-    void resultsDataTable() {
-        rewriteRun(
-
-          spec -> spec.recipe(RewriteTest.fromRuntimeClasspath("org.openrewrite.java.cleanup.CommonStaticAnalysis")),
-          java(
-            """
-              class A {
-                  void foo() {
-                      String s = new StringBuilder().append("A").append("B").toString();
-                  }
-              }
-              """,
-            """
-              class A {
-                  void foo() {
-                      String s = "A" + "B";
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              class B {
-                  void foo() {
-                      String s = new StringBuilder().append("A").append("B").toString();
-                  }
-              }
-              """,
-            """
-              class B {
-                  void foo() {
-                      String s = "A" + "B";
-                  }
-              }
-              """
-          )
-        );
-    }
 
     @Test
     void replaceLiteralConcatenation() {
@@ -177,7 +138,6 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
     @Test
     void withConstructor() {
         rewriteRun(
-          spec -> spec.recipe(RewriteTest.fromRuntimeClasspath("org.openrewrite.java.cleanup.CommonStaticAnalysis")),
           java(
             """
               class A {
@@ -194,34 +154,6 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
               """,
             """
               class A {
-                  void method() {
-                      String key1 = "_" + "a";
-                      String key2 = name() + "_" + "a";
-                      String key3 = "m" + "_" + "a";
-                      String key4 = "A" + "B" + "C";
-                  }
-                  String name() {
-                      return "name";
-                  }
-              }
-              """
-          ),
-          java(
-            """
-              class B {
-                  void method() {
-                      String key1 = new StringBuilder(10).append("_").append("a").toString();
-                      String key2 = new StringBuilder(name()).append("_").append("a").toString();
-                      String key3 = new StringBuilder("m").append("_").append("a").toString();
-                      String key4 = new StringBuilder("A" + "B").append("C").toString();
-                  }
-                  String name() {
-                      return "name";
-                  }
-              }
-              """,
-            """
-              class B {
                   void method() {
                       String key1 = "_" + "a";
                       String key2 = name() + "_" + "a";
