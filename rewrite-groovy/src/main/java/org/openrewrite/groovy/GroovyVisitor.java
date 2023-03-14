@@ -46,6 +46,9 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         G.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        if (c.getPackageDeclaration() != null) {
+            c = c.withPackageDeclaration((G.Package) visit(c.getPackageDeclaration(), p));
+        }
         c = c.withStatements(ListUtils.map(c.getStatements(), e -> visitAndCast(e, p)));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;
