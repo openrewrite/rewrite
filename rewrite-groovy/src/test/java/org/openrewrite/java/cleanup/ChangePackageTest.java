@@ -21,17 +21,14 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.nio.file.Paths;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
-import static org.openrewrite.java.Assertions.java;
 
 public class ChangePackageTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangePackage("a.b", "x.y", true));
+        spec.recipe(new ChangePackage("a.b", "x.y", false));
     }
 
     @SuppressWarnings("GrPackage")
@@ -96,30 +93,31 @@ public class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("GrPackage")
     @Test
     void renamePackageRecursive() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePackage("org.openrewrite", "org.openrewrite.test", true)),
-          java(
+          spec -> spec.recipe(new ChangePackage("org.foo", "org.foo.test", true)),
+          groovy(
             """
-              package org.openrewrite.internal;
+              package org.foo.internal
               class Test {
               }
               """,
             """
-              package org.openrewrite.test.internal;
+              package org.foo.test.internal
               class Test {
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(cu.getSourcePath()).isEqualTo(Paths.get("org/openrewrite/test/internal/Test.java"));
-                assertThat(cu.findType("org.openrewrite.internal.Test")).isEmpty();
-                assertThat(cu.findType("org.openrewrite.test.internal.Test")).isNotEmpty();
+            spec -> spec.path("org/foo/internal/Test.groovy").afterRecipe(cu -> {
+                assertThat(cu.getSourcePath().toString()).isEqualTo("org/foo/test/internal/Test.groovy");
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
             })
           )
         );
     }
 
+    @SuppressWarnings("GrPackage")
     @Test
     void changeDefinition() {
         rewriteRun(
@@ -127,17 +125,17 @@ public class ChangePackageTest implements RewriteTest {
           groovy(
             """
             package org.foo
-            class file {
+            class Test {
             }
             """,
             """
             package x.y.z
-            class file {
+            class Test {
             }
             """,
-            spec -> spec.path("org/foo/file.groovy").afterRecipe(cu -> {
-              assertThat("x/y/z/file.groovy").isEqualTo(cu.getSourcePath().toString());
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.file")).isTrue();
+            spec -> spec.path("org/foo/Test.groovy").afterRecipe(cu -> {
+              assertThat("x/y/z/Test.groovy").isEqualTo(cu.getSourcePath().toString());
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
             })
           )
         );
