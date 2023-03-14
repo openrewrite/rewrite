@@ -29,7 +29,6 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
         spec.recipe(new ReplaceStringBuilderWithString());
     }
 
-
     @Test
     void replaceLiteralConcatenation() {
         rewriteRun(
