@@ -77,7 +77,7 @@ public class DataTable<Row> {
 
     public void insertRow(ExecutionContext ctx, Row row) {
         if (enabled) {
-            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, LinkedHashMap::new, (extract, allDataTables) -> {
+            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
                 //noinspection unchecked
                 List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
                 dataTablesOfType.add(row);

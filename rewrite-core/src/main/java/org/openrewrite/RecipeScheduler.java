@@ -467,11 +467,6 @@ class RecipeSchedulerUtils {
             while (!recipeStack.isEmpty()) {
                 RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
 
-                // skip applicability test recipes
-                if (recipeThatMadeChange[1].getDisplayName().startsWith("Single Source Applicable test for")) {
-                    continue;
-                }
-
                 resultsTable.insertRow(ctx, new SourcesFileResults.Row(
                         result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),

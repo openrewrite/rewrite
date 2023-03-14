@@ -33,19 +33,23 @@ class DataTableTest implements RewriteTest {
                   .as("Running recipe CommonStaticAnalysis on a two source files, if each file is changed only by " +
                       "one recipe, so it should produce 4 rows in the SourcesFileResults table")
                   .hasSize(4);
+
                 SourcesFileResults.Row row0 = rows.get(0);
-                assertThat(row0.getSourcePath()).isEqualTo("A.java");
                 assertThat(row0.getRecipe()).isEqualTo("org.openrewrite.java.cleanup.CommonStaticAnalysis");
                 SourcesFileResults.Row row1 = rows.get(1);
-                assertThat(row1.getSourcePath()).isEqualTo("A.java");
+
                 assertThat(row1.getRecipe()).isEqualTo("org.openrewrite.java.cleanup.ReplaceStringBuilderWithString");
 
                 SourcesFileResults.Row row2 = rows.get(2);
-                assertThat(row2.getSourcePath()).isEqualTo("B.java");
                 assertThat(row2.getRecipe()).isEqualTo("org.openrewrite.java.cleanup.CommonStaticAnalysis");
                 SourcesFileResults.Row row3 = rows.get(3);
-                assertThat(row3.getSourcePath()).isEqualTo("B.java");
                 assertThat(row3.getRecipe()).isEqualTo("org.openrewrite.java.cleanup.ReplaceStringBuilderWithString");
+
+                assertThat(row0.getSourcePath().equals("A.java") || row0.getSourcePath().equals("B.java")).isTrue();
+                assertThat(row2.getSourcePath().equals("A.java") || row2.getSourcePath().equals("B.java")).isTrue();
+                assertThat(row0.getSourcePath()).isEqualTo(row1.getSourcePath());
+                assertThat(row2.getSourcePath()).isEqualTo(row3.getSourcePath());
+                assertThat(row0.getSourcePath()).isNotEqualTo(row2.getSourcePath());
             }),
           java(
             """

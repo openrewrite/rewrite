@@ -123,7 +123,7 @@ public class Result {
                 index = rootDescriptor;
             }
 
-            if (currentStack.peek().getDisplayName().startsWith("Single Source Applicable test for")) {
+            if (currentStack.peek().isApplicableTest()) {
                 continue;
             }
 
