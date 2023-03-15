@@ -58,22 +58,8 @@ public class ChangePropertyKey extends Recipe {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                String oldKeyAsProperty = "${" + oldKey + "}";
-                ResolvedPom pom = getResolutionResult().getPom();
-                if (pom.getProperties().containsKey(oldKey)) {
-                    return SearchResult.found(document);
-                }
-                for (Dependency dependency : pom.getRequestedDependencies()) {
-                    if (dependency.getVersion().contains(oldKeyAsProperty)) {
-                        return SearchResult.found(document);
-                    }
-                }
-                for (ResolvedManagedDependency dependency : pom.getDependencyManagement()) {
-                    if (dependency.getVersion().contains(oldKeyAsProperty)) {
-                        return SearchResult.found(document);
-                    }
-                }
-                return document;
+                // Scanning every tag's value is not an efficient applicable test, so just accept all maven files
+                return SearchResult.found(document);
             }
         };
     }
