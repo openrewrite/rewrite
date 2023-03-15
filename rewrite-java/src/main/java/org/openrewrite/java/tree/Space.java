@@ -34,6 +34,7 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode
 public class Space {
     public static final Space EMPTY = new Space("", emptyList());
+    public static final Space SINGLE_SPACE = Space.build(" ", emptyList());
 
     private final List<Comment> comments;
 
