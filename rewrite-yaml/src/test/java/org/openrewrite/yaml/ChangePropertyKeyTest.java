@@ -778,4 +778,28 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2881")
+    void embedIndentedPropertyIntoExisting() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.b.d", "a.b", null, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c: false
+                  d:
+                    c: true
+                    e: true
+              """,
+            """
+              a:
+                b:
+                  c: false
+                  e: true
+              """
+          )
+        );
+    }
+
 }
