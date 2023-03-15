@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.PathUtils;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
@@ -104,7 +105,7 @@ public class ChangePackageTest implements RewriteTest {
               class Test
               """,
             spec -> spec.path("org/foo/internal/Test.kt").afterRecipe(cu -> {
-                assertThat(cu.getSourcePath().toString()).isEqualTo("org/foo/test/internal/Test.kt");
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.kt");
                 assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
             })
           )
@@ -125,7 +126,7 @@ public class ChangePackageTest implements RewriteTest {
             class Test
             """,
             spec -> spec.path("org/foo/Test.kt").afterRecipe(cu -> {
-                assertThat("x/y/z/Test.kt").isEqualTo(cu.getSourcePath().toString());
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.kt");
                 assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
             })
           )
