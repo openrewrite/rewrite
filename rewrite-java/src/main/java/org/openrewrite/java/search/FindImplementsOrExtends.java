@@ -82,10 +82,6 @@ public class FindImplementsOrExtends extends Recipe {
             }
 
             for (JavaType.FullyQualified it : jc.getInterfaces()) {
-                if (it.toString().equals(interfaceFullyQualifiedName)) {
-                    return true;
-                }
-
                 if (findInterface(it)) {
                     return true;
                 }
