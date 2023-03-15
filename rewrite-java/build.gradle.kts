@@ -67,5 +67,5 @@ tasks.withType<Javadoc> {
     //   symbol:   method onConstructor_()
     //   location: @interface AllArgsConstructor
     // 1 error
-    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**")
+    exclude("**/JavaParser**", "**/ChangeMethodTargetToStatic**", "**/trait/**")
 }

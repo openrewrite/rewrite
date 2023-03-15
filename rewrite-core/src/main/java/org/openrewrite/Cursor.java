@@ -235,7 +235,7 @@ public class Cursor {
     /**
      * Return the first parent of the current cursor which points to an AST element, or the root cursor if the current
      * cursor already points to the root AST element. This skips over non-tree Padding elements.
-     *
+     * </p>
      * If you do want to access Padding elements, use getParent() or getParentOrThrow(), which do not skip over these elements.
      *
      * @return a cursor which either points at the first non-padding parent of the current element

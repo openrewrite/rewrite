@@ -21,6 +21,7 @@ import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
+import org.openrewrite.java.trait.expr.VarAccess;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -256,24 +257,13 @@ public class ForwardFlow extends JavaVisitor<Integer> {
 
         @Override
         public J visitIdentifier(J.Identifier ident, Integer p) {
-            // If the variable side of an assignment is not a flow step, so we don't need to do anything
-            J.Assignment parentAssignment = getCursor().firstEnclosing(J.Assignment.class);
-            if (parentAssignment != null && parentAssignment.getVariable().unwrap() == ident) {
+            // The identifier must be a variable access to be used in a flow
+            if (VarAccess.viewOf(getCursor()).map(va -> !va.isRValue()).orSuccess(true)) {
                 return ident;
             }
             // If the identifier is a field access then it is not local flow
             J.FieldAccess parentFieldAccess = getCursor().firstEnclosing(J.FieldAccess.class);
             if (parentFieldAccess != null && parentFieldAccess.getName() == ident) {
-                return ident;
-            }
-            // If the identifier is a new class name, then it is not local flow
-            J.NewClass parentNewClass = getCursor().firstEnclosing(J.NewClass.class);
-            if (parentNewClass != null && parentNewClass.getClazz() == ident) {
-                return ident;
-            }
-            // If the identifier is a method name, then it is not local flow
-            J.MethodInvocation parentMethodInvocation = getCursor().firstEnclosing(J.MethodInvocation.class);
-            if (parentMethodInvocation != null && parentMethodInvocation.getName() == ident) {
                 return ident;
             }
 

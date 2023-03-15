@@ -2585,22 +2585,22 @@ public interface J extends Tree {
 
         @Nullable
         public J.Identifier getAlias() {
-            if(alias == null) {
+            if (alias == null) {
                 return null;
             }
             return alias.getElement();
         }
 
         public J.Import withAlias(@Nullable J.Identifier alias) {
-            if(this.alias == null) {
-                if(alias == null) {
+            if (this.alias == null) {
+                if (alias == null) {
                     return this;
                 }
                 return new J.Import(null, id, prefix, markers, statik, qualid, JLeftPadded
                         .build(alias)
                         .withBefore(Space.format(" ")));
             }
-            if(alias == null) {
+            if (alias == null) {
                 return new J.Import(null, id, prefix, markers, statik, qualid, null);
             }
             return getPadding().withAlias(this.alias.withElement(alias));
@@ -2665,7 +2665,7 @@ public interface J extends Tree {
                 String name = part.getSimpleName();
                 if (part.getTarget() instanceof J.Identifier) {
                     typeName.insert(0, ((Identifier) part.getTarget()).getSimpleName() +
-                                       "." + name);
+                            "." + name);
                     break;
                 } else {
                     part = (FieldAccess) part.getTarget();
@@ -3387,6 +3387,9 @@ public interface J extends Tree {
             return getAnnotations().withName(this.name.withIdentifier(name));
         }
 
+        /**
+         * Can be either a list of {@link VariableDeclarations}, when there are no parameters, a single {@link J.Empty}.
+         */
         JContainer<Statement> parameters;
 
         public List<Statement> getParameters() {
@@ -3395,6 +3398,20 @@ public interface J extends Tree {
 
         public MethodDeclaration withParameters(List<Statement> parameters) {
             return getPadding().withParameters(JContainer.withElements(this.parameters, parameters));
+        }
+
+        public List<VariableDeclarations> getParametersAsVariableDeclarations() {
+            List<VariableDeclarations> declarations = new ArrayList<>(getParameters().size());
+            for (Statement parameter : getParameters()) {
+                if (parameter instanceof VariableDeclarations) {
+                    declarations.add((VariableDeclarations) parameter);
+                } else if (parameter instanceof J.Empty) {
+                    // ignore
+                } else {
+                    throw new IllegalStateException("Unexpected parameter type: " + parameter.getClass());
+                }
+            }
+            return declarations;
         }
 
         @Nullable
@@ -3499,8 +3516,8 @@ public interface J extends Tree {
         @Override
         public String toString() {
             return "MethodDeclaration{" +
-                   (getMethodType() == null ? "unknown" : getMethodType()) +
-                   "}";
+                    (getMethodType() == null ? "unknown" : getMethodType()) +
+                    "}";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

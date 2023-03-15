@@ -54,7 +54,8 @@ class FindLocalFlowPathsStringTest implements RewriteTest {
             public boolean isSource(Expression expr, Cursor cursor) {
                 if (expr instanceof J.Literal) {
                     return Objects.equals(((J.Literal) expr).getValue(), "42");
-                } else if (expr instanceof J.MethodInvocation) {
+                }
+                if (expr instanceof J.MethodInvocation) {
                     return ((J.MethodInvocation) expr).getName().getSimpleName().equals("source");
                 }
                 return false;

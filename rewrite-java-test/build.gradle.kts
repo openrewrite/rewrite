@@ -9,6 +9,7 @@ dependencies {
 
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("com.tngtech.archunit:archunit-junit5:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("junit:junit:4.13.2") {
         because("Used for RemoveUnneededAssertionTest")
