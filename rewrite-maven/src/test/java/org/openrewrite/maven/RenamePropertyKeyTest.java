@@ -16,15 +16,21 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-class ChangePropertyKeyTest implements RewriteTest {
+class RenamePropertyKeyTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new RenamePropertyKey("guava.version", "version.com.google.guava"));
+    }
+
     @Test
     void propertyInDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("guava.version", "version.com.google.guava")),
           pomXml(
             """
               <project>
@@ -75,7 +81,6 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void propertyInDependencyManagement() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("guava.version", "version.com.google.guava")),
           pomXml(
             """
               <project>
@@ -130,7 +135,6 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void propertyInProperty() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("guava.version", "version.com.google.guava")),
           pomXml(
             """
               <project>

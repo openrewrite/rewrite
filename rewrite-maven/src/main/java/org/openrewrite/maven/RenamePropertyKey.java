@@ -24,16 +24,12 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
-import org.openrewrite.maven.tree.ResolvedPom;
-import org.openrewrite.xml.ChangeTagNameVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class ChangePropertyKey extends Recipe {
+public class RenamePropertyKey extends Recipe {
 
     @Option(displayName = "Old key",
             description = "The old name of the property key to be replaced.",
@@ -74,17 +70,18 @@ public class ChangePropertyKey extends Recipe {
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isPropertyTag() && oldKey.equals(tag.getName())) {
-                    doAfterVisit(new ChangeTagNameVisitor<>(tag, newKey));
+                Xml.Tag t = super.visitTag(tag, ctx);
+                if (isPropertyTag() && oldKey.equals(t.getName())) {
+                    t = t.withName(newKey);
                 }
-                if (tag.getChildren().isEmpty()) {
-                    Optional<String> value = tag.getValue();
+                if (t.getChildren().isEmpty()) {
+                    Optional<String> value = t.getValue();
                     if (value.isPresent() && value.get().contains(oldKeyAsProperty)) {
                         String newValue = value.get().replace(oldKeyAsProperty, newKeyAsProperty);
-                        doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                        doAfterVisit(new ChangeTagValueVisitor<>(t, newValue));
                     }
                 }
-                return super.visitTag(tag, ctx);
+                return t;
             }
         };
     }
