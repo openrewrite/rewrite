@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import java.util.Optional;
+
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -75,8 +77,12 @@ public class ChangePropertyKey extends Recipe {
                 if (isPropertyTag() && oldKey.equals(tag.getName())) {
                     doAfterVisit(new ChangeTagNameVisitor<>(tag, newKey));
                 }
-                if (oldKeyAsProperty.equals(tag.getValue().orElse(null))) {
-                    doAfterVisit(new ChangeTagValueVisitor<>(tag, newKeyAsProperty));
+                if (tag.getChildren().isEmpty()) {
+                    Optional<String> value = tag.getValue();
+                    if (value.isPresent() && value.get().contains(oldKeyAsProperty)) {
+                        String newValue = value.get().replace(oldKeyAsProperty, newKeyAsProperty);
+                        doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
+                    }
                 }
                 return super.visitTag(tag, ctx);
             }

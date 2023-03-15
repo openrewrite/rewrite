@@ -137,10 +137,10 @@ class ChangePropertyKeyTest implements RewriteTest {
                 <modelVersion>4.0.0</modelVersion>
                  
                 <properties>
-                  <abc>value1</abc>
                   <guava.version>29.0-jre</guava.version>
-                  <def>value1</def>
-                  <xyz>${guava.version}</xyz>
+                  <abc>${guava.version}</abc>
+                  <def>prefix ${guava.version}</def>
+                  <xyz>${guava.version} suffix ${abc}</xyz>
                 </properties>
                 
                 <groupId>com.mycompany.app</groupId>
@@ -153,10 +153,10 @@ class ChangePropertyKeyTest implements RewriteTest {
                 <modelVersion>4.0.0</modelVersion>
                  
                 <properties>
-                  <abc>value1</abc>
                   <version.com.google.guava>29.0-jre</version.com.google.guava>
-                  <def>value1</def>
-                  <xyz>${version.com.google.guava}</xyz>
+                  <abc>${version.com.google.guava}</abc>
+                  <def>prefix ${version.com.google.guava}</def>
+                  <xyz>${version.com.google.guava} suffix ${abc}</xyz>
                 </properties>
                 
                 <groupId>com.mycompany.app</groupId>
