@@ -191,8 +191,14 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
-            val a: KotlinCompilation < * > = null
+            package org.foo
+            class Test<T>
+            """
+          ),
+          kotlin(
+            """
+            import org.foo.Test
+            val a : Test < * > = null
             """
           )
         );
