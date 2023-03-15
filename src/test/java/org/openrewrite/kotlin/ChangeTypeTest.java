@@ -58,6 +58,66 @@ public class ChangeTypeTest implements RewriteTest {
     }
 
     @Test
+    void changeTypeWithGenericArgument() {
+        rewriteRun(
+          kotlin(
+            """
+            package a.b
+            class Original<A>
+            """),
+          kotlin(
+            """
+            package x.y
+            class Target<A>
+            """),
+          kotlin(
+            """
+            package example
+            
+            import a.b.Original
+            
+            fun test(original: Original<String>) { }
+            """,
+            """
+            package example
+            
+            import x.y.Target
+            
+            fun test(original: Target<String>) { }
+            """
+          )
+        );
+    }
+
+    @Test
+    void changeTypeWithGenericArgumentFullyQualified() {
+        rewriteRun(
+          kotlin(
+            """
+            package a.b
+            class Original<A>
+            """),
+          kotlin(
+            """
+            package x.y
+            class Target<A>
+            """),
+          kotlin(
+            """
+            package example
+            
+            fun test(original: a.b.Original<String>) { }
+            """,
+            """
+            package example
+                        
+            fun test(original: x.y.Target<String>) { }
+            """
+          )
+        );
+    }
+
+    @Test
     void changeType() {
         rewriteRun(
           kotlin(
