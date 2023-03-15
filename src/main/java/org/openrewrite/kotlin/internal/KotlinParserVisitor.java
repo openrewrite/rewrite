@@ -1486,11 +1486,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (addTypeReferencePrefix) {
                     markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
                 }
-                typeExpression = (TypeTree) visitElement(typeRef.getDelegatedTypeRef(), ctx);
-                typeExpression = typeExpression.withType(typeMapping.type(typeRef.getType()));
+                J j = visitElement(typeRef, ctx);
+                if (j instanceof TypeTree) {
+                    typeExpression = (TypeTree) j;
+                } else {
+                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null);
+                }
             }
-        } else {
-            throw new IllegalStateException("Implement me.");
         }
 
         // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
@@ -1669,8 +1671,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitResolvedTypeRef(FirResolvedTypeRef resolvedTypeRef, ExecutionContext ctx) {
         if (resolvedTypeRef.getDelegatedTypeRef() != null) {
             J j = visitElement(resolvedTypeRef.getDelegatedTypeRef(), ctx);
+            JavaType type = typeMapping.type(resolvedTypeRef);
             if (j instanceof TypeTree) {
-                j = ((TypeTree) j).withType(typeMapping.type(resolvedTypeRef));
+                j = ((TypeTree) j).withType(type);
+            }
+
+            if (j instanceof J.ParameterizedType) {
+                // The identifier on a parameterized type of the FIR does not contain type information and must be added separately.
+                J.ParameterizedType parameterizedType = (J.ParameterizedType) j;
+                j = parameterizedType.withClazz(parameterizedType.getClazz().withType(type));
+
             }
             return j;
         }
@@ -2145,13 +2155,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (addTypeReferencePrefix) {
                     markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
                 }
-                J j = visitElement(typeRef.getDelegatedTypeRef(), ctx);
+                J j = visitElement(typeRef, ctx);
                 if (j instanceof TypeTree) {
                     typeExpression = (TypeTree) j;
                 } else {
                     typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null);
                 }
-                typeExpression = typeExpression.withType(typeMapping.type(typeRef.getType()));
             }
         }
 

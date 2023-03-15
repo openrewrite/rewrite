@@ -15,7 +15,9 @@
  */
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
@@ -57,6 +59,7 @@ public class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/42")
     @Test
     void changeTypeWithGenericArgument() {
         rewriteRun(
@@ -89,6 +92,7 @@ public class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Disabled("Requires fix in rewrite: https://github.com/openrewrite/rewrite/issues/2995")
     @Test
     void changeTypeWithGenericArgumentFullyQualified() {
         rewriteRun(
@@ -110,7 +114,7 @@ public class ChangeTypeTest implements RewriteTest {
             """,
             """
             package example
-                        
+            
             fun test(original: x.y.Target<String>) { }
             """
           )
