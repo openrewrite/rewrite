@@ -34,7 +34,7 @@ public class FindImplementsOrExtends extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find class declaration with implements";
+        return "Find class declarations implementing an interface";
     }
 
     @Override
