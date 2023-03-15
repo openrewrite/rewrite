@@ -18,17 +18,17 @@ package org.openrewrite.java.search;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.Objects;
-
-public class FindImplements extends Recipe {
+public class FindImplementsOrExtends extends Recipe {
     private final String interfaceFullyQualifiedName;
 
-    public FindImplements(String interfaceFullyQualifiedName) {
+    public FindImplementsOrExtends(String interfaceFullyQualifiedName) {
         this.interfaceFullyQualifiedName = interfaceFullyQualifiedName;
     }
 
@@ -49,15 +49,55 @@ public class FindImplements extends Recipe {
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
                                                             ExecutionContext ctx) {
                 classDecl = super.visitClassDeclaration(classDecl, ctx);
+
                 if (classDecl.getImplements() != null) {
                     for (TypeTree impl : classDecl.getImplements()) {
-                        if (interfaceFullyQualifiedName.equals(Objects.requireNonNull(impl.getType()).toString())) {
+                        if (findInterface(impl.getType())) {
                             return SearchResult.found(classDecl);
                         }
+                    }
+                }
+
+                TypeTree ext = classDecl.getExtends();
+                if (ext != null) {
+                    JavaType.Class jc = (JavaType.Class) ext.getType();
+                    if (findInterface(jc)) {
+                        return SearchResult.found(classDecl);
                     }
                 }
                 return classDecl;
             }
         };
+    }
+
+    private boolean findInterface(@Nullable JavaType javaType) {
+        if (javaType == null) {
+            return false;
+        }
+
+        if (javaType instanceof JavaType.Class) {
+            JavaType.Class jc = (JavaType.Class) javaType;
+            if (jc.toString().equals(interfaceFullyQualifiedName)) {
+                return true;
+            }
+
+            for (JavaType.FullyQualified it : jc.getInterfaces()) {
+                if (it.toString().equals(interfaceFullyQualifiedName)) {
+                    return true;
+                }
+
+                if (findInterface(it)) {
+                    return true;
+                }
+            }
+            return false;
+        } else if (javaType instanceof JavaType.Parameterized) {
+            JavaType.Parameterized jp = (JavaType.Parameterized) javaType;
+            if (jp.toString().equals(interfaceFullyQualifiedName)) {
+                return true;
+            }
+            return findInterface(jp.getType());
+        }
+        return false;
     }
 }
