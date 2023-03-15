@@ -27,6 +27,40 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 public class JavaTemplateMatchTest implements RewriteTest {
 
+    // IMPORTANT: This test needs to stay at the top, so that the name of `JavaTemplateMatchTest$1_Equals1` matches the expectations
+    @SuppressWarnings("ConstantValue")
+    @Test
+    void matchBinaryUsingCompile() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              // matches manually written class JavaTemplateMatchTest$1_Equals1 below
+              private final JavaTemplate template = JavaTemplate.compile(this, "Equals1", (Integer i) -> 1 == i).build();
+
+              @Override
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  boolean b1 = 1 == 2;
+                  boolean b2 = 1 == 3;
+
+                  boolean b3 = 2 == 1;
+              }
+              """,
+            """
+              class Test {
+                  boolean b1 = /*~~>*/1 == 2;
+                  boolean b2 = /*~~>*/1 == 3;
+
+                  boolean b3 = 2 == 1;
+              }
+              """
+          ));
+    }
+
     @SuppressWarnings("ConstantValue")
     @Test
     void matchBinary() {
@@ -61,15 +95,22 @@ public class JavaTemplateMatchTest implements RewriteTest {
 
     @SuppressWarnings("ConstantValue")
     @Test
-    void matchBinaryUsingCompile() {
+    void extractParameterUsingMatcher() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              // matches manually written class JavaTemplateMatchTest$2_Equals1 below
-              private final JavaTemplate template = JavaTemplate.compile(this, "Equals1", (Integer i) -> 1 == i).build();
+              final JavaTemplate template = JavaTemplate.builder(this::getCursor, "1 == #{any(int)}").build();
+              final JavaTemplate replacement = JavaTemplate.builder(this::getCursor, "Objects.equals(#{any()}, 1)")
+                .imports("java.util.Objects")
+                .build();
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+                  JavaTemplate.Matcher matcher = template.matcher(binary);
+                  if (matcher.find()) {
+                      maybeAddImport("java.util.Objects");
+                      return binary.withTemplate(replacement, binary.getCoordinates().replace(), matcher.parameter(0));
+                  }
+                  return super.visitBinary(binary, ctx);
               }
           })),
           java(
@@ -82,9 +123,11 @@ public class JavaTemplateMatchTest implements RewriteTest {
               }
               """,
             """
+              import java.util.Objects;
+
               class Test {
-                  boolean b1 = /*~~>*/1 == 2;
-                  boolean b2 = /*~~>*/1 == 3;
+                  boolean b1 = Objects.equals(2, 1);
+                  boolean b2 = Objects.equals(3, 1);
 
                   boolean b3 = 2 == 1;
               }
@@ -367,7 +410,7 @@ public class JavaTemplateMatchTest implements RewriteTest {
  * and is used by the test {@link JavaTemplateMatchTest#matchBinaryUsingCompile()}.
  */
 @SuppressWarnings("unused")
-class JavaTemplateMatchTest$2_Equals1 {
+class JavaTemplateMatchTest$1_Equals1 {
     static JavaTemplate.Builder getTemplate(JavaVisitor<?> visitor) {
         return JavaTemplate.builder(visitor::getCursor, "1 == #{any(int)}");
     }
