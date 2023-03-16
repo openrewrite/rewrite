@@ -26,7 +26,7 @@ import org.openrewrite.marker.SearchResult;
 public class FindImplementations extends Recipe {
     private final String interfaceFullyQualifiedName;
 
-    public FindImplementsOrExtends(String interfaceFullyQualifiedName) {
+    public FindImplementations(String interfaceFullyQualifiedName) {
         this.interfaceFullyQualifiedName = interfaceFullyQualifiedName;
     }
 
