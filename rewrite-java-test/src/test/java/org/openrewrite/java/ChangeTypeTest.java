@@ -1313,7 +1313,7 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             spec -> spec.path("a/b/Original.java").afterRecipe(cu -> {
-                assertThat(PathUtils.separatorsToUnix("x/y/Target.java")).isEqualTo(cu.getSourcePath().toString());
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/Target.java");
                 assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
             })
           )
