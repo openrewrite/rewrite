@@ -881,4 +881,49 @@ class JavaTemplateTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nestedEnums() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitBinary(J.Binary binary, ExecutionContext p) {
+                  return binary.withTemplate(JavaTemplate.builder(this::getCursor, "\"ab\"").build(),
+                      binary.getCoordinates().replace());
+              }
+          })),
+          java(
+            """
+              enum Outer {
+                  A, B;
+
+                  enum Inner {
+                      C, D
+                  }
+
+                  private final String s;
+
+                  Outer() {
+                      s = "a" + "b";
+                  }
+              }
+              """,
+            """
+              enum Outer {
+                  A, B;
+
+                  enum Inner {
+                      C, D
+                  }
+
+                  private final String s;
+
+                  Outer() {
+                      s = "ab";
+                  }
+              }
+              """
+          )
+        );
+    }
 }
