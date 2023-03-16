@@ -35,7 +35,7 @@ public class RemoveCompileScope extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Removes the compile scope for all the dependencies as it is the default scope,and it is redundant.";
+        return "Remove the compile scope from dependencies where it is redundant. Compile is the default scope.";
     }
 
     @Override
