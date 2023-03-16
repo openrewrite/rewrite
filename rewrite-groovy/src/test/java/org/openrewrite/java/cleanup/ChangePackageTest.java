@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.PathUtils;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
@@ -110,7 +111,7 @@ public class ChangePackageTest implements RewriteTest {
               }
               """,
             spec -> spec.path("org/foo/internal/Test.groovy").afterRecipe(cu -> {
-                assertThat(cu.getSourcePath().toString()).isEqualTo("org/foo/test/internal/Test.groovy");
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/foo/test/internal/Test.groovy");
                 assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.foo.test.internal.Test")).isTrue();
             })
           )
@@ -134,7 +135,7 @@ public class ChangePackageTest implements RewriteTest {
             }
             """,
             spec -> spec.path("org/foo/Test.groovy").afterRecipe(cu -> {
-              assertThat("x/y/z/Test.groovy").isEqualTo(cu.getSourcePath().toString());
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.groovy");
               assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
             })
           )
