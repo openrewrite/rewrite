@@ -240,6 +240,54 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
+    void staticImports() {
+        var cus = jp().parse(
+          """
+            package com.example;
+            
+            import static com.example.Assertions.java;
+            
+            import static java.util.Collections.singletonList;
+            import static org.assertj.core.api.Assertions.assertThat;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            
+            import java.util.List;
+            """,
+          """
+            package com.example;
+            
+            import static com.example.Assertions.java;
+            
+            import static java.util.Collections.singletonList;
+            import static org.assertj.core.api.Assertions.assertThat;
+            import static org.junit.jupiter.api.Assertions.assertEquals;
+            
+            import java.util.List;
+            """
+        );
+
+        var styles = Autodetect.detect(cus);
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
+
+        assertThat(importLayout.getLayout().get(0))
+          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
+
+        assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
+
+        assertThat(importLayout.getLayout().get(2))
+          .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
+          .matches(b -> ((ImportLayoutStyle.Block.AllOthers) b).isStatic());
+
+        assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
+
+        assertThat(importLayout.getLayout().get(4))
+          .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
+          .matches(b -> !((ImportLayoutStyle.Block.AllOthers) b).isStatic());
+    }
+
+    @Test
     void detectStarImport() {
         var cus = jp().parse(
           """
