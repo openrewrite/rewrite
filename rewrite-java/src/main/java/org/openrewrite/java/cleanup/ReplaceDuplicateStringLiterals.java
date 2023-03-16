@@ -113,7 +113,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                             continue;
                         }
                         J.Literal replaceLiteral = ((J.Literal) duplicateLiteralsMap.get(valueOfLiteral).toArray()[0]).withId(Tree.randomId());
-                        String insertStatement = "private static final String " + variableName + " = #{any(String)}";
+                        String insertStatement = "private static final String " + variableName + " = #{any(String)};";
                         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum) {
                             J.EnumValueSet enumValueSet = classDecl.getBody().getStatements().stream()
                                     .filter(it -> it instanceof J.EnumValueSet)
