@@ -203,8 +203,12 @@ public class TypeUtils {
     public static boolean isAssignableTo(String to, @Nullable JavaType from) {
         try {
             if (from instanceof JavaType.FullyQualified) {
+                if (from instanceof JavaType.Parameterized) {
+                    if (to.equals(from.toString())) {
+                        return true;
+                    }
+                }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
-
                 return to.equals(classFrom.getFullyQualifiedName()) ||
                         isAssignableTo(to, classFrom.getSupertype()) ||
                         classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
