@@ -928,6 +928,19 @@ public class GroovyParserVisitor {
             );
         }
 
+        private J.Case visitDefaultCaseStatement(BlockStatement statement) {
+            return new J.Case(randomId(),
+                    sourceBefore("default"),
+                    Markers.EMPTY,
+                    J.Case.Type.Statement,
+                    null,
+                    JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null)))),
+                    JContainer.build(sourceBefore(":"),
+                            visitRightPadded(statement.getStatements().toArray(new ASTNode[0]), null), Markers.EMPTY),
+                    null
+            );
+        }
+
         @Override
         public void visitCastExpression(CastExpression cast) {
             // Might be looking at a Java-style cast "(type)object" or a groovy-style cast "object as type"
@@ -1569,7 +1582,10 @@ public class GroovyParserVisitor {
                     new J.Block(
                             randomId(), sourceBefore("{"), Markers.EMPTY,
                             JRightPadded.build(false),
-                            visitRightPadded(statement.getCaseStatements().toArray(new CaseStatement[0]), null),
+                            ListUtils.concat(
+                                    visitRightPadded(statement.getCaseStatements().toArray(new CaseStatement[0]), null),
+                                    statement.getDefaultStatement().isEmpty() ? null : JRightPadded.build(visitDefaultCaseStatement((BlockStatement) statement.getDefaultStatement()))
+                            ),
                             sourceBefore("}"))));
         }
 
@@ -1899,6 +1915,17 @@ public class GroovyParserVisitor {
         String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
         cursor += prefix.length();
         return format(prefix);
+    }
+
+    private String skip(@Nullable String token) {
+        if (token == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        if (source.startsWith(token, cursor)) {
+            cursor += token.length();
+        }
+        return token;
     }
 
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {
