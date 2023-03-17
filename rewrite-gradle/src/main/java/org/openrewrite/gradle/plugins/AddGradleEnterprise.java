@@ -15,23 +15,26 @@
  */
 package org.openrewrite.gradle.plugins;
 
-import org.openrewrite.Incubating;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.*;
+import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.marker.BuildTool;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 
+@Value
+@EqualsAndHashCode(callSuper = true)
 @Incubating(since = "7.33.0")
 public class AddGradleEnterprise extends Recipe {
 
     @Option(displayName = "Plugin version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "3.x")
-    private final String version;
-
-    public AddGradleEnterprise(String version) {
-        this.version = version;
-        doNext(new AddSettingsPlugin("com.gradle.enterprise", version, null));
-        doNext(new UpgradePluginVersion("com.gradle.enterprise", version, null));
-    }
+    String version;
 
     @Override
     public String getDisplayName() {
@@ -41,5 +44,33 @@ public class AddGradleEnterprise extends Recipe {
     @Override
     public String getDescription() {
         return "Add the Gradle Enterprise plugin to `settings.gradle(.kts)`.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return Applicability.or(new IsBuildGradle<>(), new IsSettingsGradle<>());
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new GroovyIsoVisitor<ExecutionContext>() {
+            @Override
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                cu.getMarkers().findFirst(BuildTool.class)
+                        .ifPresent(buildTool -> {
+                            if (buildTool.getType() == BuildTool.Type.Gradle) {
+                                VersionComparator versionComparator = Semver.validate("(,6)", null).getValue();
+                                if (versionComparator != null && versionComparator.isValid(null, buildTool.getVersion())) {
+                                    doAfterVisit(new AddBuildPlugin("com.gradle.build-scan", version, null));
+                                    doAfterVisit(new UpgradePluginVersion("com.gradle.build-scan", version, null));
+                                } else {
+                                    doAfterVisit(new AddSettingsPlugin("com.gradle.enterprise", version, null));
+                                    doAfterVisit(new UpgradePluginVersion("com.gradle.enterprise", version, null));
+                                }
+                            }
+                        });
+                return cu;
+            }
+        };
     }
 }

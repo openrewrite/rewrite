@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -24,9 +25,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.gradle.Assertions.*;
 
-public class AddGradleEnterpriseTest implements RewriteTest {
+class AddGradleEnterpriseTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -34,15 +36,62 @@ public class AddGradleEnterpriseTest implements RewriteTest {
     }
 
     @Test
-    void addNewPluginsBlock() {
+    void addNewBuildPluginsBlock() {
+        rewriteRun(
+          buildGradle(
+            "",
+            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))
+              .after(actual -> {
+                  assertThat(actual).isNotNull();
+                  Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
+                  assertThat(version.find()).isTrue();
+                  return """
+                    plugins {
+                        id 'com.gradle.build-scan' version '%s'
+                    }
+                    """.formatted(version.group(0));
+              })
+          )
+        );
+    }
+
+    @Test
+    @Disabled("Need to be able to specify Gradle wrapper to generate tooling model for")
+    void addExistingBuildPluginsBlock() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id("java")
+              }
+              """,
+            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))
+              .after(actual -> {
+                  assertThat(actual).isNotNull();
+                  Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
+                  assertThat(version.find()).isTrue();
+                  return """
+                    plugins {
+                        id("java")
+                        id("com.gradle.build-scan") version "%s"
+                    }
+                    """.formatted(version.group(0));
+              })
+          )
+        );
+    }
+
+    @Test
+    void addNewSettingsPluginsBlock() {
         rewriteRun(
           settingsGradle(
             """
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> {
+            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))
+              .after(actual -> {
                 assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3.\\d+(.\\d+)?").matcher(actual);
+                Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
                 assertThat(version.find()).isTrue();
                 return """
                   plugins {
@@ -56,9 +105,8 @@ public class AddGradleEnterpriseTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
-    void addExistingPluginsBlock() {
+    void addExistingSettingsPluginsBlock() {
         rewriteRun(
           settingsGradle(
             """
@@ -68,18 +116,18 @@ public class AddGradleEnterpriseTest implements RewriteTest {
                             
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> {
+            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")).after(actual -> {
                 assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
+                Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
                 assertThat(version.find()).isTrue();
                 return """
-                      plugins {
-                      id 'com.gradle.enterprise' version '%s'
+                  plugins {
                       id 'org.openrewrite' version '1'
+                      id 'com.gradle.enterprise' version '%s'
                   }
                                 
                   rootProject.name = 'my-project'
-                      """.formatted(version.group(0));
+                  """.formatted(version.group(0));
             })
           )
         );
