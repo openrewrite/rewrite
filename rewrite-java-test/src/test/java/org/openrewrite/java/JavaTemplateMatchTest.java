@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
@@ -86,6 +87,188 @@ public class JavaTemplateMatchTest implements RewriteTest {
                   boolean b2 = /*~~>*/1 == 3;
 
                   boolean b3 = 2 == 1;
+              }
+              """
+          ));
+    }
+
+    @Test
+    @SuppressWarnings({"ObviousNullCheck"})
+    void matchAgainstQualifiedReference() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate miTemplate = JavaTemplate.builder(this::getCursor, "java.util.Objects.requireNonNull(#{any(String)})").build();
+              private final JavaTemplate faTemplate = JavaTemplate.builder(this::getCursor, "java.util.regex.Pattern.UNIX_LINES").build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return miTemplate.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+
+              @Override
+              public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                  if (getCursor().getParentTreeCursor().getValue() instanceof J.Import) {
+                      return fieldAccess;
+                  }
+                  return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Objects;
+              import java.util.regex.Pattern;
+
+              import static java.util.Objects.requireNonNull;
+              import static java.util.regex.Pattern.UNIX_LINES;
+
+              class Test {
+                  String s1 = java.util.Objects.requireNonNull("");
+                  String s2 = Objects.requireNonNull("");
+                  String s3 = requireNonNull("");
+
+                  int i1 = java.util.regex.Pattern.UNIX_LINES;
+                  int i2 = Pattern.UNIX_LINES;
+                  int i3 = UNIX_LINES;
+              }
+              """,
+            """
+              import java.util.Objects;
+              import java.util.regex.Pattern;
+
+              import static java.util.Objects.requireNonNull;
+              import static java.util.regex.Pattern.UNIX_LINES;
+
+              class Test {
+                  String s1 = /*~~>*/java.util.Objects.requireNonNull("");
+                  String s2 = /*~~>*/Objects.requireNonNull("");
+                  String s3 = /*~~>*/requireNonNull("");
+
+                  int i1 = /*~~>*/java.util.regex.Pattern.UNIX_LINES;
+                  int i2 = /*~~>*/Pattern.UNIX_LINES;
+                  int i3 = UNIX_LINES;
+              }
+              """
+          ));
+    }
+
+    @Test
+    @SuppressWarnings({"ObviousNullCheck"})
+    void matchAgainstUnqualifiedReference() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate miTemplate = JavaTemplate.builder(this::getCursor, "Objects.requireNonNull(#{any(String)})")
+                .imports("java.util.Objects").build();
+              private final JavaTemplate faTemplate = JavaTemplate.builder(this::getCursor, "Pattern.UNIX_LINES")
+                .imports("java.util.regex.Pattern").build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return miTemplate.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+
+              @Override
+              public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                  if (getCursor().getParentTreeCursor().getValue() instanceof J.Import) {
+                      return fieldAccess;
+                  }
+                  return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Objects;
+              import java.util.regex.Pattern;
+
+              import static java.util.Objects.requireNonNull;
+              import static java.util.regex.Pattern.UNIX_LINES;
+
+              class Test {
+                  String s1 = java.util.Objects.requireNonNull("");
+                  String s2 = Objects.requireNonNull("");
+                  String s3 = requireNonNull("");
+
+                  int i1 = java.util.regex.Pattern.UNIX_LINES;
+                  int i2 = Pattern.UNIX_LINES;
+                  int i3 = UNIX_LINES;
+              }
+              """,
+            """
+              import java.util.Objects;
+              import java.util.regex.Pattern;
+
+              import static java.util.Objects.requireNonNull;
+              import static java.util.regex.Pattern.UNIX_LINES;
+
+              class Test {
+                  String s1 = /*~~>*/java.util.Objects.requireNonNull("");
+                  String s2 = /*~~>*/Objects.requireNonNull("");
+                  String s3 = /*~~>*/requireNonNull("");
+
+                  int i1 = /*~~>*/java.util.regex.Pattern.UNIX_LINES;
+                  int i2 = /*~~>*/Pattern.UNIX_LINES;
+                  int i3 = UNIX_LINES;
+              }
+              """
+          ));
+    }
+
+    @Test
+    @ExpectedToFail
+    @SuppressWarnings({"ObviousNullCheck"})
+    void matchAgainstStaticallyImportedReference() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate miTemplate = JavaTemplate.builder(this::getCursor, "requireNonNull(#{any(String)})")
+                .staticImports("java.util.Objects.requireNonNull").build();
+              private final JavaTemplate faTemplate = JavaTemplate.builder(this::getCursor, "UNIX_LINES")
+                .staticImports("java.util.regex.Pattern.UNIX_LINES").build();
+
+              @Override
+              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  return miTemplate.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              }
+
+              @Override
+              public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                  if (getCursor().getParentTreeCursor().getValue() instanceof J.Import) {
+                      return fieldAccess;
+                  }
+                  return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Objects;
+              import java.util.regex.Pattern;
+
+              import static java.util.Objects.requireNonNull;
+              import static java.util.regex.Pattern.UNIX_LINES;
+
+              class Test {
+                  String s1 = java.util.Objects.requireNonNull("");
+                  String s2 = Objects.requireNonNull("");
+                  String s3 = requireNonNull("");
+
+                  int i1 = java.util.regex.Pattern.UNIX_LINES;
+                  int i2 = Pattern.UNIX_LINES;
+                  int i3 = UNIX_LINES;
+              }
+              """,
+            """
+              import java.util.Objects;
+              import java.util.regex.Pattern;
+
+              import static java.util.Objects.requireNonNull;
+              import static java.util.regex.Pattern.UNIX_LINES;
+
+              class Test {
+                  String s1 = /*~~>*/java.util.Objects.requireNonNull("");
+                  String s2 = /*~~>*/Objects.requireNonNull("");
+                  String s3 = /*~~>*/requireNonNull("");
+
+                  int i1 = /*~~>*/java.util.regex.Pattern.UNIX_LINES;
+                  int i2 = /*~~>*/Pattern.UNIX_LINES;
+                  int i3 = UNIX_LINES;
               }
               """
           ));

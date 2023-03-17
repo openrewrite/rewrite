@@ -660,16 +660,20 @@ public class SemanticallyEqual {
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.FieldAccess)) {
-                    isEqual.set(false);
+                    if (!(j instanceof J.Identifier) || !TypeUtils.isOfType(fieldAccess.getType(), ((J.Identifier) j).getType())) {
+                        isEqual.set(false);
+                    }
                     return fieldAccess;
                 }
 
                 J.FieldAccess compareTo = (J.FieldAccess) j;
-                if (!fieldAccess.getSimpleName().equals(compareTo.getSimpleName()) ||
-                        !TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType()) ||
-                        !TypeUtils.isOfType(fieldAccess.getTarget().getType(), compareTo.getTarget().getType())) {
-                    isEqual.set(false);
-                    return fieldAccess;
+                if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())) {
+                    if (!fieldAccess.getSimpleName().equals(compareTo.getSimpleName())) {
+                        isEqual.set(false);
+                        return fieldAccess;
+                    }
+
+                    this.visit(fieldAccess.getTarget(), compareTo.getTarget());
                 }
             }
             return fieldAccess;
@@ -954,17 +958,21 @@ public class SemanticallyEqual {
                     return method;
                 }
 
+                boolean static_ = method.getMethodType().hasFlags(Flag.Static);
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
                         !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
-                        nullMissMatch(method.getSelect(), compareTo.getSelect()) ||
+                        !(static_ == compareTo.getMethodType().hasFlags(Flag.Static) ||
+                          !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
                         method.getArguments().size() != compareTo.getArguments().size() ||
                         nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {
                     isEqual.set(false);
                     return method;
                 }
 
-                this.visit(method.getSelect(), compareTo.getSelect());
+                if (!static_) {
+                    this.visit(method.getSelect(), compareTo.getSelect());
+                }
                 boolean containsLiteral = false;
                 if (!compareMethodArguments) {
                     for (int i = 0; i < method.getArguments().size(); i++) {
