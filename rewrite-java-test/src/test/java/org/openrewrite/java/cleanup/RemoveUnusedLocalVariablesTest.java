@@ -16,7 +16,6 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -537,7 +536,6 @@ class RemoveUnusedLocalVariablesTest implements RewriteTest {
     }
 
     @Test
-    @SuppressWarnings("MissingSerialAnnotation")
     void ignoreAnonymousClassVariables() {
         rewriteRun(
           java(
@@ -925,32 +923,6 @@ class RemoveUnusedLocalVariablesTest implements RewriteTest {
               class A {
                   void foo() {
                       Long.parseLong("123");
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    @ExpectedToFail
-    void aliasingPackageNamePart() {
-        rewriteRun(
-          java(
-            """
-              class A {
-                  void foo() {
-                      String io = 3;
-                      File f = new java.io.File("f");
-                      Long.parseLong(f.getName());
-                  }
-              }
-              """,
-            """
-              class A {
-                  void foo() {
-                      File f = new java.io.File("f");
-                      Long.parseLong(f.getName());
                   }
               }
               """
