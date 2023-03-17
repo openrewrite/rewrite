@@ -26,7 +26,10 @@ import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -460,5 +463,22 @@ class EnvironmentTest implements RewriteTest {
             ))).build();
         var recipe = env.activateRecipes("test.Foo");
         assertThat(recipe.validate().isValid()).isTrue();
+    }
+
+    @Test
+    void recipeWithContributors() {
+        var env = Environment.builder().scanRuntimeClasspath().build();
+
+        Map<String, RecipeDescriptor> descriptors = env.listRecipeDescriptors().stream()
+          .collect(Collectors.toMap(RecipeDescriptor::getName, Function.identity()));
+        assertThat(descriptors).hasSizeGreaterThanOrEqualTo(3)
+          .containsKeys("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon", "org.openrewrite.text.HelloKotlin");
+
+        assertThat(descriptors.get("org.openrewrite.text.ChangeTextToJon").getContributors())
+          .containsExactly(new RecipeContributor("Foo Bar", "foo@bar.com"), new RecipeContributor("Baz Qux", "baz@qux.com"));
+        assertThat(descriptors.get("org.openrewrite.text.HelloKotlin").getContributors())
+          .containsExactly(new RecipeContributor("Nobody", "not@here.com"));
+        assertThat(descriptors.get("org.openrewrite.HelloJon").getContributors())
+          .containsExactly(new RecipeContributor("Foo Bar", "foo@bar.com"));
     }
 }

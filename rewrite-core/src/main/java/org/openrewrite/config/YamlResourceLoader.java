@@ -73,7 +73,8 @@ public class YamlResourceLoader implements ResourceLoader {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
         Category("specs.openrewrite.org/v1beta/category"),
-        Example("specs.openrewrite.org/v1beta/example");
+        Example("specs.openrewrite.org/v1beta/example"),
+        Contributors("specs.openrewrite.org/v1beta/contributors");
 
         private final String spec;
 
@@ -213,7 +214,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
             List<Object> rawMaintainers = (List<Object>) r.getOrDefault("maintainers", emptyList());
             List<Maintainer> maintainers;
-            if(rawMaintainers.isEmpty()) {
+            if (rawMaintainers.isEmpty()) {
                 maintainers = emptyList();
             } else {
                 maintainers = new ArrayList<>(rawMaintainers.size());
@@ -438,4 +439,39 @@ public class YamlResourceLoader implements ResourceLoader {
                         (String) c.get("after"))
                 ).collect(toList());
     }
+
+    public Collection<RecipeContributionDescriptor> listRecipeContributionDescriptors() {
+        Collection<Map<String, Object>> resources = loadResources(ResourceType.Contributors);
+        List<RecipeContributionDescriptor> contributions = new ArrayList<>(resources.size());
+        for (Map<String, Object> r : resources) {
+            if (!r.containsKey("name")) {
+                continue;
+            }
+
+            String name = (String) r.get("name");
+
+            @SuppressWarnings("unchecked")
+            List<Object> rawContributors = (List<Object>) r.getOrDefault("contributors", emptyList());
+            List<RecipeContributor> contributors;
+            if (rawContributors.isEmpty()) {
+                contributors = emptyList();
+            } else {
+                contributors = new ArrayList<>(rawContributors.size());
+                for (Object rawContributor : rawContributors) {
+                    if (rawContributor instanceof Map) {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> contributorMap = (Map<String, Object>) rawContributor;
+                        String contributorName = (String) contributorMap.get("name");
+                        String contributorEmail = (String) contributorMap.get("email");
+                        contributors.add(new RecipeContributor(contributorName, contributorEmail));
+                    }
+                }
+            }
+
+            contributions.add(new RecipeContributionDescriptor(name, contributors));
+        }
+
+        return contributions;
+    }
+
 }

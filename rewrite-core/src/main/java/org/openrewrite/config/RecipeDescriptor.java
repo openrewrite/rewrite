@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Maintainer;
-import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
@@ -55,6 +54,9 @@ public class RecipeDescriptor {
     List<DataTableDescriptor> dataTables;
 
     List<Maintainer> maintainers;
+
+    @With
+    List<RecipeContributor> contributors;
 
     URI source;
 }

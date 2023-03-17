@@ -42,6 +42,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
     private final List<RecipeExample> recipeExamples = new ArrayList<>();
+    private final Map<String, List<RecipeContributor>> recipeContributions = new HashMap<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -50,11 +51,11 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param acceptPackages Limit scan to specified packages
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
-        scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
         scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
                 properties,
                 emptyList(),
                 null);
+        scanClasses(new ClassGraph().acceptPackages(acceptPackages), getClass().getClassLoader());
     }
 
     /**
@@ -64,10 +65,6 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param classLoader Limit scan to classes loadable by this classloader
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
-        scanClasses(new ClassGraph()
-                 .ignoreParentClassLoaders()
-                 .overrideClassLoaders(classLoader), classLoader);
-
         scanYaml(new ClassGraph()
                  .ignoreParentClassLoaders()
                  .overrideClassLoaders(classLoader)
@@ -75,21 +72,25 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 properties,
                 emptyList(),
                 classLoader);
+
+        scanClasses(new ClassGraph()
+                 .ignoreParentClassLoaders()
+                 .overrideClassLoaders(classLoader), classLoader);
     }
 
     public ClasspathScanningLoader(Path jar, Properties properties, Collection<? extends ResourceLoader> dependencyResourceLoaders, ClassLoader classLoader) {
         String jarName = jar.toFile().getName();
-
-        scanClasses(new ClassGraph()
-                .acceptJars(jarName)
-                .ignoreParentClassLoaders()
-                .overrideClassLoaders(classLoader), classLoader);
 
         scanYaml(new ClassGraph()
                 .acceptJars(jarName)
                 .ignoreParentClassLoaders()
                 .overrideClassLoaders(classLoader)
                 .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
+
+        scanClasses(new ClassGraph()
+                .acceptJars(jarName)
+                .ignoreParentClassLoaders()
+                .overrideClassLoaders(classLoader), classLoader);
     }
 
     /**
@@ -113,9 +114,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
                 recipeExamples.addAll(resourceLoader.listRecipeExamples());
+                resourceLoader.listRecipeContributionDescriptors().forEach(d -> recipeContributions.put(d.getName(), d.getContributors()));
             }
             for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes));
+                Collection<RecipeDescriptor> descriptors = resourceLoader.listRecipeDescriptors(recipes);
+                for (RecipeDescriptor descriptor : descriptors) {
+                    recipeDescriptors.add(descriptor.withContributors(recipeContributions.getOrDefault(descriptor.getName(), emptyList())));
+                }
             }
         }
     }
@@ -133,7 +138,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 }
                 try {
                     Recipe recipe = constructRecipe(recipeClass);
-                    recipeDescriptors.add(recipeDescriptorFromRecipe(recipe));
+                    RecipeDescriptor descriptor = recipeDescriptorFromRecipe(recipe);
+                    descriptor = descriptor.withContributors(recipeContributions.getOrDefault(descriptor.getName(), emptyList()));
+                    recipeDescriptors.add(descriptor);
                     recipes.add(recipe);
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
