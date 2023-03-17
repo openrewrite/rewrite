@@ -309,6 +309,9 @@ public interface RewriteTest extends SourceSpecs {
         for (Consumer<List<SourceFile>> beforeRecipe : testMethodSpec.beforeRecipes) {
             beforeRecipe.accept(beforeSourceFiles);
         }
+        for (SourceFile beforeSourceFile : beforeSourceFiles) {
+            specBySourceFile.put(beforeSourceFile, specBySourceFile.remove(beforeSourceFile));
+        }
 
         List<SourceFile> runnableSourceFiles = new ArrayList<>(beforeSourceFiles.size());
         for (Map.Entry<SourceFile, SourceSpec<?>> sourceFileSpec : specBySourceFile.entrySet()) {

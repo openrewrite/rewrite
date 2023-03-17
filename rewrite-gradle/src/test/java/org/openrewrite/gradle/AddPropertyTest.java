@@ -20,13 +20,15 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 import static org.openrewrite.properties.Assertions.properties;
 
-public class AddPropertyTest implements RewriteTest {
+class AddPropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddProperty("org.gradle.caching", "true", true));
+        spec.beforeRecipe(withToolingApi())
+          .recipe(new AddProperty("org.gradle.caching", "true", true));
     }
 
     @Test

@@ -16,24 +16,39 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.toolingapi.OpenRewriteModel;
 import org.openrewrite.gradle.toolingapi.OpenRewriteModelBuilder;
+import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.OperatingSystemProvenance;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
-import org.openrewrite.test.internal.ThrowingUnaryOperator;
+import org.openrewrite.test.UncheckedConsumer;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
+
+import static java.util.Objects.requireNonNull;
+import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.*;
 
 public class Assertions {
 
@@ -43,6 +58,76 @@ public class Assertions {
     private static final Parser.Builder gradleParser = GradleParser.builder()
             .groovyParser(GroovyParser.builder().logCompilationWarningsAndErrors(true));
 
+    public static UncheckedConsumer<List<SourceFile>> withToolingApi(@Nullable String version, @Nullable String distribution) {
+        return sourceFiles -> {
+            try {
+                Path projectDir = Files.createTempDirectory("project");
+                try {
+                    for (SourceFile sourceFile : sourceFiles) {
+                        if (sourceFile instanceof G.CompilationUnit) {
+                            G.CompilationUnit g = (G.CompilationUnit) sourceFile;
+                            if (g.getSourcePath().toString().endsWith(".gradle")) {
+                                Path groovyGradle = projectDir.resolve(g.getSourcePath());
+                                Files.createDirectories(groovyGradle.getParent());
+                                Files.write(groovyGradle, g.printAllAsBytes());
+                            }
+                        } else if (sourceFile instanceof Properties.File) {
+                            Properties.File f = (Properties.File) sourceFile;
+                            if (f.getSourcePath().endsWith("gradle.properties")) {
+                                Path gradleProperties = projectDir.resolve(f.getSourcePath());
+                                Files.createDirectories(gradleProperties.getParent());
+                                Files.write(gradleProperties, f.printAllAsBytes());
+                            }
+                        }
+                    }
+
+                    if (version != null) {
+                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null, null).getValue());
+                        Files.createDirectories(projectDir.resolve("gradle/wrapper/"));
+                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION), ("distributionBase=GRADLE_USER_HOME\n" +
+                                "distributionPath=wrapper/dists\n" +
+                                "distributionUrl=" + gradleWrapper.getPropertiesFormattedUrl() + "\n" +
+                                "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n" +
+                                "zipStoreBase=GRADLE_USER_HOME\n" +
+                                "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
+                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.asRemote().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
+                        Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
+                        Files.copy(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew")), gradleSh);
+                        OperatingSystemProvenance current = OperatingSystemProvenance.current();
+                        if (current.isLinux() || current.isMacOsX()) {
+                            Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(gradleSh);
+                            permissions.add(PosixFilePermission.OWNER_EXECUTE);
+                            Files.setPosixFilePermissions(gradleSh, permissions);
+                        }
+                        Files.copy(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")), projectDir.resolve(GradleWrapper.WRAPPER_BATCH_LOCATION));
+                    }
+
+                    OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile());
+                    GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
+                    for (int i = 0; i < sourceFiles.size(); i++) {
+                        SourceFile sourceFile = sourceFiles.get(i);
+                        if (sourceFile.getSourcePath().equals(Paths.get("build.gradle"))) {
+                            sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleProject)));
+                            break;
+                        }
+                    }
+                } finally {
+                    deleteDirectory(projectDir.toFile());
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        };
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> withToolingApi(String version) {
+        return withToolingApi(version, "bin");
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> withToolingApi() {
+        return withToolingApi(null, null);
+    }
+
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before) {
         return buildGradle(before, s -> {
         });
@@ -51,7 +136,7 @@ public class Assertions {
     public static SourceSpecs buildGradle(@Language("groovy") @Nullable String before, Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, null);
         gradle.path(Paths.get("build.gradle"));
-        acceptSpec(spec, gradle);
+        spec.accept(gradle);
         return gradle;
     }
 
@@ -64,7 +149,7 @@ public class Assertions {
                                           Consumer<SourceSpec<G.CompilationUnit>> spec) {
         SourceSpec<G.CompilationUnit> gradle = new SourceSpec<>(G.CompilationUnit.class, "gradle", gradleParser, before, s -> after);
         gradle.path("build.gradle");
-        acceptSpec(spec, gradle);
+        spec.accept(gradle);
         return gradle;
     }
 
@@ -91,27 +176,6 @@ public class Assertions {
         gradle.path("settings.gradle");
         spec.accept(gradle);
         return gradle;
-    }
-
-    private static void acceptSpec(Consumer<SourceSpec<G.CompilationUnit>> spec, SourceSpec<G.CompilationUnit> buildGradle) {
-        ThrowingUnaryOperator<G.CompilationUnit> userSuppliedBeforeRecipe = buildGradle.getBeforeRecipe();
-        buildGradle.mapBeforeRecipe(cu -> {
-            G.CompilationUnit c = userSuppliedBeforeRecipe.apply(cu);
-            try {
-                Path projectDir = Files.createTempDirectory("project");
-                Path buildGradleOnDisk = projectDir.resolve("build.gradle");
-                try {
-                    Files.write(buildGradleOnDisk, c.printAllAsBytes());
-                    OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile());
-                    return c.withMarkers(c.getMarkers().add(GradleProject.fromToolingModel(model.gradleProject())));
-                } finally {
-                    deleteDirectory(projectDir.toFile());
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
-        spec.accept(buildGradle);
     }
 
     private static void deleteDirectory(File directoryToBeDeleted) {
