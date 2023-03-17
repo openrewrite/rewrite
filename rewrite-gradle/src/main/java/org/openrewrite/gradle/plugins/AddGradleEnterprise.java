@@ -61,11 +61,11 @@ public class AddGradleEnterprise extends Recipe {
                             if (buildTool.getType() == BuildTool.Type.Gradle) {
                                 VersionComparator versionComparator = Semver.validate("(,6)", null).getValue();
                                 if (versionComparator != null && versionComparator.isValid(null, buildTool.getVersion())) {
-                                    doAfterVisit(new AddBuildPlugin("com.gradle.build-scan", version, null));
-                                    doAfterVisit(new UpgradePluginVersion("com.gradle.build-scan", version, null));
+                                    doNext(new AddBuildPlugin("com.gradle.build-scan", version, null));
+                                    doNext(new UpgradePluginVersion("com.gradle.build-scan", version, null));
                                 } else {
-                                    doAfterVisit(new AddSettingsPlugin("com.gradle.enterprise", version, null));
-                                    doAfterVisit(new UpgradePluginVersion("com.gradle.enterprise", version, null));
+                                    doNext(new AddSettingsPlugin("com.gradle.enterprise", version, null));
+                                    doNext(new UpgradePluginVersion("com.gradle.enterprise", version, null));
                                 }
                             }
                         });

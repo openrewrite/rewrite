@@ -26,7 +26,8 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class AddGradleEnterpriseTest implements RewriteTest {
 
@@ -38,10 +39,10 @@ class AddGradleEnterpriseTest implements RewriteTest {
     @Test
     void addNewBuildPluginsBlock() {
         rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
           buildGradle(
             "",
-            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))
-              .after(actual -> {
+            spec -> spec.after(actual -> {
                   assertThat(actual).isNotNull();
                   Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
                   assertThat(version.find()).isTrue();
@@ -51,6 +52,11 @@ class AddGradleEnterpriseTest implements RewriteTest {
                     }
                     """.formatted(version.group(0));
               })
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """
           )
         );
     }
@@ -59,6 +65,7 @@ class AddGradleEnterpriseTest implements RewriteTest {
     @Disabled("Need to be able to specify Gradle wrapper to generate tooling model for")
     void addExistingBuildPluginsBlock() {
         rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
           buildGradle(
             """
               plugins {
@@ -77,6 +84,11 @@ class AddGradleEnterpriseTest implements RewriteTest {
                     }
                     """.formatted(version.group(0));
               })
+          ),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              """
           )
         );
     }
@@ -84,12 +96,15 @@ class AddGradleEnterpriseTest implements RewriteTest {
     @Test
     void addNewSettingsPluginsBlock() {
         rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+          buildGradle(
+            ""
+          ),
           settingsGradle(
             """
               rootProject.name = 'my-project'
               """,
-            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))
-              .after(actual -> {
+            spec -> spec.after(actual -> {
                 assertThat(actual).isNotNull();
                 Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
                 assertThat(version.find()).isTrue();
@@ -108,6 +123,10 @@ class AddGradleEnterpriseTest implements RewriteTest {
     @Test
     void addExistingSettingsPluginsBlock() {
         rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+          buildGradle(
+            ""
+          ),
           settingsGradle(
             """
               plugins {
@@ -116,7 +135,7 @@ class AddGradleEnterpriseTest implements RewriteTest {
                             
               rootProject.name = 'my-project'
               """,
-            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")).after(actual -> {
+            spec -> spec.after(actual -> {
                 assertThat(actual).isNotNull();
                 Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
                 assertThat(version.find()).isTrue();
