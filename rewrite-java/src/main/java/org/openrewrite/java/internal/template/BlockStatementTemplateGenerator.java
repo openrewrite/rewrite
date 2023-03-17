@@ -353,12 +353,12 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Try) {
             J.Try t = (J.Try) j;
-            if (t.getResources() != null) {
-                before.insert(0, ")");
+            if (t.getResources() != null && referToSameElement(prior, t.getBody())) {
+                StringJoiner joiner = new StringJoiner("; ", "try (", ")");
                 for (J.Try.Resource resource : t.getResources()) {
-                    before.insert(0, resource.withPrefix(Space.EMPTY).printTrimmed(cursor).trim() + ';');
+                    joiner.add(resource.withPrefix(Space.EMPTY).printTrimmed(cursor).trim());
                 }
-                before.insert(0, "try(");
+                before.insert(0, joiner);
             }
         } else if (j instanceof J.Lambda) {
             J.Lambda l = (J.Lambda) j;
