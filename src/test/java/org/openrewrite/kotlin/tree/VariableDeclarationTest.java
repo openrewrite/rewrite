@@ -214,4 +214,21 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void typeAlias() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test
+            """
+          ),
+          kotlin(
+            """
+            typealias TestAlias = Test
+            val a : TestAlias = Test ( )
+            """
+          )
+        );
+    }
 }

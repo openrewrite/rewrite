@@ -3051,7 +3051,63 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitTypeAlias(FirTypeAlias typeAlias, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTypeAlias is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        Space prefix = whitespace();
+
+        List<J> modifiers = emptyList();
+        Markers markers = Markers.EMPTY;
+
+        List<J.Annotation> annotations = mapModifiers(typeAlias.getAnnotations(), "typealias");
+        Space aliasPrefix = whitespace();
+        J.Annotation aliasAnnotation = new J.Annotation(
+                randomId(),
+                aliasPrefix,
+                Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
+                createIdentifier("typealias"),
+                JContainer.empty());
+        annotations.add(aliasAnnotation);
+
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
+        Space namePrefix = EMPTY;
+        String valueName = "";
+        if ("<no name provided>".equals(typeAlias.getName().toString())) {
+            KtSourceElement sourceElement = typeAlias.getSource();
+            if (sourceElement == null) {
+                throw new IllegalStateException("Unexpected null source.");
+            }
+        } else {
+            valueName = typeAlias.getName().asString();
+            namePrefix = whitespace();
+        }
+        J.Identifier name = createIdentifier(valueName, typeMapping.type(typeAlias.getExpandedTypeRef()), null);
+
+        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
+        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
+
+        Space initializerPrefix = sourceBefore("=");
+        Expression expr = (Expression) visitElement(typeAlias.getExpandedTypeRef(), ctx);
+        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
+                new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        namePrefix,
+                        Markers.EMPTY,
+                        name,
+                        dimensionsAfterName,
+                        padLeft(initializerPrefix, expr),
+                        null
+                )
+        );
+        vars.add(namedVariable);
+
+        return new J.VariableDeclarations(
+                randomId(),
+                prefix,
+                markers,
+                annotations,
+                emptyList(),
+                null,
+                null,
+                null,
+                vars);
     }
 
     @Override
