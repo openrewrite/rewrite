@@ -15,24 +15,15 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.Value;
-import lombok.With;
-import org.antlr.v4.runtime.*;
 import org.openrewrite.Incubating;
-import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
-import org.openrewrite.java.internal.grammar.TemplateParameterParser;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Recursively checks the equality of each element of two ASTs to determine if two trees are semantically equal.
@@ -42,13 +33,13 @@ import static org.openrewrite.Tree.randomId;
 @Incubating(since = "7.24.0")
 public class SemanticallyEqual {
 
-    private SemanticallyEqual() {
+    protected SemanticallyEqual() {
     }
 
     public static boolean areEqual(J firstElem, J secondElem) {
         SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(true);
         semanticallyEqualVisitor.visit(firstElem, secondElem);
-        return semanticallyEqualVisitor.isEqual.get();
+        return semanticallyEqualVisitor.isEqual();
     }
 
     /**
@@ -62,123 +53,30 @@ public class SemanticallyEqual {
         return semanticallyEqualVisitor.isEqual.get();
     }
 
-    @Incubating(since = "7.38.0")
-    public static boolean matchesTemplate(JavaTemplate template, J input) {
-        JavaCoordinates coordinates;
-        if (input instanceof Expression) {
-            coordinates = ((Expression) input).getCoordinates().replace();
-        } else if (input instanceof Statement) {
-            coordinates = ((Statement) input).getCoordinates().replace();
-        } else {
-            throw new IllegalArgumentException("Only expressions and statements can be matched against a template: " + input.getClass());
-        }
-
-        J[] parameters = createTemplateParameters(template.getCode());
-        J templateTree = template.withTemplate(input, coordinates, parameters);
-        return matchesTemplate(templateTree, input);
-    }
-
-    private static J[] createTemplateParameters(String code) {
-        PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper(
-                "#{", "}", null);
-
-        List<J> parameters = new ArrayList<>();
-        String substituted = code;
-        while (true) {
-            String previous = substituted;
-            substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
-                String s;
-                if (!key.isEmpty()) {
-                    TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
-                            CharStreams.fromString(key))));
-
-                    parser.removeErrorListeners();
-                    parser.addErrorListener(new BaseErrorListener() {
-                        @Override
-                        public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
-                                                int line, int charPositionInLine, String msg, RecognitionException e) {
-                            throw new IllegalArgumentException(
-                                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
-                        }
-                    });
-
-                    TemplateParameterParser.MatcherPatternContext ctx = parser.matcherPattern();
-                    String matcherName = ctx.matcherName().Identifier().getText();
-                    List<TemplateParameterParser.MatcherParameterContext> params = ctx.matcherParameter();
-
-                    if ("any".equals(matcherName)) {
-                        String fqn;
-
-                        if (params.size() == 1) {
-                            if(params.get(0).Identifier() != null) {
-                                fqn = params.get(0).Identifier().getText();
-                            } else {
-                                fqn = params.get(0).FullyQualifiedName().getText();
-                            }
-                        } else {
-                            fqn = "java.lang.Object";
-                        }
-
-                        s = fqn.replace("$", ".");
-
-                        Markers markers = Markers.build(Collections.singleton(new TemplateParameter(randomId(), s)));
-                        parameters.add(new J.Empty(randomId(), Space.EMPTY, markers));
-                    } else {
-                        throw new IllegalArgumentException("Invalid template matcher '" + key + "'");
-                    }
-                } else {
-                    throw new IllegalArgumentException("Only typed placeholders are allowed.");
-                }
-
-                return s;
-            });
-
-            if (previous.equals(substituted)) {
-                break;
-            }
-        }
-
-        return parameters.toArray(new J[0]);
-    }
-
-    @Value
-    @With
-    public static class TemplateParameter implements Marker {
-        UUID id;
-        String typeName;
-    }
-
-    private static boolean matchesTemplate(J templateTree, J tree) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new SemanticallyEqualVisitor(true, true);
-        semanticallyEqualVisitor.visit(templateTree, tree);
-        return semanticallyEqualVisitor.isEqual.get();
-    }
-
     @SuppressWarnings("ConstantConditions")
-    private static class SemanticallyEqualVisitor extends JavaIsoVisitor<J> {
+    protected static class SemanticallyEqualVisitor extends JavaIsoVisitor<J> {
         private final boolean compareMethodArguments;
-        private final boolean matchAgainstTemplate;
 
-        AtomicBoolean isEqual = new AtomicBoolean(true);
+        protected final AtomicBoolean isEqual = new AtomicBoolean(true);
+
         public SemanticallyEqualVisitor(boolean compareMethodArguments) {
-            this(compareMethodArguments, false);
-        }
-
-        public SemanticallyEqualVisitor(boolean compareMethodArguments, boolean matchAgainstTemplate) {
             this.compareMethodArguments = compareMethodArguments;
-            this.matchAgainstTemplate = matchAgainstTemplate;
         }
 
-        private boolean nullMissMatch(Object obj1, Object obj2) {
+        public boolean isEqual() {
+            return isEqual.get();
+        }
+
+        protected boolean nullMissMatch(Object obj1, Object obj2) {
             return (obj1 == null && obj2 != null || obj1 != null && obj2 == null);
         }
 
-        private boolean nullListSizeMissMatch(List<?> list1, List<?> list2) {
+        protected boolean nullListSizeMissMatch(List<?> list1, List<?> list2) {
             return nullMissMatch(list1, list2) ||
                     list1 != null && list2 != null && list1.size() != list2.size();
         }
 
-        private void visitList(@Nullable List<? extends J> list1, @Nullable List<? extends J> list2) {
+        protected void visitList(@Nullable List<? extends J> list1, @Nullable List<? extends J> list2) {
             if (!isEqual.get() || nullListSizeMissMatch(list1, list2)) {
                 isEqual.set(false);
                 return;
@@ -191,14 +89,6 @@ public class SemanticallyEqual {
                     }
                 }
             }
-        }
-
-        private boolean matchesTemplateParameterPlaceholder(J.Empty empty, J j) {
-            return empty.getMarkers().findFirst(TemplateParameter.class)
-                    .map(m -> "java.lang.Object".equals(m.typeName)
-                            || j instanceof TypedTree
-                            && TypeUtils.isAssignableTo(m.typeName, ((TypedTree) j).getType()))
-                    .orElse(false);
         }
 
         @Override
@@ -600,9 +490,6 @@ public class SemanticallyEqual {
         @Override
         public J.Empty visitEmpty(J.Empty empty, J j) {
             if (isEqual.get()) {
-                if (matchAgainstTemplate && matchesTemplateParameterPlaceholder(empty, j)) {
-                    return empty;
-                }
                 if (!(j instanceof J.Empty)) {
                     isEqual.set(false);
                     return empty;

@@ -24,7 +24,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
-import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.Space.Location;
@@ -115,7 +114,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     @Incubating(since = "7.38.0")
     public boolean matches(J tree) {
-        return SemanticallyEqual.matchesTemplate(this, tree);
+        return JavaTemplateSemanticallyEqual.matchesTemplate(this, tree);
     }
 
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
