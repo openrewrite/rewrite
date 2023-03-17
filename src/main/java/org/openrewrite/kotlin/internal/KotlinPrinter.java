@@ -370,10 +370,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(impoort, Space.Location.IMPORT_PREFIX, p);
             p.append("import");
             if (impoort.isStatic()) {
-                visitSpace(impoort.getPadding().getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
-                p.append("static");
+                J.FieldAccess qualid = impoort.getQualid();
+                visitSpace(qualid.getPrefix(), Space.Location.FIELD_ACCESS_PREFIX, p);
+                if (qualid.getTarget() instanceof J.FieldAccess) {
+                    visit(((J.FieldAccess) qualid.getTarget()).getTarget(), p);
+                    p.append(".");
+                } else {
+                    visit(qualid.getTarget(), p);
+                }
+                visit(qualid.getName(), p);
+            } else {
+                visit(impoort.getQualid(), p);
             }
-            visit(impoort.getQualid(), p);
             JLeftPadded<J.Identifier> alias = impoort.getPadding().getAlias();
             if(alias != null) {
                 visitSpace(alias.getBefore(), Space.Location.IMPORT_ALIAS_PREFIX, p);

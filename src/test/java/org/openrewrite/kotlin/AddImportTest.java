@@ -67,4 +67,41 @@ public class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.b.Target", "method", false))),
+          kotlin(
+            """
+            package a.b
+            class Original
+            """),
+          kotlin(
+            """
+            package a.b
+            class Target {
+                inline fun method() {}
+            }
+            """),
+          kotlin(
+            """
+            import a.b.Original
+            
+            class A {
+                val type : Original = Original()
+            }
+            """,
+            """
+            import a.b.Original
+            
+            import a.b.method
+            
+            class A {
+                val type : Original = Original()
+            }
+            """
+          )
+        );
+    }
 }
