@@ -33,6 +33,7 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.*;
 
 /**
  * Generates a stub containing enough variable, method, and class scope
@@ -62,7 +63,7 @@ public class BlockStatementTemplateGenerator {
 
     private final Set<String> imports;
 
-    public String template(Cursor cursor, String template, Space.Location location) {
+    public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
         return Timer.builder("rewrite.template.generate.statement")
                 .register(Metrics.globalRegistry)
@@ -70,7 +71,7 @@ public class BlockStatementTemplateGenerator {
                     StringBuilder before = new StringBuilder();
                     StringBuilder after = new StringBuilder();
 
-                    // for replaceBody()
+                    // for CoordinateBuilder.MethodDeclaration#replaceBody()
                     if (cursor.getValue() instanceof J.MethodDeclaration &&
                         location.equals(Space.Location.BLOCK_PREFIX)) {
                         J.MethodDeclaration method = cursor.getValue();
@@ -79,7 +80,7 @@ public class BlockStatementTemplateGenerator {
                         after.append('}');
                     }
 
-                    template(next(cursor), cursor.getValue(), before, after, cursor.getValue());
+                    template(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
 
                     return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after;
                 });
@@ -198,7 +199,7 @@ public class BlockStatementTemplateGenerator {
     }
 
     @SuppressWarnings("ConstantConditions")
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J toReplace) {
+    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
             before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
@@ -220,12 +221,12 @@ public class BlockStatementTemplateGenerator {
             J parent = next(cursor).getValue();
             if (parent instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = (J.ClassDeclaration) parent;
-                classDeclaration(prior, c, before, after, cursor);
+                classDeclaration(prior, c, before, after, cursor, mode);
             } else if (parent instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) parent;
 
                 // variable declarations up to the point of insertion
-                addLeadingVariableDeclarations(cursor, prior, m.getBody(), before, toReplace);
+                addLeadingVariableDeclarations(cursor, prior, m.getBody(), before, insertionPoint);
 
                 if (m.getReturnTypeExpression() != null && !JavaType.Primitive.Void
                         .equals(m.getReturnTypeExpression().getType())) {
@@ -243,7 +244,7 @@ public class BlockStatementTemplateGenerator {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
-                addLeadingVariableDeclarations(cursor, prior, b, before, toReplace);
+                addLeadingVariableDeclarations(cursor, prior, b, before, insertionPoint);
 
                 before.insert(0, "{\n");
                 if (b.isStatic()) {
@@ -415,7 +416,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.If) {
             J.If iff = (J.If) j;
             if (referToSameElement(prior, iff.getIfCondition())) {
-                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), toReplace);
+                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
                 int toReplaceIdx;
                 if (condition != null && (toReplaceIdx = condition.indexOf('§')) != -1) {
                     before.insert(0, "if (" + condition.substring(0, toReplaceIdx) + '(');
@@ -427,7 +428,7 @@ public class BlockStatementTemplateGenerator {
                     });
                 }
             } else {
-                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), toReplace);
+                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
                 if (condition != null) {
                     if (referToSameElement(prior, iff.getThenPart())) {
                         insertControlWithBlock(iff.getThenPart(), before, after, () ->
@@ -440,7 +441,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) j;
-            String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), toReplace);
+            String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), insertionPoint);
             if(condition != null) {
                 if (referToSameElement(prior, ternary.getCondition())) {
                     int splitIdx = condition.indexOf('§');
@@ -475,10 +476,10 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
         }
-        template(next(cursor), j, before, after, toReplace);
+        template(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
 
-    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J toReplace) {
+    private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {
         for (Statement statement : containingBlock.getStatements()) {
             if (referToSameElement(current, statement)) {
                 break;
@@ -492,7 +493,7 @@ public class BlockStatementTemplateGenerator {
                                  ";\n");
             } else if (statement instanceof J.If) {
                 J.If iff = (J.If) statement;
-                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), toReplace);
+                String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
                 if (condition != null) {
                     boolean thenNeverCompletesNormally = PatternVariables.neverCompletesNormally(iff.getThenPart());
                     boolean elseNeverCompletesNormally = iff.getElsePart() != null && PatternVariables.neverCompletesNormally(iff.getElsePart().getBody());
@@ -515,7 +516,7 @@ public class BlockStatementTemplateGenerator {
         }
     }
 
-    private void classDeclaration(@Nullable J prior, J.ClassDeclaration cd, StringBuilder before, StringBuilder after, Cursor cursor) {
+    private void classDeclaration(@Nullable J prior, J.ClassDeclaration cd, StringBuilder before, StringBuilder after, Cursor cursor, JavaCoordinates.Mode mode) {
         StringBuilder beforeBuffer = prior == null ? null : new StringBuilder();
         StringBuilder appendBuffer = prior == null ? after : beforeBuffer;
 
@@ -524,8 +525,12 @@ public class BlockStatementTemplateGenerator {
         List<Statement> statements = cd.getBody().getStatements();
         for (Statement statement : statements) {
             if (referToSameElement(statement, prior)) {
-                appendBuffer = after;
-                continue;
+                if (mode != AFTER) {
+                    appendBuffer = after;
+                    if (mode == REPLACEMENT) {
+                        continue;
+                    }
+                }
             }
 
             if (statement instanceof J.EnumValueSet) {
@@ -545,7 +550,7 @@ public class BlockStatementTemplateGenerator {
             } else if (statement instanceof J.ClassDeclaration) {
                 // this is a sibling class. we need declarations for all variables and methods.
                 // setting prior to null will cause them all to be written.
-                classDeclaration(null, (J.ClassDeclaration) statement, before, appendBuffer, cursor);
+                classDeclaration(null, (J.ClassDeclaration) statement, before, appendBuffer, cursor, REPLACEMENT);
                 appendBuffer.append('}');
             }
         }

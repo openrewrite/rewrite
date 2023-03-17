@@ -926,4 +926,62 @@ class JavaTemplateTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void firstClassMember() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitBlock(J.Block block, ExecutionContext ctx) {
+                  if (block.getStatements().size() == 1) {
+                      return block.withTemplate(JavaTemplate.builder(this::getCursor, "String x = s;").build(),
+                        block.getCoordinates().firstStatement());
+                  }
+                  return super.visitBlock(block, ctx);
+              }
+          })),
+          java(
+            """
+              class T {
+                  String s = "s";
+              }
+              """,
+            """
+              class T {
+                  String x = s;
+                  String s = "s";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lastClassMember() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitBlock(J.Block block, ExecutionContext ctx) {
+                  if (block.getStatements().size() == 1) {
+                      return block.withTemplate(JavaTemplate.builder(this::getCursor, "String x = s;").build(),
+                      block.getStatements().get(0).getCoordinates().after());
+                  }
+                  return super.visitBlock(block, ctx);
+              }
+          })),
+          java(
+            """
+              class T {
+                  String s = "s";
+              }
+              """,
+            """
+              class T {
+                  String s = "s";
+                  String x = s;
+              }
+              """
+          )
+        );
+    }
 }
