@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
@@ -89,6 +90,22 @@ public class SemanticallyEqual {
                     }
                 }
             }
+        }
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, J j) {
+            return super.visit(unwrap(tree), unwrap(j));
+        }
+
+        @Nullable
+        private static J unwrap(@Nullable Tree tree) {
+            if (tree instanceof Expression) {
+                tree = ((Expression) tree).unwrap();
+            }
+            if (tree instanceof J.ControlParentheses) {
+                tree = unwrap(((J.ControlParentheses<?>) tree).getTree());
+            }
+            return (J) tree;
         }
 
         @Override
@@ -401,7 +418,6 @@ public class SemanticallyEqual {
 
                 J.CompilationUnit compareTo = (J.CompilationUnit) j;
                 if (nullMissMatch(cu.getPackageDeclaration(), compareTo.getPackageDeclaration()) ||
-                        cu.getImports().size() != compareTo.getImports().size() ||
                         cu.getClasses().size() != compareTo.getClasses().size()) {
                     isEqual.set(false);
                     return cu;
@@ -410,7 +426,7 @@ public class SemanticallyEqual {
                 if (cu.getPackageDeclaration() != null && compareTo.getPackageDeclaration() != null) {
                     this.visit(cu.getPackageDeclaration(), compareTo.getPackageDeclaration());
                 }
-                this.visitList(cu.getImports(), compareTo.getImports());
+                // NOTE: no checking of imports, as that is just syntax sugar in a type-attributed LST
                 this.visitList(cu.getClasses(), compareTo.getClasses());
             }
             return cu;
@@ -1034,16 +1050,11 @@ public class SemanticallyEqual {
             return type;
         }
 
-        @SuppressWarnings("unchecked")
         @Override
         public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, J j) {
             if (isEqual.get()) {
-                if (j instanceof J.Parentheses) {
-                    J.Parentheses<T> compareTo = (J.Parentheses<T>) j;
-                    this.visit(parens.getTree(), compareTo.getTree());
-                } else if (j instanceof J.ControlParentheses) {
-                    J.ControlParentheses<T> compareTo = (J.ControlParentheses<T>) j;
-                    this.visit(parens.getTree(), compareTo.getTree());
+                if (j instanceof Expression) {
+                    this.visit(parens.getTree(), ((Expression) j).unwrap());
                 } else {
                     isEqual.set(false);
                     return parens;
@@ -1210,14 +1221,21 @@ public class SemanticallyEqual {
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, J j) {
             if (isEqual.get()) {
-                if (!(j instanceof J.TypeCast)) {
+                if (!(j instanceof Expression)) {
                     isEqual.set(false);
                     return typeCast;
                 }
 
-                J.TypeCast compareTo = (J.TypeCast) j;
-                this.visit(typeCast.getClazz(), compareTo.getClazz());
-                this.visit(typeCast.getExpression(), compareTo.getExpression());
+                Expression compareTo = (Expression) j;
+                if (!TypeUtils.isOfType(typeCast.getType(), compareTo.getType())) {
+                    isEqual.set(false);
+                } else {
+                    if (compareTo instanceof J.TypeCast) {
+                        this.visit(typeCast.getExpression(), ((J.TypeCast) compareTo).getExpression());
+                    } else {
+                        this.visit(typeCast.getExpression(), compareTo);
+                    }
+                }
             }
             return typeCast;
         }
