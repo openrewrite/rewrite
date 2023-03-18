@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle.plugins;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
@@ -62,14 +61,13 @@ class AddGradleEnterpriseTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("Need to be able to specify Gradle wrapper to generate tooling model for")
     void addExistingBuildPluginsBlock() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
           buildGradle(
             """
               plugins {
-                  id("java")
+                  id "java"
               }
               """,
             spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))
@@ -79,8 +77,8 @@ class AddGradleEnterpriseTest implements RewriteTest {
                   assertThat(version.find()).isTrue();
                   return """
                     plugins {
-                        id("java")
-                        id("com.gradle.build-scan") version "%s"
+                        id "java"
+                        id "com.gradle.build-scan" version "%s"
                     }
                     """.formatted(version.group(0));
               })
