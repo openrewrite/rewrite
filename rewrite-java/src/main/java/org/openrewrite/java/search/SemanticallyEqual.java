@@ -563,20 +563,17 @@ public class SemanticallyEqual {
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.FieldAccess)) {
-                    if (!(j instanceof J.Identifier) || !TypeUtils.isOfType(fieldAccess.getType(), ((J.Identifier) j).getType())) {
+                    if (!(j instanceof J.Identifier) || !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), ((J.Identifier) j).getFieldType())) {
                         isEqual.set(false);
                     }
                     return fieldAccess;
                 }
 
                 J.FieldAccess compareTo = (J.FieldAccess) j;
-                if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())) {
-                    if (!fieldAccess.getSimpleName().equals(compareTo.getSimpleName())) {
+                if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())
+                    || !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), compareTo.getName().getFieldType())) {
                         isEqual.set(false);
                         return fieldAccess;
-                    }
-
-                    this.visit(fieldAccess.getTarget(), compareTo.getTarget());
                 }
             }
             return fieldAccess;
@@ -652,7 +649,9 @@ public class SemanticallyEqual {
         public J.Identifier visitIdentifier(J.Identifier identifier, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.Identifier)) {
-                    isEqual.set(false);
+                    if (!(j instanceof J.FieldAccess) || !TypeUtils.isOfType(identifier.getFieldType(), ((J.FieldAccess) j).getName().getFieldType())) {
+                        isEqual.set(false);
+                    }
                     return identifier;
                 }
 

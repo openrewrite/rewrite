@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
@@ -112,6 +111,14 @@ public class JavaTemplateMatchTest implements RewriteTest {
                   }
                   return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
               }
+
+              @Override
+              public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+                  if (ident.getFieldType() == null) {
+                      return ident;
+                  }
+                  return faTemplate.matches(ident) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
+              }
           })),
           java(
             """
@@ -145,7 +152,7 @@ public class JavaTemplateMatchTest implements RewriteTest {
 
                   int i1 = /*~~>*/java.util.regex.Pattern.UNIX_LINES;
                   int i2 = /*~~>*/Pattern.UNIX_LINES;
-                  int i3 = UNIX_LINES;
+                  int i3 = /*~~>*/UNIX_LINES;
               }
               """
           ));
@@ -173,6 +180,14 @@ public class JavaTemplateMatchTest implements RewriteTest {
                   }
                   return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
               }
+
+              @Override
+              public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+                  if (ident.getFieldType() == null) {
+                      return ident;
+                  }
+                  return faTemplate.matches(ident) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
+              }
           })),
           java(
             """
@@ -206,14 +221,13 @@ public class JavaTemplateMatchTest implements RewriteTest {
 
                   int i1 = /*~~>*/java.util.regex.Pattern.UNIX_LINES;
                   int i2 = /*~~>*/Pattern.UNIX_LINES;
-                  int i3 = UNIX_LINES;
+                  int i3 = /*~~>*/UNIX_LINES;
               }
               """
           ));
     }
 
     @Test
-    @ExpectedToFail
     @SuppressWarnings({"ObviousNullCheck"})
     void matchAgainstStaticallyImportedReference() {
         rewriteRun(
@@ -235,6 +249,14 @@ public class JavaTemplateMatchTest implements RewriteTest {
                   }
                   return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
               }
+
+              @Override
+              public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+                  if (ident.getFieldType() == null) {
+                      return ident;
+                  }
+                  return faTemplate.matches(ident) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
+              }
           })),
           java(
             """
@@ -268,7 +290,7 @@ public class JavaTemplateMatchTest implements RewriteTest {
 
                   int i1 = /*~~>*/java.util.regex.Pattern.UNIX_LINES;
                   int i2 = /*~~>*/Pattern.UNIX_LINES;
-                  int i3 = UNIX_LINES;
+                  int i3 = /*~~>*/UNIX_LINES;
               }
               """
           ));

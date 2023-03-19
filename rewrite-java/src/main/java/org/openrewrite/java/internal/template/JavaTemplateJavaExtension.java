@@ -241,6 +241,13 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(fa.getPrefix()), p);
+                } else if (loc.equals(STATEMENT_PREFIX) && fa.isScope(insertionPoint)) {
+                    // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
+                                    new Cursor(getCursor(), insertionPoint),
+                                    substitutedTemplate,
+                                    loc))
+                            .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);
             }
