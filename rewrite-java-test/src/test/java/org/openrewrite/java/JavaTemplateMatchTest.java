@@ -339,10 +339,14 @@ public class JavaTemplateMatchTest implements RewriteTest {
     }
 
     @Test
-    void dontMatchOverloads() {
+    @SuppressWarnings("DataFlowIssue")
+    void matchMethodInvocationParameter() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate template = JavaTemplate.builder(this::getCursor, "#{any(java.lang.StringBuilder)}.append(#{any(int)})").build();
+              private final JavaTemplate template = JavaTemplate.builder(
+                this::getCursor,
+                "#{any(java.sql.Statement)}.executeUpdate(#{any(java.lang.String)})"
+              ).build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -351,32 +355,28 @@ public class JavaTemplateMatchTest implements RewriteTest {
           })),
           java(
             """
+              import java.sql.*;
               class Test {
-                  void m(StringBuilder sb, int i, long l) {
-                      sb.append(i);
-                      sb.append(1);
-                      sb.append(1 + 1);
-                      sb.append(1 + 'c');
-
-                      sb.append((short) 1);
-                      sb.append(l);
-                      sb.append(1L);
-                      sb.append((long) 1);
+                  void m(StringBuilder sb) throws SQLException {
+                      try (Connection c = null) {
+                          try (Statement s = c.createStatement()) {
+                              s.executeUpdate("foo");
+                              s.executeUpdate(sb.toString());
+                          }
+                      }
                   }
               }
               """,
             """
+              import java.sql.*;
               class Test {
-                  void m(StringBuilder sb, int i, long l) {
-                      /*~~>*/sb.append(i);
-                      /*~~>*/sb.append(1);
-                      /*~~>*/sb.append(1 + 1);
-                      /*~~>*/sb.append(1 + 'c');
-
-                      sb.append((short) 1);
-                      sb.append(l);
-                      sb.append(1L);
-                      sb.append((long) 1);
+                  void m(StringBuilder sb) throws SQLException {
+                      try (Connection c = null) {
+                          try (Statement s = c.createStatement()) {
+                              /*~~>*/s.executeUpdate("foo");
+                              /*~~>*/s.executeUpdate(sb.toString());
+                          }
+                      }
                   }
               }
               """)
