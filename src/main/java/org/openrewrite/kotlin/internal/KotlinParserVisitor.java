@@ -1057,25 +1057,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else {
                 Space containerPrefix = sourceBefore("(");
                 List<JRightPadded<Expression>> expressions = new ArrayList<>(firExpressions.size());
+                boolean isTrailingComma = false;
                 for (int i = 0; i < firExpressions.size(); i++) {
                     FirExpression expression = firExpressions.get(i);
-                    if (i == firExpressions.size() - 1 && expression instanceof FirLambdaArgumentExpression) {
-                        int saveCursor = cursor;
-                        Space space = whitespace();
-                        // Trailing lambda argument: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
-                        if (source.startsWith(")", cursor)) {
-                            skip(")");
-                            Expression expr = convert(expression, ctx);
-                            expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
-                            expressions.add(padRight(expr, space));
-                            break;
-                        } else {
-                            cursor(saveCursor);
-                        }
+                    Expression expr = convert(expression, ctx);
+                    if (isTrailingComma) {
+                        expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
+                        expressions.add(padRight(expr, EMPTY));
+                        break;
                     }
 
-                    Expression expr = convert(expression, ctx);
-                    Space padding = i < firExpressions.size() - 1 ? sourceBefore(",") : sourceBefore(")");
+                    Space padding = whitespace();
+                    if (i < firExpressions.size() - 1) {
+                        if (source.startsWith(",", cursor)) {
+                            skip(",");
+                        } else if (source.startsWith(")", cursor) && firExpressions.get(i + 1) instanceof FirLambdaArgumentExpression) {
+                            // Trailing comma: https://kotlinlang.org/docs/coding-conventions.html#trailing-commas
+                            isTrailingComma = true;
+                            skip(")");
+                        }
+                    } else {
+                        skip(")");
+                    }
                     expressions.add(padRight(expr, padding));
                 }
                 args = JContainer.build(containerPrefix, expressions, Markers.EMPTY);

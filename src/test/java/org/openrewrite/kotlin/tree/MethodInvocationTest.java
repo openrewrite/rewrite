@@ -290,6 +290,7 @@ class MethodInvocationTest implements RewriteTest {
                 ensure ( false ) { "failure" }
                 return 1
             }
+            val x: Map<String, String> = emptyMap()
             """
           )
         );
