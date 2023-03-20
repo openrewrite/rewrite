@@ -424,15 +424,12 @@ public class StringUtils {
         }
 
         return SelectorUtils.match(
-                globPattern
-                        .replace('/', File.separatorChar)
-                        .replace('\\', File.separatorChar),
-                value
-                        .replace('/', File.separatorChar)
-                        .replace('\\', File.separatorChar),
+                globPattern.replace(wrongFileSeparatorChar, File.separatorChar),
+                value.replace(wrongFileSeparatorChar, File.separatorChar),
                 false
         );
     }
+    private static final char wrongFileSeparatorChar = File.separatorChar == '/' ? '\\' : '/';
 
     public static String indent(String text) {
         StringBuilder indent = new StringBuilder();
