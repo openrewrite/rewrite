@@ -185,7 +185,7 @@ public class VariableNameUtils {
             }
 
             if (scope.getValue().equals(tree)) {
-                Cursor aggregatedScope = aggregateNameScope();
+                Cursor aggregatedScope = getCursor().getValue() instanceof JavaSourceFile ? getCursor() : aggregateNameScope();
                 // Add names from parent scope.
                 Set<String> names = nameScopes.get(aggregatedScope);
 
@@ -225,7 +225,7 @@ public class VariableNameUtils {
                 }
             });
 
-            addImportedStaticFieldNames(getCursor().firstEnclosing(J.CompilationUnit.class), getCursor());
+            addImportedStaticFieldNames(getCursor().firstEnclosing(JavaSourceFile.class), getCursor());
             if (classDecl.getType() != null) {
                 namesInScope.addAll(findInheritedNames(classDecl));
             }
@@ -241,7 +241,7 @@ public class VariableNameUtils {
             return super.visitVariable(variable, strings);
         }
 
-        private void addImportedStaticFieldNames(@Nullable J.CompilationUnit cu, Cursor classCursor) {
+        private void addImportedStaticFieldNames(@Nullable JavaSourceFile cu, Cursor classCursor) {
             if (cu != null) {
                 List<J.Import> imports = cu.getImports();
                 imports.forEach(i -> {
