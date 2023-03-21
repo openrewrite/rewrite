@@ -1267,7 +1267,7 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             spec -> spec.path("a/b/Original.java").afterRecipe(cu ->
-              assertThat("a/b/Original.java").isEqualTo(cu.getSourcePath().toString()))
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/Original.java"))
           )
         );
     }
@@ -1328,15 +1328,15 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a.b;
-
+              
               import java.util.List;
-
+              
               class Original {
               }
               """,
             """
               import java.util.List;
-
+              
               class Target {
               }
               """
