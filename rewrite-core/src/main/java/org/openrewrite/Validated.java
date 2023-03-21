@@ -15,28 +15,48 @@
  */
 package org.openrewrite;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.StreamSupport.stream;
 
-public interface Validated extends Iterable<Validated> {
+/**
+ * A container object which may or may not contain a valid value.
+ * If a value is valid, {@link #isValid()} returns {@code true}.
+ * If the value is invalid, the object is considered <i>invalid</i> and
+ * {@link #isValid()} returns {@code false}.
+ *
+ * @param <T> the type of value being validated
+ */
+public interface Validated<T> extends Iterable<Validated<T>> {
     boolean isValid();
 
     default boolean isInvalid() {
         return !isValid();
     }
 
-    default List<Invalid> failures() {
-        List<Invalid> list = new ArrayList<>();
-        for (Validated v : this) {
+    default <T> Validated<T> asInvalid() {
+        if (this.isInvalid()) {
+            //noinspection unchecked
+            return (Validated<T>) this;
+        } else {
+            throw new IllegalStateException("Not an invalid value");
+        }
+    }
+
+    default List<Invalid<T>> failures() {
+        List<Invalid<T>> list = new ArrayList<>();
+        for (Validated<T> v : this) {
             if (v.isInvalid()) {
-                list.add((Invalid) v);
+                list.add((Invalid<T>) v);
             }
         }
         return list;
@@ -46,12 +66,16 @@ public interface Validated extends Iterable<Validated> {
         return new Secret(property, value);
     }
 
-    static None none() {
-        return new None();
+    static <T> None<T> none() {
+        return new None<>();
     }
 
-    static Valid valid(String property, @Nullable Object value) {
-        return new Valid(property, value);
+    static <T> Valid<T> valid(String property, @Nullable T value) {
+        return new Valid<>(property, value);
+    }
+
+    static <T> Validated<T> lazy(String property, Supplier<T> supplier) {
+        return new LazyValidated<>(property, supplier);
     }
 
     /**
@@ -67,75 +91,118 @@ public interface Validated extends Iterable<Validated> {
      * @param <T>      The property value type.
      * @return A validation result
      */
-    static <T> Validated test(String property, String message, @Nullable T value, Predicate<T> test) {
+    static <T> Validated<T> test(String property, String message, @Nullable T value, Predicate<T> test) {
         return test.test(value) ?
                 valid(property, value) :
                 invalid(property, value, message.replace("{}", value == null ? "null" : value.toString()));
     }
 
-    static Validated required(String property, @Nullable Object value) {
+    /**
+     * Validate that the Predicate will evaluate to 'true' on the supplied value.
+     * Will return a {@link None} if the value is valid.
+     * <p>
+     * This allows validation of a value that is not the intended return value.
+     * <p>
+     * When the Predicate evaluates to 'false' the error message will be of the form:
+     * <p>
+     * "[property] was '[value]' but it [message]"
+     *
+     * @param property The property name to test
+     * @param message  The failure message if the test doesn't pass
+     * @param value    The value of the property
+     * @param test     The test predicate
+     * @param <T>      The property value type.
+     * @return A validation result
+     */
+    static <T, V> Validated<T> testNone(String property, String message, @Nullable V value, Predicate<V> test) {
+        return test.test(value) ?
+                new None<>() :
+                invalid(property, value, message.replace("{}", value == null ? "null" : value.toString()));
+    }
+
+    static <T> Validated<T> required(String property, @Nullable T value) {
         return value != null ?
                 valid(property, value) :
                 missing(property, null, "is required");
     }
 
-    static Validated notBlank(String property, @Nullable String value) {
+    static Validated<String> notBlank(String property, @Nullable String value) {
         return test(property, "must not be blank", value, s -> value != null && !StringUtils.isBlank(value));
     }
 
-    static Missing missing(String property, @Nullable Object value, String message) {
-        return new Missing(property, value, message);
+    static <T> Missing<T> missing(String property, @Nullable T value, String message) {
+        return new Missing<>(property, value, message);
     }
 
-    static Invalid invalid(String property, @Nullable Object value, String message) {
+    static <T> Invalid<T> invalid(String property, @Nullable Object value, String message) {
         return invalid(property, value, message, null);
     }
 
-    static Invalid invalid(String property, @Nullable Object value, String message,
-                           @Nullable Throwable exception) {
-        return new Invalid(property, value, message, exception);
+    static <T> Invalid<T> invalid(String property, @Nullable Object value, String message,
+                                  @Nullable Throwable exception) {
+        return new Invalid<>(property, value, message, exception);
     }
 
-    default Validated and(Validated validated) {
-        if (this instanceof None) {
-            return validated;
+    @SuppressWarnings("unchecked")
+    default Validated<T> and(Validated<? extends T> validated) {
+        if (validated instanceof None) {
+            return this;
         }
-        return new Both(this, validated);
+        return new Both<>(this, (Validated<T>) validated);
     }
 
-    default Validated or(Validated validated) {
-        if (this instanceof None) {
-            return validated;
+    @SuppressWarnings("unchecked")
+    default Validated<T> or(Validated<? extends T> validated) {
+        if (validated instanceof None) {
+            return this;
         }
-        return new Either(this, validated);
+        return new Either<>(this, (Validated<T>) validated);
     }
 
-    @Nullable <T> T getValue();
+    @Nullable T getValue();
 
     /**
      * Indicates that no validation has occurred. None is considered "valid", effectively a no-op validation.
      */
-    class None implements Validated {
+    class None<T> implements Validated<T> {
         @Override
         public boolean isValid() {
             return true;
         }
 
         @Override
-        public Iterator<Validated> iterator() {
+        public Iterator<Validated<T>> iterator() {
             return Collections.emptyIterator();
         }
 
         @Override
-        public <T> T getValue() {
+        public T getValue() {
             throw new IllegalStateException("Value does not exist");
+        }
+
+        @Override
+        public Validated<T> or(Validated<? extends T> validated) {
+            if (validated instanceof None) {
+                return this;
+            }
+            //noinspection unchecked
+            return (Validated<T>) validated;
+        }
+
+        @Override
+        public Validated<T> and(Validated<? extends T> validated) {
+            if (validated instanceof None) {
+                return this;
+            }
+            //noinspection unchecked
+            return (Validated<T>) validated;
         }
     }
 
     /**
      * A specialization {@link Valid} that won't print the secret in plain text if the validation is serialized.
      */
-    class Secret extends Valid {
+    class Secret extends Valid<String> {
         public Secret(String property, String value) {
             super(property, value);
         }
@@ -151,11 +218,12 @@ public interface Validated extends Iterable<Validated> {
     /**
      * A valid property value.
      */
-    class Valid implements Validated {
+    class Valid<T> implements Validated<T> {
         protected final String property;
-        private final Object value;
+        @Nullable
+        private final T value;
 
-        public Valid(String property, @Nullable Object value) {
+        public Valid(String property, @Nullable T value) {
             this.property = property;
             this.value = value;
         }
@@ -166,18 +234,17 @@ public interface Validated extends Iterable<Validated> {
         }
 
         @Override
-        public Iterator<Validated> iterator() {
-            return Stream.of((Validated) this).iterator();
+        public Iterator<Validated<T>> iterator() {
+            return Stream.of((Validated<T>) this).iterator();
         }
 
         public String getProperty() {
             return property;
         }
 
-        @SuppressWarnings("unchecked")
         @Override
-        public <T> T getValue() {
-            return (T) value;
+        public T getValue() {
+            return value;
         }
 
         @Override
@@ -189,7 +256,64 @@ public interface Validated extends Iterable<Validated> {
         }
     }
 
-    class Invalid implements Validated {
+    class LazyValidated<T> implements Validated<T> {
+        private final String property;
+        private final Supplier<T> valueSupplier;
+
+        private T value;
+        private RuntimeException exception;
+
+        public LazyValidated(String property, Supplier<T> valueSupplier) {
+            this.property = requireNonNull(property);
+            this.valueSupplier = requireNonNull(valueSupplier);
+        }
+
+        private void evaluate() {
+            try {
+                if (value == null && exception == null) {
+                    value = valueSupplier.get();
+                }
+            } catch (RuntimeException e) {
+                exception = e;
+            }
+        }
+
+        @Override
+        public boolean isValid() {
+            evaluate();
+            if (value == null) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        @Override
+        public @Nullable T getValue() {
+            evaluate();
+            if (value == null) {
+                throw new IllegalStateException("Value does not exist", exception);
+            }
+            return value;
+        }
+
+        @NotNull
+        @Override
+        public Iterator<Validated<T>> iterator() {
+            return Stream.of((Validated<T>) this).iterator();
+        }
+
+        @Override
+        public String toString() {
+            return "LazyValidated{" +
+                    "property='" + property + '\'' +
+                    ", value='" + (value == null ? (exception == null ? "[UNEVALUATED]" : "[EXCEPTION]") : value) + '\'' +
+                    (exception == null ? "" : ", exception=" + exception) +
+                    '}';
+        }
+    }
+
+    class Invalid<T> implements Validated<T> {
         private final String property;
 
         @Nullable
@@ -213,8 +337,13 @@ public interface Validated extends Iterable<Validated> {
         }
 
         @Override
-        public Iterator<Validated> iterator() {
-            return Stream.of((Validated) this).iterator();
+        public @Nullable T getValue() {
+            throw new ValidationException(this);
+        }
+
+        @Override
+        public Iterator<Validated<T>> iterator() {
+            return Stream.of((Validated<T>) this).iterator();
         }
 
         public String getMessage() {
@@ -225,9 +354,8 @@ public interface Validated extends Iterable<Validated> {
             return property;
         }
 
-        @SuppressWarnings("unchecked")
         @Nullable
-        public Object getValue() {
+        public Object getInvalidValue() {
             return value;
         }
 
@@ -246,17 +374,17 @@ public interface Validated extends Iterable<Validated> {
         }
     }
 
-    class Missing extends Invalid {
-        public Missing(String property, @Nullable Object value, String message) {
+    class Missing<T> extends Invalid<T> {
+        public Missing(String property, @Nullable T value, String message) {
             super(property, value, message, null);
         }
     }
 
-    class Either implements Validated {
-        private final Validated left;
-        private final Validated right;
+    class Either<T> implements Validated<T> {
+        private final Validated<T> left;
+        private final Validated<T> right;
 
-        public Either(Validated left, Validated right) {
+        public Either(Validated<T> left, Validated<T> right) {
             this.left = left;
             this.right = right;
         }
@@ -266,23 +394,21 @@ public interface Validated extends Iterable<Validated> {
             return left.isValid() || right.isValid();
         }
 
-        public Optional<Valid> findAny() {
+        public Optional<Validated<T>> findAny() {
             return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator(), Spliterator.CONCURRENT), false)
-                    .filter(Valid.class::isInstance)
-                    .map(Valid.class::cast)
+                    .filter(Validated::isValid)
                     .findAny();
         }
 
-        @SuppressWarnings("unchecked")
         @Override
-        public <T> T getValue() {
+        public T getValue() {
             return findAny()
-                    .map(v -> (T) v.getValue())
+                    .map(Validated::getValue)
                     .orElseThrow(() -> new IllegalStateException("Value does not exist"));
         }
 
         @Override
-        public Iterator<Validated> iterator() {
+        public Iterator<Validated<T>> iterator() {
             //If only one side is valid, this short circuits the invalid path.
             if (left.isValid() && right.isInvalid()) {
                 return stream(left.spliterator(), false).iterator();
@@ -298,11 +424,11 @@ public interface Validated extends Iterable<Validated> {
         }
     }
 
-    class Both implements Validated {
-        protected final Validated left;
-        protected final Validated right;
+    class Both<T> implements Validated<T> {
+        protected final Validated<T> left;
+        protected final Validated<T> right;
 
-        public Both(Validated left, Validated right) {
+        public Both(Validated<T> left, Validated<T> right) {
             this.left = left;
             this.right = right;
         }
@@ -313,12 +439,12 @@ public interface Validated extends Iterable<Validated> {
         }
 
         @Override
-        public <T> T getValue() {
+        public T getValue() {
             return right.getValue();
         }
 
         @Override
-        public Iterator<Validated> iterator() {
+        public Iterator<Validated<T>> iterator() {
             return Stream.concat(
                     stream(left.spliterator(), false),
                     stream(right.spliterator(), false)

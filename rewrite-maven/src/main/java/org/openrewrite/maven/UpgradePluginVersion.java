@@ -78,8 +78,8 @@ public class UpgradePluginVersion extends Recipe {
 
     @SuppressWarnings("ConstantConditions")
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }

@@ -69,7 +69,7 @@ public class DoesNotIncludeDependency extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate()
                 .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)))
                 .and(Validated.test("scope", "scope is a valid Maven scope", scope,

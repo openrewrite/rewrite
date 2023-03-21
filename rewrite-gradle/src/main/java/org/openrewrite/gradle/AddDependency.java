@@ -112,8 +112,8 @@ public class AddDependency extends Recipe {
     }
 
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         if (version != null) {
             validated = validated.or(Semver.validate(version, versionPattern));
         }

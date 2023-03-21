@@ -108,8 +108,8 @@ public class AddManagedDependency extends Recipe {
     Boolean addToRootPom;
 
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         //noinspection ConstantConditions
         if (version != null) {
             validated = validated.or(Semver.validate(version, versionPattern));
@@ -180,7 +180,7 @@ public class AddManagedDependency extends Recipe {
                         Xml maven = super.visitDocument(document, executionContext);
 
                         if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
-                            Validated versionValidation = Semver.validate(version, versionPattern);
+                            Validated<VersionComparator> versionValidation = Semver.validate(version, versionPattern);
                             if (versionValidation.isValid()) {
                                 VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
                                 try {

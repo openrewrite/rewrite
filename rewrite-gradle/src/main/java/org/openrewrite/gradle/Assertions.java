@@ -25,7 +25,6 @@ import org.openrewrite.gradle.toolingapi.OpenRewriteModelBuilder;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.OperatingSystemProvenance;
 import org.openrewrite.properties.tree.Properties;
@@ -48,7 +47,6 @@ import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.*;
 
 public class Assertions {
 
@@ -82,7 +80,7 @@ public class Assertions {
                     }
 
                     if (version != null) {
-                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null, null).getValue());
+                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null).getValue());
                         Files.createDirectories(projectDir.resolve("gradle/wrapper/"));
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION), ("distributionBase=GRADLE_USER_HOME\n" +
                                 "distributionPath=wrapper/dists\n" +
