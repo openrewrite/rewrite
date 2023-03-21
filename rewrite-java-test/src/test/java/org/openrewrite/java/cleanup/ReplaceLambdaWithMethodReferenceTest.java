@@ -921,4 +921,42 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void tryInAForLoop() {
+        rewriteRun(
+          java(
+            """
+              import java.nio.file.DirectoryStream;
+              import java.nio.file.Files;
+              import java.nio.file.Path;
+              import java.util.Set;
+
+              class A {
+                  void cleanOldBackups(Set<Path> backupPaths) throws Exception {
+                      for (Path backupDirPath : backupPaths)
+                          try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(backupDirPath, path -> Files.isDirectory(path))) {
+                          }
+                  }
+              }
+              """,
+            """
+              import java.nio.file.DirectoryStream;
+              import java.nio.file.Files;
+              import java.nio.file.Path;
+              import java.util.Set;
+
+              class A {
+                  void cleanOldBackups(Set<Path> backupPaths) throws Exception {
+                      for (Path backupDirPath : backupPaths)
+                          try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(backupDirPath, Files::isDirectory)) {
+                          }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
 }
