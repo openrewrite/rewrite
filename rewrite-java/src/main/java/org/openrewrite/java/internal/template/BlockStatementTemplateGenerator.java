@@ -475,6 +475,9 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
+        } else if (j instanceof J.Try.Resource) {
+            before.insert(0, "{");
+            after.append("}");
         }
         template(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
