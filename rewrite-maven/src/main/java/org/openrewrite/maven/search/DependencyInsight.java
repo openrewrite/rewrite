@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.search;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -70,7 +71,7 @@ public class DependencyInsight extends Recipe {
     UUID searchId = randomId();
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope,
                 s -> Scope.fromName(s) != Scope.Invalid));
     }

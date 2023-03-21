@@ -99,7 +99,7 @@ public class NamedStyles implements Marker {
                 mergedStyles);
     }
 
-    public Validated<Object> validate() {
+    public Validated validate() {
         return Validated.none();
     }
 }

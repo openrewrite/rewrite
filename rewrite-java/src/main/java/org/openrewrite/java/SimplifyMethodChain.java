@@ -61,7 +61,7 @@ public class SimplifyMethodChain extends Recipe {
     }
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate().and(Validated.test("methodPatternChain",
                 "Requires more than one pattern",
                 methodPatternChain, c -> c.size() > 1));

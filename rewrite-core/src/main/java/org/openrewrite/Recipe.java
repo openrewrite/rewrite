@@ -35,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
+import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -426,8 +427,8 @@ public abstract class Recipe implements Cloneable {
         return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
-    public Validated<Object> validate(ExecutionContext ctx) {
-        Validated<Object> validated = validate();
+    public Validated validate(ExecutionContext ctx) {
+        Validated validated = validate();
 
         for (Recipe recipe : recipeList) {
             validated = validated.and(recipe.validate(ctx));
@@ -442,8 +443,8 @@ public abstract class Recipe implements Cloneable {
      *
      * @return A validated instance based using non-null/nullable annotations to determine which fields of the recipe are required.
      */
-    public Validated<Object> validate() {
-        Validated<Object> validated = Validated.none();
+    public Validated validate() {
+        Validated validated = Validated.none();
         List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
         for (Field field : requiredFields) {
             try {

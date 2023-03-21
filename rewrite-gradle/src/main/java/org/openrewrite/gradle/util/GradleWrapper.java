@@ -47,53 +47,80 @@ public class GradleWrapper {
     String version;
     DistributionInfos distributionInfos;
 
-    public static Validated<GradleWrapper> validate(
+    public static Validated validate(
             ExecutionContext ctx,
             String version,
             @Nullable String distribution,
-            @Nullable String repositoryUrl
-    ) {
+            @Nullable Validated cachedValidation,
+            @Nullable String repositoryUrl) {
+        if (cachedValidation != null) {
+            return cachedValidation;
+        }
         String distributionTypeName = distribution != null ? distribution : DistributionType.Bin.name().toLowerCase();
-        Validated<Object> validated =
-                Validated
-                        .testNone("distributionType", "must be a valid distribution type", distributionTypeName,
-                                dt -> Arrays.stream(DistributionType.values())
-                                        .anyMatch(type -> type.name().equalsIgnoreCase(dt)))
-                        .and(Semver.validate(version, null));
-        if (validated.isInvalid()) {
-            return validated.asInvalid();
-        }
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        return Validated.lazy("", () -> create(distributionTypeName, version, repositoryUrl, httpSender));
-    }
 
-    private static GradleWrapper create(String distributionTypeName, String version, @Nullable String repositoryUrl, HttpSender httpSender) {
-        DistributionType distributionType = Arrays.stream(DistributionType.values())
-                .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
-                .findAny()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
-        VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
+        //noinspection unchecked
+        return new Validated.Both(
+            Validated.test("distributionType", "must be a valid distribution type", distributionTypeName,
+                dt -> Arrays.stream(DistributionType.values())
+                    .anyMatch(type -> type.name().equalsIgnoreCase(dt))),
+            Semver.validate(version, null)
+        ) {
+            GradleWrapper wrapper;
 
-        String gradleVersionsUrl = (repositoryUrl == null) ? "https://services.gradle.org/versions/all" : repositoryUrl;
-        try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
-            if (resp.isSuccessful()) {
-                List<GradleVersion> allVersions = new ObjectMapper()
-                        .registerModule(new ParameterNamesModule())
-                        .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                        .readValue(resp.getBody(), new TypeReference<List<GradleVersion>>() {
-                        });
-                GradleVersion gradleVersion = allVersions.stream()
-                        .filter(v -> versionComparator.isValid(null, v.version))
-                        .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
-                        .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
-
-                DistributionInfos infos = DistributionInfos.fetch(httpSender, distributionType, gradleVersion);
-                return new GradleWrapper(gradleVersion.version, infos);
+            @Override
+            public boolean isValid() {
+                if (!super.isValid()) {
+                    return false;
+                }
+                try {
+                    buildWrapper();
+                    return true;
+                } catch (Throwable t) {
+                    return false;
+                }
             }
-            throw new IOException("Could not get Gradle versions at: " + gradleVersionsUrl);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+
+            @Override
+            public GradleWrapper getValue() {
+                return buildWrapper();
+            }
+
+            private GradleWrapper buildWrapper() {
+                if (wrapper != null) {
+                    return wrapper;
+                }
+
+                DistributionType distributionType = Arrays.stream(DistributionType.values())
+                        .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
+                        .findAny()
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
+                VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
+
+                String gradleVersionsUrl = (repositoryUrl == null) ?  "https://services.gradle.org/versions/all" : repositoryUrl;
+                try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
+                    if (resp.isSuccessful()) {
+                        List<GradleVersion> allVersions = new ObjectMapper()
+                                .registerModule(new ParameterNamesModule())
+                                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                                .readValue(resp.getBody(), new TypeReference<List<GradleVersion>>() {
+                                });
+                        GradleVersion gradleVersion = allVersions.stream()
+                                .filter(v -> versionComparator.isValid(null, v.version))
+                                .max((v1, v2) -> versionComparator.compare(null, v1.version, v2.version))
+                                .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle wrapper version to select from."));
+
+                        DistributionInfos infos = DistributionInfos.fetch(httpSender, distributionType, gradleVersion);
+                        wrapper = new GradleWrapper(gradleVersion.version, infos);
+                        return wrapper;
+                    }
+                    throw new IOException("Could not get Gradle versions at: " + gradleVersionsUrl);
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+
+        };
     }
 
     public String getDistributionUrl() {

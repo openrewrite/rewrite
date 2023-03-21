@@ -26,18 +26,18 @@ import java.util.UUID;
 
 public class DeclarativeNamedStyles extends NamedStyles {
     @JsonIgnore
-    private Validated<Object> validation = Validated.none();
+    private Validated validation = Validated.none();
 
     public DeclarativeNamedStyles(UUID id, String name, String displayName, String description, Set<String> tags, Collection<Style> styles) {
         super(id, name, displayName, description, tags, styles);
     }
 
-    void addValidation(Validated<Object> validated) {
+    void addValidation(Validated validated) {
         validation = validation.and(validated);
     }
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return validation;
     }
 }

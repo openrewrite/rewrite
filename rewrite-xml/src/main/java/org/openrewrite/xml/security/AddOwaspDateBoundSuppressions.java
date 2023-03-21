@@ -63,7 +63,7 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
     }
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate().and(Validated.test("untilDate", "Must be empty or a valid date of format yyyy-MM-dd", untilDate, date -> {
             if (date != null && !date.isEmpty()) {
                 try {

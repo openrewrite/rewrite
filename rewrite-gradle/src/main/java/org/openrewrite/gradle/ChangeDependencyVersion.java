@@ -79,7 +79,7 @@ public class ChangeDependencyVersion extends Recipe {
     }
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 

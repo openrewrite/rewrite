@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -132,8 +133,8 @@ public class AddDependency extends Recipe {
     Boolean acceptTransitive;
 
     @Override
-    public Validated<Object> validate() {
-        Validated<Object> validated = super.validate();
+    public Validated validate() {
+        Validated validated = super.validate();
         //noinspection ConstantConditions
         if (version != null) {
             validated = validated.or(Semver.validate(version, versionPattern));

@@ -62,7 +62,7 @@ public class MergeYaml extends Recipe {
     String objectIdentifyingProperty;
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate()
                 .and(Validated.test("yaml", "Must be valid YAML",
                         yaml, y -> {

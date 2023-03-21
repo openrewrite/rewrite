@@ -53,7 +53,7 @@ public class FindText extends Recipe {
     }
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate().and(Validated.test(
                 "patterns",
                 "Patterns must be compilable regular expressions",

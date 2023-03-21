@@ -126,8 +126,8 @@ public class ChangeParentPom extends Recipe {
     }
 
     @Override
-    public Validated<Object> validate() {
-        Validated<Object> validated = super.validate();
+    public Validated validate() {
+        Validated validated = super.validate();
         //noinspection ConstantConditions
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));

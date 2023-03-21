@@ -53,7 +53,7 @@ public class ExcludeDependency extends Recipe {
     String scope;
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope, s -> {
             try {
                 if (s != null) {

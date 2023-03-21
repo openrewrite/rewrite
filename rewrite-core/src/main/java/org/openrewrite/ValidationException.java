@@ -35,14 +35,14 @@ public class ValidationException extends RuntimeException {
 
     private URI source;
 
-    public ValidationException(Validated<?> validation) {
+    public ValidationException(Validated validation) {
         this(validation, null);
     }
 
-    public ValidationException(Validated<?> validation, @Nullable URI source) {
+    public ValidationException(Validated validation, @Nullable URI source) {
         super(validation.failures().stream()
                 .map(invalid -> invalid.getProperty() + " was '" +
-                        (invalid.getInvalidValue() == null ? "null" : invalid.getInvalidValue()) +
+                        (invalid.getValue() == null ? "null" : invalid.getValue()) +
                         "' but it " + invalid.getMessage())
                 .collect(Collectors.joining(
                         "\n",

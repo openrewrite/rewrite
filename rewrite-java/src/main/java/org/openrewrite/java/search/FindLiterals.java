@@ -49,7 +49,7 @@ public class FindLiterals extends Recipe {
     }
 
     @Override
-    public Validated<Object> validate() {
+    public Validated validate() {
         return super.validate().and(
                 Validated.test("pattern", "Must be a valid regular expression", pattern,
                         p -> {

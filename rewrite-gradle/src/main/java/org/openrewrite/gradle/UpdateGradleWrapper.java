@@ -16,8 +16,11 @@
 package org.openrewrite.gradle;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
@@ -40,9 +43,9 @@ import java.util.Set;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
-import static org.openrewrite.internal.StringUtils.isBlank;
 
 @Value
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = true)
 public class UpdateGradleWrapper extends Recipe {
 
@@ -71,17 +74,12 @@ public class UpdateGradleWrapper extends Recipe {
     @Nullable
     String distribution;
 
-    private Validated<GradleWrapper> createGradleWrapperValidated(ExecutionContext ctx) {
-        return GradleWrapper.validate(ctx,
-                isBlank(version) ? "latest.release" : version,
-                distribution,
-                null
-        );
-    }
+    @NonFinal
+    Validated gradleWrapper;
 
     @Override
-    public Validated<Object> validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(createGradleWrapperValidated(ctx));
+    public Validated validate(ExecutionContext ctx) {
+        return super.validate(ctx).and(GradleWrapper.validate(ctx, version, distribution, gradleWrapper, null));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
@@ -109,7 +107,7 @@ public class UpdateGradleWrapper extends Recipe {
                     return entry;
                 }
 
-                GradleWrapper gradleWrapper = requireNonNull(createGradleWrapperValidated(context).getValue());
+                GradleWrapper gradleWrapper = requireNonNull(validate(context).getValue());
 
                 // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                 String currentDistributionUrl = entry.getValue().getText();
@@ -123,7 +121,7 @@ public class UpdateGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        GradleWrapper gradleWrapper = createGradleWrapperValidated(ctx).getValue();
+        GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
 
         List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
