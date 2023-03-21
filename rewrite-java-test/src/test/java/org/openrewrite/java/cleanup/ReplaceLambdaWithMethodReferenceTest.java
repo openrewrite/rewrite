@@ -934,10 +934,9 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
               class A {
                   void cleanOldBackups(Set<Path> backupPaths) throws Exception {
-                      for (Path backupDirPath : backupPaths) {
+                      for (Path backupDirPath : backupPaths)
                           try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(backupDirPath, path -> Files.isDirectory(path))) {
                           }
-                      }
                   }
               }
               """,
@@ -949,10 +948,9 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
 
               class A {
                   void cleanOldBackups(Set<Path> backupPaths) throws Exception {
-                      for (Path backupDirPath : backupPaths) {
+                      for (Path backupDirPath : backupPaths)
                           try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(backupDirPath, Files::isDirectory)) {
                           }
-                      }
                   }
               }
               """
