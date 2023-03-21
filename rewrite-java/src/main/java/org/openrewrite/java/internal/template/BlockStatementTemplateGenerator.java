@@ -261,10 +261,8 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.DoWhileLoop) {
             J.DoWhileLoop dw = (J.DoWhileLoop) j;
             if (referToSameElement(prior, dw.getWhileCondition())) {
-                insertControlWithBlock(dw.getBody(), before, after, () -> {
-                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
-                    after.append(";");
-                });
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
             }
         } else if (j instanceof J.Assert) {
             before.insert(0, "assert ");
@@ -422,10 +420,8 @@ public class BlockStatementTemplateGenerator {
                     before.insert(0, "if (" + condition.substring(0, toReplaceIdx) + '(');
                     after.append(')').append(condition.substring(toReplaceIdx + 1)).append(") {}");
                 } else {
-                    insertControlWithBlock(iff.getThenPart(), before, after, () -> {
-                        before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
-                        after.append(";");
-                    });
+                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                    after.append(";");
                 }
             } else {
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
@@ -459,10 +455,8 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.WhileLoop) {
             J.WhileLoop wl = (J.WhileLoop) j;
             if (referToSameElement(prior, wl.getCondition())) {
-                insertControlWithBlock(wl.getBody(), before, after, () -> {
-                    before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
-                    after.append(";");
-                });
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
             }
         } else if (j instanceof J.Assignment) {
             J.Assignment as = (J.Assignment) j;
@@ -475,9 +469,6 @@ public class BlockStatementTemplateGenerator {
             before.insert(0, ev.getName());
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
-        } else if (j instanceof J.Try.Resource) {
-            before.insert(0, "{");
-            after.append("}");
         }
         template(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
@@ -512,9 +503,11 @@ public class BlockStatementTemplateGenerator {
     }
 
     private void insertControlWithBlock(J body, StringBuilder before, StringBuilder after, Runnable insertion) {
-        insertion.run();
         if (!(body instanceof J.Block)) {
             before.insert(0, "{");
+        }
+        insertion.run();
+        if (!(body instanceof J.Block)) {
             after.append("}");
         }
     }
