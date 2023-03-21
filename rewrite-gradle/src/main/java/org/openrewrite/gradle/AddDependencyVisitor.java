@@ -72,7 +72,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
         }
 
-        Validated versionValidation = Semver.validate(version, versionPattern);
+        Validated<VersionComparator> versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {
             @Nullable VersionComparator versionComparator = versionValidation.getValue();
         }

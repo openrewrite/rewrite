@@ -64,7 +64,7 @@ public class DeclarativeRecipe extends CompositeRecipe {
     private final List<Maintainer> maintainers;
 
     @JsonIgnore
-    private Validated validation = Validated.test("initialization",
+    private Validated<Object> validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> uninitializedRecipes.isEmpty());
 
@@ -136,12 +136,12 @@ public class DeclarativeRecipe extends CompositeRecipe {
         }
     }
 
-    public void addValidation(Validated validated) {
+    public void addValidation(Validated<Object> validated) {
         validation = validation.and(validated);
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return validation;
     }
 

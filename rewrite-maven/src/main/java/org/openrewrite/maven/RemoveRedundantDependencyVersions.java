@@ -77,8 +77,8 @@ public class RemoveRedundantDependencyVersions extends Recipe {
     }
 
     @Override
-    public Validated validate() {
-        Validated validated = Validated.none();
+    public Validated<Object> validate() {
+        Validated<Object> validated = Validated.none();
         if (except != null) {
             for (int i = 0; i < except.size(); i++) {
                 final String retainVersion = except.get(i);

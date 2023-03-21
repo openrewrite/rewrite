@@ -29,7 +29,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void validation()  {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "org.apache.logging:*", true);
-        Validated validated = recipe.validate();
+        Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
 

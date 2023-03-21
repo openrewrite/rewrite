@@ -68,7 +68,7 @@ public class RemoveManagedDependency extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(Validated.test("scope", "Scope must be one of compile, runtime, test, or provided",
                 scope, s -> !Scope.Invalid.equals(Scope.fromName(s))));
     }

@@ -113,7 +113,7 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
             }
         }
 
-        Validated versionValidation = Semver.validate(version, versionPattern);
+        Validated<VersionComparator> versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {
             versionComparator = versionValidation.getValue();
         }

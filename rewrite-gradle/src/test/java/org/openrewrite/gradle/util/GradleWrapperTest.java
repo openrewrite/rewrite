@@ -96,7 +96,7 @@ public class GradleWrapperTest {
     @Test
     void validateDistributionTypeBin() {
         mockGradleServices(mockWebServer -> {
-            Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", null, "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
+            Validated<GradleWrapper> validated = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
             GradleWrapper gw = validated.getValue();
             assertThat(validated.isValid()).isTrue();
             assertThat(gw).isNotNull();
@@ -107,7 +107,7 @@ public class GradleWrapperTest {
     @Test
     void validateWithDistributionNull() {
         mockGradleServices(mockWebServer -> {
-            Validated validated = GradleWrapper.validate(new InMemoryExecutionContext(), "latest.release", null, null, "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
+            Validated<GradleWrapper> validated = GradleWrapper.validate(new InMemoryExecutionContext(), "latest.release", null, "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
             GradleWrapper gw = validated.getValue();
             assertThat(validated.isValid()).isTrue();
             assertThat(gw).isNotNull();

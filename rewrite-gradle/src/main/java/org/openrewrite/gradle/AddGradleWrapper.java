@@ -20,7 +20,6 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
@@ -84,17 +83,18 @@ public class AddGradleWrapper extends Recipe {
     @Nullable
     String repositoryUrl;
 
-    @NonFinal
-    Validated gradleWrapper;
+    private Validated<GradleWrapper> createGradleWrapperValidated(ExecutionContext ctx) {
+        return GradleWrapper.validate(ctx,
+                isBlank(version) ? "latest.release" : version,
+                distribution,
+                repositoryUrl
+        );
+    }
+
 
     @Override
-    public Validated validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(
-                GradleWrapper.validate(ctx,
-                        isBlank(version) ? "latest.release" : version,
-                        distribution,
-                        gradleWrapper,
-                        repositoryUrl));
+    public Validated<Object> validate(ExecutionContext ctx) {
+        return super.validate(ctx).and(createGradleWrapperValidated(ctx));
     }
 
     //NOTE: Using an explicit constructor here due to a bug that surfaces when running JavaDoc.
@@ -115,7 +115,7 @@ public class AddGradleWrapper extends Recipe {
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        GradleWrapper gradleWrapper = validate(ctx).getValue();
+        GradleWrapper gradleWrapper = createGradleWrapperValidated(ctx).getValue();
         assert gradleWrapper != null;
         return addGradleFiles(gradleWrapper, before);
     }
