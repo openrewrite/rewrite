@@ -3680,9 +3680,6 @@ public interface J extends Tree {
         }
 
         public MethodInvocation withArguments(List<Expression> arguments) {
-            if (this.arguments.getElements() == arguments) {
-                return this;
-            }
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
 

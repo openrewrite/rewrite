@@ -90,17 +90,17 @@ public class JLeftPadded<T> {
     }
 
     @Nullable
-    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T elements) {
+    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
         if (before == null) {
-            if (elements == null) {
+            if (element == null) {
                 return null;
             }
-            return new JLeftPadded<>(Space.EMPTY, elements, Markers.EMPTY);
+            return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
         }
-        if (elements == null) {
+        if (element == null) {
             return null;
         }
-        return before.withElement(elements);
+        return before.withElement(element);
     }
 
     @Override
