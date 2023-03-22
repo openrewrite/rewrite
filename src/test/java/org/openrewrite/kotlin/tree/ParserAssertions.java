@@ -16,9 +16,12 @@
 package org.openrewrite.kotlin.tree;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.Assertions;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
@@ -29,15 +32,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 public class ParserAssertions {
 
+    private ParserAssertions() {
+    }
+
+    static void customizeExecutionContext(ExecutionContext ctx) {
+        if (ctx.getMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION) == null) {
+            ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
+    }
+
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before) {
-        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before, null);
-        isFullyParsed().accept(kotlin);
-        return kotlin;
+        return kotlin(before, s -> {
+        });
     }
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before, null);
-        spec.andThen(isFullyParsed()).accept(kotlin);
+        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(
+                K.CompilationUnit.class, null, KotlinParser.builder(), before,
+                SourceSpec.EachResult.noop,
+                ParserAssertions::customizeExecutionContext
+        );
+        acceptSpec(spec, kotlin);
         return kotlin;
     }
 
@@ -48,14 +63,17 @@ public class ParserAssertions {
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after,
                                      Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> kotlin =
-          new SourceSpec<>(K.CompilationUnit.class,
-            null,
-            KotlinParser.builder(),
-            before,
-            s -> after);
-        spec.accept(kotlin);
+        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before,
+                SourceSpec.EachResult.noop,
+                ParserAssertions::customizeExecutionContext).after(s -> after);
+        acceptSpec(spec, kotlin);
         return kotlin;
+    }
+
+    private static void acceptSpec(Consumer<SourceSpec<K.CompilationUnit>> spec, SourceSpec<K.CompilationUnit> kotlin) {
+        Consumer<K.CompilationUnit> userSuppliedAfterRecipe = kotlin.getAfterRecipe();
+        kotlin.afterRecipe(userSuppliedAfterRecipe::accept);
+        spec.andThen(isFullyParsed()).accept(kotlin);
     }
 
     public static Consumer<SourceSpec<K.CompilationUnit>> isFullyParsed() {

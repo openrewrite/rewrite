@@ -60,9 +60,13 @@ import org.jetbrains.kotlin.utils.PathUtil;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.internal.KotlinParserVisitor;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
@@ -96,6 +100,13 @@ import static org.jetbrains.kotlin.config.JVMConfigurationKeys.FRIEND_PATHS;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser<K.CompilationUnit> {
+    public static final String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.kotlin.skipSourceSetTypeGeneration";
+
+    private String sourceSet = "main";
+
+    @Nullable
+    private transient JavaSourceSet sourceSetProvenance;
+
     @Nullable
     private final Collection<Path> classpath;
 
@@ -153,7 +164,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
 
         FirSession firSession = (FirSession) firSessionToCus.keySet().toArray()[0];
         List<CompiledKotlinSource> compilerCus = firSessionToCus.get(firSession);
-        List<K.CompilationUnit> cus = new ArrayList<>(firSessionToCus.get(firSession).size());
+        List<K.CompilationUnit> mappedCus = new ArrayList<>(firSessionToCus.get(firSession).size());
 
         for (CompiledKotlinSource compiled : compilerCus) {
             try {
@@ -167,7 +178,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                 );
 
                 K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
-                cus.add(kcu);
+                mappedCus.add(kcu);
                 parsingListener.parsed(compiled.getInput(), kcu);
             } catch (Throwable t) {
                 pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
@@ -176,8 +187,20 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         }
 
         Disposer.dispose(disposable);
-
-        return cus;
+        JavaSourceSet sourceSet = getSourceSet(ctx);
+        if (!ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
+            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
+            for (K.CompilationUnit cu : mappedCus) {
+                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                    if (type instanceof JavaType.FullyQualified) {
+                        classpath.add((JavaType.FullyQualified) type);
+                    }
+                }
+            }
+            sourceSetProvenance = sourceSet.withClasspath(classpath);
+        }
+        assert sourceSetProvenance != null;
+        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
     }
 
     /**
@@ -347,6 +370,23 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     public KotlinParser reset() {
         typeCache.clear();
         return this;
+    }
+
+    public void setSourceSet(String sourceSet) {
+        this.sourceSetProvenance = null;
+        this.sourceSet = sourceSet;
+    }
+
+    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
+        if (sourceSetProvenance == null) {
+            if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
+                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
+            } else {
+                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
+                        typeCache, false);
+            }
+        }
+        return sourceSetProvenance;
     }
 
     @Override

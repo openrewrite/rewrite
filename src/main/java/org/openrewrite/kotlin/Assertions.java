@@ -17,6 +17,7 @@ package org.openrewrite.kotlin;
 
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.SourceSpec;
@@ -28,14 +29,24 @@ public final class Assertions {
     private Assertions() {
     }
 
+    static void customizeExecutionContext(ExecutionContext ctx) {
+        if (ctx.getMessage(KotlinParser.SKIP_SOURCE_SET_TYPE_GENERATION) == null) {
+            ctx.putMessage(KotlinParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        }
+    }
+
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before) {
         return kotlin(before, s -> {
         });
     }
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before, null);
-        spec.accept(kotlin);
+        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(
+                K.CompilationUnit.class, null, KotlinParser.builder(), before,
+                SourceSpec.EachResult.noop,
+                Assertions::customizeExecutionContext
+        );
+        acceptSpec(spec, kotlin);
         return kotlin;
     }
 
@@ -46,8 +57,16 @@ public final class Assertions {
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after,
                                      Consumer<SourceSpec<K.CompilationUnit>> spec) {
-        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before, s -> after);
-        spec.accept(kotlin);
+        SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before,
+                SourceSpec.EachResult.noop,
+                Assertions::customizeExecutionContext).after(s -> after);
+        acceptSpec(spec, kotlin);
         return kotlin;
+    }
+
+    private static void acceptSpec(Consumer<SourceSpec<K.CompilationUnit>> spec, SourceSpec<K.CompilationUnit> kotlin) {
+        Consumer<K.CompilationUnit> userSuppliedAfterRecipe = kotlin.getAfterRecipe();
+        kotlin.afterRecipe(userSuppliedAfterRecipe::accept);
+        spec.accept(kotlin);
     }
 }
