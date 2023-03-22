@@ -43,6 +43,9 @@ public class BuildToolFailures extends DataTable<BuildToolFailures.Row> {
         @Column(displayName = "Exit code", description = "The exit code of the build tool run.")
         Integer exitCode;
 
+        @Column(displayName = "Required Java version", description = "The required Java version for the build, if detectable.")
+        String requiredJavaVersion;
+
         @Column(displayName = "Log output", description = "The log output of the build tool run.")
         String logOutput;
     }
