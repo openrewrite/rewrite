@@ -31,6 +31,12 @@ import java.util.stream.Stream;
 public class FindBuildToolFailures extends Recipe {
     BuildToolFailures failures = new BuildToolFailures(this);
 
+    @Option(displayName = "Suppress log output",
+            description = "Default false. If true, the `logOutput` column will be empty in the output table.",
+            required = false)
+    @Nullable
+    Boolean suppressLogOutput;
+
     @Override
     public String getDisplayName() {
         return "Find source files with `BuildToolFailure` markers";
@@ -51,6 +57,9 @@ public class FindBuildToolFailures extends Recipe {
                         .<Tree>map(failure -> {
                             String logFileContents = sourceFile.printAll();
                             String requiredJavaVersion = FailureLogAnalyzer.requiredJavaVersion(logFileContents);
+                            if (suppressLogOutput != null && suppressLogOutput) {
+                                logFileContents = "";
+                            }
                             failures.insertRow(ctx, new BuildToolFailures.Row(
                                     failure.getType(),
                                     failure.getVersion(),
