@@ -111,4 +111,32 @@ class SwitchTest implements RewriteTest {
           )
         );
     }
+
+
+    @Test
+    void switchWithCommas() {
+        rewriteRun(
+          groovy(
+            """
+              switch (0) {
+                case 0:
+                  return [
+                    "https://example.com",
+                    "https://example.com"
+                  ].join(",")
+                case 1:
+                  return [
+                    "https://example.com",
+                    "https://example.com"
+                  ].join(",")
+                default:
+                  return [
+                    "https://example.com/${path}",
+                    "https://example.com/${path}"
+                  ].join(",")
+              }
+              """
+          )
+        );
+    }
 }
