@@ -24,10 +24,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Maintainer;
-import org.openrewrite.Recipe;
-import org.openrewrite.RecipeException;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -69,11 +66,16 @@ public class YamlResourceLoader implements ResourceLoader {
     private final ClassLoader classLoader;
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
+    @Nullable
+    private Map<String, List<Contributor>> contributors;
+
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
         Category("specs.openrewrite.org/v1beta/category"),
-        Example("specs.openrewrite.org/v1beta/example");
+        Example("specs.openrewrite.org/v1beta/example"),
+
+        Attribution("specs.openrewrite.org/v1beta/attribution");
 
         private final String spec;
 
@@ -183,6 +185,7 @@ public class YamlResourceLoader implements ResourceLoader {
     public Collection<Recipe> listRecipes() {
         Collection<Map<String, Object>> resources = loadResources(ResourceType.Recipe);
         List<Recipe> recipes = new ArrayList<>(resources.size());
+        Map<String, List<Contributor>> contributors = listContributors();
         for (Map<String, Object> r : resources) {
             if (!r.containsKey("name")) {
                 continue;
@@ -254,7 +257,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     }
                 }
             }
-
+            recipe.setContributors(contributors.get(recipe.getName()));
             recipes.add(recipe);
         }
 
@@ -309,10 +312,10 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList());
+        return listRecipeDescriptors(emptyList(), listContributors());
     }
 
-    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes) {
+    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes, Map<String, List<Contributor>> recipeNamesToContributors) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
                 Stream.concat(
@@ -326,6 +329,7 @@ public class YamlResourceLoader implements ResourceLoader {
         for (Recipe recipe : internalRecipes) {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
             declarativeRecipe.initialize(allRecipes);
+            declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
             recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromDeclarativeRecipe(declarativeRecipe, source));
         }
         return recipeDescriptors;
@@ -437,5 +441,34 @@ public class YamlResourceLoader implements ResourceLoader {
                         (String) c.get("before"),
                         (String) c.get("after"))
                 ).collect(toList());
+    }
+
+    public Map<String, List<Contributor>> listContributors() {
+        if(contributors == null) {
+            Collection<Map<String, Object>> rawAttribution = loadResources(ResourceType.Attribution);
+            if(rawAttribution.isEmpty()) {
+                contributors = Collections.emptyMap();
+            } else {
+                Map<String, List<Contributor>> result = new HashMap<>(rawAttribution.size());
+                for (Map<String, Object> attribution : rawAttribution) {
+                    String recipeName = (String) attribution.get("recipeName");
+
+                    //noinspection unchecked
+                    List<Map<String, Object>> rawContributors = (List<Map<String, Object>>) attribution.get("contributors");
+                    List<Contributor> contributors = new ArrayList<>(rawContributors.size());
+                    for (Map<String, Object> rawContributor : rawContributors) {
+                        contributors.add(new Contributor(
+                                (String) rawContributor.get("name"),
+                                (String) rawContributor.get("email"),
+                                (int) rawContributor.get("lineCount")
+                        ));
+                    }
+                    result.put(recipeName, contributors);
+                }
+                contributors = result;
+            }
+        }
+        return contributors;
+
     }
 }

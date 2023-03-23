@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
+import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.style.NamedStyles;
@@ -42,6 +43,8 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
     private final List<RecipeExample> recipeExamples = new ArrayList<>();
+
+    private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
@@ -113,9 +116,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
                 recipeExamples.addAll(resourceLoader.listRecipeExamples());
+                recipeAttributions.putAll(resourceLoader.listContributors());
             }
             for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes));
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions));
             }
         }
     }

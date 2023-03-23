@@ -16,12 +16,16 @@
 package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
+import org.openrewrite.Recipe;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.util.Collection;
+import java.util.List;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -184,5 +188,58 @@ class YamlResourceLoaderTest implements RewriteTest {
             spec -> spec.path("night.txt")
           )
         );
+    }
+
+    @Test
+    void recipeContributorAttribution() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/attribution
+              recipeName: test.ChangeTextToHello
+              contributors:
+                - name: "Jonathan Schneider"
+                  email: "jon@moderne.io"
+                  lineCount: 5
+                - name: "Sam Snyder"
+                  email: "sam@moderne.io"
+                  lineCount: 3
+              """.getBytes()
+          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+          .build();
+        Collection<Recipe> recipes = env.listRecipes();
+        assertThat(recipes).hasSize(1);
+        Recipe recipe = recipes.iterator().next();
+        List<Contributor> contributors = recipe.getContributors();
+        assertThat(contributors).hasSize(2);
+        Contributor jon = contributors.get(0);
+        assertThat(jon.getName()).isEqualTo("Jonathan Schneider");
+        assertThat(jon.getEmail()).isEqualTo("jon@moderne.io");
+        assertThat(jon.getLineCount()).isEqualTo(5);
+        Contributor sam = contributors.get(1);
+        assertThat(sam.getName()).isEqualTo("Sam Snyder");
+        assertThat(sam.getEmail()).isEqualTo("sam@moderne.io");
+        assertThat(sam.getLineCount()).isEqualTo(3);
+
+        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
+        assertThat(recipeDescriptors).hasSize(1);
+        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
+        List<Contributor> descriptorContributors = descriptor.getContributors();
+        assertThat(descriptorContributors).containsExactlyElementsOf(contributors);
+
+        RecipeDescriptor introspectedDescriptor = RecipeIntrospectionUtils.recipeDescriptorFromRecipe(recipe);
+        assertThat(introspectedDescriptor.getContributors()).containsExactlyElementsOf(contributors);
     }
 }

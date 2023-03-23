@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
+import lombok.Setter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
@@ -35,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
-import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -213,6 +213,15 @@ public abstract class Recipe implements Cloneable {
         return emptyList();
     }
 
+    @Setter
+    private transient List<Contributor> contributors;
+
+    public List<Contributor> getContributors() {
+        if(contributors == null) {
+            return emptyList();
+        }
+        return contributors;
+    }
 
     /**
      * @return Determines if another cycle is run when this recipe makes a change. In some cases, like changing method declaration names,
