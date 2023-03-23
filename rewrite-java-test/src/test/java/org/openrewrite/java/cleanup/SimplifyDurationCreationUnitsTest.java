@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -261,14 +262,18 @@ public class SimplifyDurationCreationUnitsTest implements RewriteTest {
      * before removing: when an operation other than multiplication is present
      * in one of these method invocations, what does it mean to the user?
      *
+     * <p>
      * It's possible that simplifying units could obfuscate meaning.
      * It may be better to distribute the multiplicative factor change, rather
      * than simplify the expression; e.g. preferring
      *
+     * <p>
      *     `Duration.ofMillis(1000 + 1000)`  --> `Duration.ofSeconds(1 + 1)`
      *
+     * <p>
      * rather than
      *
+     * <p>
      *     `Duration.ofMillis(1000 + 1000)`  --> `Duration.ofSeconds(2)`
      */
     @Test
@@ -295,6 +300,7 @@ public class SimplifyDurationCreationUnitsTest implements RewriteTest {
      * This test just documents the current behavior.
      */
     @Test
+    @SuppressWarnings("IntegerMultiplicationImplicitCastToLong")
     void doesNotChangeNonConstantUnitCount() {
         rewriteRun(
           java(
@@ -304,6 +310,24 @@ public class SimplifyDurationCreationUnitsTest implements RewriteTest {
               public class Test {
                   int seconds = 30;
                   static Duration duration = Duration.ofMillis(1000 * seconds);
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/moderneinc/support-public/issues/30")
+    void doesNotChangeZeroConstant() {
+        rewriteRun(
+          java(
+              """
+              import java.time.Duration;
+                            
+              public class Test {
+                  static Duration duration1 = Duration.ofMillis(0);
+                  static Duration duration2 = Duration.ofSeconds(0);
+                  static Duration duration3 = Duration.ofDays(0);
               }
               """
           )

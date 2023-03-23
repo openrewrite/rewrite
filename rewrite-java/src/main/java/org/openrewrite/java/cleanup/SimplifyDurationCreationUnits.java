@@ -88,7 +88,7 @@ public class SimplifyDurationCreationUnits extends Recipe {
                 }
 
                 Long invocationUnitCount = getConstantIntegralValue(method.getArguments().get(0));
-                if (invocationUnitCount == null) {
+                if (invocationUnitCount == null || invocationUnitCount == 0L) {
                     return method;
                 }
 
