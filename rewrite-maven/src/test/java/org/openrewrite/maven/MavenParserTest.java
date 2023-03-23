@@ -258,6 +258,34 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void parentVersionRange() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.managed.test</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-parent</artifactId>
+                      <version>[2.9.1,2.10.0)</version>
+                  </parent>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.11</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void guava25() {
         rewriteRun(
           pomXml(
