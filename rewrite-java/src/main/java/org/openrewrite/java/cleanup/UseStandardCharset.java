@@ -22,6 +22,7 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.nio.charset.Charset;
@@ -63,7 +64,11 @@ public class UseStandardCharset extends Recipe {
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
             if (CHARSET_FOR_NAME.matches(m)) {
-                String maybeReplace = (String) ((J.Literal) m.getArguments().get(0)).getValue();
+                Expression charsetName = m.getArguments().get(0);
+                if (!(charsetName instanceof J.Literal)) {
+                    return m;
+                }
+                String maybeReplace = (String) ((J.Literal) charsetName).getValue();
                 if (maybeReplace != null) {
                     maybeAddImport("java.nio.charset.StandardCharsets");
 
