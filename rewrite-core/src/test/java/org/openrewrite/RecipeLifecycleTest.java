@@ -243,6 +243,35 @@ class RecipeLifecycleTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2919")
+    @Test
+    void nestedSingleSourceApplicabilityTests() {
+        @Language("yaml")
+        String yamlRecipe = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.NestSingleSourceApplicabilityTests
+          displayName: Nested singleSource Applicability test runs as expected
+          description: >
+            This test is designed to have nested singleSource applicability tests, because the `FindAndReplace` has its
+            own singleSource applicability tests.
+            For the file `2.txt`, it should be skipped since it doesn't apply to the FindSourceFiles test.
+          applicability:
+            singleSource:
+              - org.openrewrite.FindSourceFiles:
+                    filePattern: "**/*.adoc"
+          recipeList:
+            - org.openrewrite.text.FindAndReplace:
+                  find: 1
+                  replace: 2
+          """;
+        rewriteRun(
+          spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.NestSingleSourceApplicabilityTests"),
+          text("1", "2", spec -> spec.path("x/1.adoc").noTrim()),
+          text("1", spec -> spec.path("x/2.txt").noTrim())
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2754")
     @Test
     void yamlApplicabilityTrueWithRecipesHaveVisitMethodOverridden() {

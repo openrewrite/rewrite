@@ -20,13 +20,14 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 
 class UpgradeLiteralDependencyVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpgradeLiteralDependencyVersion("com.google.guava",
-          "guava", "30.x", "-jre"));
+        spec.beforeRecipe(withToolingApi())
+          .recipe(new UpgradeLiteralDependencyVersion("com.google.guava", "guava", "30.x", "-jre"));
     }
 
     @Test

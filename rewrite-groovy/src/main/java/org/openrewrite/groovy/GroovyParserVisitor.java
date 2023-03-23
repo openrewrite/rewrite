@@ -44,6 +44,7 @@ import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -922,9 +923,22 @@ public class GroovyParserVisitor {
                             null,
                             JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
                             JContainer.build(sourceBefore(":"),
-                                    visitRightPadded(((BlockStatement) statement.getCode()).getStatements().toArray(new ASTNode[0]), null), Markers.EMPTY),
+                                    convertStatements(((BlockStatement) statement.getCode()).getStatements(),  t -> Space.EMPTY), Markers.EMPTY),
                             null
                     )
+            );
+        }
+
+        private J.Case visitDefaultCaseStatement(BlockStatement statement) {
+            return new J.Case(randomId(),
+                    sourceBefore("default"),
+                    Markers.EMPTY,
+                    J.Case.Type.Statement,
+                    null,
+                    JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null)))),
+                    JContainer.build(sourceBefore(":"),
+                            convertStatements(statement.getStatements(), t -> Space.EMPTY), Markers.EMPTY),
+                    null
             );
         }
 
@@ -1569,7 +1583,10 @@ public class GroovyParserVisitor {
                     new J.Block(
                             randomId(), sourceBefore("{"), Markers.EMPTY,
                             JRightPadded.build(false),
-                            visitRightPadded(statement.getCaseStatements().toArray(new CaseStatement[0]), null),
+                            ListUtils.concat(
+                                    convertAll(statement.getCaseStatements(),  t -> Space.EMPTY, t -> Space.EMPTY),
+                                    statement.getDefaultStatement().isEmpty() ? null : JRightPadded.build(visitDefaultCaseStatement((BlockStatement) statement.getDefaultStatement()))
+                            ),
                             sourceBefore("}"))));
         }
 
@@ -1773,6 +1790,39 @@ public class GroovyParserVisitor {
             ));
         }
 
+        private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends ASTNode> nodes,
+                                                                 Function<ASTNode, Space> innerSuffix,
+                                                                 Function<ASTNode, Space> suffix) {
+            if (nodes.isEmpty()) {
+                return emptyList();
+            }
+            List<JRightPadded<J2>> converted = new ArrayList<>(nodes.size());
+            for (int i = 0; i < nodes.size(); i++) {
+                converted.add(convert(nodes.get(i), i == nodes.size() - 1 ? suffix : innerSuffix));
+            }
+            return converted;
+        }
+
+        private <J2 extends J> JRightPadded<J2> convert(ASTNode node, Function<ASTNode, Space> suffix) {
+            J2 j = visit(node);
+            return padRight(j, suffix.apply(node));
+        }
+
+        private List<JRightPadded<Statement>> convertStatements(List<? extends ASTNode> nodes,
+                                                                Function<ASTNode, Space> suffix) {
+            if (nodes.isEmpty()) {
+                return emptyList();
+            }
+
+            List<JRightPadded<Statement>> converted = new ArrayList<>(nodes.size());
+            for (ASTNode node : nodes) {
+                Statement statement = visit(node);
+                converted.add(padRight(statement, suffix.apply(node)));
+            }
+
+            return converted;
+        }
+
         @SuppressWarnings({"unchecked", "ConstantConditions"})
         private <T> T pollQueue() {
             return (T) queue.poll();
@@ -1852,6 +1902,10 @@ public class GroovyParserVisitor {
         }
     }
 
+    private <T> JRightPadded<T> padRight(T tree, Space right) {
+        return new JRightPadded<>(tree, right, Markers.EMPTY);
+    }
+
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
         return new JLeftPadded<>(left, tree, Markers.EMPTY);
     }
@@ -1899,6 +1953,17 @@ public class GroovyParserVisitor {
         String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
         cursor += prefix.length();
         return format(prefix);
+    }
+
+    private String skip(@Nullable String token) {
+        if (token == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        if (source.startsWith(token, cursor)) {
+            cursor += token.length();
+        }
+        return token;
     }
 
     private <T extends TypeTree & Expression> T typeTree(@Nullable ClassNode classNode) {

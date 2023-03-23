@@ -350,8 +350,7 @@ public class ResolvedPom {
             mergeRepositories(pom.getRepositories());
 
             if (pom.getParent() != null) {
-                Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
-                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                Pom parentPom = resolveParentPom(pom);
 
                 for (Pom ancestor : pomAncestry) {
                     if (ancestor.getGav().equals(parentPom.getGav())) {
@@ -379,8 +378,7 @@ public class ResolvedPom {
             mergeRequestedDependencies(pom.getDependencies());
 
             if (pom.getParent() != null) {
-                Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
-                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                Pom parentPom = resolveParentPom(pom);
 
                 MavenExecutionContextView.view(ctx)
                         .getResolutionListener()
@@ -396,6 +394,24 @@ public class ResolvedPom {
                 pomAncestry.add(0, parentPom);
                 resolveParentDependenciesRecursively(pomAncestry);
             }
+        }
+
+        private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
+            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
+            if (gav.getVersion() == null) {
+                throw new MavenParsingException("Parent version must always specify a version " + gav);
+            }
+
+            VersionRequirement newRequirement = VersionRequirement.fromVersion(gav.getVersion(), 0);
+            GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
+            String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
+            if (newRequiredVersion == null) {
+                throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
+            }
+            gav = gav.withVersion(newRequiredVersion);
+
+            return downloader.download(gav,
+                    pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
         }
 
         private void mergeRequestedDependencies(List<Dependency> incomingRequestedDependencies) {

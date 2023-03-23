@@ -16,6 +16,7 @@
 
 package org.openrewrite.java.cleanup;
 
+
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -799,4 +800,163 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
+    @Test
+    void multipleConstructors() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Predicate;
+
+              class B {
+                  B () {}
+                  B (Predicate<String> predicate) {}
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              class A {
+                  void method(Supplier<B> supplier) {}
+                  void method(Function<B, B> function) {}
+
+                  void test() {
+                      method(() -> new B());            // OK
+                      method(() -> new B(t -> false));  // OK
+                      method((x) -> new B(t -> false)); // OK
+                      // method(B::new);                // Error
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
+    @Test
+    void anotherMultipleConstructorsCaseEasyUnderstanding() {
+        rewriteRun(
+          java(
+            """
+              class B {
+                  B () {}
+                  B (String name) {}
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              class A {
+                  void method(Supplier<B> supplier) {}
+                  void method(Function<String, B> function) {}
+
+                  void test() {
+                      method(() -> new B());         // OK
+                      method(name -> new B(name));   // OK
+                      // method(B::new);             // Error
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2949")
+    @Test
+    void anotherSimplerMultipleConstructorsCase() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Function;
+              import java.util.function.Supplier;
+
+              public class A {
+                  void method(Supplier<String> visitor) {}
+                  void method(Function<String, String> visitor) {}
+
+                  void test() {
+                      method(() -> new String());
+                      // method(String::new); // Error
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2958")
+    @Test
+    void insideIfConditionAfterInstanceOfPatternVariable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Collection;
+              class A {
+                  Collection<?> test(Object value) {
+                      if (value instanceof Collection<?> values && values.stream().allMatch(it -> it instanceof Class)) {
+                          return values;
+                      }
+                      return null;
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              class A {
+                  Collection<?> test(Object value) {
+                      if (value instanceof Collection<?> values && values.stream().allMatch(Class.class::isInstance)) {
+                          return values;
+                      }
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tryInAForLoop() {
+        rewriteRun(
+          java(
+            """
+              import java.nio.file.DirectoryStream;
+              import java.nio.file.Files;
+              import java.nio.file.Path;
+              import java.util.Set;
+
+              class A {
+                  void cleanOldBackups(Set<Path> backupPaths) throws Exception {
+                      for (Path backupDirPath : backupPaths)
+                          try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(backupDirPath, path -> Files.isDirectory(path))) {
+                          }
+                  }
+              }
+              """,
+            """
+              import java.nio.file.DirectoryStream;
+              import java.nio.file.Files;
+              import java.nio.file.Path;
+              import java.util.Set;
+
+              class A {
+                  void cleanOldBackups(Set<Path> backupPaths) throws Exception {
+                      for (Path backupDirPath : backupPaths)
+                          try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(backupDirPath, Files::isDirectory)) {
+                          }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
 }

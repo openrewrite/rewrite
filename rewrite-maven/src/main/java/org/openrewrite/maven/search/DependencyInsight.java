@@ -15,10 +15,12 @@
  */
 package org.openrewrite.maven.search;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.marker.SearchResult;
@@ -59,19 +61,19 @@ public class DependencyInsight extends Recipe {
             example = "compile")
     String scope;
 
+    @Option(displayName = "Only direct",
+            description = "Default false. If enabled, transitive dependencies will not be considered.",
+            required = false,
+            example = "true")
+    @Nullable
+    Boolean onlyDirect;
+
     UUID searchId = randomId();
 
     @Override
     public Validated validate() {
-        return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope, s -> {
-            try {
-                //noinspection ResultOfMethodCallIgnored
-                Scope.fromName(s);
-                return true;
-            } catch (Throwable t) {
-                return false;
-            }
-        }));
+        return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope,
+                s -> Scope.fromName(s) != Scope.Invalid));
     }
 
     @Override
@@ -101,6 +103,8 @@ public class DependencyInsight extends Recipe {
                         if (match != null) {
                             if (match == dependency) {
                                 t = SearchResult.found(t);
+                            } else if (Boolean.TRUE.equals(onlyDirect)) {
+                                return t;
                             } else {
                                 t = SearchResult.found(t, match.getGav().toString());
                             }

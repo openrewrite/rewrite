@@ -34,6 +34,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.version;
 
 @SuppressWarnings("InfiniteRecursion")
 class MethodParamPadTest implements RewriteTest {
@@ -321,6 +322,27 @@ class MethodParamPadTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Test
+    void recordWithCompactConstructor() {
+        rewriteRun(
+          version(java(
+            """
+              public record HttpClientTrafficLogData(
+                  Request request,
+                  Response response
+              )
+              {
+                  public HttpClientTrafficLogData
+                  {
+                      Objects.requireNonNull(request, "request must not be null");
+                      Objects.requireNonNull(response, "response must not be null");
+                  }
+              }
+              """
+          ), 17)
         );
     }
 

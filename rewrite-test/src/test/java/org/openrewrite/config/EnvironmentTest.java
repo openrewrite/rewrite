@@ -25,7 +25,9 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -273,15 +275,38 @@ class EnvironmentTest implements RewriteTest {
 
     @Test
     void scanClasspath() {
-        var env = Environment.builder().scanRuntimeClasspath().build();
+        var env = Environment.builder()
+          .scanRuntimeClasspath()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/attribution
+              recipeName: org.openrewrite.text.ChangeTextToJon
+              contributors:
+                - name: "Jonathan Schneider"
+                  email: "jon@moderne.io"
+                  lineCount: 5
+              """.getBytes()
+          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+          .build();
 
-        assertThat(env.listRecipes()).hasSizeGreaterThanOrEqualTo(2)
+        Collection<Recipe> recipes = env.listRecipes();
+        assertThat(recipes).hasSizeGreaterThanOrEqualTo(2)
           .extracting("name")
           .contains("org.openrewrite.text.ChangeTextToJon", "org.openrewrite.HelloJon");
 
         assertThat(env.listStyles()).hasSizeGreaterThanOrEqualTo(1)
           .extracting("name")
           .contains("org.openrewrite.SampleStyle");
+
+        //noinspection OptionalGetWithoutIsPresent
+        Recipe cttj = recipes.stream()
+          .filter(it -> "org.openrewrite.text.ChangeTextToJon".equals(it.getName()))
+          .findAny()
+          .get();
+
+        assertThat(cttj.getContributors())
+          .isNotEmpty();
     }
 
     @Test

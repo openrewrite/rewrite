@@ -16,8 +16,10 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GrUnnecessarySemicolon", "GroovyVariableNotAssigned"})
@@ -59,7 +61,12 @@ class SwitchTest implements RewriteTest {
               switch(0) {
                   default: System.out.println("default!");
               }
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getStatements()).hasSize(1);
+                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
+                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(1);
+            })
           )
         );
     }
@@ -76,6 +83,57 @@ class SwitchTest implements RewriteTest {
                   case "bar": {
                      break
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleCasesWithDefault() {
+        rewriteRun(
+          groovy(
+            """
+              switch("foo") {
+                  case "foo":
+                      break
+                  case "bar":
+                      break
+                  default:
+                      break
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getStatements()).hasSize(1);
+                assertThat(cu.getStatements().get(0)).isInstanceOf(J.Switch.class);
+                assertThat(((J.Switch) cu.getStatements().get(0)).getCases().getStatements()).hasSize(3);
+            })
+          )
+        );
+    }
+
+
+    @Test
+    void switchWithCommas() {
+        rewriteRun(
+          groovy(
+            """
+              switch (0) {
+                case 0:
+                  return [
+                    "https://example.com",
+                    "https://example.com"
+                  ].join(",")
+                case 1:
+                  return [
+                    "https://example.com",
+                    "https://example.com"
+                  ].join(",")
+                default:
+                  return [
+                    "https://example.com/${path}",
+                    "https://example.com/${path}"
+                  ].join(",")
               }
               """
           )

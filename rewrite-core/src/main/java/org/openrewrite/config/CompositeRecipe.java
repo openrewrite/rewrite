@@ -27,10 +27,6 @@ import java.util.List;
  * Anonymous recipe classes aren't serializable/deserializable so use this, or another named type, instead
  */
 public class CompositeRecipe extends Recipe {
-
-    private static final Duration DEFAULT_ESTIMATED_EFFORT = Duration.ofMinutes(5);
-    private Duration estimatedEffortPerOccurrence;
-
     @Override
     public String getDisplayName() {
         return getName();
@@ -39,10 +35,6 @@ public class CompositeRecipe extends Recipe {
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return null;
-    }
-
-    private static boolean isNonzero(@Nullable Duration estimatedEffortPerOccurrence) {
-        return estimatedEffortPerOccurrence != null && !estimatedEffortPerOccurrence.equals(Duration.ZERO);
     }
 
     @Override

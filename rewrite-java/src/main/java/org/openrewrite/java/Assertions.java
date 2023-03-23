@@ -191,7 +191,7 @@ public class Assertions {
         return sourceSpec;
     }
 
-    private static JavaVersion javaVersion(int version) {
+    public static JavaVersion javaVersion(int version) {
         return javaVersions.computeIfAbsent(version, v ->
                 new JavaVersion(Tree.randomId(), "openjdk", "adoptopenjdk",
                         Integer.toString(v), Integer.toString(v)));

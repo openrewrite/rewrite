@@ -80,6 +80,9 @@ public class TypesInUse {
             if (c.getPadding().getImplements() != null) {
                 visitContainer(c.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, p);
             }
+            if (c.getPrimaryConstructor() != null) {
+                visitContainer(c.getPadding().getPrimaryConstructor(), JContainer.Location.RECORD_STATE_VECTOR, p);
+            }
             visit(c.getBody(), p);
             return c;
         }
@@ -127,7 +130,7 @@ public class TypesInUse {
             usedMethods.add(newClass.getConstructorType());
             return super.visitNewClass(newClass, integer);
         }
-    };
+    }
 
 
     private static class NullSkippingSet<T> extends HashSet<T> {

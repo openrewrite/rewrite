@@ -24,6 +24,8 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SourceSet;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
@@ -40,6 +42,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
@@ -47,11 +50,11 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null, visitor, null, null, null);
+        return new AdHocRecipe(null, null, null, visitor, null, null, null, emptyList());
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null);
+        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null, emptyList());
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
@@ -240,6 +243,12 @@ public interface RewriteTest extends SourceSpecs {
                 } else {
                     sourcePath = parser.sourcePathFromSourceText(sourceSpec.dir, beforeTrimmed);
                 }
+                for (UncheckedConsumer<SourceSpec<?>> consumer : testMethodSpec.allSources) {
+                    consumer.accept(sourceSpec);
+                }
+                for (UncheckedConsumer<SourceSpec<?>> consumer : testClassSpec.allSources) {
+                    consumer.accept(sourceSpec);
+                }
                 inputs.put(sourceSpec, new Parser.Input(sourcePath, () -> new ByteArrayInputStream(beforeTrimmed.getBytes(parser.getCharset(executionContext)))));
             }
 
@@ -255,18 +264,17 @@ public interface RewriteTest extends SourceSpecs {
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);
-                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
-                        sourceFile.getMarkers().getMarkers(), testClassSpec.allSources.markers)));
-                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
-                        sourceFile.getMarkers().getMarkers(), testMethodSpec.allSources.markers)));
+                Markers markers = sourceFile.getMarkers();
 
                 SourceSpec<?> nextSpec = sourceSpecIter.next();
-                sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().withMarkers(ListUtils.concatAll(
-                        sourceFile.getMarkers().getMarkers(), nextSpec.markers)));
+                for (Marker marker : nextSpec.getMarkers()) {
+                    markers = markers.setByType(marker);
+                }
+                sourceFile = sourceFile.withMarkers(markers);
 
                 // Update the default 'main' SourceSet Marker added by the JavaParser with the specs sourceSetName
                 if (nextSpec.sourceSetName != null) {
-                    sourceFile = sourceFile.withMarkers((sourceFile.getMarkers().withMarkers(ListUtils.map(sourceFile.getMarkers().getMarkers(), m -> {
+                    sourceFile = sourceFile.withMarkers((markers.withMarkers(ListUtils.map(markers.getMarkers(), m -> {
                         if (m instanceof SourceSet) {
                             m = ((SourceSet) m).withName(nextSpec.sourceSetName);
                         }
@@ -300,6 +308,9 @@ public interface RewriteTest extends SourceSpecs {
         }
         for (Consumer<List<SourceFile>> beforeRecipe : testMethodSpec.beforeRecipes) {
             beforeRecipe.accept(beforeSourceFiles);
+        }
+        for (SourceFile beforeSourceFile : beforeSourceFiles) {
+            specBySourceFile.put(beforeSourceFile, specBySourceFile.remove(beforeSourceFile));
         }
 
         List<SourceFile> runnableSourceFiles = new ArrayList<>(beforeSourceFiles.size());

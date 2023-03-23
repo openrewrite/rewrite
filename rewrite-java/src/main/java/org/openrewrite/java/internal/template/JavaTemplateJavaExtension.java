@@ -80,7 +80,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
                                     new Cursor(getCursor(), insertionPoint),
                                     Statement.class,
-                                    substitutedTemplate, loc));
+                                    substitutedTemplate, loc, mode));
 
                             if (coordinates.getComparator() != null) {
                                 J.Block b = block;
@@ -110,7 +110,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                 List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(
                                         new Cursor(getCursor(), insertionPoint),
                                         Statement.class,
-                                        substitutedTemplate, loc));
+                                        substitutedTemplate, loc, mode));
 
                                 Cursor parent = getCursor();
                                 for (int i = 0; i < gen.size(); i++) {
@@ -241,6 +241,13 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(fa.getPrefix()), p);
+                } else if (loc.equals(STATEMENT_PREFIX) && fa.isScope(insertionPoint)) {
+                    // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
+                    return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
+                                    new Cursor(getCursor(), insertionPoint),
+                                    substitutedTemplate,
+                                    loc))
+                            .withPrefix(fa.getPrefix()), p);
                 }
                 return super.visitFieldAccess(fa, p);
             }
@@ -294,7 +301,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         }
                         case BLOCK_PREFIX: {
                             List<Statement> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(), Statement.class,
-                                    substitutedTemplate, loc));
+                                    substitutedTemplate, loc, mode));
                             J.Block body = method.getBody();
                             if (body == null) {
                                 body = EMPTY_BLOCK;
@@ -445,7 +452,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (loc.equals(STATEMENT_PREFIX) && statement.isScope(insertionPoint)) {
                     if (mode.equals(JavaCoordinates.Mode.REPLACEMENT)) {
                         List<J3> gen = substitutions.unsubstitute(templateParser.parseBlockStatements(getCursor(),
-                                expected, substitutedTemplate, loc));
+                                expected, substitutedTemplate, loc, mode));
                         if (gen.size() != 1) {
                             // for some languages with optional semicolons, templates may generate a statement
                             // and an empty, e.g. for a statement replacement in Groovy for the last statement

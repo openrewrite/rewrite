@@ -49,10 +49,12 @@ class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
             List<S> before,
             ExecutionContext ctx,
             @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
-            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile
+            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile,
+            boolean isApplicableTest
     ) {
         ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges);
-        List<S> afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, singleSourceApplicableTestResult, recipeThatAddedOrDeletedSourceFile);
+        List<S> afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, singleSourceApplicableTestResult,
+            recipeThatAddedOrDeletedSourceFile, isApplicableTest);
         if (afterList != before) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&

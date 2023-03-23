@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.format;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
@@ -296,7 +296,7 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/636")
+    @ExpectedToFail("https://github.com/openrewrite/rewrite/issues/636")
     @Test
     void methodInvocationArgumentOnNewLineWithMethodSelect() {
         rewriteRun(
@@ -350,7 +350,7 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/636")
+    @ExpectedToFail("https://github.com/openrewrite/rewrite/issues/636")
     @Test
     void methodInvocationArgumentsContinuationIndentsAssorted() {
         rewriteRun(
@@ -746,7 +746,7 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void forLoop() {
         rewriteRun(
@@ -2282,6 +2282,21 @@ class TabsAndIndentsTest implements RewriteTest {
               // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
               // DOES shift the suffix of comment 2.
                   void shiftRight() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2968")
+    @Test
+    void recordComponents() {
+        rewriteRun(
+          java(
+            """
+              public record RenameRequest(
+                  @NotBlank
+                  @JsonProperty("name") String name) {
               }
               """
           )

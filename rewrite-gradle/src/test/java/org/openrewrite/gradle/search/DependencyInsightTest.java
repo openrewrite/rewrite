@@ -20,12 +20,14 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 
-public class DependencyInsightTest implements RewriteTest {
+class DependencyInsightTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new DependencyInsight("com.google.guava", "failureaccess", null));
+        spec.beforeRecipe(withToolingApi())
+          .recipe(new DependencyInsight("com.google.guava", "failureaccess", null));
     }
 
     @Test

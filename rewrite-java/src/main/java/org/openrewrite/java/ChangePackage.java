@@ -26,7 +26,6 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
@@ -104,29 +103,6 @@ public class ChangePackage extends Recipe {
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
 
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            JavaSourceFile c = super.visitJavaSourceFile(cu, ctx);
-
-            String changingTo = getCursor().getMessage(RENAME_TO_KEY);
-            if (changingTo != null) {
-                String path = ((SourceFile) c).getSourcePath().toString().replace('\\', '/');
-                String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
-                assert changingFrom != null;
-                c = ((SourceFile) c).withSourcePath(Paths.get(path.replaceFirst(
-                        changingFrom.replace('.', '/'),
-                        changingTo.replace('.', '/')
-                )));
-
-                for (J.Import anImport : c.getImports()) {
-                    if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
-                        c = new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visitJavaSourceFile(c, ctx);
-                    }
-                }
-            }
-            return c;
-        }
-
-        @Override
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
 
@@ -147,21 +123,21 @@ public class ChangePackage extends Recipe {
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext context) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
-            getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_FROM_KEY, original);
+            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
 
             if (original.equals(oldPackageName)) {
-                getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, newPackageName);
+                getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, newPackageName);
 
                 if (!newPackageName.isEmpty()) {
                     pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, newPackageName).build(), pkg.getCoordinates().replace());
                 } else {
                     // Covers unlikely scenario where the package is removed.
-                    getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
+                    getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "UPDATE_PREFIX", true);
                     pkg = null;
                 }
             } else if (isTargetRecursivePackageName(original)) {
                 String changingTo = getNewPackageName(original);
-                getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, RENAME_TO_KEY, changingTo);
+                getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, changingTo);
                 pkg = pkg.withTemplate(JavaTemplate.builder(this::getCursor, changingTo).build(), pkg.getCoordinates().replace());
             }
             //noinspection ConstantConditions
@@ -208,6 +184,28 @@ public class ChangePackage extends Recipe {
                 return n.withConstructorType(updateType(n.getConstructorType()));
             } else if (j instanceof TypedTree) {
                 return ((TypedTree) j).withType(updateType(((TypedTree) j).getType()));
+            } else if (j instanceof JavaSourceFile) {
+                JavaSourceFile sf = (JavaSourceFile) j;
+
+                String changingTo = getCursor().getNearestMessage(RENAME_TO_KEY);
+                if (changingTo != null) {
+                    String path = ((SourceFile) sf).getSourcePath().toString().replace('\\', '/');
+                    String changingFrom = getCursor().getMessage(RENAME_FROM_KEY);
+                    assert changingFrom != null;
+                    sf = ((SourceFile) sf).withSourcePath(Paths.get(path.replaceFirst(
+                            changingFrom.replace('.', '/'),
+                            changingTo.replace('.', '/')
+                    )));
+
+                    for (J.Import anImport : sf.getImports()) {
+                        if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
+                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visit(sf, executionContext, getCursor());
+                            assert sf != null;
+                        }
+                    }
+                }
+
+                j = sf;
             }
             return j;
         }

@@ -19,433 +19,403 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.version;
+import static org.openrewrite.java.Assertions.*;
 
+@SuppressWarnings("UnnecessaryStringEscape")
 class ReplaceTextBlockWithStringTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ReplaceTextBlockWithString());
+        spec.recipe(new ReplaceTextBlockWithString()).allSources(s -> s.markers(javaVersion(14)));
     }
 
     @Test
     void newLine() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "\\n";
+            }
+            """));
     }
 
     @Test
     void singleLine() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          line1
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        line1
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "line1\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "line1\\n";
+            }
+            """));
     }
 
     @Test
     void singleLineNoNewLineAtEnd() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          line1\"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        line1\"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "line1";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "line1";
+            }
+            """));
     }
 
     @Test
     void multipleLines() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          line1
-                          line2
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        line1
+                        line2
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "line1\\n" +
-                          "line2\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "line1\\n" +
+                        "line2\\n";
+            }
+            """));
     }
 
     @Test
     void multipleLinesNoNewLineAtEnd() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          line1
-                          line2\"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        line1
+                        line2\"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "line1\\n" +
-                          "line2";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "line1\\n" +
+                        "line2";
+            }
+            """));
     }
 
     @Test
     void indent() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          line1
-                              line2
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        line1
+                            line2
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "line1\\n" +
-                          "    line2\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "line1\\n" +
+                        "    line2\\n";
+            }
+            """));
     }
 
     @Test
     void startingEmptyLines() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
+            public class Test {
+                String str =
+                        \"\"\"
 
 
-                          line1
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+                        line1
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "\\n" +
-                          "\\n" +
-                          "line1\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "\\n" +
+                        "\\n" +
+                        "line1\\n";
+            }
+            """));
     }
 
     @Test
     void endingEmptyLines() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          line1
+            public class Test {
+                String str =
+                        \"\"\"
+                        line1
 
 
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "line1\\n" +
-                          "\\n" +
-                          "\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "line1\\n" +
+                        "\\n" +
+                        "\\n";
+            }
+            """));
     }
 
     @Test
     void middleEmptyLines() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          line1
+            public class Test {
+                String str =
+                        \"\"\"
+                        line1
 
 
-                          line2
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+                        line2
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "line1\\n" +
-                          "\\n" +
-                          "\\n" +
-                          "line2\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "line1\\n" +
+                        "\\n" +
+                        "\\n" +
+                        "line2\\n";
+            }
+            """));
     }
 
     @Test
     void assignmentAndBlockSameLine() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str = \"\"\"
-                          line1
-                          line2
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str = \"\"\"
+                        line1
+                        line2
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str = "line1\\n" +
-                          "line2\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str = "line1\\n" +
+                        "line2\\n";
+            }
+            """));
     }
 
     @Test
     void singleLineComment() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          // Comment
-                          \"\"\"
-                          line1
-                          line2
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        // Comment
+                        \"\"\"
+                        line1
+                        line2
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          // Comment
-                          "line1\\n" +
-                          "line2\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        // Comment
+                        "line1\\n" +
+                        "line2\\n";
+            }
+            """));
     }
 
     @Test
     void multiLineComment() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          /* Comment
-                           * Next line
-                           */
-                          \"\"\"
-                          line1
-                          line2
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        /* Comment
+                         * Next line
+                         */
+                        \"\"\"
+                        line1
+                        line2
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          /* Comment
-                           * Next line
-                           */
-                          "line1\\n" +
-                          "line2\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        /* Comment
+                         * Next line
+                         */
+                        "line1\\n" +
+                        "line2\\n";
+            }
+            """));
     }
 
     @Test
     void doubleQuote() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          "line1"
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        "line1"
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "\\"line1\\"\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "\\"line1\\"\\n";
+            }
+            """));
     }
 
     @Test
     void threeDoubleQuotes() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          \\"\\"\\"line1\\"\\"\\"
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        \\"\\"\\"line1\\"\\"\\"
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "\\"\\"\\"line1\\"\\"\\"\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "\\"\\"\\"line1\\"\\"\\"\\n";
+            }
+            """));
     }
 
     @Test
     void unicode() {
         rewriteRun(
-          version(
-            java(
-              """
-              package com.example;
+          java(
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          \"\"\"
-                          Γειά σου Κόσμε
-                          \"\"\";
-              }
-              """,
-              """
-              package com.example;
+            public class Test {
+                String str =
+                        \"\"\"
+                        Γειά σου Κόσμε
+                        \"\"\";
+            }
+            """,
+            """
+            package com.example;
 
-              public class Test {
-                  String str =
-                          "Γειά σου Κόσμε\\n";
-              }
-              """),
-            14));
+            public class Test {
+                String str =
+                        "Γειά σου Κόσμε\\n";
+            }
+            """));
     }
 
 }

@@ -29,17 +29,18 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 "Statistics used in analyzing the performance of recipes.");
     }
 
-    public void record(ExecutionContext ctx, Recipe recipe, org.openrewrite.RecipeRunStats runStats) {
+    public void record(ExecutionContext ctx, org.openrewrite.RecipeRunStats runStats) {
         insertRow(ctx, new org.openrewrite.table.RecipeRunStats.Row(
                 runStats.getRecipe().getName(),
                 runStats.getCalls(),
                 runStats.getCumulative().toNanos(),
                 runStats.getMax().toNanos(),
                 runStats.getOwnGetVisitor().toNanos(),
-                runStats.getOwnVisit().toNanos()
+                runStats.getOwnVisit().toNanos(),
+                runStats.getApplicability().toNanos()
         ));
         for (org.openrewrite.RecipeRunStats called : runStats.getCalled()) {
-            record(ctx, recipe, called);
+            record(ctx, called);
         }
     }
 
@@ -68,5 +69,9 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         @Column(displayName = "Time running `visit()`",
                 description = "The total time spent in running `Recipe#visit()` for this recipe.")
         Long ownVisit;
+
+        @Column(displayName = "Time evaluating applicability tests",
+                description = "The total time spent in evaluating applicability tests for this recipe.")
+        Long applicability;
     }
 }

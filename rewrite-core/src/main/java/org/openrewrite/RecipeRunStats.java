@@ -128,6 +128,15 @@ public class RecipeRunStats {
         ownVisit.addAndGet(System.nanoTime() - ownVisitStartTime);
     }
 
+    private final AtomicLong applicability = new AtomicLong();
+    void applicabilityCompleted(long applicabilityStartTime) {
+        applicability.addAndGet(System.nanoTime() - applicabilityStartTime);
+    }
+
+    public Duration getApplicability() {
+        return Duration.ofNanos(applicability.get());
+    }
+
     @Incubating(since = "7.29.0")
     public String printAsMermaidGantt(double scale) {
         StringBuilder gantt = new StringBuilder("gantt\n");

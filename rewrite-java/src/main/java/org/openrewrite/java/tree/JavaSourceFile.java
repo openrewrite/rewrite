@@ -32,7 +32,11 @@ public interface JavaSourceFile extends J {
 
     List<Import> getImports();
 
+    JavaSourceFile withImports(List<Import> imports);
+
     List<J.ClassDeclaration> getClasses();
+
+    JavaSourceFile withClasses(List<J.ClassDeclaration> classes);
 
     Space getEof();
 

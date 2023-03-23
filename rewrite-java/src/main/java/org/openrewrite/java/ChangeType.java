@@ -30,13 +30,8 @@ import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.IdentityHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.Stack;
-import java.util.stream.Collectors;
-
-import static java.util.Collections.emptySet;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -77,27 +72,14 @@ public class ChangeType extends Recipe {
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                JavaSourceFile sf = super.visitJavaSourceFile(cu, executionContext);
-                if (!Boolean.TRUE.equals(ignoreDefinition)) {
-                    Boolean visit = getCursor().pollNearestMessage("TARGET_CLASS");
-                    if (visit != null && visit) {
-                        return SearchResult.found(sf);
-                    }
-                }
-                doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName));
-                return sf;
-            }
 
             @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-                J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, executionContext);
-                if (!Boolean.TRUE.equals(ignoreDefinition) &&
-                        TypeUtils.isOfClassType(cd.getType(), oldFullyQualifiedTypeName)) {
-                    getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "TARGET_CLASS", true);
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
+                    return SearchResult.found(cu);
                 }
-                return cd;
+                doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName));
+                return cu;
             }
         };
     }
@@ -115,6 +97,7 @@ public class ChangeType extends Recipe {
         private final Boolean ignoreDefinition;
 
         private final Map<JavaType, JavaType> oldNameToChangedType = new IdentityHashMap<>();
+        private final Set<String> topLevelClassnames = new HashSet<>();
 
         private ChangeTypeVisitor(String oldFullyQualifiedTypeName, String newFullyQualifiedTypeName, @Nullable Boolean ignoreDefinition) {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
@@ -123,61 +106,27 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            if (!Boolean.TRUE.equals(ignoreDefinition)) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
-                if (fq != null) {
-                    ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(originalType.getFullyQualifiedName(), fq.getFullyQualifiedName());
-                    cu = (JavaSourceFile) changeClassDefinition.visit(cu, executionContext);
-                    assert cu != null;
+        public @Nullable J visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+            if (sourceFile instanceof J) {
+                if (!Boolean.TRUE.equals(ignoreDefinition)) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                    if (fq != null) {
+                        ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(originalType.getFullyQualifiedName(), fq.getFullyQualifiedName());
+                        sourceFile = (SourceFile) changeClassDefinition.visit(sourceFile, executionContext);
+                        assert sourceFile != null;
+                    }
                 }
             }
-            return super.visitJavaSourceFile(cu, executionContext);
+            return super.visitSourceFile(sourceFile, executionContext);
         }
 
-        @SuppressWarnings({"unchecked", "rawtypes", "ConstantConditions"})
         @Override
-        public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            J.CompilationUnit c = visitAndCast(cu, ctx, super::visitCompilationUnit);
-            if (targetType instanceof JavaType.FullyQualified) {
-                for (J.Import anImport : c.getImports()) {
-                    if (anImport.isStatic()) {
-                        continue;
-                    }
-
-                    JavaType maybeType = anImport.getQualid().getType();
-                    if (maybeType instanceof JavaType.FullyQualified) {
-                        JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
-                        if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                            c = (J.CompilationUnit) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(c, ctx);
-                            assert c != null;
-                        } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                            c = (J.CompilationUnit) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(c, ctx);
-                            assert c != null;
-                        }
-                    }
-                }
+        public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+            J.ClassDeclaration cd = (J.ClassDeclaration) super.visitClassDeclaration(classDecl, executionContext);
+            if (cd.getType() != null) {
+                topLevelClassnames.add(getTopLevelClassName(cd.getType()).getFullyQualifiedName());
             }
-
-            JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
-            Set<String> classNames = fullyQualifiedTarget == null ? emptySet() : cu.getClasses().stream()
-                    .filter(it -> it.getType() != null)
-                    .map(it -> it.getType().getFullyQualifiedName())
-                    .collect(Collectors.toSet());
-
-            if (fullyQualifiedTarget != null && !(fullyQualifiedTarget.getOwningClass() != null && classNames.contains(getTopLevelClassName(fullyQualifiedTarget)))) {
-                if (fullyQualifiedTarget.getOwningClass() != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                    c = (J.CompilationUnit) new AddImport(fullyQualifiedTarget.getOwningClass().getFullyQualifiedName(), null, true).visit(c, ctx);
-                }
-                if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                    c = (J.CompilationUnit) new AddImport(fullyQualifiedTarget.getFullyQualifiedName(), null, true).visit(c, ctx);
-                }
-            }
-
-            if (c != null) {
-                c = c.withImports(ListUtils.map(c.getImports(), i -> visitAndCast(i, ctx, super::visitImport)));
-            }
-            return c;
+            return cd;
         }
 
         @Override
@@ -207,7 +156,43 @@ public class ChangeType extends Recipe {
                 j = n.withConstructorType(updateType(n.getConstructorType()));
             } else if (tree instanceof TypedTree) {
                 j = ((TypedTree) tree).withType(updateType(((TypedTree) tree).getType()));
+            } else if (tree instanceof JavaSourceFile) {
+                JavaSourceFile sf = (JavaSourceFile) tree;
+                if (targetType instanceof JavaType.FullyQualified) {
+                    for (J.Import anImport : sf.getImports()) {
+                        if (anImport.isStatic()) {
+                            continue;
+                        }
+
+                        JavaType maybeType = anImport.getQualid().getType();
+                        if (maybeType instanceof JavaType.FullyQualified) {
+                            JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
+                            if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, executionContext, getCursor());
+                            } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, executionContext, getCursor());
+                            }
+                        }
+                    }
+                }
+
+                JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
+                if (fullyQualifiedTarget != null && !(fullyQualifiedTarget.getOwningClass() != null && topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName()))) {
+                    if (fullyQualifiedTarget.getOwningClass() != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
+                        sf = (JavaSourceFile) new AddImport<>(fullyQualifiedTarget.getOwningClass().getFullyQualifiedName(), null, true).visit(sf, executionContext, getCursor());
+                    }
+                    if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
+                        sf = (JavaSourceFile) new AddImport<>(fullyQualifiedTarget.getFullyQualifiedName(), null, true).visit(sf, executionContext, getCursor());
+                    }
+                }
+
+                if (sf != null) {
+                    sf = sf.withImports(ListUtils.map(sf.getImports(), i -> visitAndCast(i, executionContext, super::visitImport)));
+                }
+
+                j = sf;
             }
+
             return j;
         }
 
@@ -490,7 +475,7 @@ public class ChangeType extends Recipe {
             return !oldPath.equals(newPath) && sf.getClasses().stream()
                     .anyMatch(o -> !J.Modifier.hasModifier(o.getModifiers(), J.Modifier.Type.Private) &&
                             o.getType() != null && !o.getType().getFullyQualifiedName().contains("$") &&
-                            TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType)));
+                            TypeUtils.isOfClassType(o.getType(), getTopLevelClassName(originalType).getFullyQualifiedName()));
         }
 
         @Override
@@ -579,9 +564,28 @@ public class ChangeType extends Recipe {
         }
     }
 
-    public static String getTopLevelClassName(JavaType.FullyQualified classType) {
+    public static boolean containsClassDefinition(JavaSourceFile sourceFile, String fullyQualifiedTypeName) {
+        AtomicBoolean found = new AtomicBoolean(false);
+        JavaIsoVisitor<AtomicBoolean> visitor = new JavaIsoVisitor<AtomicBoolean>() {
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, AtomicBoolean found) {
+                if (found.get()) {
+                    return classDecl;
+                }
+
+                if (classDecl.getType() != null && TypeUtils.isOfClassType(classDecl.getType(), fullyQualifiedTypeName)) {
+                    found.set(true);
+                }
+                return super.visitClassDeclaration(classDecl, found);
+            }
+        };
+        visitor.visit(sourceFile, found);
+        return found.get();
+    }
+
+    public static JavaType.FullyQualified getTopLevelClassName(JavaType.FullyQualified classType) {
         if (classType.getOwningClass() == null) {
-            return classType.getFullyQualifiedName();
+            return classType;
         }
         return getTopLevelClassName(classType.getOwningClass());
     }

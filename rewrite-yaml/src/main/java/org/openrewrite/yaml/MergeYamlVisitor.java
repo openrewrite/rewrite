@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
+@AllArgsConstructor
 @RequiredArgsConstructor
 public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private final Yaml scope;
@@ -37,6 +39,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Nullable
     private final String objectIdentifyingProperty;
+
+    private boolean shouldAutoFormat = true;
 
     public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty) {
         this(scope, new YamlParser().parse(yamlString).get(0).getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
@@ -56,7 +60,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             if (incoming instanceof Yaml.Mapping) {
                 return existingSeq.withEntries(ListUtils.map(existingSeq.getEntries(), (i, existingSeqEntry) -> {
                     Yaml.Block b = (Yaml.Block) new MergeYamlVisitor<>(existingSeqEntry.getBlock(),
-                            incoming, acceptTheirs, objectIdentifyingProperty).visit(existingSeqEntry.getBlock(), p, getCursor());
+                            incoming, acceptTheirs, objectIdentifyingProperty, shouldAutoFormat).visit(existingSeqEntry.getBlock(), p, getCursor());
                     return existingSeqEntry.withBlock(requireNonNull(b));
                 }));
             } else if (incoming instanceof Yaml.Sequence) {
@@ -96,7 +100,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
             for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
                 if (keyMatches(existingEntry, incomingEntry)) {
                     return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
-                            incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty)
+                            incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
                             .visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
                 }
             }
@@ -109,7 +113,10 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     return null;
                 }
             }
-            return autoFormat(incomingEntry, p, cursor);
+            if (shouldAutoFormat) {
+                return autoFormat(incomingEntry, p, cursor);
+            }
+            return incomingEntry;
         }));
 
         return m1.withEntries(mutatedEntries);

@@ -161,10 +161,8 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependencyWithClassifier() {
-        AddDependency addDep = new AddDependency(
-          "io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null, "compile", true,
-          "com.google.common.math.IntMath", null, "linux-x86_64", false, null
-        );
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
+          "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject(
@@ -276,7 +274,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void doNotAddBecauseAlreadyTransitive() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.x", "org.junit.jupiter.api.*")),
+          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.x", "org.junit.jupiter.api.*", true)),
           mavenProject(
             "project",
             srcTestJava(
@@ -313,10 +311,8 @@ class AddDependencyTest implements RewriteTest {
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void semverSelector(String onlyIfUsing) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency(
-            "com.google.guava", "guava", "29.x", "-jre",
-            null, false, onlyIfUsing, null, null, false, null
-          )),
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.x", "-jre", null, false, onlyIfUsing,
+            null, null, false, null, null)),
           mavenProject(
             "project",
             srcMainJava(
@@ -555,11 +551,8 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void useRequestedVersionInUseByOtherMembersOfTheFamily() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency(
-            "com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
-            null, null, false, "com.fasterxml.jackson.databind.*",
-            null, null, null, "com.fasterxml.*"
-          )),
+          spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
+            null, null, false, "com.fasterxml.jackson.databind.*", null, null, null, "com.fasterxml.*", null)),
           mavenProject(
             "project",
             srcMainJava(
@@ -845,14 +838,20 @@ class AddDependencyTest implements RewriteTest {
     }
 
     private AddDependency addDependency(String gav, String onlyIfUsing) {
-        return addDependency(gav, onlyIfUsing, null);
+        return addDependency(gav, onlyIfUsing, null, null);
+    }
+
+    private AddDependency addDependency(String gav, String onlyIfUsing, Boolean acceptTransitive) {
+        return addDependency(gav, onlyIfUsing, null, acceptTransitive);
     }
 
     private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope) {
+        return addDependency(gav, onlyIfUsing, scope, null);
+    }
+
+    private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
         String[] gavParts = gav.split(":");
-        return new AddDependency(
-          gavParts[0], gavParts[1], gavParts[2], null, scope, true,
-          onlyIfUsing, null, null, false, null
-        );
+        return new AddDependency(gavParts[0], gavParts[1], gavParts[2], null, scope, true, onlyIfUsing, null, null,
+          false, null, acceptTransitive);
     }
 }

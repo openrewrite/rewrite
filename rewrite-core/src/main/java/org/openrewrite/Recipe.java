@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.EqualsAndHashCode;
+import lombok.Setter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
@@ -203,6 +204,23 @@ public abstract class Recipe implements Cloneable {
     @Deprecated
     public List<String> getLanguages() {
         return emptyList();
+    }
+
+    /**
+     * @return a list of the organization(s) responsible for maintaining this recipe.
+     */
+    public List<Maintainer> getMaintainers() {
+        return emptyList();
+    }
+
+    @Setter
+    private transient List<Contributor> contributors;
+
+    public List<Contributor> getContributors() {
+        if(contributors == null) {
+            return emptyList();
+        }
+        return contributors;
     }
 
     /**

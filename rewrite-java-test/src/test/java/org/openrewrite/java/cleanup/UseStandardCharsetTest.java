@@ -104,4 +104,22 @@ class UseStandardCharsetTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/moderneinc/support-public/issues/29")
+    void nonConstantCharset() {
+        rewriteRun(
+          java(
+            """
+              import java.nio.charset.Charset;
+
+              class Test {
+                  void m(String charsetName) {
+                      Charset cs = Charset.forName(charsetName);
+                  }
+              }
+              """
+          )
+        );
+    }
 }

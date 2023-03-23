@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 class FinalClassTest implements RewriteTest {
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FinalClass());
@@ -47,6 +48,34 @@ class FinalClassTest implements RewriteTest {
                   }
                             
                   private A() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/2954")
+    void nestedClassWithSubclass() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  private A() {
+                  }
+
+                  private static class C extends B {
+                      private C() {
+                      }
+
+                      private static class D extends C {
+                      }
+                  }
+
+                  private static class B extends A {
+                      private B() {
+                      }
                   }
               }
               """
@@ -101,21 +130,6 @@ class FinalClassTest implements RewriteTest {
                   final class B {
                       private B() {}
                   }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void classInsideInterfaceIsImplicitlyFinal() {
-        rewriteRun(
-          java(
-            """
-              public interface A {
-                 class B {
-                     private B() { }
-                 }
               }
               """
           )

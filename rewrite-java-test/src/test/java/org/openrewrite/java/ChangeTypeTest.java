@@ -270,7 +270,6 @@ class ChangeTypeTest implements RewriteTest {
         rewriteRun(
           java(a1),
           java(a2),
-
           java(
             """
               import a.A1;
@@ -1267,29 +1266,8 @@ class ChangeTypeTest implements RewriteTest {
               public class NoMatch {
               }
               """,
-            spec -> spec.path("a/b/Original.java")
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/1904")
-    @Test
-    void onlyChangeTypeMissingPublicModifier() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeType("a.b.Original", "x.y.Target", false)),
-          java(
-            """
-              package a.b;
-              class Original {
-              }
-              """,
-            """
-              package x.y;
-              class Target {
-              }
-              """,
             spec -> spec.path("a/b/Original.java").afterRecipe(cu ->
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue())
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/Original.java"))
           )
         );
     }
@@ -1310,8 +1288,10 @@ class ChangeTypeTest implements RewriteTest {
               public class Target {
               }
               """,
-            spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu ->
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue())
+            spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu -> {
+              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
+              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+            })
           )
         );
     }
@@ -1332,8 +1312,10 @@ class ChangeTypeTest implements RewriteTest {
               public class Target {
               }
               """,
-            spec -> spec.path("a/b/Original.java").afterRecipe(cu ->
-              assertThat(cu.getSourcePath().toString()).isEqualTo(PathUtils.separatorsToSystem("x/y/Target.java")))
+            spec -> spec.path("a/b/Original.java").afterRecipe(cu -> {
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/Target.java");
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+            })
           )
         );
     }
@@ -1346,15 +1328,15 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a.b;
-
+              
               import java.util.List;
-
+              
               class Original {
               }
               """,
             """
               import java.util.List;
-
+              
               class Target {
               }
               """

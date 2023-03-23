@@ -15,9 +15,11 @@
  */
 package org.openrewrite.config;
 
+import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.style.NamedStyles;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -38,6 +40,13 @@ public class Environment {
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
             dependencyRecipes.addAll(dependencyResourceLoader.listRecipes());
         }
+        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        for(ResourceLoader r : resourceLoaders) {
+            if(r instanceof YamlResourceLoader) {
+                recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
+            }
+        }
+
         List<Recipe> recipes = new ArrayList<>();
         for (ResourceLoader r : resourceLoaders) {
             recipes.addAll(r.listRecipes());
@@ -48,6 +57,7 @@ public class Environment {
             }
         }
         for (Recipe recipe : recipes) {
+            recipe.setContributors(recipeToContributors.get(recipe.getName()));
             if (recipe instanceof DeclarativeRecipe) {
                 List<Recipe> availableRecipes = new ArrayList<>();
                 availableRecipes.addAll(dependencyRecipes);
@@ -65,9 +75,21 @@ public class Environment {
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return resourceLoaders.stream()
-                .flatMap(r -> r.listRecipeDescriptors().stream())
-                .collect(toList());
+        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        for(ResourceLoader r : resourceLoaders) {
+            if(r instanceof YamlResourceLoader) {
+                recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
+            }
+        }
+        List<RecipeDescriptor> result = new ArrayList<>();
+        for(ResourceLoader r : resourceLoaders) {
+            if(r instanceof YamlResourceLoader) {
+                result.addAll((((YamlResourceLoader)r).listRecipeDescriptors(emptyList(), recipeToContributors)));
+            } else {
+                result.addAll(r.listRecipeDescriptors());
+            }
+        }
+        return result;
     }
 
     public Collection<RecipeExample> listRecipeExamples() {
