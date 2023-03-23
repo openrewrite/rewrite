@@ -25,10 +25,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -92,17 +89,6 @@ public class RecipeIntrospectionUtils {
                 getColumnDescriptors(dataTable));
     }
 
-    public static RecipeDescriptor recipeDescriptorFromDeclarativeRecipe(DeclarativeRecipe recipe, URI source) {
-        List<RecipeDescriptor> recipeList = new ArrayList<>();
-        for (Recipe childRecipe : recipe.getRecipeList()) {
-            recipeList.add(recipeDescriptorFromRecipe(childRecipe));
-        }
-        //noinspection deprecation
-        return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(), recipe.getDescription(),
-                recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                emptyList(), recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), recipe.getMaintainers(), recipe.getContributors(), source);
-    }
-
     public static Constructor<?> getPrimaryConstructor(Class<?> recipeClass) {
         Constructor<?>[] constructors = recipeClass.getConstructors();
         if (constructors.length == 0) {
@@ -131,25 +117,6 @@ public class RecipeIntrospectionUtils {
             }
         }
         return null;
-    }
-
-    public static RecipeDescriptor recipeDescriptorFromRecipe(Recipe recipe) {
-        List<OptionDescriptor> options = getOptionsDescriptors(recipe);
-        List<RecipeDescriptor> recipeList = new ArrayList<>();
-        for (Recipe next : recipe.getRecipeList()) {
-            recipeList.add(recipeDescriptorFromRecipe(next));
-        }
-        URI recipeSource;
-        try {
-            recipeSource = recipe.getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-
-        //noinspection deprecation
-        return new RecipeDescriptor(recipe.getName(), recipe.getDisplayName(),
-                recipe.getDescription(), recipe.getTags(), recipe.getEstimatedEffortPerOccurrence(),
-                options, recipe.getLanguages(), recipeList, recipe.getDataTableDescriptors(), recipe.getMaintainers(), recipe.getContributors(), recipeSource);
     }
 
     public static Recipe constructRecipe(Class<?> recipeClass) {
@@ -196,25 +163,6 @@ public class RecipeIntrospectionUtils {
         return new RecipeIntrospectionException("Unable to call primary constructor for Recipe " + recipeClass, e);
     }
 
-    private static List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
-        List<OptionDescriptor> options = new ArrayList<>();
-
-        for (Field field : recipeClass.getDeclaredFields()) {
-            Option option = field.getAnnotation(Option.class);
-            if (option != null) {
-                options.add(new OptionDescriptor(field.getName(),
-                        field.getType().getSimpleName(),
-                        option.displayName(),
-                        option.description(),
-                        option.example().isEmpty() ? null : option.example(),
-                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
-                        option.required(),
-                        null));
-            }
-        }
-        return options;
-    }
-
     private static List<ColumnDescriptor> getColumnDescriptors(DataTable<?> dataTable) {
         List<ColumnDescriptor> columns = new ArrayList<>();
 
@@ -230,33 +178,6 @@ public class RecipeIntrospectionUtils {
             }
         }
         return columns;
-    }
-
-    private static List<OptionDescriptor> getOptionsDescriptors(Recipe recipe) {
-        List<OptionDescriptor> options = new ArrayList<>();
-
-        for (Field field : recipe.getClass().getDeclaredFields()) {
-            field.setAccessible(true);
-            Option option = field.getAnnotation(Option.class);
-            if (option != null) {
-                Object fieldValue;
-                try {
-                    fieldValue = field.get(recipe);
-                } catch (IllegalAccessException e) {
-                    throw new RecipeIntrospectionException("Error getting recipe option value, recipe: " +
-                                                           recipe.getClass().getName() + ", option: " + field.getName(), e);
-                }
-                options.add(new OptionDescriptor(field.getName(),
-                        field.getType().getSimpleName(),
-                        option.displayName(),
-                        option.description(),
-                        option.example().isEmpty() ? null : option.example(),
-                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
-                        option.required(),
-                        fieldValue));
-            }
-        }
-        return options;
     }
 
     private static Object getPrimitiveDefault(Class<?> t) {

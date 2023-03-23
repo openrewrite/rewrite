@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -239,7 +238,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         List<Contributor> descriptorContributors = descriptor.getContributors();
         assertThat(descriptorContributors).containsExactlyElementsOf(contributors);
 
-        RecipeDescriptor introspectedDescriptor = RecipeIntrospectionUtils.recipeDescriptorFromRecipe(recipe);
-        assertThat(introspectedDescriptor.getContributors()).containsExactlyElementsOf(contributors);
+        RecipeDescriptor recipeDescriptor = recipe.getDescriptor();
+        assertThat(recipeDescriptor.getContributors()).containsExactlyElementsOf(contributors);
     }
 }

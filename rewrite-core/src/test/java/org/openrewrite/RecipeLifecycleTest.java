@@ -524,7 +524,7 @@ class RecipeLifecycleTest implements RewriteTest {
 
                 var aDescriptor = recipeDescriptors.get(0);
                 var bDescriptor = aDescriptor.getRecipeList().get(0);
-                // B (2 test recipes, 2 ChangeText with different options and 1 noChangeRecipe) resulting in 4 changes
+                // B recipeList = D, E, ChangeText(E1), ChangeText(E2)
                 assertThat(bDescriptor.getName()).isEqualTo("B");
                 assertThat(bDescriptor.getRecipeList()).hasSize(4);
             })
