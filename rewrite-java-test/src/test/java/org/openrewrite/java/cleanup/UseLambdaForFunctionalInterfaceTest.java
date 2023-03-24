@@ -61,7 +61,8 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
             """
               class Test {
                   Runnable r = new Runnable() {
-                      @Overridepublic void run() {
+                      @Override
+                      public void run() {
                           Test.this.execute();
                       }
                   };
@@ -350,6 +351,66 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
               public class Temp {
                   public static void foo(){
                       new HashMap<Integer, String>().computeIfAbsent(3, integer -> String.valueOf(integer + 1));
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("DataFlowIssue")
+    void noReplaceOnReferenceToUninitializedFinalField() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Supplier;
+
+              public class Temp {
+                  final Supplier<Integer> supplier;
+                  final Supplier<Integer> supplier1 = new Supplier<>() {
+                      @Override
+                      public Integer get() {
+                          return supplier.get();
+                      }
+                  };
+                  public Temp() {
+                      supplier = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceOnReferenceToUninitializedNonFinalField() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Supplier;
+
+              public class Temp {
+                  Supplier<Integer> supplier;
+                  final Supplier<Integer> supplier1 = new Supplier<>() {
+                      @Override
+                      public Integer get() {
+                          return supplier.get();
+                      }
+                  };
+                  public Temp() {
+                      supplier = null;
+                  }
+              }
+              """,
+            """
+              import java.util.function.Supplier;
+
+              public class Temp {
+                  Supplier<Integer> supplier;
+                  final Supplier<Integer> supplier1 = () -> supplier.get();
+                  public Temp() {
+                      supplier = null;
                   }
               }
               """

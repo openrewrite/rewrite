@@ -15,12 +15,10 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.RemoveUnusedImports;
@@ -82,16 +80,18 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                             return n;
                         }
 
-                        if (usesThis(getCursor()) || shadowsLocalVariable(getCursor()) ||
-                            usedAsStatement(getCursor())) {
+                        if (usesThis(getCursor())
+                            || shadowsLocalVariable(getCursor())
+                            || usedAsStatement(getCursor())
+                            || fieldInitializerReferencingUninitializedField(getCursor())) {
                             return n;
                         }
 
                         //The interface may be parameterized and that is needed to maintain type attribution:
                         JavaType.FullyQualified typedInterface = null;
-                        JavaType.FullyQualified annoymousClass = TypeUtils.asFullyQualified(n.getType());
-                        if (annoymousClass != null) {
-                            typedInterface = annoymousClass.getInterfaces().stream().filter(i -> i.getFullyQualifiedName().equals(type.getFullyQualifiedName())).findFirst().orElse(null);
+                        JavaType.FullyQualified anonymousClass = TypeUtils.asFullyQualified(n.getType());
+                        if (anonymousClass != null) {
+                            typedInterface = anonymousClass.getInterfaces().stream().filter(i -> i.getFullyQualifiedName().equals(type.getFullyQualifiedName())).findFirst().orElse(null);
                         }
                         if (typedInterface == null) {
                             return n;
@@ -231,6 +231,45 @@ public class UseLambdaForFunctionalInterface extends Recipe {
             }
         }
         return false;
+    }
+
+    private static boolean fieldInitializerReferencingUninitializedField(Cursor cursor) {
+        J.NewClass n = cursor.getValue();
+        assert n.getBody() != null;
+        Cursor parent = cursor.dropParentUntil(is -> is instanceof J.VariableDeclarations.NamedVariable || is instanceof SourceFile);
+        Object parentValue = parent.getValue();
+        if (!(parentValue instanceof J.VariableDeclarations.NamedVariable)) {
+            return false;
+        }
+
+        J.VariableDeclarations.NamedVariable variable = cursor.firstEnclosing(J.VariableDeclarations.NamedVariable.class);
+        if (variable == null || variable.getInitializer() == null) {
+            return false;
+        }
+
+        parent = cursor.dropParentUntil(is -> is instanceof J.MethodDeclaration || is instanceof J.ClassDeclaration || is instanceof SourceFile);
+        parentValue = parent.getValue();
+        if (!(parentValue instanceof J.ClassDeclaration) || ((J.ClassDeclaration) parentValue).getType() == null) {
+            return false;
+        }
+
+        JavaType.FullyQualified owner = ((J.ClassDeclaration) parentValue).getType();
+        AtomicBoolean referencesUninitializedFinalField = new AtomicBoolean(false);
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier ident, Integer integer) {
+                if (referencesUninitializedFinalField.get()) {
+                    return ident;
+                }
+                if (ident.getFieldType() != null && ident.getFieldType().hasFlags(Flag.Final)
+                    && !ident.getFieldType().hasFlags(Flag.HasInit)
+                    && owner.equals(ident.getFieldType().getOwner())) {
+                    referencesUninitializedFinalField.set(true);
+                }
+                return super.visitIdentifier(ident, integer);
+            }
+        }.visit(n.getBody(), 0, cursor);
+        return referencesUninitializedFinalField.get();
     }
 
     // if the contents of the cursor value shadow a local variable in its containing name scope
