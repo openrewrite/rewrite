@@ -24,7 +24,8 @@ class FailureLogAnalyzerTest {
 
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-      BUG! exception in phase 'semantic analysis' in source unit '_BuildScript_' Unsupported class file major version 61 | 17
+      BUG! exception in phase 'semantic analysis' in source unit '_BuildScript_' Unsupported class file major version 61 | 8
+      Error:PARSE ERROR: Error:unsupported class file version 53.0 | 8
       DefaultCodeFormatter has been compiled by a more recent version of the Java Runtime (class file version 55.0), | 11
       Fatal error compiling: invalid target release: 17 -> [Help 1] | 17
       Fatal error compiling: invalid target release: 11 -> [Help 1] | 11
