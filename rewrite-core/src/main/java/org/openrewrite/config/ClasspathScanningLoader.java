@@ -32,7 +32,6 @@ import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
-import static org.openrewrite.internal.RecipeIntrospectionUtils.recipeDescriptorFromRecipe;
 
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
@@ -137,7 +136,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 }
                 try {
                     Recipe recipe = constructRecipe(recipeClass);
-                    recipeDescriptors.add(recipeDescriptorFromRecipe(recipe));
+                    recipeDescriptors.add(recipe.getDescriptor());
                     recipes.add(recipe);
                 } catch (Exception e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);

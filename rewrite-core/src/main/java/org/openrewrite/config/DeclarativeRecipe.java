@@ -28,6 +28,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
@@ -157,6 +158,17 @@ public class DeclarativeRecipe extends CompositeRecipe {
         }
     }
 
+    @Override
+    protected RecipeDescriptor createRecipeDescriptor() {
+        List<RecipeDescriptor> recipeList = new ArrayList<>();
+        for (Recipe childRecipe : getRecipeList()) {
+            recipeList.add(childRecipe.getDescriptor());
+        }
+        //noinspection deprecation
+        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
+                getTags(), getEstimatedEffortPerOccurrence(),
+                emptyList(), getLanguages(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(), source);
+    }
 
     public enum RecipeUse {
         /**

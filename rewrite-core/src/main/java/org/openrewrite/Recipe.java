@@ -23,9 +23,9 @@ import lombok.Setter;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.scheduling.ForkJoinScheduler;
@@ -36,6 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Field;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -77,6 +79,7 @@ public abstract class Recipe implements Cloneable {
 
     private transient List<Recipe> singleSourceApplicableTests;
     private transient List<Recipe> applicableTests;
+    private transient RecipeDescriptor descriptor;
 
     @Nullable
     private transient List<DataTableDescriptor> dataTables;
@@ -184,7 +187,54 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeDescriptor getDescriptor() {
-        return RecipeIntrospectionUtils.recipeDescriptorFromRecipe(this);
+        if (descriptor == null) {
+            descriptor = createRecipeDescriptor();
+        }
+        return descriptor;
+    }
+
+    protected RecipeDescriptor createRecipeDescriptor() {
+        List<OptionDescriptor> options = getOptionDescriptors(this.getClass());
+        List<RecipeDescriptor> recipeList1 = new ArrayList<>();
+        for (Recipe next : getRecipeList()) {
+            recipeList1.add(next.getDescriptor());
+        }
+        URI recipeSource;
+        try {
+            recipeSource = getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
+
+        return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
+                getEstimatedEffortPerOccurrence(), options, getLanguages(), recipeList1, getDataTableDescriptors(),
+                getMaintainers(), getContributors(), recipeSource);
+    }
+
+    private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
+        List<OptionDescriptor> options = new ArrayList<>();
+
+        for (Field field : recipeClass.getDeclaredFields()) {
+            Object value;
+            try {
+                field.setAccessible(true);
+                value = field.get(this);
+            } catch (IllegalAccessException e) {
+                value = null;
+            }
+            Option option = field.getAnnotation(Option.class);
+            if (option != null) {
+                options.add(new OptionDescriptor(field.getName(),
+                        field.getType().getSimpleName(),
+                        option.displayName(),
+                        option.description(),
+                        option.example().isEmpty() ? null : option.example(),
+                        option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
+                        option.required(),
+                        value));
+            }
+        }
+        return options;
     }
 
     private static final List<DataTableDescriptor> GLOBAL_DATA_TABLES = Arrays.asList(

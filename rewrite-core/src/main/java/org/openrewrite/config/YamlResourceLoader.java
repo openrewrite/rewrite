@@ -26,7 +26,6 @@ import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -330,7 +329,7 @@ public class YamlResourceLoader implements ResourceLoader {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
             declarativeRecipe.initialize(allRecipes);
             declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
-            recipeDescriptors.add(RecipeIntrospectionUtils.recipeDescriptorFromDeclarativeRecipe(declarativeRecipe, source));
+            recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
     }
