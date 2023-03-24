@@ -78,6 +78,7 @@ public class FindBuildToolFailures extends Recipe {
 
 class FailureLogAnalyzer {
 
+    private static final Pattern UNSUPPORTED_CLASS_FILE_MAJOR_VERSION = Pattern.compile("Unsupported class file (?:major )?version (\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern CLASS_FILE_MAJOR_VERSION = Pattern.compile("class file (?:major )?version (\\d+)");
     private static final String INVALID_FLAG_RELEASE = "invalid flag: --release";
     private static final String ADD_EXPORTS = "Unrecognized option: --add-exports";
@@ -93,7 +94,13 @@ class FailureLogAnalyzer {
 
     @Nullable
     static String requiredJavaVersion(String logFileContents) {
-        Matcher matcher = CLASS_FILE_MAJOR_VERSION.matcher(logFileContents);
+        // Possibly downgrade Java when necessary
+        Matcher matcher = UNSUPPORTED_CLASS_FILE_MAJOR_VERSION.matcher(logFileContents);
+        if (matcher.find()) {
+            return "8";
+        }
+        // Possibly upgrade Java when necessary
+        matcher = CLASS_FILE_MAJOR_VERSION.matcher(logFileContents);
         if (matcher.find()) {
             // https://docs.oracle.com/javase/specs/jvms/se20/html/jvms-4.html#jvms-4.1-200-B.2
             return String.valueOf(Integer.parseInt(matcher.group(1)) - 44);
