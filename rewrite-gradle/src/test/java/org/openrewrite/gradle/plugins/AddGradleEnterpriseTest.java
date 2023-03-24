@@ -15,11 +15,15 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.groovy.tree.G.CompilationUnit;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,12 +31,47 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.test.SourceSpecs.dir;
 
 class AddGradleEnterpriseTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddGradleEnterprise("3.x"));
+        spec.recipe(new AddGradleEnterprise("3.x"
+//          , null, null, null, null
+        ));
+    }
+
+    private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
+        return spec -> spec.after(actual -> {
+            assertThat(actual).isNotNull();
+            Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
+            assertThat(version.find()).isTrue();
+            return after.formatted(version.group(0));
+        });
+    }
+
+    @Test
+    void onlyChangeRootBuildGradle() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
+          buildGradle(
+            "",
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.build-scan' version '%s'
+              }
+              """
+            )
+          ),
+          dir("subproject", buildGradle("")),
+          settingsGradle(
+            """
+              rootProject.name = 'my-project'
+              include("subproject")
+              """
+          )
+        );
     }
 
     @Test
@@ -41,16 +80,12 @@ class AddGradleEnterpriseTest implements RewriteTest {
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))),
           buildGradle(
             "",
-            spec -> spec.after(actual -> {
-                  assertThat(actual).isNotNull();
-                  Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-                  assertThat(version.find()).isTrue();
-                  return """
-                    plugins {
-                        id 'com.gradle.build-scan' version '%s'
-                    }
-                    """.formatted(version.group(0));
-              })
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.build-scan' version '%s'
+              }
+              """
+            )
           ),
           settingsGradle(
             """
@@ -70,18 +105,13 @@ class AddGradleEnterpriseTest implements RewriteTest {
                   id "java"
               }
               """,
-            spec -> spec.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "5.6.1"))
-              .after(actual -> {
-                  assertThat(actual).isNotNull();
-                  Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-                  assertThat(version.find()).isTrue();
-                  return """
-                    plugins {
-                        id "java"
-                        id "com.gradle.build-scan" version "%s"
-                    }
-                    """.formatted(version.group(0));
-              })
+            interpolateResolvedVersion("""
+              plugins {
+                  id "java"
+                  id "com.gradle.build-scan" version "%s"
+              }
+              """
+            )
           ),
           settingsGradle(
             """
@@ -102,18 +132,14 @@ class AddGradleEnterpriseTest implements RewriteTest {
             """
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> {
-                assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-                assertThat(version.find()).isTrue();
-                return """
-                  plugins {
-                      id 'com.gradle.enterprise' version '%s'
-                  }
-
-                  rootProject.name = 'my-project'
-                  """.formatted(version.group(0));
-            })
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.enterprise' version '%s'
+              }
+              
+              rootProject.name = 'my-project'
+              """
+            )
           )
         );
     }
@@ -133,19 +159,15 @@ class AddGradleEnterpriseTest implements RewriteTest {
                             
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> {
-                assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
-                assertThat(version.find()).isTrue();
-                return """
-                  plugins {
-                      id 'org.openrewrite' version '1'
-                      id 'com.gradle.enterprise' version '%s'
-                  }
-                                
-                  rootProject.name = 'my-project'
-                  """.formatted(version.group(0));
-            })
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'org.openrewrite' version '1'
+                  id 'com.gradle.enterprise' version '%s'
+              }
+                            
+              rootProject.name = 'my-project'
+              """
+            )
           )
         );
     }
