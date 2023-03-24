@@ -16,6 +16,7 @@
 package org.openrewrite.maven.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.maven.MavenDownloadingException;
 
 import java.util.List;
@@ -58,5 +59,12 @@ class VersionRequirementTest {
         assertThat(VersionRequirement.fromVersion("[1,2]", 1).addRequirement("[9,10]")
           .resolve(this::available))
           .isEqualTo("2");
+    }
+
+    @ExpectedToFail("https://github.com/openrewrite/rewrite/issues/3025")
+    @Test
+    void emptyUnboundedRange() throws MavenDownloadingException {
+        assertThat(VersionRequirement.fromVersion("(,)", 0).resolve(this::available))
+                .isEqualTo("10");
     }
 }
