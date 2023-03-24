@@ -106,26 +106,26 @@ public class VersionRequirement {
                     @Override
                     public VersionSpec visitVersionRequirement(VersionRangeParser.VersionRequirementContext ctx) {
                         return new RangeSet(ctx.range().stream()
-                               .map(range -> {
-                                   Version lower, upper;
-                                   if (range.bounds().boundedLower() != null) {
-                                       Iterator<TerminalNode> versionIter = range.bounds().boundedLower().Version().iterator();
-                                       lower = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
-                                       upper = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
-                                   } else if (range.bounds().unboundedLower() != null) {
-                                       TerminalNode upperVersionNode = range.bounds().unboundedLower().Version();
-                                       lower = null;
-                                       upper = upperVersionNode != null ? toVersion(upperVersionNode) : null;
-                                   } else {
-                                       lower = toVersion(range.bounds().exactly().Version());
-                                       upper = toVersion(range.bounds().exactly().Version());
-                                   }
-                                   return new Range(
-                                           range.CLOSED_RANGE_OPEN() != null, lower,
-                                           range.CLOSED_RANGE_CLOSE() != null, upper
-                                   );
-                               })
-                               .collect(toList())
+                                .map(range -> {
+                                    Version lower, upper;
+                                    if (range.bounds().boundedLower() != null) {
+                                        Iterator<TerminalNode> versionIter = range.bounds().boundedLower().Version().iterator();
+                                        lower = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
+                                        upper = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
+                                    } else if (range.bounds().unboundedLower() != null) {
+                                        TerminalNode upperVersionNode = range.bounds().unboundedLower().Version();
+                                        lower = null;
+                                        upper = upperVersionNode != null ? toVersion(upperVersionNode) : null;
+                                    } else {
+                                        lower = toVersion(range.bounds().exactly().Version());
+                                        upper = toVersion(range.bounds().exactly().Version());
+                                    }
+                                    return new Range(
+                                            range.CLOSED_RANGE_OPEN() != null, lower,
+                                            range.CLOSED_RANGE_CLOSE() != null, upper
+                                    );
+                                })
+                                .collect(toList())
                         );
                     }
 
