@@ -77,9 +77,10 @@ public class DeleteProperty extends Recipe {
                 Properties.File f = (Properties.File) super.visitFile(file, executionContext);
 
                 String prefix = null;
-                List<Properties.Content> fileContent = new ArrayList<>();
-                for (int i = 0; i < f.getContent().size(); i++) {
-                    Properties.Content content = f.getContent().get(i);
+                List<Properties.Content> contents = f.getContent();
+                List<Properties.Content> newContents = new ArrayList<>();
+                for (int i = 0; i < contents.size(); i++) {
+                    Properties.Content content = contents.get(i);
                     if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
                         if (i == 0) {
                             prefix = ((Properties.Entry) content).getPrefix();
@@ -89,11 +90,11 @@ public class DeleteProperty extends Recipe {
                             content = (Properties.Content) content.withPrefix(prefix);
                             prefix = null;
                         }
-                        fileContent.add(content);
+                        newContents.add(content);
                     }
                 }
 
-                return f.getContent().size() == fileContent.size() ? f : f.withContent(fileContent);
+                return contents.size() == newContents.size() ? f : f.withContent(newContents);
             }
 
             private boolean isMatch(String key) {

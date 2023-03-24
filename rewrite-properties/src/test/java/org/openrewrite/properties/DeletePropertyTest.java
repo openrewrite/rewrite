@@ -33,6 +33,19 @@ class DeletePropertyTest implements RewriteTest {
     }
 
     @Test
+    void deleteOnlyProperty() {
+        rewriteRun(
+          properties(
+            """
+              delete.me = baz
+              """,
+            """
+              """
+          )
+        );
+    }
+
+    @Test
     void basic() {
         rewriteRun(
           properties(

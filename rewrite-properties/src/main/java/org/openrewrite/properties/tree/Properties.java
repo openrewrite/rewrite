@@ -26,6 +26,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -96,18 +97,21 @@ public interface Properties extends Tree {
         }
 
         public List<Content> getContent() {
-            return new ArrayList<>(content);
+            return Collections.unmodifiableList(content);
         }
 
         public File withContent(List<Content> content) {
             int size = content.size();
             if (size == this.content.size()) {
+                boolean allIdentical = true;
                 for (int i = 0; i < size; i++) {
                     if (content.get(i) != this.content.get(i)) {
+                        allIdentical = false;
                         break;
-                    } else if (i == size - 1) {
-                        return this;
                     }
+                }
+                if (allIdentical) {
+                    return this;
                 }
             }
 

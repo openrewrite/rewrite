@@ -18,6 +18,7 @@ package org.openrewrite.properties;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.RewriteTest;
@@ -42,7 +43,7 @@ class Issue3026Test implements RewriteTest {
                   if (content.size() != 1) {
                       return file;
                   }
-                  content.add(0, new Properties.Comment(randomId(), "", Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, "foo\n"));
+                  content = ListUtils.concat(new Properties.Comment(randomId(), "", Markers.EMPTY, Properties.Comment.Delimiter.HASH_TAG, "foo\n"), content);
                   return file.withContent(content);
               }
           })),
