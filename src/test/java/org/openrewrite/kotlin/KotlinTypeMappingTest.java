@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
@@ -68,7 +67,7 @@ public class KotlinTypeMappingTest {
     @Test
     void className() {
         JavaType.Class clazz = (JavaType.Class) this.firstMethodParameter("clazz");
-        Assertions.assertThat(TypeUtils.asFullyQualified(clazz).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
+        assertThat(TypeUtils.asFullyQualified(clazz).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Test
