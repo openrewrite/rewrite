@@ -25,6 +25,9 @@ class FailureLogAnalyzerTest {
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
       BUG! exception in phase 'semantic analysis' in source unit '_BuildScript_' Unsupported class file major version 61 | 8
+      error: Source option 6 is no longer supported. Use 7 or later. | 6
+      error: source option 6 is no longer supported. Use 7 or later. | 6
+      error: Target option 6 is no longer supported. Use 7 or later. | 6
       Error:PARSE ERROR: Error:unsupported class file version 53.0 | 8
       DefaultCodeFormatter has been compiled by a more recent version of the Java Runtime (class file version 55.0), | 11
       Fatal error compiling: invalid target release: 17 -> [Help 1] | 17
@@ -32,9 +35,6 @@ class FailureLogAnalyzerTest {
       Fatal error compiling: error: release version 17 not supported | 17
       javac: invalid target release: 11 | 11
       error: invalid source release: 17 | 17
-      error: Source option 6 is no longer supported. Use 7 or later. | 7
-      error: source option 6 is no longer supported. Use 7 or later. | 7
-      error: Target option 6 is no longer supported. Use 7 or later. | 7
       Fatal error compiling: invalid flag: --release | 11
       Unrecognized option: --add-exports | 11
       [ERROR] jdk [ version='1.8' ] | 8
