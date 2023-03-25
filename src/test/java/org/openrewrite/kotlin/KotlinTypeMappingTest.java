@@ -207,11 +207,11 @@ public class KotlinTypeMappingTest {
     @Test
     void ignoreSourceRetentionAnnotations() {
         JavaType.Parameterized goat = goatType;
-        assertThat(goat.getAnnotations().size()).isEqualTo(1);
+        assertThat(goat.getAnnotations()).hasSize(1);
         assertThat(goat.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
 
         JavaType.Method clazzMethod = methodType("clazz");
-        assertThat(clazzMethod.getAnnotations().size()).isEqualTo(1);
+        assertThat(clazzMethod.getAnnotations()).hasSize(1);
         assertThat(clazzMethod.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
     }
 
