@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindTest implements RewriteTest {
+class FindTest implements RewriteTest {
 
     @Test
     void regex() {
