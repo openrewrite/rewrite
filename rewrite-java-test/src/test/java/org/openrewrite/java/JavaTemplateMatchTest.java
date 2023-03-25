@@ -24,7 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class JavaTemplateMatchTest implements RewriteTest {
+class JavaTemplateMatchTest implements RewriteTest {
 
     @SuppressWarnings("ConstantValue")
     @Test
