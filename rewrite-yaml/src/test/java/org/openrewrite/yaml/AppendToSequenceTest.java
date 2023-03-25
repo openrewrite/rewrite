@@ -55,6 +55,38 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
+    void appendToSequenceOfNameValuePair() {
+        rewriteRun(
+          spec -> spec.recipe(new AppendToSequence(
+            "$.things.fruit",
+            "name: strawberry",
+            null
+          )),
+          yaml(
+            """
+                  things:
+                    fruit:
+                      - name: apple
+                      - name: blueberry
+                    animals:
+                      - cat
+                      - dog
+              """,
+            """
+                  things:
+                    fruit:
+                      - name: apple
+                      - name: blueberry
+                      - name: strawberry
+                    animals:
+                      - cat
+                      - dog
+              """
+          )
+        );
+    }
+
+    @Test
     void appendToSequenceHasDashFalse() {
         rewriteRun(
           spec -> spec.recipe(new AppendToSequence(
