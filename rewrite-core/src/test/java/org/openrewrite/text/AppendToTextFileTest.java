@@ -24,7 +24,7 @@ import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Supplier;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatExceptionOfType;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class AppendToTextFileTest implements RewriteTest {
@@ -163,19 +163,19 @@ class AppendToTextFileTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2796")
     @Test
     void missingExpectedGeneratedFiles() {
-        assertThrows(AssertionError.class, () ->
-          rewriteRun(
-            spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
-              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
-            text(
-              "existing2",
-              """
+        assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
+                rewriteRun(
+                        spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
+                                .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),
+                        text(
+                                "existing2",
+                                """
                 preamble2
                 content2
                 """,
-              spec -> spec.path("file2.txt").noTrim()
-            )
-          ));
+                                spec -> spec.path("file2.txt").noTrim()
+                        )
+                ));
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2796")

@@ -23,14 +23,14 @@ import org.openrewrite.text.ChangeText;
 import java.util.HashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatExceptionOfType;
 
 class RecipeBasicsTest {
 
     @Test
     void recipeDoNextWithItself() {
         Recipe r = Recipe.noop();
-        assertThrows(IllegalArgumentException.class, () -> r.doNext(r));
+        assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> r.doNext(r));
     }
 
     @Test

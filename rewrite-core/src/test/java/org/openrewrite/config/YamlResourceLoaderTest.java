@@ -81,7 +81,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertThat(recipeDescriptors).hasSize(1);
         RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
         assertThat(descriptor.getDataTables()).isNotEmpty();
-        assertThat(descriptor.getMaintainers().size()).isEqualTo(2);
+        assertThat(descriptor.getMaintainers()).hasSize(2);
         Maintainer sam = descriptor.getMaintainers().get(0);
         assertThat(sam.getMaintainer()).isEqualTo("Sam");
         assertThat(sam.getLogo()).isNotNull();
