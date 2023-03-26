@@ -37,6 +37,7 @@ class FailureLogAnalyzerTest {
       error: invalid source release: 17 | 17
       Fatal error compiling: invalid flag: --release | 11
       Unrecognized option: --add-exports | 11
+      javac: invalid flag: --module-path | 11
       [ERROR] jdk [ version='1.8' ] | 8
       [WARNING] : bad option '-target:11' was ignored | 11
       [ERROR] warning: [options] source value 1.5 is obsolete and will be removed in a future release | 5

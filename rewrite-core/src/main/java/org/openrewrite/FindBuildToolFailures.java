@@ -86,6 +86,7 @@ class FailureLogAnalyzer {
     private static final Pattern CLASS_FILE_MAJOR_VERSION = Pattern.compile("class file (?:major )?version (\\d+)");
     private static final String INVALID_FLAG_RELEASE = "invalid flag: --release";
     private static final String ADD_EXPORTS = "Unrecognized option: --add-exports";
+    private static final String MODULE_PATH = "javac: invalid flag: --module-path";
 
     private static final Pattern BAD_OPTION_WAS_IGNORED = Pattern.compile("bad option '-target:(\\d+)' was ignored");
     private static final Pattern INCOMPATIBLE_COMPONENT = Pattern.compile("Incompatible because this component declares a component compatible with Java (\\d+)");
@@ -115,7 +116,9 @@ class FailureLogAnalyzer {
             // https://docs.oracle.com/javase/specs/jvms/se20/html/jvms-4.html#jvms-4.1-200-B.2
             return String.valueOf(Integer.parseInt(matcher.group(1)) - 44);
         }
-        if (logFileContents.contains(INVALID_FLAG_RELEASE) || logFileContents.contains(ADD_EXPORTS)) {
+        if (logFileContents.contains(INVALID_FLAG_RELEASE) ||
+            logFileContents.contains(ADD_EXPORTS) ||
+            logFileContents.contains(MODULE_PATH)) {
             return "11"; // Technically 9+, but we'll go for 11 as it's an LTS release
         }
         return Stream.of(
