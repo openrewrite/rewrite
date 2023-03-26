@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -78,6 +79,172 @@ class UnwrapParenthesesTest implements RewriteTest {
                   {
                       if(true) {}
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapOnUnaryWithWrappedPreIncrement() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    ++(count);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    ++count;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapOnUnaryWithWrappedPostIncrement() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    (count)++;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    count++;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapOnUnaryWithWrappedPreDecrement() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    --(count);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    --count;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapOnUnaryWithWrappedPostDecrement() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    (count)--;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static boolean count = 0;
+                  static {
+                    count--;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepParenthesesOnUnaryWithWrappedBinary() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static boolean notEmpty = !(set == null || set.isEmpty());
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapOnUnaryWithWrappedMethodCall() {
+        rewriteRun(
+          java(
+            """
+              import java.util.HashSet;
+              
+              public class A {
+                  static boolean notEmpty = !(new HashSet<>().isEmpty());
+              }
+              """,
+            """
+              import java.util.HashSet;
+              
+              public class A {
+                  static boolean notEmpty = !new HashSet<>().isEmpty();
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("Parentheses are removed as intended but overall formatting looks weird.")
+    @Test
+    void unwrapOnUnaryWithWrappedSwitch() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static int count = 100;
+                  static boolean uncategorized = !(
+                      switch (count) {
+                        case 10:
+                        case 20:
+                            return true;
+                        default:
+                            return false;
+                      }
+                  );
+              }
+              """,
+            """
+              public class A {
+                  static int count = 100;
+                  static boolean uncategorized = !switch (count) {
+                    case 10:
+                    case 20:
+                        return true;
+                    default:
+                        return false;
+                  };
               }
               """
           )
