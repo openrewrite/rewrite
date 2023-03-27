@@ -17,11 +17,10 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -44,6 +43,11 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
     @Override
     public String getDescription() {
         return "Replace constant with another constant, adding/removing import on class if needed.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return new UsesType<>(existingFullyQualifiedConstantName.substring(0,existingFullyQualifiedConstantName.lastIndexOf('.')));
     }
 
     @Override
