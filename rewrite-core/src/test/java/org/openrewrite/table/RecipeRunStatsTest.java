@@ -15,7 +15,6 @@
  */
 package org.openrewrite.table;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;

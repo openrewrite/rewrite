@@ -15,7 +15,6 @@
  */
 package org.openrewrite.text;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
@@ -24,7 +23,7 @@ import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Supplier;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatExceptionOfType;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class AppendToTextFileTest implements RewriteTest {
@@ -163,7 +162,7 @@ class AppendToTextFileTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2796")
     @Test
     void missingExpectedGeneratedFiles() {
-        assertThrows(AssertionError.class, () ->
+        assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
           rewriteRun(
             spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, "replace")
               .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, "replace"))),

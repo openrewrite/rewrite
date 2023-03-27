@@ -18,7 +18,7 @@ package org.openrewrite;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class FailureLogAnalyzerTest {
 
@@ -47,6 +47,6 @@ class FailureLogAnalyzerTest {
       Incompatible because this component declares a component compatible with Java 11 and the consumer needed a component compatible with Java 8 | 11
       """)
     void determineRequiredClassFileVersion(String logFileContents, String expected) {
-        assertEquals(expected, FailureLogAnalyzer.requiredJavaVersion(logFileContents));
+        assertThat(FailureLogAnalyzer.requiredJavaVersion(logFileContents)).isEqualTo(expected);
     }
 }
