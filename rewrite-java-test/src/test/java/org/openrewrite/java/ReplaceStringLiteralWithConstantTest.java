@@ -142,6 +142,90 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceStringLiteralWithConstantValueWhenLiteralValueIsNotConfigured() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_FQN)),
+          java(
+            """ 
+            class Test {
+                Object o = "Hello World!";
+            }
+            """,
+            """
+            import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
+            
+            class Test {
+                Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void replaceStringLiteralWithConstantValueWhenLiteralValueIsConfiguredNull() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(null, EXAMPLE_STRING_FQN)),
+          java(
+            """
+            class Test {
+                Object o = "Hello World!";
+            }
+            """,
+            """
+            import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
+            
+            class Test {
+                Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void replaceStringLiteralWithLiteralValueWhenLiteralValueIsConfiguredEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("", EXAMPLE_STRING_FQN)),
+          java(
+            """
+            class Test {
+                Object o = "";
+            }
+            """,
+            """
+            import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
+            
+            class Test {
+                Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void replaceStringLiteralWithLiteralValueWhenLiteralValueIsConfiguredBlank() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(" ", EXAMPLE_STRING_FQN)),
+          java(
+            """                
+            class Test {
+                Object o = " ";
+            }
+            """,
+            """
+            import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
+            
+            class Test {
+                Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+            }
+            """
+          )
+        );
+    }
+
     public static String EXAMPLE_STRING_FQN = ReplaceStringLiteralWithConstantTest.class.getName() + ".EXAMPLE_STRING_CONSTANT";
     public static String EXAMPLE_STRING_CONSTANT = "Hello World!";
 }
