@@ -281,6 +281,38 @@ class FinalizeLocalVariablesTest implements RewriteTest {
     }
 
     @Test
+    void shouldNotFinalizeForCounterWhichIsReassignedWithinForHeader() {
+        rewriteRun(
+                java("""
+                class A {             
+                    static {
+                        for (int i = 0; i < 10; i++) {
+                            // no-op
+                        }
+                    }
+                }
+                """
+                )
+        );
+    }
+
+    @Test
+    void shouldNotFinalizeForCounterWhichIsReassignedWithinForBody() {
+        rewriteRun(
+                java("""
+                class A {             
+                    static {
+                        for (int i = 0; i < 10;) {
+                            i = 11;
+                        }
+                    }
+                }
+                """
+                )
+        );
+    }
+
+    @Test
     void nonModifyingUnaryOperatorAwareness() {
         rewriteRun(
           java(
@@ -365,6 +397,26 @@ class FinalizeLocalVariablesTest implements RewriteTest {
             }
               """
           ), 17)
+        );
+    }
+
+    @Test
+    void shouldNotFinalizeVariableWhichIsReassigedInAnotherSwitchBranch() {
+        rewriteRun(
+                java("""
+                class A {             
+                    static int variable = 0;
+                    static {
+                        switch (variable) {
+                          case 0:
+                              int notFinalized = 0;
+                          default:
+                              notFinalized = 1;
+                        }
+                    }
+                }
+                """
+                )
         );
     }
 }
