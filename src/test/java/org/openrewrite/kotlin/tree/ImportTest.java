@@ -44,6 +44,28 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
+    void staticEquivalent() {
+        rewriteRun(
+          kotlin(
+            """
+            package a.b
+            class Target {
+                inline fun method() {}
+            }
+            """
+          ),
+          kotlin(
+            """
+            import a.b.method
+            
+            class A {
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void alias() {
         rewriteRun(
           kotlin("import kotlin.collections.List as L")

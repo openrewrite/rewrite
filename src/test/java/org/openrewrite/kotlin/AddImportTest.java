@@ -76,14 +76,16 @@ public class AddImportTest implements RewriteTest {
             """
             package a.b
             class Original
-            """),
+            """
+          ),
           kotlin(
             """
             package a.b
             class Target {
                 inline fun method() {}
             }
-            """),
+            """
+          ),
           kotlin(
             """
             import a.b.Original
