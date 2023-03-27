@@ -61,6 +61,29 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     }
 
     @Test
+    void shouldNotAddImportWhenUnnecessary() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("Hello World!", EXAMPLE_STRING_FQN)),
+          java(
+            """
+            package org.openrewrite.java;
+                            
+            class Test {
+                Object o = "Hello World!";
+            }
+            """,
+            """                
+            package org.openrewrite.java;
+            
+            class Test {
+                Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void replaceStringLiteralWithConstant() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant("UTF_8", "com.google.common.base.Charsets.UTF_8")),
@@ -118,4 +141,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           )
         );
     }
+
+    public static String EXAMPLE_STRING_FQN = ReplaceStringLiteralWithConstantTest.class.getName() + ".EXAMPLE_STRING_CONSTANT";
+    public static String EXAMPLE_STRING_CONSTANT = "Hello World!";
 }
