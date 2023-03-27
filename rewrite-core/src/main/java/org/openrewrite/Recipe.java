@@ -297,6 +297,7 @@ public abstract class Recipe implements Cloneable {
             throw new IllegalArgumentException("Cannot add a recipe to itself.");
         }
         recipeList.add(recipe);
+        descriptor = null;
         return this;
     }
 
