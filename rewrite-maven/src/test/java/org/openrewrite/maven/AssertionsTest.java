@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.xml.Assertions.xml;
 
-public class AssertionsTest implements RewriteTest {
+class AssertionsTest implements RewriteTest {
     private static final AtomicInteger xmlCount = new AtomicInteger();
 
     @BeforeEach

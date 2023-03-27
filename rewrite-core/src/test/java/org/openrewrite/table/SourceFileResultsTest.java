@@ -23,7 +23,7 @@ import java.io.ByteArrayInputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class SourceFileResultsTest implements RewriteTest {
+class SourceFileResultsTest implements RewriteTest {
 
     @Test
     void hierarchical() {

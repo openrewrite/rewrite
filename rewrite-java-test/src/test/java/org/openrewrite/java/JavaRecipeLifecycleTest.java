@@ -31,6 +31,7 @@ import static org.openrewrite.test.SourceSpecs.dir;
 
 public class JavaRecipeLifecycleTest {
     @Issue("https://github.com/openrewrite/rewrite/discussions/2849")
+    @Nested
     interface SourceSetFilteringTest extends RewriteTest {
         @Language("java")
         String MAIN_INITIAL = """

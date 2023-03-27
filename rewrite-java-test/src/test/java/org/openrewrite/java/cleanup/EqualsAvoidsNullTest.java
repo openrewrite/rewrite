@@ -118,4 +118,48 @@ class EqualsAvoidsNullTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeUnnecessaryNullCheckAndKeepNecessaryParens() {
+        rewriteRun(
+          java(
+            """
+            import java.util.Collection;
+
+            public class A {
+                public void triggersRecipe(String toCheck) {
+                    if (toCheck != null && toCheck.equals("stringLiteral")) { }
+                }
+
+                public boolean triggersParenthesesRemoval() {
+                    return (System.getProperties() != null) ? System.getProperties().keySet().isEmpty() : false;
+                }
+
+                public boolean needsToKeepParentheses() {
+                    Collection<Object> set = System.getProperties().keySet();
+                    return !(set == null || set.isEmpty());
+                }
+            }
+            """,
+            """
+            import java.util.Collection;
+
+            public class A {
+                public void triggersRecipe(String toCheck) {
+                    if ("stringLiteral".equals(toCheck)) { }
+                }
+
+                public boolean triggersParenthesesRemoval() {
+                    return System.getProperties() != null ? System.getProperties().keySet().isEmpty() : false;
+                }
+
+                public boolean needsToKeepParentheses() {
+                    Collection<Object> set = System.getProperties().keySet();
+                    return !(set == null || set.isEmpty());
+                }
+            }
+            """
+          )
+        );
+    }
 }

@@ -78,17 +78,21 @@ public class FindBuildToolFailures extends Recipe {
 
 class FailureLogAnalyzer {
 
+    // Downgrade Java when necessary
     private static final Pattern UNSUPPORTED_CLASS_FILE_MAJOR_VERSION = Pattern.compile("Unsupported class file (?:major )?version (\\d+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern SOURCE_TARGET_OPTION = Pattern.compile("(?:Source|Target) option (\\d+) is no longer supported. Use \\d+ or later", Pattern.CASE_INSENSITIVE);
+
+    // Upgrade Java when necessary
     private static final Pattern CLASS_FILE_MAJOR_VERSION = Pattern.compile("class file (?:major )?version (\\d+)");
     private static final String INVALID_FLAG_RELEASE = "invalid flag: --release";
     private static final String ADD_EXPORTS = "Unrecognized option: --add-exports";
+    private static final String MODULE_PATH = "javac: invalid flag: --module-path";
 
     private static final Pattern BAD_OPTION_WAS_IGNORED = Pattern.compile("bad option '-target:(\\d+)' was ignored");
     private static final Pattern INCOMPATIBLE_COMPONENT = Pattern.compile("Incompatible because this component declares a component compatible with Java (\\d+)");
     private static final Pattern INVALID_SOURCE_TARGET_RELEASE = Pattern.compile("invalid (?:source|target) release: (\\d+)");
     private static final Pattern RELEASE_VERSION_NOT_SUPPORTED = Pattern.compile("release version (\\d+) not supported");
     private static final Pattern SOURCE_TARGET_OBSOLETE = Pattern.compile("(?:source|target) value (?:1\\.)?(\\d+) is obsolete", Pattern.CASE_INSENSITIVE);
-    private static final Pattern SOURCE_TARGET_OPTION = Pattern.compile("(?:Source|Target) option \\d+ is no longer supported. Use (\\d+) or later", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOOLCHAIN = Pattern.compile("\\[ERROR] jdk \\[ version='(?:1\\.)?(\\d+)' ]");
     private static final Pattern USE_SOURCE = Pattern.compile("use -source (\\d+) or higher to enable");
 
@@ -97,15 +101,24 @@ class FailureLogAnalyzer {
         // Possibly downgrade Java when necessary
         Matcher matcher = UNSUPPORTED_CLASS_FILE_MAJOR_VERSION.matcher(logFileContents);
         if (matcher.find()) {
+            // Oldest version we currently support, as message gives us no indication of what version is required
             return "8";
         }
+        matcher = SOURCE_TARGET_OPTION.matcher(logFileContents);
+        if (matcher.find()) {
+            // Might return unsupported versions, which we will then have to skip
+            return matcher.group(1);
+        }
+
         // Possibly upgrade Java when necessary
         matcher = CLASS_FILE_MAJOR_VERSION.matcher(logFileContents);
         if (matcher.find()) {
             // https://docs.oracle.com/javase/specs/jvms/se20/html/jvms-4.html#jvms-4.1-200-B.2
             return String.valueOf(Integer.parseInt(matcher.group(1)) - 44);
         }
-        if (logFileContents.contains(INVALID_FLAG_RELEASE) || logFileContents.contains(ADD_EXPORTS)) {
+        if (logFileContents.contains(INVALID_FLAG_RELEASE) ||
+            logFileContents.contains(ADD_EXPORTS) ||
+            logFileContents.contains(MODULE_PATH)) {
             return "11"; // Technically 9+, but we'll go for 11 as it's an LTS release
         }
         return Stream.of(
@@ -114,7 +127,6 @@ class FailureLogAnalyzer {
                         INVALID_SOURCE_TARGET_RELEASE,
                         RELEASE_VERSION_NOT_SUPPORTED,
                         SOURCE_TARGET_OBSOLETE,
-                        SOURCE_TARGET_OPTION,
                         TOOLCHAIN,
                         USE_SOURCE)
                 .map(pattern -> pattern.matcher(logFileContents))
