@@ -5586,13 +5586,18 @@ public interface J extends Tree {
                 return v.visitVariable(this, p);
             }
 
+            public Cursor getDeclaringScope(Cursor cursor) {
+                return cursor.dropParentUntil(it ->
+                        it instanceof J.Block
+                        || it instanceof J.Lambda
+                        || it instanceof J.MethodDeclaration
+                        || it == Cursor.ROOT_VALUE);
+            }
+
             public boolean isField(Cursor cursor) {
-                Cursor declaringScope = cursor.dropParentUntil(it -> it instanceof J.Block || it instanceof J.Lambda
-                        || it instanceof J.MethodDeclaration || it == Cursor.ROOT_VALUE);
-                if(!(declaringScope.getValue() instanceof J.Block)) {
-                    return false;
-                }
-                return declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
+                Cursor declaringScope = getDeclaringScope(cursor);
+                return declaringScope.getValue() instanceof J.Block
+                        && declaringScope.getParentTreeCursor().getValue() instanceof J.ClassDeclaration;
             }
 
             public Padding getPadding() {
