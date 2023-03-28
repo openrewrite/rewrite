@@ -77,7 +77,6 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
         if (this.literalValue == null) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
-                return this.literalValue;
             } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
                 throw new IllegalArgumentException("Failed to retrieve value from the configured constant", e);
             }

@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ReplaceStringLiteralWithConstantTest implements RewriteTest {
@@ -35,56 +34,9 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     }
 
     @Test
-    void shouldReadValuesInOrderProperties() {
-        ReplaceStringLiteralWithConstant recipe = (ReplaceStringLiteralWithConstant) RecipeSpec.defaults().recipeFromYaml("""
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.ReplaceStringLiteralWithConstantList
-            recipeList:
-                - org.openrewrite.java.ReplaceStringLiteralWithConstant:
-                    literalValue: %s
-                    fullyQualifiedConstantName: %s
-            """.formatted("default", EXAMPLE_STRING_FQN),
-          "org.openrewrite.ReplaceStringLiteralWithConstantList"
-        ).getRecipe().getRecipeList().get(0).getRecipeList().get(0);
-        assertThat(recipe.getFullyQualifiedConstantName()).isEqualTo(EXAMPLE_STRING_FQN);
-        assertThat(recipe.getLiteralValue()).isEqualTo("default");
-    }
-
-    @Test
-    void shouldReadValuesInvertedOrderProperties() {
-        ReplaceStringLiteralWithConstant recipe = (ReplaceStringLiteralWithConstant) RecipeSpec.defaults().recipeFromYaml("""
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.ReplaceStringLiteralWithConstantList
-            recipeList:
-                - org.openrewrite.java.ReplaceStringLiteralWithConstant:
-                    fullyQualifiedConstantName: %s
-                    literalValue: %s
-            """.formatted(EXAMPLE_STRING_FQN, "default"),
-          "org.openrewrite.ReplaceStringLiteralWithConstantList"
-        ).getRecipe().getRecipeList().get(0).getRecipeList().get(0);
-        assertThat(recipe.getFullyQualifiedConstantName()).isEqualTo(EXAMPLE_STRING_FQN);
-        assertThat(recipe.getLiteralValue()).isEqualTo("default");
-    }
-
-    @Test
-    void shouldUseConstantValueAsDefaultLiteralValue() {
-        ReplaceStringLiteralWithConstant recipe = (ReplaceStringLiteralWithConstant) RecipeSpec.defaults().recipeFromYaml("""
-            type: specs.openrewrite.org/v1beta/recipe
-            name: org.openrewrite.ReplaceStringLiteralWithConstantList
-            recipeList:
-                - org.openrewrite.java.ReplaceStringLiteralWithConstant:
-                    fullyQualifiedConstantName: %s
-            """.formatted(EXAMPLE_STRING_FQN),
-          "org.openrewrite.ReplaceStringLiteralWithConstantList"
-        ).getRecipe().getRecipeList().get(0).getRecipeList().get(0);
-        assertThat(recipe.getFullyQualifiedConstantName()).isEqualTo(EXAMPLE_STRING_FQN);
-        assertThat(recipe.getLiteralValue()).isEqualTo(EXAMPLE_STRING_CONSTANT);
-    }
-
-    @Test
     void doNothingIfStringLiteralNotFound() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("Hello World!", EXAMPLE_STRING_FQN)),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
           java("""
             package org.openrewrite.java;
                             
@@ -99,7 +51,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void doNotReplaceDefinition() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("Hello World!", EXAMPLE_STRING_FQN)),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
           java(
             """
               package org.openrewrite.java;
@@ -114,7 +66,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void shouldNotAddImportWhenUnnecessary() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("Hello World!", EXAMPLE_STRING_FQN)),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
           java(
             """
               package org.openrewrite.java;
@@ -137,7 +89,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     @Test
     void replaceStringLiteralWithConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("Hello World!", EXAMPLE_STRING_FQN)),
+          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(EXAMPLE_STRING_CONSTANT, EXAMPLE_STRING_FQN)),
           java(
             """
               class Test {
@@ -208,28 +160,7 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     }
 
     @Test
-    void replaceStringLiteralWithConstantValueWhenLiteralValueIsConfiguredNull() {
-        rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant(null, EXAMPLE_STRING_FQN)),
-          java(
-            """
-              class Test {
-                  Object o = "Hello World!";
-              }
-              """,
-            """
-              import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                          
-              class Test {
-                  Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void replaceStringLiteralWithLiteralValueWhenLiteralValueIsConfiguredEmpty() {
+    void replaceEmptyStringLiteralWhenLiteralValueIsConfiguredEmpty() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant("", EXAMPLE_STRING_FQN)),
           java(
@@ -250,13 +181,70 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     }
 
     @Test
-    void replaceStringLiteralWithLiteralValueWhenLiteralValueIsConfiguredBlank() {
+    void replaceWhitespaceStringLiteralWhenLiteralValueIsConfiguredWhitespace() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(" ", EXAMPLE_STRING_FQN)),
           java(
-            """                
+            """
               class Test {
                   Object o = " ";
+              }
+              """,
+            """
+              import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
+                          
+              class Test {
+                  Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStringLiteralWithConstantValueWhenLiteralValueIsNotConfiguredYaml() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ReplaceStringLiteralWithConstantList
+              recipeList:
+                  - org.openrewrite.java.ReplaceStringLiteralWithConstant:
+                      fullyQualifiedConstantName: %s
+              """.formatted(EXAMPLE_STRING_FQN),
+            "org.openrewrite.ReplaceStringLiteralWithConstantList"),
+          java(
+            """                
+              class Test {
+                  Object o = "Hello World!";
+              }
+              """,
+            """
+              import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
+                           
+              class Test {
+                  Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceStringLiteralWithConstantValueWhenLiteralValueIsConfiguredYaml() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.ReplaceStringLiteralWithConstantList
+              recipeList:
+                  - org.openrewrite.java.ReplaceStringLiteralWithConstant:
+                      literalValue: %s
+                      fullyQualifiedConstantName: %s
+              """.formatted("Hello Darkness!", EXAMPLE_STRING_FQN),
+            "org.openrewrite.ReplaceStringLiteralWithConstantList"),
+          java(
+            """ 
+              class Test {
+                  Object o = "Hello Darkness!";
               }
               """,
             """
