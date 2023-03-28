@@ -16,7 +16,6 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -26,7 +25,10 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -100,11 +102,9 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                         StringBuilder templateBuilder = new StringBuilder();
                         J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) n.getBody().getStatements().get(0);
 
-                        boolean hasParameters = false;
                         if (methodDeclaration.getParameters().get(0) instanceof J.Empty) {
                             templateBuilder.append("() -> {");
                         } else {
-                            hasParameters = true;
                             templateBuilder.append(methodDeclaration.getParameters().stream()
                                     .map(param -> ((J.VariableDeclarations) param).getVariables().get(0).getSimpleName())
                                     .collect(Collectors.joining(",", "(", ") -> {")));
@@ -122,16 +122,6 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                                 n.getCoordinates().replace()
                         );
                         lambda = lambda.withType(typedInterface);
-                        if (hasParameters) {
-                            lambda = lambda.withParameters(lambda.getParameters().withParameters(
-                                    methodDeclaration.getParameters().stream()
-                                            .map(p -> {
-                                                J.VariableDeclarations decl = (J.VariableDeclarations) p;
-                                                decl = decl.withVariables(ListUtils.map(decl.getVariables(), v -> v.withPrefix(Space.EMPTY)));
-                                                return decl.withTypeExpression(null).withModifiers(Collections.emptyList());
-                                            }).collect(Collectors.toList())
-                            ));
-                        }
                         lambda = (J.Lambda) new UnnecessaryParenthesesVisitor<ExecutionContext>(Checkstyle.unnecessaryParentheses())
                                 .visitNonNull(lambda, ctx);
 

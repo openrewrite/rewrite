@@ -417,4 +417,33 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arrayTypes() {
+        rewriteRun(
+          java(
+            """
+              class Temp {
+                  final TrustStrategy strategy = new TrustStrategy() {
+                      @Override
+                      public boolean isTrusted(Integer[] var1, String var2) {
+                          return true;
+                      }
+                  };
+                  public interface TrustStrategy {
+                      boolean isTrusted(Integer[] var1, String var2);
+                  }
+              }
+              """,
+            """
+              class Temp {
+                  final TrustStrategy strategy = (var1, var2) -> true;
+                  public interface TrustStrategy {
+                      boolean isTrusted(Integer[] var1, String var2);
+                  }
+              }
+              """
+          )
+        );
+    }
 }
