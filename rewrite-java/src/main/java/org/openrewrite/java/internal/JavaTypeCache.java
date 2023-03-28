@@ -36,16 +36,28 @@ public class JavaTypeCache implements Cloneable {
         byte[] data;
     }
 
-    Map<Object, Object> typeCache = new HashMap<>();
+    Map<Object, Object> sourceTypeCache = new HashMap<>();
+    Map<Object, Object> classTypeCache = new HashMap<>();
 
     @Nullable
     public <T> T get(String signature) {
+        Object key = key(signature);
+        Object t = sourceTypeCache.get(key);
         //noinspection unchecked
-        return (T) typeCache.get(key(signature));
+        return (T) (t != null ? t : classTypeCache.get(key));
     }
 
     public void put(String signature, Object o) {
-        typeCache.put(key(signature), o);
+        // to err on the safe side add to `sourceTypeCache` so it gets removed in `clear()`
+        put(JavaTypeSource.SOURCE, signature, o);
+    }
+
+    public void put(JavaTypeSource source, String signature, Object o) {
+        if (source == JavaTypeSource.SOURCE) {
+            sourceTypeCache.put(key(signature), o);
+        } else {
+            classTypeCache.put(key(signature), o);
+        }
     }
 
     private Object key(String signature) {
@@ -60,18 +72,20 @@ public class JavaTypeCache implements Cloneable {
     }
 
     public void clear() {
-        typeCache.clear();
+        // the `classTypeCache` is not cleared so that it can be reused
+        sourceTypeCache.clear();
     }
 
     public int size() {
-        return typeCache.size();
+        return sourceTypeCache.size() + classTypeCache.size();
     }
 
     @Override
     public JavaTypeCache clone() {
         try {
             JavaTypeCache clone = (JavaTypeCache) super.clone();
-            clone.typeCache = new HashMap<>(this.typeCache);
+            clone.classTypeCache = new HashMap<>(this.classTypeCache);
+            clone.sourceTypeCache = new HashMap<>(this.sourceTypeCache);
             return clone;
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);

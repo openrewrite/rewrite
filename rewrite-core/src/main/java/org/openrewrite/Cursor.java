@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -41,6 +42,11 @@ public class Cursor {
     public Cursor(@Nullable Cursor parent, Object value) {
         this.parent = parent;
         this.value = value;
+
+        // the root cursor will potentially be used concurrently
+        if (parent == null && value == ROOT_VALUE) {
+            messages = new ConcurrentHashMap<>();
+        }
     }
 
     public Cursor getRoot() {

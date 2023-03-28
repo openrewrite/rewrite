@@ -344,6 +344,10 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return (B) this;
         }
 
+        public Collection<Path> classpath() {
+            return Collections.unmodifiableCollection(this.classpath);
+        }
+
         public B classpath(Collection<Path> classpath) {
             this.classpath = classpath;
             return (B) this;

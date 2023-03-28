@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
+import org.openrewrite.java.internal.JavaTypeSource;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -45,8 +46,16 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     private final JavaTypeCache typeCache;
 
     public JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
+        return type(type, (JavaTypeSource) null);
+    }
+
+    private JavaType type(@Nullable com.sun.tools.javac.code.Type type, @Nullable JavaTypeSource ownerSource) {
         if (type == null || type instanceof Type.ErrorType || type instanceof Type.PackageType || type instanceof Type.UnknownType ||
                 type instanceof NullType) {
+            return JavaType.Class.Unknown.getInstance();
+        } else if (type instanceof Type.JCVoidType) {
+            return JavaType.Primitive.Void;
+        } else if (type instanceof Type.JCNoType) {
             return JavaType.Class.Unknown.getInstance();
         }
 
@@ -56,35 +65,32 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        if (type instanceof Type.ClassType) {
-            return classType((Type.ClassType) type, signature);
-        } else if (type instanceof Type.TypeVar) {
-            return generic((Type.TypeVar) type, signature);
+        if (type instanceof Type.ClassType classType) {
+            return classType(classType, signature);
+        } else if (type instanceof Type.TypeVar typeVar) {
+            return generic(typeVar, signature, ownerSource);
         } else if (type instanceof Type.JCPrimitiveType) {
             return primitive(type.getTag());
-        } else if (type instanceof Type.JCVoidType) {
-            return JavaType.Primitive.Void;
-        } else if (type instanceof Type.ArrayType) {
-            return array(type, signature);
-        } else if (type instanceof Type.WildcardType) {
-            return generic((Type.WildcardType) type, signature);
-        } else if (type instanceof Type.JCNoType) {
-            return JavaType.Class.Unknown.getInstance();
+        } else if (type instanceof Type.ArrayType arrayType) {
+            return array(arrayType, signature);
+        } else if (type instanceof Type.WildcardType wildcardType) {
+            return generic(wildcardType, signature, ownerSource);
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
     }
 
-    private JavaType array(Type type, String signature) {
+    private JavaType array(Type.ArrayType type, String signature) {
         JavaType.Array arr = new JavaType.Array(null, null);
-        typeCache.put(signature, arr);
-        arr.unsafeSet(type(((Type.ArrayType) type).elemtype));
+        typeCache.put(source(type), signature, arr);
+        arr.unsafeSet(type(type.elemtype));
         return arr;
     }
 
-    private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature) {
+    private JavaType.GenericTypeVariable generic(Type.WildcardType wildcard, String signature, @Nullable JavaTypeSource ownerSource) {
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null, "?", INVARIANT, null);
-        typeCache.put(signature, gtv);
+        assert ownerSource != null;
+        typeCache.put(ownerSource, signature, gtv);
 
         JavaType.GenericTypeVariable.Variance variance;
         List<JavaType> bounds;
@@ -114,11 +120,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
         return gtv;
     }
 
-    private JavaType generic(Type.TypeVar type, String signature) {
+    private JavaType generic(Type.TypeVar type, String signature, @Nullable JavaTypeSource ownerSource) {
         String name = type.tsym.name.toString();
         JavaType.GenericTypeVariable gtv = new JavaType.GenericTypeVariable(null,
                 name, INVARIANT, null);
-        typeCache.put(signature, gtv);
+        typeCache.put(ownerSource != null ? ownerSource : source(type.tsym), signature, gtv);
 
         List<JavaType> bounds = null;
         if (type.getUpperBound() instanceof Type.IntersectionClassType) {
@@ -150,6 +156,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
 
         JavaType.FullyQualified fq = typeCache.get(fqn);
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
+        JavaTypeSource source = source(sym);
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
                 completeClassSymbol(sym);
@@ -163,7 +170,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     null, null, null, null, null, null, null
             );
 
-            typeCache.put(fqn, clazz);
+            typeCache.put(source, fqn, clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
@@ -219,7 +226,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             if (symType.typarams_field != null && symType.typarams_field.length() > 0) {
                 typeParameters = new ArrayList<>(symType.typarams_field.length());
                 for (Type tParam : symType.typarams_field) {
-                    typeParameters.add(type(tParam));
+                    typeParameters.add(type(tParam, source));
                 }
             }
             clazz.unsafeSet(typeParameters, supertype, owner, listAnnotations(sym), interfaces, fields, methods);
@@ -229,11 +236,11 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             JavaType.Parameterized pt = typeCache.get(signature);
             if (pt == null) {
                 pt = new JavaType.Parameterized(null, null, null);
-                typeCache.put(signature, pt);
+                typeCache.put(source, signature, pt);
 
                 List<JavaType> typeParameters = new ArrayList<>(classType.typarams_field.length());
                 for (Type tParam : classType.typarams_field) {
-                    typeParameters.add(type(tParam));
+                    typeParameters.add(type(tParam, source));
                 }
 
                 pt.unsafeSet(clazz, typeParameters);
@@ -339,7 +346,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 symbol.name.toString(),
                 null, null, null);
 
-        typeCache.put(signature, variable);
+        typeCache.put(source(symbol), signature, variable);
 
         JavaType resolvedOwner = owner;
         if (owner == null) {
@@ -405,7 +412,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 paramNames,
                 null, null, null, null
         );
-        typeCache.put(signature, method);
+        typeCache.put(source(methodSymbol), signature, method);
 
         JavaType returnType = null;
         List<JavaType> parameterTypes = null;
@@ -490,8 +497,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 }
             }
             List<String> defaultValues = null;
-            if(methodSymbol.getDefaultValue() != null) {
-                if(methodSymbol.getDefaultValue() instanceof Attribute.Array) {
+            if (methodSymbol.getDefaultValue() != null) {
+                if (methodSymbol.getDefaultValue() instanceof Attribute.Array) {
                     defaultValues = ((Attribute.Array) methodSymbol.getDefaultValue()).getValue().stream()
                             .map(attr -> attr.getValue().toString())
                             .collect(Collectors.toList());
@@ -509,7 +516,8 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     null, null, null,
                     defaultValues
             );
-            typeCache.put(signature, method);
+            JavaTypeSource source = source(methodSymbol);
+            typeCache.put(source, signature, method);
 
             Type signatureType = methodSymbol.type instanceof Type.ForAll ?
                     ((Type.ForAll) methodSymbol.type).qtype :
@@ -569,7 +577,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     parameterTypes = new ArrayList<>(mt.argtypes.size());
                     for (com.sun.tools.javac.code.Type argtype : mt.argtypes) {
                         if (argtype != null) {
-                            JavaType javaType = type(argtype);
+                            JavaType javaType = type(argtype, source);
                             parameterTypes.add(javaType);
                         }
                     }
@@ -607,12 +615,35 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     continue;
                 }
                 Retention retention = a.getAnnotationType().asElement().getAnnotation(Retention.class);
-                if(retention != null && retention.value() == RetentionPolicy.SOURCE) {
+                if (retention != null && retention.value() == RetentionPolicy.SOURCE) {
                     continue;
                 }
                 annotations.add(annotType);
             }
         }
         return annotations;
+    }
+
+    private JavaTypeSource source(Type type) {
+        if (type instanceof Type.ArrayType) {
+            return source(((Type.ArrayType) type).elemtype);
+        } else {
+            return source(type.tsym);
+        }
+    }
+
+    private static JavaTypeSource source(Symbol sym) {
+        if (sym instanceof Symbol.ClassSymbol) {
+            return source((Symbol.ClassSymbol) sym);
+        } else if (sym.owner != null) {
+            return source(sym.owner);
+        }
+        return JavaTypeSource.SOURCE;
+    }
+    private static JavaTypeSource source(Symbol.TypeSymbol sym) {
+        return sym.type.isPrimitiveOrVoid() ? JavaTypeSource.CLASS : source(((Symbol) sym));
+    }
+    private static JavaTypeSource source(Symbol.ClassSymbol sym) {
+        return sym.classfile != null ? JavaTypeSource.CLASS : JavaTypeSource.SOURCE;
     }
 }
