@@ -24,6 +24,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -92,6 +93,9 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             if (!(constantValue instanceof String)) {
                 // currently, we only support string literals, also see visitor implementation
                 return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unsupported type of constant provided. Only literals can be replaced."));
+            }
+            if (StringUtils.isNullOrEmpty((String) constantValue)) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Provided constant should be neither null nor empty."));
             }
             return result;
         } catch (ClassNotFoundException e) {
