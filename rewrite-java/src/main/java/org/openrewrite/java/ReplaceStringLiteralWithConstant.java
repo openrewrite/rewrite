@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.experimental.NonFinal;
+
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -43,6 +45,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             example = "application/json",
             required = false)
     @Nullable
+    @NonFinal
     String literalValue;
 
     @Option(displayName = "Fully qualified name of the constant to use in place of String literal", example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
@@ -74,7 +77,8 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             return this.literalValue;
         }
         try {
-            return (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
+            this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
+            return this.literalValue;
         } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
             throw new IllegalArgumentException("Failed to retrieve value from the configured constant", e);
         }
