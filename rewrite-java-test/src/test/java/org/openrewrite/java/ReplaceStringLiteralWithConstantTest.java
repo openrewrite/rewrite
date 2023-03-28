@@ -23,6 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 class ReplaceStringLiteralWithConstantTest implements RewriteTest {
+
+    public static String EXAMPLE_STRING_CONSTANT = "Hello World!";
+    public static String EXAMPLE_STRING_FQN = ReplaceStringLiteralWithConstantTest.class.getName() + ".EXAMPLE_STRING_CONSTANT";
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec
@@ -265,7 +269,4 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
           )
         );
     }
-
-    public static String EXAMPLE_STRING_FQN = ReplaceStringLiteralWithConstantTest.class.getName() + ".EXAMPLE_STRING_CONSTANT";
-    public static String EXAMPLE_STRING_CONSTANT = "Hello World!";
 }
