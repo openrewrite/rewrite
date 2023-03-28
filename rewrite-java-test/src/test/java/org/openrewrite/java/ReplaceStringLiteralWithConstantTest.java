@@ -160,27 +160,6 @@ class ReplaceStringLiteralWithConstantTest implements RewriteTest {
     }
 
     @Test
-    void replaceEmptyStringLiteralWhenLiteralValueIsConfiguredEmpty() {
-        rewriteRun(
-          spec -> spec.recipe(new ReplaceStringLiteralWithConstant("", EXAMPLE_STRING_FQN)),
-          java(
-            """
-              class Test {
-                  Object o = "";
-              }
-              """,
-            """
-              import org.openrewrite.java.ReplaceStringLiteralWithConstantTest;
-                          
-              class Test {
-                  Object o = ReplaceStringLiteralWithConstantTest.EXAMPLE_STRING_CONSTANT;
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void replaceWhitespaceStringLiteralWhenLiteralValueIsConfiguredWhitespace() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceStringLiteralWithConstant(" ", EXAMPLE_STRING_FQN)),

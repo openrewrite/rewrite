@@ -87,14 +87,17 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     @Override
     public Validated validate() {
         Validated result = super.validate();
+        if (StringUtils.isBlank(fullyQualifiedConstantName)) {
+            return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "The constant's fully qualified name may not be empty or blank."));
+        }
         try {
             Object constantValue = getConstantValueByFullyQualifiedName(fullyQualifiedConstantName);
+            if (constantValue == null) {
+                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Provided constant should not be null."));
+            }
             if (!(constantValue instanceof String)) {
                 // currently, we only support string literals, also see visitor implementation
                 return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Unsupported type of constant provided. Only literals can be replaced."));
-            }
-            if (StringUtils.isNullOrEmpty((String) constantValue)) {
-                return result.and(invalid(CONSTANT_FQN_PARAM, fullyQualifiedConstantName, "Provided constant should be neither null nor empty."));
             }
             return result;
         } catch (ClassNotFoundException e) {
