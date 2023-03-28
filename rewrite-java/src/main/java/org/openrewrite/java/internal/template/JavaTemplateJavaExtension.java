@@ -159,7 +159,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     getCursor().getParentOrThrow());
                         }
                         case EXTENDS: {
-                            TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(substitutedTemplate));
+                            TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(substitutedTemplate, getCursor()));
                             J.ClassDeclaration c = classDecl.withExtends(anExtends);
 
                             //noinspection ConstantConditions
@@ -167,7 +167,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return c;
                         }
                         case IMPLEMENTS: {
-                            List<TypeTree> implementings = substitutions.unsubstitute(templateParser.parseImplements(substitutedTemplate));
+                            List<TypeTree> implementings = substitutions.unsubstitute(templateParser.parseImplements(substitutedTemplate, getCursor()));
                             List<JavaType.FullyQualified> implementsTypes = implementings.stream()
                                     .map(TypedTree::getType)
                                     .map(TypeUtils::asFullyQualified)
@@ -213,7 +213,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     getCursor().getParentOrThrow());
                         }
                         case TYPE_PARAMETERS: {
-                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate, getCursor()));
                             return classDecl.withTypeParameters(typeParameters);
                         }
                     }
@@ -268,7 +268,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitLambda(J.Lambda lambda, Integer p) {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
-                    return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
+                    return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate, getCursor())));
                 }
                 return maybeReplaceStatement(lambda, J.class, 0);
             }
@@ -310,7 +310,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return method.withBody(autoFormat(body, p, getCursor()));
                         }
                         case METHOD_DECLARATION_PARAMETERS: {
-                            List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate));
+                            List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate, getCursor()));
 
                             // Update the J.MethodDeclaration's type information to reflect its new parameter list
                             JavaType.Method type = method.getMethodType();
@@ -368,7 +368,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return method.withParameters(parameters).withMethodType(type);
                         }
                         case THROWS: {
-                            J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
+                            J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate, getCursor())));
 
                             // Update method type information to reflect the new checked exceptions
                             JavaType.Method type = m.getMethodType();
@@ -388,7 +388,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return m;
                         }
                         case TYPE_PARAMETERS: {
-                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate, getCursor()));
                             J.MethodDeclaration m = method.withTypeParameters(typeParameters);
                             return autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
                                     getCursor().getParentOrThrow());
@@ -438,7 +438,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitPackage(J.Package pkg, Integer integer) {
                 if (loc.equals(PACKAGE_PREFIX) && pkg.isScope(insertionPoint)) {
-                    return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(substitutedTemplate)));
+                    return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(substitutedTemplate, getCursor())));
                 }
                 return super.visitPackage(pkg, integer);
             }

@@ -38,10 +38,10 @@ class RemoveObjectsIsNullTest implements RewriteTest {
             """
               import static java.util.Objects.isNull;
               public class A {
-                  public void test() {
+                  public void test(Object o) {
                       boolean a = true;
                       if (java.util.Objects.isNull(a)) {
-                          System.out.println("a is null");
+                          System.out.println(java.util.Objects.isNull(o));
                       }
                   }
               }
@@ -49,10 +49,10 @@ class RemoveObjectsIsNullTest implements RewriteTest {
             """
               import static java.util.Objects.isNull;
               public class A {
-                  public void test() {
+                  public void test(Object o) {
                       boolean a = true;
                       if (a == null) {
-                          System.out.println("a is null");
+                          System.out.println(o == null);
                       }
                   }
               }

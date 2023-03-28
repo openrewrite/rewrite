@@ -20,7 +20,6 @@ import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.DiagnosticSource;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
@@ -60,16 +59,16 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 
 /**
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
  */
 @NonNullApi
-public class ReloadableJava17Parser implements JavaParser {
+public class ReloadableJava17Parser implements JavaParser, JavaParser.Internal {
     private String sourceSet = "main";
-    private final JavaTypeCache typeCache;
+    private JavaTypeCache typeCache;
 
     @Nullable
     private transient JavaSourceSet sourceSetProvenance;
@@ -350,6 +349,16 @@ public class ReloadableJava17Parser implements JavaParser {
         com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> compilationUnits = com.sun.tools.javac.util.List.from(
                 cus.toArray(JCTree.JCCompilationUnit[]::new));
         enter.main(compilationUnits);
+    }
+
+    @Override
+    public Collection<Path> getClasspath() {
+        return classpath == null ? emptyList() : unmodifiableCollection(classpath);
+    }
+
+    @Override
+    public void setTypeCache(JavaTypeCache typeCache) {
+        this.typeCache = typeCache;
     }
 
     private static class ResettableLog extends Log {

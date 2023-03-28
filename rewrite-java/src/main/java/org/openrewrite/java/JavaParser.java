@@ -22,6 +22,7 @@ import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -37,9 +38,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -178,6 +177,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                             );
                             missingArtifactNames.remove(artifactName);
                             artifacts.add(artifact);
+                        } catch (FileAlreadyExistsException ignore) {
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
@@ -401,5 +401,16 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                                    .orElse(Long.toString(System.nanoTime())) + ".java";
 
         return prefix.resolve(Paths.get(pkg + className));
+    }
+
+    /**
+     * Extension interface which can optionally be implemented by `JavaParser` implementation classes,
+     * providing internal accessors.
+     */
+    @Incubating(since = "7.38.0")
+    interface Internal extends JavaParser {
+        Collection<Path> getClasspath();
+
+        void setTypeCache(JavaTypeCache typeCache);
     }
 }

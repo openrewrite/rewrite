@@ -45,30 +45,30 @@ public class RemoveObjectsIsNull extends Recipe {
         return new TransformCallsToObjectsIsNullVisitor();
     }
 
-    private static final MethodMatcher isNullmatcher = new MethodMatcher("java.util.Objects isNull(..)");
-    private static final MethodMatcher nonNullmatcher = new MethodMatcher("java.util.Objects nonNull(..)");
+    private static final MethodMatcher isNullMatcher = new MethodMatcher("java.util.Objects isNull(..)");
+    private static final MethodMatcher nonNullMatcher = new MethodMatcher("java.util.Objects nonNull(..)");
 
+    private static class TransformCallsToObjectsIsNullVisitor extends JavaVisitor<ExecutionContext> {
+        JavaTemplate isNullTemplate = JavaTemplate.builder(this::getCursor, "(#{any(boolean)}) == null").build();
+        JavaTemplate nonNullTemplate = JavaTemplate.builder(this::getCursor, "(#{any(boolean)}) != null").build();
 
-
-    private class TransformCallsToObjectsIsNullVisitor extends JavaVisitor<ExecutionContext> {
         @Override
         public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
-            if(isNullmatcher.matches(m)) {
-                return replace(executionContext, m, "(#{any(boolean)}) == null");
-            } else if(nonNullmatcher.matches(m)) {
-                return replace(executionContext, m, "(#{any(boolean)}) != null");
+            if (isNullMatcher.matches(m)) {
+                return replace(executionContext, m, isNullTemplate);
+            } else if (nonNullMatcher.matches(m)) {
+                return replace(executionContext, m, nonNullTemplate);
             }
             return m;
         }
 
         @NonNull
-        private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
-            JavaTemplate template = JavaTemplate.builder(this::getCursor, pattern).build();
+        private Expression replace(ExecutionContext ctx, J.MethodInvocation m, JavaTemplate template) {
             Expression e = m.getArguments().get(0);
             Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
             UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
-            return (Expression) v.visitNonNull(replaced, executionContext, getCursor());
+            return (Expression) v.visitNonNull(replaced, ctx, getCursor());
         }
     }
 

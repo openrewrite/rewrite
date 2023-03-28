@@ -27,10 +27,10 @@ import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
 
-public class Java17Parser implements JavaParser {
-    private final JavaParser delegate;
+public class Java17Parser implements JavaParser, JavaParser.Internal {
+    private final JavaParser.Internal delegate;
 
-    Java17Parser(JavaParser delegate) {
+    Java17Parser(JavaParser.Internal delegate) {
         this.delegate = delegate;
     }
 
@@ -70,6 +70,16 @@ public class Java17Parser implements JavaParser {
         return new Builder();
     }
 
+    @Override
+    public Collection<Path> getClasspath() {
+        return delegate.getClasspath();
+    }
+
+    @Override
+    public void setTypeCache(JavaTypeCache typeCache) {
+        delegate.setTypeCache(typeCache);
+    }
+
     public static class Builder extends JavaParser.Builder<Java17Parser, Builder> {
 
         @Nullable
@@ -98,7 +108,7 @@ public class Java17Parser implements JavaParser {
 
                 parserConstructor.setAccessible(true);
 
-                JavaParser delegate = (JavaParser) parserConstructor
+                JavaParser.Internal delegate = (JavaParser.Internal) parserConstructor
                         .newInstance(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
 
                 return new Java17Parser(delegate);
