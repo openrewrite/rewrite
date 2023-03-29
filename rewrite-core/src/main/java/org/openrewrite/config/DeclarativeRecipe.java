@@ -64,6 +64,9 @@ public class DeclarativeRecipe extends CompositeRecipe {
     @Getter
     private final List<Maintainer> maintainers;
 
+    @Getter
+    private final List<CodeExample> examples;
+
     @JsonIgnore
     private Validated validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
@@ -166,8 +169,9 @@ public class DeclarativeRecipe extends CompositeRecipe {
         }
         //noinspection deprecation
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
-                getTags(), getEstimatedEffortPerOccurrence(),
-                emptyList(), getLanguages(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(), source);
+            getTags(), getEstimatedEffortPerOccurrence(),
+            emptyList(), getLanguages(), recipeList, getDataTableDescriptors(),
+            getMaintainers(), getContributors(), getExamples(), source);
     }
 
     public enum RecipeUse {

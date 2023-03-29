@@ -195,9 +195,9 @@ public abstract class Recipe implements Cloneable {
 
     protected RecipeDescriptor createRecipeDescriptor() {
         List<OptionDescriptor> options = getOptionDescriptors(this.getClass());
-        List<RecipeDescriptor> recipeList1 = new ArrayList<>();
+        List<RecipeDescriptor> recipeList = new ArrayList<>();
         for (Recipe next : getRecipeList()) {
-            recipeList1.add(next.getDescriptor());
+            recipeList.add(next.getDescriptor());
         }
         URI recipeSource;
         try {
@@ -207,8 +207,8 @@ public abstract class Recipe implements Cloneable {
         }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, getLanguages(), recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), recipeSource);
+                getEstimatedEffortPerOccurrence(), options, getLanguages(), recipeList, getDataTableDescriptors(),
+                getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
     private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
@@ -260,6 +260,13 @@ public abstract class Recipe implements Cloneable {
      * @return a list of the organization(s) responsible for maintaining this recipe.
      */
     public List<Maintainer> getMaintainers() {
+        return emptyList();
+    }
+
+    /**
+     * @return a list of the code example(s) demonstrating the changes made by the recipe.
+     */
+    public List<CodeExample> getExamples() {
         return emptyList();
     }
 

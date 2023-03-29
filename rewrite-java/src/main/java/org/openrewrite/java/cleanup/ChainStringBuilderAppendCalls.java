@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.CodeExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -27,6 +28,7 @@ import org.openrewrite.java.PartProvider;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -49,6 +51,28 @@ public class ChainStringBuilderAppendCalls extends Recipe {
     @Override
     public @Nullable Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(2);
+    }
+
+    @Override
+    public List<CodeExample> getExamples() {
+        CodeExample example = new CodeExample("Chain `StringBuilder.append()` calls instead of the '+' operator to efficiently concatenate strings and numbers",
+            "class A {\n" +
+            "  void method() {\n" +
+            "      StringBuilder sb = new StringBuilder();\n" +
+            "      String op = \"+\";\n" +
+            "      sb.append(\"A\" + op + \"B\");\n" +
+            "      sb.append(1 + op + 2);\n" +
+            "  }\n" +
+            "}",
+            "class A {\n" +
+            "  void method() {\n" +
+            "      StringBuilder sb = new StringBuilder();\n" +
+            "      String op = \"+\";\n" +
+            "      sb.append(\"A\").append(op).append(\"B\");\n" +
+            "      sb.append(1).append(op).append(2);\n" +
+            "  }\n" +
+            "}");
+        return Collections.singletonList(example);
     }
 
     @Override

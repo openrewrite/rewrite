@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.CodeExample;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.internal.lang.Nullable;
@@ -57,6 +58,8 @@ public class RecipeDescriptor {
     List<Maintainer> maintainers;
 
     List<Contributor> contributors;
+
+    List<CodeExample> examples;
 
     URI source;
 }
