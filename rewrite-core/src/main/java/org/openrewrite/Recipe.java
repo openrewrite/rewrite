@@ -264,7 +264,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     @Setter
-    private transient List<Contributor> contributors;
+    protected transient List<Contributor> contributors;
 
     public List<Contributor> getContributors() {
         if(contributors == null) {

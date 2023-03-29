@@ -25,6 +25,7 @@ import java.io.ByteArrayInputStream;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -240,5 +241,38 @@ class YamlResourceLoaderTest implements RewriteTest {
 
         RecipeDescriptor recipeDescriptor = recipe.getDescriptor();
         assertThat(recipeDescriptor.getContributors()).containsExactlyElementsOf(contributors);
+    }
+
+    @Test
+    void declarativeAttributionIncludesRecipeListContributors() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/attribution
+              recipeName: org.openrewrite.text.ChangeText
+              contributors:
+                - name: "Jonathan Schneider"
+                  email: "jon@moderne.io"
+                  lineCount: 5
+              """.getBytes()
+          ), URI.create("attribution/org.openrewrite.text.ChangeText.yml"), new Properties()))
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .build();
+        Collection<Recipe> recipes = env.listRecipes();
+        assertThat(recipes).hasSize(1);
+        Recipe recipe = recipes.iterator().next();
+        Optional<Contributor> maybeJon = recipe.getContributors().stream().filter(c -> c.getName().equals("Jonathan Schneider")).findFirst();
+        assertThat(maybeJon).isPresent();
     }
 }

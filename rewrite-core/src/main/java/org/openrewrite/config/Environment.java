@@ -53,7 +53,7 @@ public class Environment {
         }
         for (Recipe recipe : dependencyRecipes) {
             if (recipe instanceof DeclarativeRecipe) {
-                ((DeclarativeRecipe) recipe).initialize(dependencyRecipes);
+                ((DeclarativeRecipe) recipe).initialize(dependencyRecipes, recipeToContributors);
             }
         }
         for (Recipe recipe : recipes) {
@@ -62,7 +62,7 @@ public class Environment {
                 List<Recipe> availableRecipes = new ArrayList<>();
                 availableRecipes.addAll(dependencyRecipes);
                 availableRecipes.addAll(recipes);
-                ((DeclarativeRecipe) recipe).initialize(availableRecipes);
+                ((DeclarativeRecipe) recipe).initialize(availableRecipes, recipeToContributors);
             }
         }
         return recipes;

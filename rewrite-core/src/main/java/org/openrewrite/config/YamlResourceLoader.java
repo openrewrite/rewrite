@@ -327,7 +327,7 @@ public class YamlResourceLoader implements ResourceLoader {
         List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
         for (Recipe recipe : internalRecipes) {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
-            declarativeRecipe.initialize(allRecipes);
+            declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
             declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }

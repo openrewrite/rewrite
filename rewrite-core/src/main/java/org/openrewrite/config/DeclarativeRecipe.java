@@ -69,7 +69,7 @@ public class DeclarativeRecipe extends CompositeRecipe {
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> uninitializedRecipes.isEmpty());
 
-    public void initialize(Collection<Recipe> availableRecipes) {
+    public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
         for (Map.Entry<RecipeUse, List<Recipe>> recipesByUse : uninitializedRecipes.entrySet()) {
             for (int i = 0; i < recipesByUse.getValue().size(); i++) {
                 Recipe recipe = recipesByUse.getValue().get(i);
@@ -100,6 +100,7 @@ public class DeclarativeRecipe extends CompositeRecipe {
                                         null));
                     }
                 } else {
+                    recipe.setContributors(recipeToContributors.getOrDefault(recipe.getName(), emptyList()));
                     configureByUse(recipesByUse.getKey(), recipe);
                 }
             }
@@ -168,6 +169,31 @@ public class DeclarativeRecipe extends CompositeRecipe {
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
                 getTags(), getEstimatedEffortPerOccurrence(),
                 emptyList(), getLanguages(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(), source);
+    }
+
+    @Value
+    private static class NameEmail {
+        String name;
+        String email;
+    }
+
+    @Override
+    public List<Contributor> getContributors() {
+        if(contributors == null) {
+            Map<NameEmail, Integer> contributorToLineCount = new HashMap<>();
+            contributors = new ArrayList<>();
+            for(Recipe recipe : getRecipeList()) {
+                for(Contributor contributor : recipe.getContributors()) {
+                    NameEmail nameEmail = new NameEmail(contributor.getName(), contributor.getEmail());
+                    contributorToLineCount.put(nameEmail, contributorToLineCount.getOrDefault(nameEmail, 0) + contributor.getLineCount());
+                }
+            }
+            for (Map.Entry<NameEmail, Integer> contributorEntry : contributorToLineCount.entrySet()) {
+                contributors.add(new Contributor(contributorEntry.getKey().getName(), contributorEntry.getKey().getEmail(), contributorEntry.getValue()));
+            }
+            contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
+        }
+        return contributors;
     }
 
     public enum RecipeUse {
