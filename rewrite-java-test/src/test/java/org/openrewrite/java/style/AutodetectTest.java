@@ -54,6 +54,8 @@ class AutodetectTest implements RewriteTest {
         var styles = Autodetect.detect(cus);
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
     @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
@@ -88,9 +90,9 @@ class AutodetectTest implements RewriteTest {
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
-        assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);
-        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(1);
-        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(2);
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
     }
 
     @SuppressWarnings("InfiniteRecursion")
@@ -184,8 +186,126 @@ class AutodetectTest implements RewriteTest {
         var styles = Autodetect.detect(cus);
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
-        assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);
-        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(1);
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize4() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+            	private final ApplicationEventPublisher publisher;
+            	public void method() {
+            		int value = 0;
+                	int value1 = 1;
+            	    int value2 = 2;
+            		{
+            	        int value3 = 2;
+                	    int value4 = 4;
+            		}
+            	}
+            }
+            """
+        );
+
+        var styles = Autodetect.detect(cus);
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    // TabSize 3 is atypical but not unheard of
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize3() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+            	private final ApplicationEventPublisher publisher;
+            	public void method() {
+            		int value = 0;
+            	   int value1 = 1;
+            	   int value2 = 2;
+            		{
+            	      int value3 = 2;
+            	      int value4 = 4;
+            		}
+            	}
+            }
+            """
+        );
+
+        var styles = Autodetect.detect(cus);
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(3);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(3);
+    }
+
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize4AndUseTabIsFalse() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+            	private final ApplicationEventPublisher publisher;
+                public void method() {
+            	    int value = 0;
+            	    int value1 = 1;
+            	    int value2 = 2;
+            	    {
+                	    int value3 = 2;
+                    	int value4 = 4;
+            	    }
+            	}
+            }
+            """
+        );
+
+        var styles = Autodetect.detect(cus);
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize4WithSomeErrors() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+                private final ApplicationEventPublisher publisher;
+                public void method() {
+            	     int value = 0;
+            	   int value1 = 1;
+            	    int value2 = 2;
+            	    {
+                	     int value3 = 2;
+                   	int value4 = 4;
+            	    }
+            	}
+            }
+            """
+        );
+
+        var styles = Autodetect.detect(cus);
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
     @Test
