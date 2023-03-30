@@ -219,7 +219,7 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
-    // TabSize 3 is unnormal, but if it exists, we can detect it.
+    // TabSize 3 is atypical but not unheard of
     @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize3() {
         var cus = jp().parse(
