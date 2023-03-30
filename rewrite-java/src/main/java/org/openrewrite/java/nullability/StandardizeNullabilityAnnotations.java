@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 @Value
@@ -33,7 +34,7 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode(callSuper = false)
 public class StandardizeNullabilityAnnotations extends Recipe {
 
-    private static final Set<String> KNOWN_NULLABLE_ANNOTATIONS = new LinkedHashSet<>(Arrays.asList(
+    private static final Set<String> KNOWN_NULLABLE_ANNOTATIONS = Stream.of(
             "javax.annotation.Nullable",
             "jakarta.annotation.Nullable",
             "org.eclipse.jdt.annotation.Nullable",
@@ -47,9 +48,9 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             "org.jmlspecs.annotation.Nullable",
             "org.openrewrite.internal.lang.Nullable",
             "lombok.NonNull"
-    ));
+    ).collect(Collectors.toSet());
 
-    private static final Set<String> KNOWN_NON_NULL_ANNOTATIONS = new LinkedHashSet<>(Arrays.asList(
+    private static final Set<String> KNOWN_NON_NULL_ANNOTATIONS = Stream.of(
             "javax.annotation.Nonnull",
             "jakarta.annotation.Nonnull",
             "org.eclipse.jdt.annotation.NonNull",
@@ -62,7 +63,7 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             "org.springframework.lang.NonNull",
             "org.jmlspecs.annotation.NonNull",
             "org.openrewrite.internal.lang.NonNull"
-    ));
+    ).collect(Collectors.toSet());
 
     @Option(displayName = "Nullable Annotation to use",
             description = "All other nullable annotations will be replaced by this one",
