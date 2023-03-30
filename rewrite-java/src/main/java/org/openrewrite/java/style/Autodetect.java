@@ -230,10 +230,10 @@ public class Autodetect extends NamedStyles {
             /**
              * For each line, if the code follows an indentation style exactly,
              * Assume :
-             *      nw = white space count in prefix
+             *      nw = space count in prefix
              *      nt = tabs count in prefix
              *      d = block depth
-             *      X = tabSize, which means  white space count per tab, unknown to be solved here.
+             *      X = tabSize, which means space count per tab, unknown to be solved here.
              * So theoretically the formula is:
              *      d = nt + (nw / X)                                                                       (1)
              *      X = nw / (d - nt)                                                                       (2)
@@ -242,14 +242,14 @@ public class Autodetect extends NamedStyles {
              * So let's define:
              *      D = d1 + d2 + .. + dn, which is the total count of depth.
              *      NT = nt1 + nt2 + .. + ntn, which is the total count of tabs.
-             *      NW = nw1 +nw2 + ... + nwn, which is the total count of white spaces.
+             *      NW = nw1 +nw2 + ... + nwn, which is the total count of spaces.
              * So
              *      D = NT + (NW / X)                                                                       (4)
              *      X = NW / (D - NT)                                                                       (5)
              * the more data (more lines of code), the more accuracy.
              *
              * (1) How to determine the `useTabs` boolean value?
-             * From formula #4, D is composed of two parts, the Tabs part (NT) and the white spaces part (NW / X).
+             * From formula #4, D is composed of two parts, the Tabs part (NT) and the spaces part (NW / X).
              * so `useTabs` should be determined by which part is bigger (> 50%).
              * define:
              *      PT = (NT / D), which means the percentage of tabs.
@@ -262,8 +262,8 @@ public class Autodetect extends NamedStyles {
              *      then we use the default value 4. Because small errors exist in reality, it is impossible to strictly
              *      satisfy the condition of (D - NT) being zero, so we use a threshold here to determine this case.
              *      let's say PT > 80%.
-             * #2. If the code contains white spaces only. NT ~= 0, X ~= NW / D.
-             * #3. Mixed tabs and white spaces
+             * #2. If the code contains spaces only. NT ~= 0, X ~= NW / D.
+             * #3. Mixed tabs and spaces
              *
              * So #1 returns default, and both #2 and #3, the tab size X can use solve by formula #5.
              */
