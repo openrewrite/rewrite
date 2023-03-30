@@ -119,7 +119,7 @@ public class Autodetect extends NamedStyles {
             int indentDepth;
             int continuationDepth;
         }
-        // depth -> count of whitespace/tab char (4 spaces, 2 tabs, etc) -> count of occurrences
+        // depth -> count of whitespace char (4 spaces, 2 tabs, etc) -> count of occurrences
         Map<DepthCoordinate, Map<Integer, Long>> depthToSpaceIndentFrequencies = new ConcurrentHashMap<>();
 
         public void record(int indentDepth, int continuationDepth, int charCount) {
