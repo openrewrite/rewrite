@@ -269,10 +269,10 @@ public class Autodetect extends NamedStyles {
                 return IntelliJ.tabsAndIndents();
             }
 
-            long d = this.accumulateDepthCount;                                 // D in above comments
+            long d = this.accumulateDepthCount;                     // D in above comments
             long nw = getTotalCharCount(spaceIndentFrequencies);    // NW in above comments
             long nt = getTotalCharCount(tabIndentFrequencies);      // NT in above comments
-            double pt = nt / (double) d;                                        // PT in above comments
+            double pt = nt / (double) d;                            // PT in above comments
             final double TAB_PORTION_THRESHOLD = 0.8;
 
             boolean useTabs = pt >= 0.5;
