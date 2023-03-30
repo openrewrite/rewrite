@@ -28,6 +28,7 @@ jobs:
       ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
   test-downstream:
+    needs: build
     strategy:
       fail-fast: false
       matrix:
