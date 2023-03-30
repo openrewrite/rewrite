@@ -22,8 +22,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.java.ChangeType;
 
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -66,12 +64,12 @@ public class StandardizeNullabilityAnnotations extends Recipe {
     ).collect(Collectors.toSet());
 
     @Option(displayName = "Nullable Annotation to use",
-            description = "All other nullable annotations will be replaced by this one",
+            description = "All other nullable annotations will be replaced by this one.",
             example = "javax.annotation.Nullable")
     String nullableAnnotation;
 
     @Option(displayName = "Non-null annotation to use",
-            description = "All other non-null annotations will be replaced by this one",
+            description = "All other non-null annotations will be replaced by this one.",
             example = "javax.annotation.Nonnull")
     String nonNullAnnotation;
 

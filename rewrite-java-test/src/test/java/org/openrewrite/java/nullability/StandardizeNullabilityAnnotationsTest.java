@@ -6,7 +6,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.openrewrite.java.Assertions.java;
 
 class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
@@ -17,61 +17,243 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
     @Test
     void removesImportIfNecessaryNullable() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package org.openrewrite.internal.lang;
+                          
+            import javax.annotation.Nullable;
+                          
+            class Test {
+              @javax.annotation.Nullable
+              String variable;
+            }
+            """,
+
+          """
+            package org.openrewrite.internal.lang;
+              
+            class Test {
+              @Nullable
+              String variable;
+            }
+            """));
     }
 
     @Test
     void removesImportIfNecessaryNonNull() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package org.openrewrite.internal.lang;
+                          
+            import javax.annotation.Nonnull;
+                          
+            class Test {
+              @Nonnull
+              String variable = "";
+            }
+            """,
+
+          """
+            package org.openrewrite.internal.lang;
+              
+            class Test {
+              @NonNull
+              String variable = "";
+            }
+            """));
     }
 
     @Test
     void addsImportIfNecessaryNullable() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package javax.annotation;
+                          
+            class Test {
+              @Nullable
+              String variable = "";
+            }
+            """,
+
+          """
+            package javax.annotation;
+              
+            import org.openrewrite.internal.lang.Nullable;
+              
+            class Test {
+              @Nullable
+              String variable;
+            }
+            """));
     }
 
     @Test
     void addsImportIfNecessaryNonNull() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package javax.annotation;
+                          
+            class Test {
+              @Nonnull
+              String variable = "";
+            }
+            """,
+
+          """
+            package javax.annotation;
+              
+            import org.openrewrite.internal.lang.NonNull;
+              
+            class Test {
+              @NonNull
+              String variable = "";
+            }
+            """));
     }
 
     @Test
     void doesNotAddImportIfUnnecessaryNullable() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package org.openrewrite.internal.lang;
+                          
+            import javax.annotation.Nullable;
+                          
+            class Test {
+              @javax.annotation.Nullable
+              String variable;
+            }
+            """,
+
+          """
+            package org.openrewrite.internal.lang;
+              
+            class Test {
+              @Nullable
+              String variable;
+            }
+            """));
     }
 
     @Test
     void doesNotAddImportIfUnnecessaryNonNull() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package org.openrewrite.internal.lang;
+                          
+            import javax.annotation.Nonnull;
+                          
+            class Test {
+              @Nonnull
+              String variable = "";
+            }
+            """,
+
+          """
+            package org.openrewrite.internal.lang;
+              
+            class Test {
+              @NonNull
+              String variable = "";
+            }
+            """));
     }
 
     @Test
     void unchangedWhenNoNullabilityAnnotationWasUsed() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+          class Test {
+            String variable = "";
+          }
+          """));
     }
 
     @Test
     void unchangedWhenOnlyTheConfiguredNullabilityAnnotationsWereUsed() {
-        fail("not yet implemented");
+        rewriteRun(java("""            
+          import org.openrewrite.internal.lang.NonNull;
+          import org.openrewrite.internal.lang.Nullable;
+                          
+          class Test {
+            @NonNull
+            String nonNullVariable = "";
+            
+            @Nullable
+            String nullableVariable;
+          }
+          """));
     }
 
     @Test
     void replacesAnnotationIfNonConfiguredAnnotationWasUsedNullable() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package org.openrewrite.java.nullability;
+                          
+            import javax.annotation.Nullable;
+                          
+            class Test {
+              @Nullable
+              String variable;
+            }
+            """,
+
+          """
+            package org.openrewrite.java.nullability;
+              
+            import org.openrewrite.internal.lang.Nullable;
+              
+            class Test {
+              @Nullable
+              String variable;
+            }
+            """));
     }
 
     @Test
     void replacesAnnotationIfNonConfiguredAnnotationWasUsedNonNull() {
-        fail("not yet implemented");
+        rewriteRun(java("""
+            package org.openrewrite.java.nullability;
+                          
+            import javax.annotation.Nonnull;
+                          
+            class Test {
+              @Nonnull
+              String variable = "";
+            }
+            """,
+
+          """
+            package org.openrewrite.java.nullability;
+              
+            import org.openrewrite.internal.lang.NonNull;
+              
+            class Test {
+              @NonNull
+              String variable = "";
+            }
+            """));
     }
 
     @Test
     void replacesAllAnnotationsIfDifferentNonConfiguredAnnotationWereUsed() {
-        fail("not yet implemented");
-    }
-
-    @Test
-    void recipeIsIdempotent() {
-        fail("not yet implemented");
+        rewriteRun(java("""        
+            import javax.annotation.Nonnull;
+            import jakarta.annotation.Nullable;    
+          import org.openrewrite.internal.lang.NonNull;
+          import org.openrewrite.internal.lang.Nullable;
+                          
+          class Test {
+            @NonNull
+            String nonNullVariable = "";
+            
+            @Nullable
+            String nullableVariable;
+          }
+          """, """
+          import org.openrewrite.internal.lang.NonNull;
+          import org.openrewrite.internal.lang.Nullable;
+                          
+          class Test {
+            @NonNull
+            String nonNullVariable = "";
+            
+            @Nullable
+            String nullableVariable;
+          }
+          """));
     }
 }
