@@ -49,7 +49,7 @@ public class UseStandardCharset extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.nio.charset.Charset");
+        return new UsesType<>("java.nio.charset.Charset", false);
     }
 
     @Override

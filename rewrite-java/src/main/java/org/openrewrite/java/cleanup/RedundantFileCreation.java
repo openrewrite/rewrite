@@ -38,7 +38,7 @@ public class RedundantFileCreation extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.io.FileInputStream");
+        return new UsesType<>("java.io.FileInputStream", true);
     }
 
     @Override

@@ -59,9 +59,9 @@ public class NoDoubleBraceInitialization extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesType<>("java.util.Map"));
-                doAfterVisit(new UsesType<>("java.util.List"));
-                doAfterVisit(new UsesType<>("java.util.Set"));
+                doAfterVisit(new UsesType<>("java.util.Map", false));
+                doAfterVisit(new UsesType<>("java.util.List", false));
+                doAfterVisit(new UsesType<>("java.util.Set", false));
                 return cu;
             }
         };
@@ -165,8 +165,14 @@ public class NoDoubleBraceInitialization extends Recipe {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
                 if (mi.getMethodType() != null && identifier.getFieldType() != null && mi.getSelect() == null
                         || (mi.getSelect() instanceof J.Identifier && "this".equals(((J.Identifier) mi.getSelect()).getSimpleName()))) {
+                    if (identifier.getFieldType() == null) {
+                        return mi;
+                    }
                     JavaType rawFieldType = identifier.getFieldType().getType();
                     rawFieldType = rawFieldType instanceof JavaType.Parameterized ? ((JavaType.Parameterized) rawFieldType).getType() : rawFieldType;
+                    if (mi.getMethodType() == null) {
+                        return mi;
+                    }
                     JavaType rawMethodDeclaringType = mi.getMethodType().getDeclaringType();
                     rawMethodDeclaringType = rawMethodDeclaringType instanceof JavaType.Parameterized ? ((JavaType.Parameterized) rawMethodDeclaringType).getType() : rawMethodDeclaringType;
 

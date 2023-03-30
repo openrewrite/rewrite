@@ -81,9 +81,9 @@ public class ChangePackage extends Recipe {
                     }
                 }
                 if (recursive != null && recursive) {
-                    doAfterVisit(new UsesType<>(oldPackageName + "..*"));
+                    doAfterVisit(new UsesType<>(oldPackageName + "..*", false));
                 } else {
-                    doAfterVisit(new UsesType<>(oldPackageName + ".*"));
+                    doAfterVisit(new UsesType<>(oldPackageName + ".*", false));
                 }
                 return cu;
             }

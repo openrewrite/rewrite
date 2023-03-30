@@ -39,7 +39,7 @@ public class ExecutionContextParameterName extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("org.openrewrite.Recipe");
+        return new UsesType<>("org.openrewrite.Recipe", false);
     }
 
     @Override

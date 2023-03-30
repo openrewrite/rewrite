@@ -44,7 +44,7 @@ public class FindRecipes extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("org.openrewrite.Recipe");
+        return new UsesType<>("org.openrewrite.Recipe", false);
     }
 
     @Override

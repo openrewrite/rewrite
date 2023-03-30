@@ -53,9 +53,9 @@ public class AtomicPrimitiveEqualsUsesGet extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicBoolean"));
-                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicInteger"));
-                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicLong"));
+                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicBoolean", true));
+                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicInteger", true));
+                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicLong", true));
                 return cu;
             }
         };
