@@ -28,3 +28,8 @@ recipeList:
       version: 1.x
       onlyIfUsing: javax.annotation.*
       acceptTransitive: "True"
+  - org.openrewrite.gradle.AddDependency:
+      groupId: javax.annotation
+      artifactId: javax.annotation-api
+      version: 1.x
+      onlyIfUsing: javax.annotation.*
