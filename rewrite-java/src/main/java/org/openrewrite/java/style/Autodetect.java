@@ -119,7 +119,7 @@ public class Autodetect extends NamedStyles {
             int indentDepth;
             int continuationDepth;
         }
-        // depth -> count of whitespace char (4 spaces, 2 tabs, etc) -> count of occurrences
+        // depth -> count of whitespace/tab char (4 spaces, 2 tabs, etc) -> count of occurrences
         Map<DepthCoordinate, Map<Integer, Long>> depthToSpaceIndentFrequencies = new ConcurrentHashMap<>();
 
         public void record(int indentDepth, int continuationDepth, int charCount) {
@@ -194,9 +194,7 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistic spaceContinuationIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
-        private int linesWithSpaceIndents = 0;
-        private int linesWithTabIndents = 0;
-
+        private long accumulateDepthCount = 0;
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
 
@@ -228,22 +226,95 @@ public class Autodetect extends NamedStyles {
             continuationDepth--;
         }
 
-        public boolean isIndentedWithSpaces() {
-            return linesWithSpaceIndents >= linesWithTabIndents;
-        }
-
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
-            boolean useTabs = !isIndentedWithSpaces();
+            /**
+             * For each line, if the code follows an indentation style exactly,
+             * Assume :
+             *      1. nw = white space count in prefix
+             *      2. nt = tabs count in prefix
+             *      3. d = block depth
+             *      4. X = tabSize, which means  white space count per tab, unknown to be solved here.
+             * So theoretically the formula is:
+             *          d = nt + (nw / X)                                                                   (1)
+             *          X = nw / (d - nt)                                                                   (2)
+             * Because this is a linear equation, it also applies to the sum of multiple values, that is:
+             *          d1 + d2 + .. + dn = (nt1 + nt2 + .. + ntn) + (nw1 +nw2 + ... + nwn) / X             (3)
+             * So let's define:
+             * D = d1 + d2 + .. + dn, which is the total count of depth.
+             * NT = nt1 + nt2 + .. + ntn, which is the total count of tabs.
+             * NW = nw1 +nw2 + ... + nwn, which is the total count of white spaces.
+             * So
+             *          D = NT + (NW / X)                                                                   (4)
+             *          X = NW / (D - NT)                                                                   (5)
+             * the more data (more lines of code), the more accuracy.
+             *
+             * (1) How to determine the `useTabs` boolean value?
+             * From formula #4, D is composed of two parts, the Tabs part (NT) and the white spaces part (NW / X).
+             * so `useTabs` should be determined by which part is bigger (> 50%).
+             * define: PT = (NT / D), which means the percentage of tabs.
+             * So `useTabs = PT > 0.5`
+             *
+             * (2) Details to solve X via formula (5)
+             * There are three scenarios here
+             * #1. If the code contains tabs only, D ~= NT, PT ~= 100%, and NW ~= 0, so X = 0/0, it's an unknown value,
+             *      then we use the default value 4. Because small errors exist in reality, it is impossible to strictly
+             *      satisfy the condition of (D - NT) being zero, so we use a threshold here to determine this case.
+             *      let's say PT > 80%.
+             * #2. If the code contains white spaces only. NT ~= 0, X = NW / D.
+             * #3. Mixed tabs and white spaces
+             * Both #2 and #3, the tab size X can use solve by formula #5.
+             */
 
-            IndentStatistic indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
+            long d = this.accumulateDepthCount;         // D in above comments
+            long nw = 0;                                // NW in above comments
+            long nt = 0;                                // NT in above comments
+            double pt;                                  // PT in above comments
+            final double TAB_PORTION_THRESHOLD = 0.8;
+
+            //  spaceIndentFrequencies
+            for (Map.Entry<IndentStatistic.DepthCoordinate, Map<Integer, Long>> entry :  tabIndentFrequencies.depthToSpaceIndentFrequencies.entrySet()) {
+                Map<Integer, Long> tabCountToOccureenceCountMap = entry.getValue();
+                for (Map.Entry<Integer, Long> entry1 : tabCountToOccureenceCountMap.entrySet()) {
+                    int tabCount = entry1.getKey();
+                    long occurrenceCount = entry1.getValue();
+                    nt += (tabCount * occurrenceCount);
+                }
+            }
+
+            for (Map.Entry<IndentStatistic.DepthCoordinate, Map<Integer, Long>> entry :  spaceIndentFrequencies.depthToSpaceIndentFrequencies.entrySet()) {
+                Map<Integer, Long> spaceCountToOccureenceCountMap = entry.getValue();
+                for (Map.Entry<Integer, Long> entry1 : spaceCountToOccureenceCountMap.entrySet()) {
+                    int spaceCount = entry1.getKey();
+                    long occurrenceCount = entry1.getValue();
+                    nw += (spaceCount * occurrenceCount);
+                }
+            }
+
+            if (d == 0) {
+                return IntelliJ.tabsAndIndents();
+            }
+
+            pt = nt / (double) d;
+
+            boolean useTabs = pt >= 0.5;
+            int tabSize;
+            if (pt > TAB_PORTION_THRESHOLD || d == nt) {
+                tabSize = 4;
+            } else {
+                double x =  nw / (double)(d - nt);
+                tabSize = (int) Math.round(x);
+            }
+
+            if (tabSize < 1) {
+                tabSize = 1;
+            }
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
 
-            int indent = indentFrequencies.commonIndent();
-            int continuationIndent = continuationFrequencies.continuationIndent(indent);
+            int continuationIndent = continuationFrequencies.continuationIndent(tabSize);
             return new TabsAndIndentsStyle(
                     useTabs,
-                    indent,
-                    indent,
+                    tabSize,
+                    tabSize,
                     continuationIndent,
                     false,
                     new TabsAndIndentsStyle.MethodDeclarationParameters(
@@ -353,6 +424,14 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Statement visitStatement(Statement statement, IndentStatistics stats) {
+            boolean isInParentheses = getCursor().dropParentUntil(p -> p instanceof J.Block ||
+                                                                       p instanceof JContainer ||
+                                                                       p instanceof J.CompilationUnit).getValue() instanceof JContainer;
+            if (isInParentheses) {
+                // ignore statements in parentheses.
+                return statement;
+            }
+
             countIndents(statement.getPrefix().getWhitespace(), false, stats);
             return statement;
         }
@@ -421,20 +500,13 @@ public class Autodetect extends NamedStyles {
                     }
                 }
                 if (spaceIndent > 0 || tabIndent > 0) {
-                    if (!mixed) {
-                        if(isContinuation) {
-                            stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
-                            stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
-                        } else {
-                            stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
-                            stats.tabIndentFrequencies.record(depth, 0, tabIndent);
-                        }
-                    }
-
-                    if (spaceIndent > tabIndent) {
-                        stats.linesWithSpaceIndents++;
-                    } else {
-                        stats.linesWithTabIndents++;
+                    if (!isContinuation) {
+                        stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
+                        stats.tabIndentFrequencies.record(depth, 0, tabIndent);
+                        stats.accumulateDepthCount += depth;
+                    } else if (!mixed) {
+                        stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
+                        stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
                     }
                 }
             }
