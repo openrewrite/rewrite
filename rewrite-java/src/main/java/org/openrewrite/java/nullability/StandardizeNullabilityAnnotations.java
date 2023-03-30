@@ -20,12 +20,49 @@ import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.java.ChangeType;
+
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 
 @Value
 @NonNullApi
 @EqualsAndHashCode(callSuper = false)
 public class StandardizeNullabilityAnnotations extends Recipe {
+
+    private static final Set<String> KNOWN_NULLABLE_ANNOTATIONS = new LinkedHashSet<>(Arrays.asList(
+            "javax.annotation.Nullable",
+            "jakarta.annotation.Nullable",
+            "org.eclipse.jdt.annotation.Nullable",
+            "org.jetbrains.annotations.Nullable",
+            "org.netbeans.api.annotations.common.NullAllowed",
+            "androidx.annotation.Nullable",
+            "android.support.annotation.Nullable",
+            "org.checkerframework.checker.nullness.qual.Nullable",
+            "edu.umd.cs.findbugs.annotations.Nullable",
+            "org.springframework.lang.Nullable",
+            "org.jmlspecs.annotation.Nullable",
+            "org.openrewrite.internal.lang.Nullable",
+            "lombok.NonNull"
+    ));
+
+    private static final Set<String> KNOWN_NON_NULL_ANNOTATIONS = new LinkedHashSet<>(Arrays.asList(
+            "javax.annotation.Nonnull",
+            "jakarta.annotation.Nonnull",
+            "org.eclipse.jdt.annotation.NonNull",
+            "org.jetbrains.annotations.NotNull",
+            "org.netbeans.api.annotations.common.NonNull",
+            "androidx.annotation.NonNull",
+            "android.support.annotation.NonNull",
+            "org.checkerframework.checker.nullness.qual.NonNull",
+            "edu.umd.cs.findbugs.annotations.NonNull",
+            "org.springframework.lang.NonNull",
+            "org.jmlspecs.annotation.NonNull",
+            "org.openrewrite.internal.lang.NonNull"
+    ));
 
     @Option(displayName = "Nullable Annotation to use",
             description = "All other nullable annotations will be replaced by this one",
@@ -37,6 +74,13 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             example = "javax.annotation.Nonnull")
     String nonNullAnnotation;
 
+    public StandardizeNullabilityAnnotations(String nullableAnnotation, String nonNullAnnotation) {
+        this.nullableAnnotation = nullableAnnotation;
+        this.nonNullAnnotation = nonNullAnnotation;
+        getNullableAnnotationToReplace().forEach(annotation -> doNext(new ChangeType(annotation, nullableAnnotation, true)));
+        getNonNullAnnotationToReplace().forEach(annotation -> doNext(new ChangeType(annotation, nonNullAnnotation, true)));
+    }
+
     @Override
     public String getDisplayName() {
         return "Standardize nullability annotations";
@@ -45,5 +89,13 @@ public class StandardizeNullabilityAnnotations extends Recipe {
     @Override
     public String getDescription() {
         return "Define one null and one non-null annotation to be used. All divergent annotations will be replaced.";
+    }
+
+    private Set<String> getNullableAnnotationToReplace() {
+        return KNOWN_NULLABLE_ANNOTATIONS.stream().filter(annotation -> !nullableAnnotation.equals(annotation)).collect(Collectors.toSet());
+    }
+
+    private Set<String> getNonNullAnnotationToReplace() {
+        return KNOWN_NULLABLE_ANNOTATIONS.stream().filter(annotation -> !nullableAnnotation.equals(annotation)).collect(Collectors.toSet());
     }
 }
