@@ -34,20 +34,16 @@ public class SuspendLambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class A {
-                suspend fun example(
-                  title: String,
-                  verifyUnique: suspend (String) -> Boolean
-                ): String = TODO()
-            }
+            suspend fun example(
+              title: String,
+              verifyUnique: suspend (String) -> Boolean
+            ): String = TODO()
             """,
             """            
-            class A {
-                suspend fun example(
-                  title: String,
-                  verifyUnique: suspend (String) -> Boolean
-                ): String = TODO()
-            }
+            suspend fun example(
+              title: String,
+              verifyUnique: suspend (String) -> Boolean
+            ): String = TODO()
             """
           )
         );
