@@ -265,36 +265,15 @@ public class Autodetect extends NamedStyles {
              * Both #2 and #3, the tab size X can use solve by formula #5.
              */
 
-            long d = this.accumulateDepthCount;         // D in above comments
-            long nw = 0;                                // NW in above comments
-            long nt = 0;                                // NT in above comments
-            double pt;                                  // PT in above comments
-            final double TAB_PORTION_THRESHOLD = 0.8;
-
-            //  spaceIndentFrequencies
-            for (Map.Entry<IndentStatistic.DepthCoordinate, Map<Integer, Long>> entry :  tabIndentFrequencies.depthToSpaceIndentFrequencies.entrySet()) {
-                Map<Integer, Long> tabCountToOccureenceCountMap = entry.getValue();
-                for (Map.Entry<Integer, Long> entry1 : tabCountToOccureenceCountMap.entrySet()) {
-                    int tabCount = entry1.getKey();
-                    long occurrenceCount = entry1.getValue();
-                    nt += (tabCount * occurrenceCount);
-                }
-            }
-
-            for (Map.Entry<IndentStatistic.DepthCoordinate, Map<Integer, Long>> entry :  spaceIndentFrequencies.depthToSpaceIndentFrequencies.entrySet()) {
-                Map<Integer, Long> spaceCountToOccureenceCountMap = entry.getValue();
-                for (Map.Entry<Integer, Long> entry1 : spaceCountToOccureenceCountMap.entrySet()) {
-                    int spaceCount = entry1.getKey();
-                    long occurrenceCount = entry1.getValue();
-                    nw += (spaceCount * occurrenceCount);
-                }
-            }
-
-            if (d == 0) {
+            if (this.accumulateDepthCount == 0) {
                 return IntelliJ.tabsAndIndents();
             }
 
-            pt = nt / (double) d;
+            long d = this.accumulateDepthCount;                                 // D in above comments
+            long nw = getTotalCharCount(spaceIndentFrequencies);    // NW in above comments
+            long nt = getTotalCharCount(tabIndentFrequencies);      // NT in above comments
+            double pt = nt / (double) d;                                        // PT in above comments
+            final double TAB_PORTION_THRESHOLD = 0.8;
 
             boolean useTabs = pt >= 0.5;
             int tabSize;
@@ -321,6 +300,14 @@ public class Autodetect extends NamedStyles {
                             multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
             );
         }
+    }
+
+    private static long getTotalCharCount(IndentStatistic indentStatistic) {
+        return indentStatistic.depthToSpaceIndentFrequencies.entrySet()
+            .stream()
+            .flatMap(entry -> entry.getValue().entrySet().stream())
+            .mapToLong(entry -> entry.getKey() * entry.getValue())
+            .sum();
     }
 
     private static class FindLineFormatJavaVisitor extends JavaIsoVisitor<GeneralFormatStatistics> {
