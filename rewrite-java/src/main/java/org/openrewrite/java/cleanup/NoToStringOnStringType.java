@@ -18,7 +18,6 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
@@ -59,13 +58,11 @@ public class NoToStringOnStringType extends Recipe {
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-            private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
-
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
-                if (TO_STRING.matches(mi)) {
-                    return mi.withTemplate(t, mi.getCoordinates().replace(), mi.getSelect());
+                if (mi.getSelect() != null && TO_STRING.matches(mi)) {
+                    return mi.getSelect().withPrefix(mi.getPrefix());
                 }
                 return mi;
             }
