@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
