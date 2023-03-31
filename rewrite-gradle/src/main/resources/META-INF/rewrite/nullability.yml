@@ -15,19 +15,13 @@
 #
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.java.nullability.UseJavaxNullabilityAnnotations
+name: org.openrewrite.gradle.java.UseJavaxNullabilityAnnotations
 displayName: Use javax nullability annotations
 description: Replace other well known Java nullability annotations with javax.
 recipeList:
-  - org.openrewrite.java.nullability.StandardizeNullabilityAnnotations:
-    nullableAnnotation: javax.annotation.Nullable
-    nonNullAnnotation: javax.annotation.Nonnull
-  - org.openrewrite.maven.AddDependency:
-      groupId: javax.annotation
-      artifactId: javax.annotation-api
-      version: 1.x
-      onlyIfUsing: javax.annotation.*
-      acceptTransitive: "True"
+  - org.openrewrite.java.StandardizeNullabilityAnnotations:
+      nullableAnnotation: javax.annotation.Nullable
+      nonNullAnnotation: javax.annotation.Nonnull
   - org.openrewrite.gradle.AddDependency:
       groupId: javax.annotation
       artifactId: javax.annotation-api

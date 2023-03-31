@@ -1,4 +1,4 @@
-package org.openrewrite.java.nullability;
+package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.lang.NonNull;

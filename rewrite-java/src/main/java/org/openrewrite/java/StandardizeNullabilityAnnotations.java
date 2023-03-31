@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.nullability;
+package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.NonNullApi;
-import org.openrewrite.java.ChangeType;
 
 import java.util.Set;
 import java.util.stream.Collectors;
