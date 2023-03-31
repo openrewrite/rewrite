@@ -793,7 +793,7 @@ public class MavenPomDownloader {
                     "HTTP " + responseCode;
         }
 
-        public boolean isAccessDenid() {
+        public boolean isAccessDenied() {
             return isClientSideException() && responseCode != 404;
         }
     }
