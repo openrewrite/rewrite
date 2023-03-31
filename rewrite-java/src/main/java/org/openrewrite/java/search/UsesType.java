@@ -25,9 +25,11 @@ import java.util.regex.Pattern;
 
 public class UsesType<P> extends JavaIsoVisitor<P> {
     private final Pattern typePattern;
+
+    @Nullable
     private final Boolean includeImplicit;
 
-    public UsesType(String fullyQualifiedType, Boolean includeImplicit) {
+    public UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit) {
         this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
         this.includeImplicit = includeImplicit;
     }
