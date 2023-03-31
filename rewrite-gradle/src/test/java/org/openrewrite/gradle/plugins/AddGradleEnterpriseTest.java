@@ -17,6 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.groovy.tree.G.CompilationUnit;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
@@ -37,9 +38,7 @@ class AddGradleEnterpriseTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddGradleEnterprise("3.x"
-//          , null, null, null, null
-        ));
+        spec.recipe(new AddGradleEnterprise("3.x", null, null, null, null, null));
     }
 
     private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
@@ -168,6 +167,63 @@ class AddGradleEnterpriseTest implements RewriteTest {
               rootProject.name = 'my-project'
               """
             )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2697")
+    @Test
+    void withConfigurationInSettings() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddGradleEnterprise("3.x", "https://ge.sam.com/", true, true, true, AddGradleEnterprise.PublishCriteria.Always)),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            "",
+            interpolateResolvedVersion("""
+              plugins {
+                  id 'com.gradle.enterprise' version '%s'
+              }
+              gradleEnterprise {
+                  server = 'https://ge.sam.com/'
+                  allowUntrustedServer = true
+                  buildScan {
+                      publishAlways()
+                      uploadInBackground = true
+                      capture {
+                          taskInputFiles = true
+                      }
+                  }
+              }
+              """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2697")
+    @Test
+    void withConfigurationOldInputCapture() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddGradleEnterprise("3.6", null, null, true, null, null)),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            "",
+            """
+              plugins {
+                  id 'com.gradle.enterprise' version '3.6'
+              }
+              gradleEnterprise {
+                  buildScan {
+                      captureTaskInputFiles = true
+                  }
+              }
+              """
           )
         );
     }

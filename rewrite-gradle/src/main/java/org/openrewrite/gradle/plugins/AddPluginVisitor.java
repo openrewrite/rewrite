@@ -55,22 +55,27 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     @Nullable
     String versionPattern;
 
+    public static Optional<String> resolvePluginVersion(String pluginId, @Nullable String newVersion, @Nullable String versionPattern, ExecutionContext ctx) {
+        Optional<String> version;
+        if (newVersion == null) {
+            version = Optional.empty();
+        } else {
+            VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+            assert versionComparator != null;
+
+            if (versionComparator instanceof ExactVersion) {
+                version = versionComparator.upgrade("0", singletonList(newVersion));
+            } else {
+                version = versionComparator.upgrade("0", availablePluginVersions(pluginId, ctx));
+            }
+        }
+        return version;
+    }
+
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
         if (FindPlugins.find(cu, pluginId).isEmpty()) {
-            Optional<String> version;
-            if (newVersion == null) {
-                version = Optional.empty();
-            } else {
-                VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-                assert versionComparator != null;
-
-                if (versionComparator instanceof ExactVersion) {
-                    version = versionComparator.upgrade("0", singletonList(newVersion));
-                } else {
-                    version = versionComparator.upgrade("0", availablePluginVersions(pluginId, ctx));
-                }
-            }
+            Optional<String> version = resolvePluginVersion(pluginId, newVersion, versionPattern, ctx);
 
             AtomicInteger singleQuote = new AtomicInteger();
             AtomicInteger doubleQuote = new AtomicInteger();
@@ -107,15 +112,14 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .getStatements();
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
+                Space leadingSpace = Space.firstPrefix(cu.getStatements());
                 if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))
                         && !cu.getStatements().isEmpty()
                         && cu.getStatements().get(0) instanceof J.MethodInvocation
                         && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
-                    Space leadingSpace = Space.firstPrefix(cu.getStatements());
                     return cu.withStatements(ListUtils.concatAll(ListUtils.concat(cu.getStatements().get(0), Space.formatFirstPrefix(statements, leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))),
                             Space.formatFirstPrefix(cu.getStatements().subList(1, cu.getStatements().size()), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
                 } else {
-                    Space leadingSpace = Space.firstPrefix(cu.getStatements());
                     return cu.withStatements(ListUtils.concatAll(statements,
                             Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
                 }
