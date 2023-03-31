@@ -70,7 +70,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(annotationType);
+        return new UsesType<>(annotationType, false);
     }
 
     @Override

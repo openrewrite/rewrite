@@ -78,7 +78,7 @@ public class ChangeType extends Recipe {
                 if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
                     return SearchResult.found(cu);
                 }
-                doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName));
+                doAfterVisit(new UsesType<>(oldFullyQualifiedTypeName, true));
                 return cu;
             }
         };

@@ -54,12 +54,12 @@ public class UpperCaseLiteralSuffixes extends Recipe {
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return Applicability.or(
-                new UsesType<>("long"),
-                new UsesType<>("java.lang.Long"),
-                new UsesType<>("double"),
-                new UsesType<>("java.lang.Double"),
-                new UsesType<>("float"),
-                new UsesType<>("java.lang.Float")
+                new UsesType<>("long", false),
+                new UsesType<>("java.lang.Long", false),
+                new UsesType<>("double", false),
+                new UsesType<>("java.lang.Double", false),
+                new UsesType<>("float", false),
+                new UsesType<>("java.lang.Float", false)
         );
     }
 

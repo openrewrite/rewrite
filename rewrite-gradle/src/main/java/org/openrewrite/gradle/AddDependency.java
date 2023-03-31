@@ -126,7 +126,7 @@ public class AddDependency extends Recipe {
             return null;
         }
 
-        return new UsesType<>(onlyIfUsing);
+        return new UsesType<>(onlyIfUsing, true);
     }
 
     @Override
@@ -135,7 +135,7 @@ public class AddDependency extends Recipe {
         for (SourceFile source : before) {
             source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                     source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                        if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
+                        if (source != new UsesType<>(onlyIfUsing, true).visit(source, ctx)) {
                             configurationByProject.compute(javaProject, (jp, configuration) -> "implementation".equals(configuration) ?
                                     configuration :
                                     "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"

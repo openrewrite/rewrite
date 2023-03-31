@@ -16,7 +16,10 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -99,6 +102,34 @@ public class ChangeTypeTest implements RewriteTest {
             spec -> spec.path("file.groovy").afterRecipe(cu -> {
               assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
               assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
+            })
+          )
+        );
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    @ExpectedToFail("fails because there's a reference change but no content diff but that's the point; would need to adjust RewriteTest")
+    @Issue("https://github.com/openrewrite/rewrite/issues/3058")
+    @Test
+    void changeTypeAttributionImplicitUsage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false)),
+          groovy(
+            """
+            import java.util.Collections
+              
+            class Test {
+                int zero = Collections.emptyList().size()
+            }
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();
+                assertThat(TypeUtils.isOfClassType(sizeMi.getMethodType().getDeclaringType(),
+                  "java.util.ArrayList")).isTrue();
+                J.MethodInvocation emptyListMi = (J.MethodInvocation) sizeMi.getSelect();
+                assertThat(TypeUtils.isOfClassType(emptyListMi.getMethodType().getReturnType(),
+                  "java.util.ArrayList")).isTrue();
             })
           )
         );

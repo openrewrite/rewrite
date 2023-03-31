@@ -59,8 +59,8 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesType<>("javax.annotation.CheckForNull"));
-                doAfterVisit(new UsesType<>("javax.annotation.Nullable"));
+                doAfterVisit(new UsesType<>("javax.annotation.CheckForNull", false));
+                doAfterVisit(new UsesType<>("javax.annotation.Nullable", false));
                 return cu;
             }
         };

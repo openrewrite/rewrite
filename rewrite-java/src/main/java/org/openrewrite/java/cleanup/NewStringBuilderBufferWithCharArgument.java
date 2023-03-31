@@ -56,8 +56,8 @@ public class NewStringBuilderBufferWithCharArgument extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         return Applicability.or(
-                new UsesType<>("java.lang.StringBuilder"),
-                new UsesType<>("java.lang.StringBuffer")
+                new UsesType<>("java.lang.StringBuilder", true),
+                new UsesType<>("java.lang.StringBuffer", true)
         );
     }
 

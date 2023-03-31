@@ -51,7 +51,7 @@ public class AvoidBoxedBooleanExpressions extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.lang.Boolean");
+        return new UsesType<>("java.lang.Boolean", true);
     }
 
     @Override

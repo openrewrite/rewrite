@@ -25,9 +25,11 @@ import java.util.regex.Pattern;
 
 public class UsesType<P> extends JavaIsoVisitor<P> {
     private final Pattern typePattern;
+    private final Boolean includeImplicit;
 
-    public UsesType(String fullyQualifiedType) {
+    public UsesType(String fullyQualifiedType, Boolean includeImplicit) {
         this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
+        this.includeImplicit = includeImplicit;
     }
 
     @Override
@@ -35,9 +37,20 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
         JavaSourceFile c = cu;
 
         for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
-            if (method.hasFlags(Flag.Static)) {
+            if (Boolean.TRUE.equals(includeImplicit) || method.hasFlags(Flag.Static)) {
                 if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
                     return c;
+                }
+            }
+            if (Boolean.TRUE.equals(includeImplicit)) {
+                if ((c = maybeMark(c, method.getReturnType())) != cu) {
+                    return c;
+                }
+
+                for (JavaType parameterType : method.getParameterTypes()) {
+                    if ((c = maybeMark(c, parameterType)) != cu) {
+                        return c;
+                    }
                 }
             }
         }

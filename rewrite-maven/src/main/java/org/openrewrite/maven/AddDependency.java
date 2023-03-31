@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
@@ -154,7 +153,7 @@ public class AddDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new UsesType<>(onlyIfUsing);
+        return new UsesType<>(onlyIfUsing, true);
     }
 
     public List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
@@ -162,7 +161,7 @@ public class AddDependency extends Recipe {
         for (SourceFile source : before) {
             source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                     source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                        if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
+                        if (source != new UsesType<>(onlyIfUsing, true).visit(source, ctx)) {
                             scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
                                     scope /* a `compile` scope dependency will also be available in test source set */ :
                                     "test".equals(sourceSet.getName()) ? "test" : "compile"

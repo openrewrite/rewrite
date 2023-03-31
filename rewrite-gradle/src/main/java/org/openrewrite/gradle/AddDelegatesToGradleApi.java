@@ -56,7 +56,7 @@ public class AddDelegatesToGradleApi extends Recipe {
 
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("groovy.lang.Closure");
+        return new UsesType<>("groovy.lang.Closure", true);
     }
 
     @Override
