@@ -340,8 +340,11 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
-            if (c.getVariable() == prior) {
+            if (referToSameElement(prior, c.getVariable())) {
                 after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+            } else if (referToSameElement(prior, c.getIterable())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
             }
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;

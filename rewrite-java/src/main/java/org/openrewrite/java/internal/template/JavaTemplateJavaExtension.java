@@ -225,7 +225,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitExpression(Expression expression, Integer p) {
                 if (loc.equals(EXPRESSION_PREFIX) && expression.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    new Cursor(getCursor(), insertionPoint),
+                                    getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(expression.getPrefix()), p);
