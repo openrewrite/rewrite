@@ -122,7 +122,7 @@ public class ActivateStyle extends Recipe {
                     keyExists.set(true);
                     if(overwriteExistingStyles) {
                         if(!fullyQualifiedStyleName.equals(entry.getValue().getText())) {
-                            entry = entry.withValue(entry.getValue().withText(fullyQualifiedStyleName));
+                            entry = entry.withValue(entry.getValue().withText(fullyQualifiedStyleName).withSource(fullyQualifiedStyleName));
                         }
                     } else {
                         List<String> activeStyles = Arrays.stream(entry.getValue().getText().split(",")).collect(Collectors.toList());
@@ -130,7 +130,8 @@ public class ActivateStyle extends Recipe {
                             return entry;
                         }
                         activeStyles.add(fullyQualifiedStyleName);
-                        entry = entry.withValue(entry.getValue().withText(String.join(",", activeStyles)));
+                        String stylesValue = String.join(",", activeStyles);
+                        entry = entry.withValue(entry.getValue().withText(stylesValue).withSource(stylesValue));
                     }
                 }
                 return entry;
@@ -138,8 +139,8 @@ public class ActivateStyle extends Recipe {
             if(!keyExists.get()) {
                 // Existing key not found, need to add one
                 p = p.withContent(ListUtils.concat(p.getContent(),
-                        new Properties.Entry(randomId(), "\n", Markers.EMPTY, STYLE_KEY, "", Properties.Entry.Delimiter.EQUALS,
-                                new Properties.Value(randomId(), "", Markers.EMPTY, fullyQualifiedStyleName))));
+                        new Properties.Entry(randomId(), "\n", Markers.EMPTY, STYLE_KEY, STYLE_KEY, "", Properties.Entry.Delimiter.EQUALS,
+                                new Properties.Value(randomId(), "", Markers.EMPTY, fullyQualifiedStyleName, fullyQualifiedStyleName))));
             }
             return p;
         }

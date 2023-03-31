@@ -142,6 +142,7 @@ public interface Properties extends Tree {
         String prefix;
         Markers markers;
         String key;
+        String keySource;
         String beforeEquals;
 
         @Nullable
@@ -165,6 +166,12 @@ public interface Properties extends Tree {
 
             Delimiter(Character character) {
                 this.character = character;
+            }
+
+            public static Delimiter getDelimiter(char value) {
+                return '=' == value ? Delimiter.EQUALS :
+                            ':' == value ? Delimiter.COLON :
+                            Delimiter.NONE;
             }
 
             public static Delimiter getDelimiter(String value) {
@@ -195,6 +202,7 @@ public interface Properties extends Tree {
         String prefix;
         Markers markers;
         String text;
+        String source;
     }
 
     @lombok.Value

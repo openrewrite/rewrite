@@ -39,6 +39,23 @@ class FindPropertiesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void valueWithLineContinuation() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("foo", null)),
+          properties(
+            """
+              foo=tr\\
+                ue
+              """,
+            """
+              foo=~~>tr\\
+                ue
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
       "acme.my-project.person.first-name",
@@ -99,6 +116,25 @@ class FindPropertiesTest implements RewriteTest {
               acme.my-project.person.first-name=~~>example
               acme.myProject.person.firstName=example
               acme.my_project.person.first_name=example
+              """
+          )
+        );
+    }
+
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    void propertyKeyWithContinuations() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("enabled", null)),
+          properties(
+            """
+              ena\\
+                  bled = true
+              """,
+            """
+              ena\\
+                  bled = ~~>true
               """
           )
         );

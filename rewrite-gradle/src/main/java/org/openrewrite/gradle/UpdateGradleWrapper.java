@@ -180,8 +180,9 @@ public class UpdateGradleWrapper extends Recipe {
             Properties p = super.visitFile(file, executionContext);
             Set<Properties.Entry> properties = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
             if (properties.isEmpty()) {
-                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());
-                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
+                String hexValue = gradleWrapper.getDistributionChecksum().getHexValue();
+                Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, hexValue, hexValue);
+                Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
                 List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
                 p = ((Properties.File) p).withContent(contentList);
             }
@@ -191,10 +192,12 @@ public class UpdateGradleWrapper extends Recipe {
         @Override
         public Properties visitEntry(Properties.Entry entry, ExecutionContext context) {
             if ("distributionUrl".equals(entry.getKey())) {
-                return entry.withValue(entry.getValue().withText(gradleWrapper.getPropertiesFormattedUrl()));
+                String value = gradleWrapper.getPropertiesFormattedUrl();
+                return entry.withValue(entry.getValue().withText(value).withSource(value));
             }
             if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
-                return entry.withValue(entry.getValue().withText(gradleWrapper.getDistributionChecksum().getHexValue()));
+                String value = gradleWrapper.getDistributionChecksum().getHexValue();
+                return entry.withValue(entry.getValue().withText(value).withSource(value));
             }
             return entry;
         }

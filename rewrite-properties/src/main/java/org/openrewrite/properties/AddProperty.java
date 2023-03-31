@@ -98,10 +98,10 @@ public class AddProperty extends Recipe {
                 if (!StringUtils.isBlank(property) && !StringUtils.isBlank(value)) {
                     Set<Properties.Entry> properties = FindProperties.find(p, property, false);
                     if (properties.isEmpty()) {
-                        Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
+                        Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value, value);
                         Properties.Entry.Delimiter delimitedBy = delimiter != null && !delimiter.isEmpty() ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
                         String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
-                        Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
+                        Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, property, beforeEquals, delimitedBy, propertyValue);
                         List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
                         p = ((Properties.File) p).withContent(contentList);
                     }

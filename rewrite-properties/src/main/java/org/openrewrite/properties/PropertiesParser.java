@@ -34,11 +34,15 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class PropertiesParser implements Parser<Properties.File> {
+
+    private static final Pattern LINE_CONTINUATION_PATTERN = Pattern.compile("\\\\\\R\\s*");
+
     @Override
     public List<Properties.File> parse(@Language("properties") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -83,6 +87,7 @@ public class PropertiesParser implements Parser<Properties.File> {
         for (char c : s.toCharArray()) {
             if (isEscapedNewLine) {
                 if (Character.isWhitespace(c)) {
+                    buff.append(c);
                     continue;
                 } else {
                     isEscapedNewLine = false;
@@ -92,7 +97,7 @@ public class PropertiesParser implements Parser<Properties.File> {
             if (c == '\n') {
                 if (prev == '\\') {
                     isEscapedNewLine = true;
-                    buff.deleteCharAt(buff.length() - 1);
+                    buff.append(c);
                 } else {
                     Properties.Content content = extractContent(buff.toString(), prefix);
                     if (content != null) {
@@ -203,7 +208,8 @@ public class PropertiesParser implements Parser<Properties.File> {
         Properties.Entry.Delimiter delimiter = Properties.Entry.Delimiter.NONE;
         char prev = '$';
         int state = 0;
-        for (char c : line.toCharArray()) {
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
             switch (state) {
                 case 0:
                     if (Character.isWhitespace(c)) {
@@ -217,24 +223,43 @@ public class PropertiesParser implements Parser<Properties.File> {
                             key.append(c);
                             break;
                         } else {
-                            delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
-                            state += 2;
+                            delimiter = Properties.Entry.Delimiter.getDelimiter(c);
+                            state += 3;
+                            break;
                         }
+                    } else if (c == '\\') {
+                        key.append(c);
+                        state++;
+                        break;
                     } else if (!Character.isWhitespace(c)) {
                         key.append(c);
                         break;
                     } else {
-                        state++;
+                        equalsPrefix.append(c);
+                        state += 2;
+                        break;
                     }
                 case 2:
+                    if (Character.isWhitespace(c)) {
+                        trailingWhitespaceBuffer.append(c);
+                        break;
+                    } else {
+                        // multi-word or continuation line value
+                        key.append(trailingWhitespaceBuffer);
+                        trailingWhitespaceBuffer.setLength(0);
+                        key.append(c);
+                        state--;
+                        break;
+                    }
+                case 3:
                     if (Character.isWhitespace(c)) {
                         equalsPrefix.append(c);
                         break;
                     } else if (c == '=' || c == ':') {
-                        delimiter = Properties.Entry.Delimiter.getDelimiter(String.valueOf(c));
+                        delimiter = Properties.Entry.Delimiter.getDelimiter(c);
                     }
                     state++;
-                case 3:
+                case 4:
                     if (c == '=' || c == ':') {
                         continue;
                     } else if (Character.isWhitespace(c)) {
@@ -242,35 +267,40 @@ public class PropertiesParser implements Parser<Properties.File> {
                         break;
                     }
                     state++;
-                case 4:
+                case 5:
                     if (!Character.isWhitespace(c)) {
                         value.append(c);
                         break;
                     }
                     state++;
-                case 5:
-                    if (!Character.isWhitespace(c)) {
-                        // multi-word value
+                case 6:
+                    if (Character.isWhitespace(c)) {
+                        trailingWhitespaceBuffer.append(c);
+                    } else {
+                        // multi-word or continuation line value
                         value.append(trailingWhitespaceBuffer);
-                        trailingWhitespaceBuffer.delete(0, trailingWhitespaceBuffer.length());
+                        trailingWhitespaceBuffer.setLength(0);
                         value.append(c);
                         state--;
                         break;
-                    } else {
-                        trailingWhitespaceBuffer.append(c);
                     }
             }
             prev = c;
         }
 
+        String keySource = key.toString();
+        String keyValue = LINE_CONTINUATION_PATTERN.matcher(keySource).replaceAll("");
+        String textSource = value.toString();
+        String textValue = LINE_CONTINUATION_PATTERN.matcher(textSource).replaceAll("");
         return new Properties.Entry(
                 randomId(),
                 prefixBuilder.toString(),
                 Markers.EMPTY,
-                key.toString(),
+                keyValue,
+                keySource,
                 equalsPrefix.toString(),
                 delimiter,
-                new Properties.Value(randomId(), valuePrefix.toString(), Markers.EMPTY, value.toString())
+                new Properties.Value(randomId(), valuePrefix.toString(), Markers.EMPTY, textValue, textSource)
         );
     }
 

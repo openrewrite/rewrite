@@ -109,14 +109,18 @@ public class ChangePropertyKey extends Recipe {
                 if (!Boolean.FALSE.equals(relaxedBinding)
                         ? NameCaseConvention.matchesRegexRelaxedBinding(entry.getKey(), oldPropertyKey)
                         : entry.getKey().matches(oldPropertyKey)) {
-                    entry = entry.withKey(entry.getKey().replaceFirst(oldPropertyKey, newPropertyKey))
+                    entry = entry
+                            .withKey(entry.getKey().replaceFirst(oldPropertyKey, newPropertyKey))
+                            .withKeySource(entry.getKeySource().replaceFirst(oldPropertyKey, newPropertyKey))
                             .withPrefix(entry.getPrefix());
                 }
             } else {
                 if (!Boolean.FALSE.equals(relaxedBinding)
                         ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), oldPropertyKey)
                         : entry.getKey().equals(oldPropertyKey)) {
-                    entry = entry.withKey(newPropertyKey)
+                    entry = entry
+                            .withKey(newPropertyKey)
+                            .withKeySource(newPropertyKey)
                             .withPrefix(entry.getPrefix());
                 }
             }
