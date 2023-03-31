@@ -16,6 +16,8 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -67,6 +69,23 @@ class FindSourceFilesTest implements RewriteTest {
             "hello world!",
             "~~>hello world!",
             spec -> spec.path("\\Windows\\hello.txt")
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"hello.txt", "/hello.txt", "\\hello.txt", "./hello.txt", ".\\hello.txt"})
+    void findRoot(String filePattern) {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles(filePattern)),
+          text(
+            "hello world!",
+            "~~>hello world!",
+            spec -> spec.path("hello.txt")
+          ),
+          text(
+            "hello world!",
+            spec -> spec.path("a/hello.txt")
           )
         );
     }

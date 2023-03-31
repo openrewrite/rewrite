@@ -52,8 +52,7 @@ public class FindSourceFiles extends Recipe {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     String sourcePath = sourceFile.getSourcePath().toString();
-                    if (StringUtils.matchesGlob(sourcePath.matches("^\\.?[/\\\\]") ? sourcePath :
-                            "./" + sourcePath, filePattern)) {
+                    if (StringUtils.matchesGlob(sourcePath, normalize(filePattern))) {
                         results.insertRow(ctx, new SourcesFiles.Row(sourcePath));
                         return SearchResult.found(sourceFile);
                     }
@@ -61,5 +60,12 @@ public class FindSourceFiles extends Recipe {
                 return tree;
             }
         };
+    }
+
+    private static String normalize(String filePattern) {
+        while (filePattern.startsWith(".") || filePattern.startsWith("/") || filePattern.startsWith("\\")) {
+            filePattern = filePattern.substring(1);
+        }
+        return filePattern;
     }
 }
