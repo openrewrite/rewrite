@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -412,9 +413,10 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Statement visitStatement(Statement statement, IndentStatistics stats) {
-            boolean isInParentheses = getCursor().dropParentUntil(p -> p instanceof J.Block ||
-                                                                       p instanceof JContainer ||
-                                                                       p instanceof J.CompilationUnit).getValue() instanceof JContainer;
+            boolean isInParentheses = getCursor().dropParentUntil(
+                    p -> p instanceof J.Block ||
+                            p instanceof JContainer ||
+                            p instanceof SourceFile).getValue() instanceof JContainer;
             if (isInParentheses) {
                 // ignore statements in parentheses.
                 return statement;
