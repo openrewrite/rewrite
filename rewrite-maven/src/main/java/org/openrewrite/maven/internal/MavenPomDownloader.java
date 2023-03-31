@@ -738,7 +738,7 @@ public class MavenPomDownloader {
         try {
             return sendRequest.apply(httpSender.get(uriString).build());
         } catch (HttpSenderResponseException retryException) {
-            if (retryException.isAccessDenid()) {
+            if (retryException.isAccessDenied()) {
                 throw originalException;
             } else {
                 throw retryException;
