@@ -151,6 +151,11 @@ public interface RecipeScheduler {
         Recipe recipe = recipeStack.peek();
         assert recipe == runStats.getRecipe() : "Recipe stack should always contain the recipe being run";
 
+        // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
+        // single source applicable tests so that data can be shared at the root (especially for caching
+        // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
+        Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+
         ctx.putCurrentRecipe(recipe);
         if (ctx instanceof WatchableExecutionContext) {
             ((WatchableExecutionContext) ctx).resetHasNewMessages();
@@ -243,6 +248,7 @@ public interface RecipeScheduler {
                     }
 
                     TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+                    visitor.cursor = rootCursor;
 
                     //noinspection unchecked
                     afterFile = (S) visitor.visitSourceFile(s, ctx);
