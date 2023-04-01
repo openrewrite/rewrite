@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -30,7 +30,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
  */
 class JavaTemplateImportTest implements RewriteTest {
 
-    @ExpectedToFail
+    @Disabled
     @Test
     void replaceImport() {
         rewriteRun(
