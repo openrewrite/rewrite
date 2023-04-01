@@ -218,7 +218,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               @Override
               public J visitArrayAccess(J.ArrayAccess arrayAccess, ExecutionContext executionContext) {
                   var t = JavaTemplate.builder(this::getCursor, "Some.method()")
-                    .javaParser(() -> JavaParser.fromJavaVersion()
+                    .javaParser(JavaParser.fromJavaVersion()
                       .dependsOn(
                         """
                           public class Some {
@@ -227,7 +227,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                               }
                           }
                           """
-                      ).build()
+                      )
                     ).build();
 
                   return arrayAccess.withTemplate(t, arrayAccess.getCoordinates().replace());
@@ -259,7 +259,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               public J visitBinary(J.Binary binary, ExecutionContext executionContext) {
                   if (binary.getOperator() == J.Binary.Type.Equal) {
                       var t = JavaTemplate.builder(this::getCursor, "Some.method()")
-                        .javaParser(() -> JavaParser.fromJavaVersion()
+                        .javaParser(JavaParser.fromJavaVersion()
                           .dependsOn(
                             """
                               public class Some {
@@ -268,7 +268,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                                   }
                               }
                               """
-                          ).build()
+                          )
                         ).build();
 
                       return binary.withTemplate(t, binary.getCoordinates().replace());
@@ -299,7 +299,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                   if (literal.getValue().equals("literal")) {
                       var t = JavaTemplate.builder(this::getCursor, "Some.method()")
-                        .javaParser(() -> JavaParser.fromJavaVersion()
+                        .javaParser(JavaParser.fromJavaVersion()
                           .dependsOn(
                             """
                               public class Some {
@@ -308,7 +308,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                                   }
                               }
                               """
-                          ).build()
+                          )
                         ).build();
 
                       return literal.withTemplate(t, literal.getCoordinates().replace());
@@ -340,7 +340,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               public J visitNewArray(J.NewArray newArray, ExecutionContext executionContext) {
                   if (((J.Literal) newArray.getDimensions().get(0).getIndex()).getValue().equals(1)) {
                       var t = JavaTemplate.builder(this::getCursor, "Some.method()")
-                        .javaParser(() -> JavaParser.fromJavaVersion()
+                        .javaParser(JavaParser.fromJavaVersion()
                           .logCompilationWarningsAndErrors(true)
                           .dependsOn("""
                                 public class Some {
@@ -348,7 +348,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
                                         return new int[0];
                                     }
                                 }
-                            """).build()
+                            """)
                         ).build();
                       return newArray.withTemplate(t, newArray.getCoordinates().replace());
                   }
@@ -379,10 +379,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
               public J visitTernary(J.Ternary ternary, ExecutionContext executionContext) {
                   var t = JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any()})")
                     .imports("java.util.Arrays")
-                    .javaParser(() -> JavaParser.fromJavaVersion()
-                      .logCompilationWarningsAndErrors(true)
-                      .build()
-                    ).build();
+                    .build();
                   maybeAddImport("java.util.Arrays");
                   return ternary.withTemplate(t, ternary.getCoordinates().replace(), ternary);
               }

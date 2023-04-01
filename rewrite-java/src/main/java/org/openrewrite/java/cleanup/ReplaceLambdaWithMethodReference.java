@@ -109,7 +109,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                             "package " + fullyQualified.getPackageName() + "; public class " +
                                     fullyQualified.getClassName();
                     JavaTemplate template = JavaTemplate.builder(this::getCursor, code)
-                            .javaParser(() -> JavaParser.fromJavaVersion().dependsOn(stub).build())
+                            .javaParser(JavaParser.fromJavaVersion().dependsOn(stub))
                             .imports(fullyQualified == null ? "" : fullyQualified.getFullyQualifiedName()).build();
                     return l.withTemplate(template, l.getCoordinates().replace(), identifier.getSimpleName());
                 } else if (body instanceof J.Binary) {
