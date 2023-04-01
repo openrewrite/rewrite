@@ -57,14 +57,14 @@ public class JavaTemplateParser {
     @Language("java")
     private static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
 
-    private final Supplier<JavaParser> parser;
+    private final JavaParser.Builder<?, ?> parser;
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
-    public JavaTemplateParser(Supplier<JavaParser> parser, Consumer<String> onAfterVariableSubstitution,
+    public JavaTemplateParser(JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
                               Consumer<String> onBeforeParseTemplate, Set<String> imports) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
@@ -240,8 +240,8 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         return stub.contains("@SubAnnotation") ?
-                parser.get().reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
-                parser.get().reset().parse(ctx, stub).get(0);
+                parser.build().reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
+                parser.build().reset().parse(ctx, stub).get(0);
     }
 
     @SuppressWarnings("unchecked")

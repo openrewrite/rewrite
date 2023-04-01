@@ -150,9 +150,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 }
                 return JavaTemplate
                         .builder(() -> statementCursor, methodInvocationTemplate)
-                        .javaParser(() -> JavaParser.fromJavaVersion()
-                                .dependsOn(methodStub)
-                                .build())
+                        .javaParser(JavaParser.fromJavaVersion().dependsOn(methodStub))
                         .imports(newClass)
                         .build();
             }

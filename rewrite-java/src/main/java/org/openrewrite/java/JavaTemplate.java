@@ -44,13 +44,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(Supplier<Cursor> parentScopeGetter, Supplier<JavaParser> parser, String code, Set<String> imports,
+    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
+        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
     }
 
     public String getCode() {
@@ -127,7 +127,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
-        private Supplier<JavaParser> javaParser = () -> JavaParser.fromJavaVersion().build();
+        private JavaParser.Builder<?, ?> javaParser = JavaParser.fromJavaVersion();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
         };
@@ -168,7 +168,29 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return true;
         }
 
+        /**
+         * A bridge for backwards compatibility of {@link #javaParser(Supplier)}.
+         */
+        private static class SupplierJavaParserBuilder extends JavaParser.Builder<JavaParser, SupplierJavaParserBuilder> {
+            private final Supplier<JavaParser> supplier;
+
+            SupplierJavaParserBuilder(Supplier<JavaParser> supplier) {
+                this.supplier = supplier;
+            }
+
+            @Override
+            public JavaParser build() {
+                return supplier.get();
+            }
+        }
+
+        @Deprecated
         public Builder javaParser(Supplier<JavaParser> javaParser) {
+            this.javaParser = new SupplierJavaParserBuilder(javaParser);
+            return this;
+        }
+
+        public Builder javaParser(JavaParser.Builder<?, ?> javaParser) {
             this.javaParser = javaParser;
             return this;
         }
