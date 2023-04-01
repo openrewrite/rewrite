@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.internal.template;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -246,10 +248,16 @@ public class JavaTemplateParser {
     private <J2 extends J> List<J2> cache(String stub, Supplier<List<? extends J>> ifAbsent) {
         List<J2> js;
         synchronized (templateCacheLock) {
+            Timer.Sample sample = Timer.start();
             js = (List<J2>) templateCache.get(stub);
             if (js == null) {
                 js = (List<J2>) ifAbsent.get();
                 templateCache.put(stub, js);
+                sample.stop(Timer.builder("rewrite.template.cache").tag("result", "miss")
+                        .register(Metrics.globalRegistry));
+            } else {
+                sample.stop(Timer.builder("rewrite.template.cache").tag("result", "hit")
+                        .register(Metrics.globalRegistry));
             }
         }
         return ListUtils.map(js, j -> (J2) new RandomizeIdVisitor<Integer>().visit(j, 0));
