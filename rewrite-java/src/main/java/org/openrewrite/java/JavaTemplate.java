@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
@@ -26,7 +27,6 @@ import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.template.SourceTemplate;
 
 import java.lang.reflect.InvocationTargetException;
@@ -67,10 +67,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Substitutions substitutions = new Substitutions(code, parameters);
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
-
-        Tree insertionPoint = coordinates.getTree();
-        Location loc = coordinates.getSpaceLocation();
-        JavaCoordinates.Mode mode = coordinates.getMode();
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
 
@@ -114,7 +110,33 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     @Incubating(since = "7.38.0")
     public boolean matches(J tree) {
-        return JavaTemplateSemanticallyEqual.matchesTemplate(this, tree);
+        return matcher(tree).find();
+    }
+
+    @Incubating(since = "7.38.0")
+    public Matcher matcher(J tree) {
+        return new Matcher(tree);
+    }
+
+    @Incubating(since = "7.38.0")
+    @Value
+    public class Matcher {
+        J tree;
+        @NonFinal
+        JavaTemplateSemanticallyEqual.TemplateMatchResult matchResult;
+
+        Matcher(J tree) {
+            this.tree = tree;
+        }
+
+        public boolean find() {
+            matchResult = JavaTemplateSemanticallyEqual.matchesTemplate(JavaTemplate.this, tree);
+            return matchResult.isMatch();
+        }
+
+        public J parameter(int i) {
+            return matchResult.getMatchedParameters().get(i);
+        }
     }
 
     public static Builder builder(Supplier<Cursor> parentScope, String code) {

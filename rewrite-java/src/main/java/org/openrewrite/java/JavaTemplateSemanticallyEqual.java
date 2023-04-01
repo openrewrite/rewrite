@@ -35,7 +35,13 @@ import static org.openrewrite.Tree.randomId;
 
 class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
 
-    static boolean matchesTemplate(JavaTemplate template, J input) {
+    @Value
+    static class TemplateMatchResult {
+        boolean match;
+        List<J> matchedParameters;
+    }
+
+    static TemplateMatchResult matchesTemplate(JavaTemplate template, J input) {
         JavaCoordinates coordinates;
         if (input instanceof Expression) {
             coordinates = ((Expression) input).getCoordinates().replace();
@@ -47,7 +53,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
 
         J[] parameters = createTemplateParameters(template.getCode());
         J templateTree = template.withTemplate(input, coordinates, parameters);
-        return matchesTemplate(templateTree, input);
+        return matchTemplate(templateTree, input);
     }
 
     private static J[] createTemplateParameters(String code) {
@@ -82,7 +88,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                         String fqn;
 
                         if (params.size() == 1) {
-                            if (params.get(0).Identifier() != null) {
+                            if(params.get(0).Identifier() != null) {
                                 fqn = params.get(0).Identifier().getText();
                             } else {
                                 fqn = params.get(0).FullyQualifiedName().getText();
@@ -113,6 +119,12 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         return parameters.toArray(new J[0]);
     }
 
+    private static TemplateMatchResult matchTemplate(J templateTree, J tree) {
+        JavaTemplateSemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();
+        semanticallyEqualVisitor.visit(templateTree, tree);
+        return new TemplateMatchResult(semanticallyEqualVisitor.isEqual(), semanticallyEqualVisitor.matchedParameters);
+    }
+
     @Value
     @With
     private static class TemplateParameter implements Marker {
@@ -120,31 +132,26 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         String typeName;
     }
 
-    private static boolean matchesTemplate(J templateTree, J tree) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();
-        semanticallyEqualVisitor.visit(templateTree, tree);
-        return semanticallyEqualVisitor.isEqual();
-    }
-
     @SuppressWarnings("ConstantConditions")
     private static class JavaTemplateSemanticallyEqualVisitor extends SemanticallyEqualVisitor {
 
+        final List<J> matchedParameters = new ArrayList<>();
         public JavaTemplateSemanticallyEqualVisitor() {
             super(true);
         }
 
-        private boolean matchesTemplateParameterPlaceholder(J.Empty empty, J j) {
+        private boolean matchTemplateParameterPlaceholder(J.Empty empty, J j) {
             return empty.getMarkers().findFirst(TemplateParameter.class)
                     .map(m -> "java.lang.Object".equals(m.typeName)
                               || j instanceof TypedTree
                                  && TypeUtils.isAssignableTo(m.typeName, ((TypedTree) j).getType()))
-                    .orElse(false);
+                    .orElse(false) && matchedParameters.add(j);
         }
 
         @Override
         public J.Empty visitEmpty(J.Empty empty, J j) {
             if (isEqual.get()) {
-                if (matchesTemplateParameterPlaceholder(empty, j)) {
+                if (matchTemplateParameterPlaceholder(empty, j)) {
                     return empty;
                 }
                 if (!(j instanceof J.Empty)) {
