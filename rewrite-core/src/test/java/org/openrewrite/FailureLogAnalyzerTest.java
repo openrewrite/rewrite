@@ -30,6 +30,7 @@ class FailureLogAnalyzerTest {
       error: Target option 6 is no longer supported. Use 7 or later. | 6
       Error:PARSE ERROR: Error:unsupported class file version 53.0 | 8
       DefaultCodeFormatter has been compiled by a more recent version of the Java Runtime (class file version 55.0), | 11
+      Fatal error compiling: invalid target release: 1.9 -> [Help 1] | 9
       Fatal error compiling: invalid target release: 17 -> [Help 1] | 17
       Fatal error compiling: invalid target release: 11 -> [Help 1] | 11
       Fatal error compiling: error: release version 17 not supported | 17
