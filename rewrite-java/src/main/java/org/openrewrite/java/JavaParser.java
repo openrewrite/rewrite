@@ -37,6 +37,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -178,6 +179,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                             );
                             missingArtifactNames.remove(artifactName);
                             artifacts.add(artifact);
+                        } catch (FileAlreadyExistsException ignore) {
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
