@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal;
 
-import org.apache.tools.ant.types.selectors.SelectorUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -423,13 +422,133 @@ public class StringUtils {
             value = "";
         }
 
-        return SelectorUtils.match(
+        return matchesGlob(
                 globPattern.replace(wrongFileSeparatorChar, File.separatorChar),
                 value.replace(wrongFileSeparatorChar, File.separatorChar),
                 false
         );
     }
     private static final char wrongFileSeparatorChar = File.separatorChar == '/' ? '\\' : '/';
+
+    private static boolean matchesGlob(String pattern, String str, boolean caseSensitive) {
+        int patIdxStart = 0;
+        int patIdxEnd = pattern.length() - 1;
+        int strIdxStart = 0;
+        int strIdxEnd = str.length() - 1;
+
+        if (!pattern.contains("*")) {
+            // No '*'s, so we make a shortcut
+            if (patIdxEnd != strIdxEnd) {
+                return false; // Pattern and string do not have the same size
+            }
+            for (int i = 0; i <= patIdxEnd; i++) {
+                char ch = pattern.charAt(i);
+                if (ch != '?' && different(caseSensitive, ch, str.charAt(i))) {
+                    return false; // Character mismatch
+                }
+            }
+            return true; // String matches against pattern
+        }
+
+        if (patIdxEnd == 0) {
+            return true; // Pattern contains only '*', which matches anything
+        }
+
+        // Process characters before first star
+        while (true) {
+            char ch = pattern.charAt(patIdxStart);
+            if (ch == '*' || strIdxStart > strIdxEnd) {
+                break;
+            }
+            if (ch != '?'
+                && different(caseSensitive, ch, str.charAt(strIdxStart))) {
+                return false; // Character mismatch
+            }
+            patIdxStart++;
+            strIdxStart++;
+        }
+        if (strIdxStart > strIdxEnd) {
+            // All characters in the string are used. Check if only '*'s are
+            // left in the pattern. If so, we succeeded. Otherwise failure.
+            return allStars(pattern, patIdxStart, patIdxEnd);
+        }
+
+        // Process characters after last star
+        while (true) {
+            char ch = pattern.charAt(patIdxEnd);
+            if (ch == '*' || strIdxStart > strIdxEnd) {
+                break;
+            }
+            if (ch != '?' && different(caseSensitive, ch, str.charAt(strIdxEnd))) {
+                return false; // Character mismatch
+            }
+            patIdxEnd--;
+            strIdxEnd--;
+        }
+        if (strIdxStart > strIdxEnd) {
+            // All characters in the string are used. Check if only '*'s are
+            // left in the pattern. If so, we succeeded. Otherwise failure.
+            return allStars(pattern, patIdxStart, patIdxEnd);
+        }
+
+        // process pattern between stars. padIdxStart and patIdxEnd point
+        // always to a '*'.
+        while (patIdxStart != patIdxEnd && strIdxStart <= strIdxEnd) {
+            int patIdxTmp = -1;
+            for (int i = patIdxStart + 1; i <= patIdxEnd; i++) {
+                if (pattern.charAt(i) == '*') {
+                    patIdxTmp = i;
+                    break;
+                }
+            }
+            if (patIdxTmp == patIdxStart + 1) {
+                // Two stars next to each other, skip the first one.
+                patIdxStart++;
+                continue;
+            }
+            // Find the pattern between padIdxStart & padIdxTmp in str between
+            // strIdxStart & strIdxEnd
+            int patLength = (patIdxTmp - patIdxStart - 1);
+            int strLength = (strIdxEnd - strIdxStart + 1);
+            int foundIdx = -1;
+            strLoop:
+            for (int i = 0; i <= strLength - patLength; i++) {
+                for (int j = 0; j < patLength; j++) {
+                    char ch = pattern.charAt(patIdxStart + j + 1);
+                    if (ch != '?' && different(caseSensitive, ch, str.charAt(strIdxStart + i + j))) {
+                        continue strLoop;
+                    }
+                }
+                foundIdx = strIdxStart + i;
+                break;
+            }
+
+            if (foundIdx == -1) {
+                return false;
+            }
+            patIdxStart = patIdxTmp;
+            strIdxStart = foundIdx + patLength;
+        }
+
+        // All characters in the string are used. Check if only '*'s are left
+        // in the pattern. If so, we succeeded. Otherwise failure.
+        return allStars(pattern, patIdxStart, patIdxEnd);
+    }
+
+    private static boolean allStars(String chars, int start, int end) {
+        for (int i = start; i <= end; ++i) {
+            if (chars.charAt(i) != '*') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean different(boolean caseSensitive, char ch, char other) {
+        return caseSensitive
+                ? ch != other
+                : Character.toUpperCase(ch) != Character.toUpperCase(other);
+    }
 
     public static String indent(String text) {
         StringBuilder indent = new StringBuilder();
