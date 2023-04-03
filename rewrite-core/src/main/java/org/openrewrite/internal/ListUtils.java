@@ -18,7 +18,6 @@ package org.openrewrite.internal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -235,6 +234,21 @@ public final class ListUtils {
         if (ls != null) {
             newLs.addAll(ls);
         }
+        return newLs;
+    }
+
+    public static <T> List<T> concat(@Nullable List<T> ls1, @Nullable List<T> ls2) {
+        if (ls1 == null && ls2 == null) {
+            //noinspection ConstantConditions
+            return null;
+        } else if (ls2 == null || ls2.isEmpty()) {
+            return ls1 == null ? emptyList() : ls1;
+        } else if (ls1 == null || ls1.isEmpty()) {
+            return ls2;
+        }
+        List<T> newLs = new ArrayList<>(ls1.size() + ls2.size());
+        newLs.addAll(ls1);
+        newLs.addAll(ls2);
         return newLs;
     }
 

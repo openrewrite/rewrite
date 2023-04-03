@@ -153,7 +153,9 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                         if (methodType.hasFlags(Flag.Static) ||
                                 methodSelectMatchesFirstLambdaParameter(method, lambda)) {
                             maybeAddImport(declaringType);
-                            return l.withTemplate(JavaTemplate.builder(this::getCursor, "#{}::#{}").build(),
+                            return l.withTemplate(JavaTemplate.builder(this::getCursor, "#{}::#{}")
+                                            .imports(declaringType.getFullyQualifiedName())
+                                            .build(),
                                     l.getCoordinates().replace(), declaringType.getClassName(),
                                     method.getMethodType().getName());
                         } else if (method instanceof J.NewClass) {

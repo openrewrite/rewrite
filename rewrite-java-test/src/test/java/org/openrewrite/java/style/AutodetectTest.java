@@ -245,8 +245,8 @@ class AutodetectTest implements RewriteTest {
         var styles = Autodetect.detect(cus);
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
-        assertThat(tabsAndIndents.getTabSize()).isEqualTo(3);
-        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(3);
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
     @Test
@@ -278,6 +278,29 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
+    @Test
+    void inconsistentIndents() {
+        var cus = jp().parse(
+          """
+            package org.openrewrite.before;
+
+            import java.util.ArrayList;
+            import java.util.List;
+            
+            public class HelloWorld {
+                public static void main(String[] args) {
+                    System.out.print("Hello");
+                        System.out.println(" world");
+                }
+            }
+            """
+        );
+        var styles = Autodetect.detect(cus);
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
 
     @Test
     void mixedTabAndWhiteSpacesIndentsWithTabSize4WithSomeErrors() {
