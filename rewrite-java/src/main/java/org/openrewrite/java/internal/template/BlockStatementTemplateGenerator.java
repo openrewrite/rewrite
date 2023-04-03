@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -94,6 +95,15 @@ public class BlockStatementTemplateGenerator {
 
             @Nullable
             J.Block blockEnclosingTemplateComment;
+
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile && (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                    // don't visit the __P__ and __M__ classes declaring stubs
+                    return classDecl;
+                }
+                return super.visitClassDeclaration(classDecl, integer);
+            }
 
             @Override
             public J.Block visitBlock(J.Block block, Integer p) {
