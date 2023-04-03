@@ -257,45 +257,20 @@ public class Autodetect extends NamedStyles {
              *      PT = (NT / D), which means the percentage of tabs.
              * So
              *      useTabs = PT > 0.5
-             *
-             * (2) Details to solve X via formula (5)
-             * There are three scenarios here
-             * #1. If the code contains tabs only, D ~= NT, PT ~= 100%, and NW ~= 0, so X = 0/0, it's an unknown value,
-             *      then we use the default value 4. Because small errors exist in reality, it is impossible to strictly
-             *      satisfy the condition of (D - NT) being zero, so we use a threshold here to determine this case.
-             *      let's say PT > 80%.
-             * #2. If the code contains spaces only. NT ~= 0, X ~= NW / D.
-             * #3. Mixed tabs and spaces
-             *
-             * So #1 returns default, and both #2 and #3, the tab size X can use solve by formula #5.
              */
             if (this.accumulateDepthCount == 0) {
                 return IntelliJ.tabsAndIndents();
             }
 
             long d = this.accumulateDepthCount;                     // D in above comments
-            long nw = getTotalCharCount(spaceIndentFrequencies);    // NW in above comments
             long nt = getTotalCharCount(tabIndentFrequencies);      // NT in above comments
             double pt = nt / (double) d;                            // PT in above comments
-            final double TAB_PORTION_THRESHOLD = 0.8;
-
             boolean useTabs = pt >= 0.5;
-            int tabSize;
-            if (pt > TAB_PORTION_THRESHOLD || d == nt) {
-                tabSize = 4;
-            } else {
-                double x =  nw / (double)(d - nt);
-                tabSize = getClosestEven(x);
-            }
 
             // Calculate tabSize based on the frequency, pick up the biggest frequency group.
             // Using frequency are less susceptible to outliers than means.
             int moreFrequentTabSize = getBiggestGroupOfTabSize(deltaSpaceIndentFrequencies);
-
-            // If two statistic results fight with each other, it means there are mess indentations in the code, then we use the default.
-            if (moreFrequentTabSize > 0 && tabSize != moreFrequentTabSize) {
-                tabSize = 4;
-            }
+            int tabSize = (moreFrequentTabSize == 0) ? 4 : moreFrequentTabSize;
 
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
 
