@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -62,6 +64,36 @@ class LambdaTest implements RewriteTest {
                 fun inputValues ( ) : List < Pair < String , Any ? > > {
                     return fields ( ) .filter { ( k , _ ) -> ! defaults . contains ( k ) }
                 }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/60")
+    @Test
+    @ExpectedToFail
+    void suspendLambda() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+                val lambda: suspend ( ) -> Int = suspend { 1 }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/56")
+    @Test
+    @ExpectedToFail
+    void suspendLambdaWithParameter() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+                val lambda: suspend ( Int ) -> Int = { number : Int -> number * number }
             }
             """
           )
