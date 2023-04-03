@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -227,6 +228,21 @@ class VariableDeclarationTest implements RewriteTest {
             """
             typealias TestAlias = Test
             val a : TestAlias = Test ( )
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/58")
+    @Test
+    @Disabled
+    void destructuringVariableDecleration() {
+        rewriteRun(
+          kotlin(
+            """
+            fun example ( ) {
+              val ( a , b , c ) = Triple ( 1 , 2 , 3 )
+            }
             """
           )
         );
