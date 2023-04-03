@@ -94,6 +94,45 @@ class MinimumSwitchCasesTest implements RewriteTest {
     }
 
     @Test
+    void caseWithReturnInsteadOfBreak() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  int test() {
+                      switch (variable) {
+                        case 0:
+                            return 0;
+                        default:
+                            doSomethingElse();
+                      }
+                      return 1;
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """,
+            """
+              class Test {
+                  int variable;
+                  int test() {
+                      if (variable == 0) {
+                          return 0;
+                      } else {
+                          doSomethingElse();
+                      }
+                      return 1;
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void caseWithFallthroughInDefault() {
         rewriteRun(
           java(

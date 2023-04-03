@@ -141,8 +141,11 @@ public class MinimumSwitchCases extends Recipe {
                                 if (aCase.getExpressions().size() > 1 || !(aCase.getBody() instanceof Statement)) {
                                     return super.visitSwitch(switzh, ctx);
                                 }
-                            } else if (j != statements.size() - 1 && (aCase.getStatements().isEmpty() || !(aCase.getStatements().get(aCase.getStatements().size() - 1) instanceof J.Break))) {
-                                return super.visitSwitch(switzh, ctx);
+                            } else {
+                                Statement lastStatement = aCase.getStatements().isEmpty() ? null : aCase.getStatements().get(aCase.getStatements().size() - 1);
+                                if (j != statements.size() - 1 && !(lastStatement instanceof J.Break || lastStatement instanceof J.Return)) {
+                                    return super.visitSwitch(switzh, ctx);
+                                }
                             }
                             cases[i++] = aCase;
                         }
