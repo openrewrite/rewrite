@@ -319,37 +319,38 @@ class YamlResourceLoaderTest implements RewriteTest {
           .build();
 
         Collection<Recipe> recipes = env.listRecipes();
-        assertThat(recipes).hasSize(1);
-        Recipe recipe = recipes.iterator().next();
-        List<RecipeExample> examples = recipe.getExamples();
-        assertThat(examples).hasSize(2);
-        RecipeExample example0 = examples.get(0);
-        assertThat(example0.getDescription()).isEqualTo("Change World to Hello in a text file");
-        assertThat(example0.getBefore()).isEqualTo("World");
-        assertThat(example0.getAfter()).isEqualTo("Hello!");
-        assertThat(example0.getLanguage()).isEqualTo("text");
-        RecipeExample example1 = examples.get(1);
-        assertThat(example1.getDescription()).isEqualTo("Change World to Hello in a java file");
-        assertThat(example1.getBefore()).isEqualTo("""
-          public class A {
-              void method() {
-                  System.out.println("World");
-              }
-          }
-          """);
-        assertThat(example1.getAfter()).isEqualTo("""
-          public class A {
-              void method() {
-                  System.out.println("Hello!");
-              }
-          }
-          """);
-        assertThat(example1.getLanguage()).isEqualTo("java");
+        assertThat(recipes).singleElement().satisfies(r -> {
+            assertThat(r.getExamples()).hasSize(2);
+            assertThat(r.getExamples()).first().satisfies(e -> {
+                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
+                assertThat(e.getBefore()).isEqualTo("World");
+                assertThat(e.getAfter()).isEqualTo("Hello!");
+                assertThat(e.getLanguage()).isEqualTo("text");
+            });
+            assertThat(r.getExamples().get(1)).satisfies(e -> {
+                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
+                assertThat(e.getBefore()).isEqualTo("""
+                  public class A {
+                      void method() {
+                          System.out.println("World");
+                      }
+                  }
+                  """);
+                assertThat(e.getAfter()).isEqualTo("""
+                  public class A {
+                      void method() {
+                          System.out.println("Hello!");
+                      }
+                  }
+                  """);
+                assertThat(e.getLanguage()).isEqualTo("java");
+            });
+        });
 
         Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
-        assertThat(recipeDescriptors).hasSize(1);
-        RecipeDescriptor descriptor = recipeDescriptors.iterator().next();
-        List<RecipeExample> descriptorExamples = descriptor.getExamples();
-        assertThat(descriptorExamples).containsExactlyElementsOf(examples);
+        assertThat(recipeDescriptors).singleElement().satisfies(descriptor -> {
+            List<RecipeExample> descriptorExamples = descriptor.getExamples();
+            assertThat(descriptorExamples).containsExactlyElementsOf(recipes.iterator().next().getExamples());
+        });
     }
 }
