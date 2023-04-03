@@ -959,4 +959,42 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     }
 
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3071")
+    void missingImportForDeclaringType() {
+        rewriteRun(
+          java(
+            """
+              import java.net.URI;
+              import java.nio.file.Paths;
+              import java.util.Optional;
+
+              class A {
+                  void m() {
+                      URI uri = Optional.ofNullable("path")
+                            .map(Paths::get)
+                            .map(path -> path.toUri())
+                            .orElse(null);
+                  }
+              }
+              """,
+            """
+              import java.net.URI;
+              import java.nio.file.Paths;
+              import java.util.Optional;
+
+              class A {
+                  void m() {
+                      URI uri = Optional.ofNullable("path")
+                            .map(Paths::get)
+                            .map(Path::toUri)
+                            .orElse(null);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
 }
