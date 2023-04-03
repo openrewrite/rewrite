@@ -112,6 +112,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
+        if (functionType.getSuspendModifier() != null) {
+            visitAnnotation(functionType.getSuspendModifier(), p);
+        }
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p);
             p.append(".");

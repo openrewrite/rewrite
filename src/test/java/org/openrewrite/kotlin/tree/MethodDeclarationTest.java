@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -199,7 +198,6 @@ class MethodDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/56")
     @Test
-    @ExpectedToFail
     void lambdaMethodParameterWithModifier() {
         rewriteRun(
           kotlin(
