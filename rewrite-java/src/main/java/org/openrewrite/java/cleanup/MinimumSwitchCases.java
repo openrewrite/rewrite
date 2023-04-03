@@ -132,10 +132,16 @@ public class MinimumSwitchCases extends Recipe {
 
                     J.Case[] cases = new J.Case[2];
                     int i = 0;
-                    for (Statement statement : sortedSwitch.getCases().getStatements()) {
+                    List<Statement> statements = sortedSwitch.getCases().getStatements();
+                    for (int j = 0; j < statements.size(); j++) {
+                        Statement statement = statements.get(j);
                         if (statement instanceof J.Case) {
                             J.Case aCase = (J.Case) statement;
-                            if ((aCase.getType() == J.Case.Type.Rule && (aCase.getExpressions().size() > 1 || !(aCase.getBody() instanceof Statement)))) {
+                            if (aCase.getType() == J.Case.Type.Rule) {
+                                if (aCase.getExpressions().size() > 1 || !(aCase.getBody() instanceof Statement)) {
+                                    return super.visitSwitch(switzh, ctx);
+                                }
+                            } else if (j != statements.size() - 1 && (aCase.getStatements().isEmpty() || !(aCase.getStatements().get(aCase.getStatements().size() - 1) instanceof J.Break))) {
                                 return super.visitSwitch(switzh, ctx);
                             }
                             cases[i++] = aCase;
@@ -196,9 +202,9 @@ public class MinimumSwitchCases extends Recipe {
                     }
 
                     // move first case to "if"
-                    List<Statement> statements = getStatements(cases[0]);
+                    List<Statement> thenStatements = getStatements(cases[0]);
 
-                    generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(statements,
+                    generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(thenStatements,
                             s -> s instanceof J.Break ? null : s)));
 
                     // move second case to "else"

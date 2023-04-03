@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
@@ -72,7 +71,6 @@ class MinimumSwitchCasesTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
     void caseWithFallthrough() {
         rewriteRun(
           java(
@@ -85,7 +83,6 @@ class MinimumSwitchCasesTest implements RewriteTest {
                             doSomething();
                         default:
                             doSomethingElse();
-                            break;
                       }
                   }
                   void doSomething() {}
@@ -97,7 +94,44 @@ class MinimumSwitchCasesTest implements RewriteTest {
     }
 
     @Test
-    @Disabled
+    void caseWithFallthroughInDefault() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      switch (variable) {
+                        case 0:
+                            doSomething();
+                            break;
+                        default:
+                            doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """,
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      if (variable == 0) {
+                          doSomething();
+                      } else {
+                          doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleExpressions() {
         rewriteRun(
           java(
@@ -350,6 +384,7 @@ class MinimumSwitchCasesTest implements RewriteTest {
                       switch(day) {
                           case MONDAY:
                               someMethod();
+                              break;
                           default:
                               someMethod();
                               break;
