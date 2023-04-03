@@ -52,7 +52,7 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
     }
 
     @Test
-    void DoNothingIfPresentPartOfElseIf() {
+    void doNothingIfPresentPartOfElseIf() {
         rewriteRun(
           java(
             """
@@ -78,7 +78,7 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
     }
 
     @Test
-    void DoNothingIfElsePartPresent() {
+    void doNothingIfElsePartPresent() {
         rewriteRun(
           java(
             """
@@ -103,7 +103,7 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
     }
 
     @Test
-    void DoNothingIfNotLambdaCompatible() {
+    void doNothingIfNotLambdaCompatible() {
         rewriteRun(
           java(
             """
