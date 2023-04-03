@@ -322,46 +322,18 @@ public class Autodetect extends NamedStyles {
     }
 
     private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
-        Map<Integer, Integer> tabSizeToFrequencyMap = new HashMap<>();
+        Map<Integer, Integer> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
+            .filter(entry -> entry.getKey().indentDepth != 0)
+            .flatMap(entry -> entry.getValue().entrySet().stream()
+                .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
+                    (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
+                    spaceCountToFrequency.getValue().intValue())))
+            .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
 
-        for (Map.Entry<IndentStatistic.DepthCoordinate, Map<Integer, Long>> entry : deltaSpaces.depthToSpaceIndentFrequencies.entrySet()) {
-            int depth = entry.getKey().indentDepth;
-            if (depth == 0) {
-                continue;
-            }
-            Map<Integer, Long> spaceCountToFrequencyMap = entry.getValue();
-            for (Map.Entry<Integer, Long> spaceCountToFrequency : spaceCountToFrequencyMap.entrySet()) {
-                int spaceCount = spaceCountToFrequency.getKey();
-                int frequency = spaceCountToFrequency.getValue().intValue();
-                int tabSize = (int) Math.round(spaceCount / (double) depth);
-
-                if (tabSizeToFrequencyMap.containsKey(tabSize)) {
-                    tabSizeToFrequencyMap.put(tabSize, tabSizeToFrequencyMap.get(tabSize) + frequency);
-                } else {
-                    tabSizeToFrequencyMap.put(tabSize, frequency);
-                }
-            }
-        }
-
-        if (tabSizeToFrequencyMap.isEmpty()) {
-            return 0;
-        }
-
-        return findKeyWithMaxValue(tabSizeToFrequencyMap);
-    }
-
-    private static int findKeyWithMaxValue(Map<Integer, Integer> map) {
-        int maxKey = 0;
-        int maxValue = Integer.MIN_VALUE;
-
-        for (Map.Entry<Integer, Integer> entry : map.entrySet()) {
-            if (entry.getValue() > maxValue) {
-                maxKey = entry.getKey();
-                maxValue = entry.getValue();
-            }
-        }
-
-        return maxKey;
+        return tabSizeToFrequencyMap.entrySet().stream()
+            .max(Map.Entry.comparingByValue())
+            .map(Map.Entry::getKey)
+            .orElse(0);
     }
 
     private static int getClosestEven(double num) {
