@@ -198,20 +198,6 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              public interface ObservableValue<T> {
-              }
-              """
-          ),
-          java(
-            """
-              @FunctionalInterface
-              public interface ChangeListener<T> {
-                  void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
-              }
-              """
-          ),
-          java(
-            """
               import java.util.function.Function;
               class Test {
                             
@@ -222,6 +208,14 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                   protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
                       String strVal = newVal.toString();
                       System.out.println(strVal);
+                  }
+
+                  interface ObservableValue<T> {
+                  }
+
+                  @FunctionalInterface
+                  interface ChangeListener<T> {
+                      void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
                   }
               }
               """,
@@ -234,6 +228,14 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                   protected void onChange(ObservableValue<?> o, Object oldVal, Object newVal) {
                       String strVal = newVal.toString();
                       System.out.println(strVal);
+                  }
+
+                  interface ObservableValue<T> {
+                  }
+
+                  @FunctionalInterface
+                  interface ChangeListener<T> {
+                      void changed(ObservableValue<? extends T> observable, T oldValue, T newValue);
                   }
               }
               """
@@ -288,10 +290,9 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                   public static void run() {
                       Collections.singletonList(1).forEach(n -> run());
                   }
-              }
-                            
-              class Test2 {
-                  Runnable r = () -> Test.run();
+                  static class Test2 {
+                      Runnable r = () -> Test.run();
+                  }
               }
               """,
             """
@@ -301,10 +302,9 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
                   public static void run() {
                       Collections.singletonList(1).forEach(n -> run());
                   }
-              }
-                            
-              class Test2 {
-                  Runnable r = Test::run;
+                  static class Test2 {
+                      Runnable r = Test::run;
+                  }
               }
               """
           )
@@ -868,6 +868,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("StringOperationCanBeSimplified")
     @Issue("https://github.com/openrewrite/rewrite/issues/2949")
     @Test
     void anotherSimplerMultipleConstructorsCase() {
@@ -922,6 +923,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("EmptyTryBlock")
     @Test
     void tryInAForLoop() {
         rewriteRun(
@@ -959,6 +961,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
     }
 
 
+    @SuppressWarnings("DataFlowIssue")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3071")
     void missingImportForDeclaringType() {
