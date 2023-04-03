@@ -230,7 +230,6 @@ public class Autodetect extends NamedStyles {
 
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             /**
-             * Calculate tabSize based on the means
              * For each line, if the code follows an indentation style exactly,
              * Assume :
              *      nw = space count in prefix
