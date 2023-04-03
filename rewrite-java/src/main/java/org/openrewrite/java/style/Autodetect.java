@@ -285,11 +285,11 @@ public class Autodetect extends NamedStyles {
                 tabSize = 4;
             } else {
                 double x =  nw / (double)(d - nt);
-                tabSize = (int) Math.round(x);
+                tabSize = getClosestEven(x);
             }
 
-            if (tabSize < 1) {
-                tabSize = 1;
+            if (tabSize < 2) {
+                tabSize = 2;
             }
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
 
@@ -312,6 +312,21 @@ public class Autodetect extends NamedStyles {
             .flatMap(entry -> entry.getValue().entrySet().stream())
             .mapToLong(entry -> entry.getKey() * entry.getValue())
             .sum();
+    }
+
+    private static int getClosestEven(double num) {
+        int integerPart = (int) num;
+        if (integerPart % 2 == 0) {
+            return integerPart;
+        } else {
+            int lowerEven = integerPart - 1;
+            int upperEven = integerPart + 1;
+            if (Math.abs(num - lowerEven) < Math.abs(num - upperEven)) {
+                return lowerEven;
+            } else {
+                return upperEven;
+            }
+        }
     }
 
     private static class FindLineFormatJavaVisitor extends JavaIsoVisitor<GeneralFormatStatistics> {
