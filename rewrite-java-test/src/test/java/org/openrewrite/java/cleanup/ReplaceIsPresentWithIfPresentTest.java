@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
+class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec
