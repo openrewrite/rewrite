@@ -15,7 +15,9 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -190,6 +192,22 @@ class MethodDeclarationTest implements RewriteTest {
           kotlin(
             """
             fun < T : Any > Array < Int > . method ( t : T ) = Unit
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/56")
+    @Test
+    @Disabled
+    void lambdaMethodParameterWithModifier() {
+        rewriteRun(
+          kotlin(
+            """
+            suspend fun example (
+              title : String ,
+              verifyUnique : suspend ( String ) -> Boolean
+            ) : String = TODO()
             """
           )
         );
