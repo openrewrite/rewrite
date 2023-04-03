@@ -31,6 +31,7 @@ import org.openrewrite.marker.SearchResult;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -73,15 +74,19 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
                 if (getCursor().getParent().getParent().getValue() instanceof J.If.Else) {
                     return _if;
                 }
+                /* check if return statement is present */
+                if(isReturnPresentVisitor.isReturnPresent(__if).get()){
+                    return _if;
+                }
 
                 /* replace if block with Optional#ifPresent and lambda expression */
-                String methodSelect = ((J.MethodInvocation) __if.getIfCondition().getTree()).getSelect().toString();
-                String template = String.format("%s.ifPresent((obj) -> #{any()})", methodSelect);
+                String methodSelector = ((J.MethodInvocation) __if.getIfCondition().getTree()).getSelect().toString();
+                String template = String.format("%s.ifPresent((obj) -> #{any()})", methodSelector);
                 J ifPresentMi = __if.withTemplate(JavaTemplate.builder(this::getCursor, template).build(), __if.getCoordinates().replace(), __if.getThenPart());
 
                 /* replace Optional#get to lambda parameter */
                 J.Identifier lambdaParameterIdentifier = ((J.VariableDeclarations) ((J.Lambda) ((J.MethodInvocation) ifPresentMi).getArguments().get(0)).getParameters().getParameters().get(0)).getVariables().get(0).getName();
-                return ReplaceMethodCallWithStringVisitor.replace(ifPresentMi, context, lambdaParameterIdentifier);
+                return ReplaceMethodCallWithStringVisitor.replace(ifPresentMi, context, lambdaParameterIdentifier, methodSelector);
             }
             return __if;
         }
@@ -142,19 +147,41 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
     public static class ReplaceMethodCallWithStringVisitor extends JavaVisitor<ExecutionContext> {
 
         J.Identifier lambdaParameterIdentifier;
+        String methodSelector;
 
-        static J replace(J subtree, ExecutionContext p, J.Identifier lambdaParameterIdentifier) {
-            return new ReplaceMethodCallWithStringVisitor(lambdaParameterIdentifier).visit(subtree, p);
+        static J replace(J subtree, ExecutionContext p, J.Identifier lambdaParameterIdentifier, String methodSelector) {
+            return new ReplaceMethodCallWithStringVisitor(lambdaParameterIdentifier,methodSelector).visit(subtree, p);
         }
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
             J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
+
+            /* Only replace method invocations that has same method selector as present in if condition */
             if (OPTIONAL_GET.matches(mi)) {
-                return lambdaParameterIdentifier;
+                if(mi.getSelect().toString().equals(methodSelector))
+                    return lambdaParameterIdentifier;
             }
             return mi;
         }
 
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    public static class isReturnPresentVisitor extends JavaVisitor<AtomicBoolean> {
+
+        static AtomicBoolean isReturnPresent(J subtree) {
+            return new isReturnPresentVisitor().reduce(subtree,new AtomicBoolean());
+        }
+
+        @Override
+        public J visitReturn(J.Return _return, AtomicBoolean isPresent){
+            if(isPresent.get()){
+                return _return;
+            }
+            isPresent.set(true);
+            return _return;
+        }
     }
 }

@@ -153,7 +153,7 @@ class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
                       if (a.isPresent()) {
                           if (b.isPresent()) {
                               if (c.isPresent()) {
-                                  return a.get() + b.get() + c.get();
+                                  int x = a.get() + b.get() + c.get();
                               }
                           }
                       }
@@ -236,6 +236,46 @@ class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
                               list.add(obj);
                           });
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceAndHandleDifferentOptionalsPresent() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class A {
+                  void method() {
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      Optional<Integer> o2 = Optional.of(3);
+                      if(o.isPresent()){
+                          list.add(o.get());
+                          list.add(o2.get());
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class A {
+                  void method() {
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      Optional<Integer> o2 = Optional.of(3);
+                      o.ifPresent((obj) -> {
+                          list.add(obj);
+                          list.add(o2.get());
+                      });
                   }
               }
               """
