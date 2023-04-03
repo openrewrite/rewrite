@@ -195,6 +195,7 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistic spaceContinuationIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
+        private final IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
         private long accumulateDepthCount = 0;
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
@@ -229,6 +230,7 @@ public class Autodetect extends NamedStyles {
 
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
             /**
+             * Calculate tabSize based on the means
              * For each line, if the code follows an indentation style exactly,
              * Assume :
              *      nw = space count in prefix
@@ -268,7 +270,6 @@ public class Autodetect extends NamedStyles {
              *
              * So #1 returns default, and both #2 and #3, the tab size X can use solve by formula #5.
              */
-
             if (this.accumulateDepthCount == 0) {
                 return IntelliJ.tabsAndIndents();
             }
@@ -288,9 +289,15 @@ public class Autodetect extends NamedStyles {
                 tabSize = getClosestEven(x);
             }
 
-            if (tabSize < 2) {
-                tabSize = 2;
+            // Calculate tabSize based on the frequency, pick up the biggest frequency group.
+            // Using frequency are less susceptible to outliers than means.
+            int moreFrequentTabSize = getBiggestGroupOfTabSize(deltaSpaceIndentFrequencies);
+
+            // If two statistic results fight with each other, it means there are mess indentations in the code, then we use the default.
+            if (moreFrequentTabSize > 0 && tabSize != moreFrequentTabSize) {
+                tabSize = 4;
             }
+
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
 
             int continuationIndent = continuationFrequencies.continuationIndent(tabSize);
@@ -312,6 +319,49 @@ public class Autodetect extends NamedStyles {
             .flatMap(entry -> entry.getValue().entrySet().stream())
             .mapToLong(entry -> entry.getKey() * entry.getValue())
             .sum();
+    }
+
+    private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
+        Map<Integer, Integer> tabSizeToFrequencyMap = new HashMap<>();
+
+        for (Map.Entry<IndentStatistic.DepthCoordinate, Map<Integer, Long>> entry : deltaSpaces.depthToSpaceIndentFrequencies.entrySet()) {
+            int depth = entry.getKey().indentDepth;
+            if (depth == 0) {
+                continue;
+            }
+            Map<Integer, Long> spaceCountToFrequencyMap = entry.getValue();
+            for (Map.Entry<Integer, Long> spaceCountToFrequency : spaceCountToFrequencyMap.entrySet()) {
+                int spaceCount = spaceCountToFrequency.getKey();
+                int frequency = spaceCountToFrequency.getValue().intValue();
+                int tabSize = (int) Math.round(spaceCount / (double) depth);
+
+                if (tabSizeToFrequencyMap.containsKey(tabSize)) {
+                    tabSizeToFrequencyMap.put(tabSize, tabSizeToFrequencyMap.get(tabSize) + frequency);
+                } else {
+                    tabSizeToFrequencyMap.put(tabSize, frequency);
+                }
+            }
+        }
+
+        if (tabSizeToFrequencyMap.isEmpty()) {
+            return 0;
+        }
+
+        return findKeyWithMaxValue(tabSizeToFrequencyMap);
+    }
+
+    private static int findKeyWithMaxValue(Map<Integer, Integer> map) {
+        int maxKey = 0;
+        int maxValue = Integer.MIN_VALUE;
+
+        for (Map.Entry<Integer, Integer> entry : map.entrySet()) {
+            if (entry.getValue() > maxValue) {
+                maxKey = entry.getKey();
+                maxValue = entry.getValue();
+            }
+        }
+
+        return maxKey;
     }
 
     private static int getClosestEven(double num) {
@@ -508,6 +558,7 @@ public class Autodetect extends NamedStyles {
                     if (!isContinuation) {
                         stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
                         stats.tabIndentFrequencies.record(depth, 0, tabIndent);
+                        stats.deltaSpaceIndentFrequencies.record(depth - tabIndent, 0, spaceIndent);
                         stats.accumulateDepthCount += depth;
                     } else if (!mixed) {
                         stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
