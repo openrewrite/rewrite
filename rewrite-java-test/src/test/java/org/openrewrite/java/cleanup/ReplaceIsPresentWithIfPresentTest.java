@@ -124,6 +124,26 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
     }
 
     @Test
+    void doNothingIfContainsReturn() {
+        rewriteRun(
+          java(
+            """
+              package com.foobar;
+              import java.util.Optional;
+              public class A {
+                  Integer method(Optional<Integer> o) {
+                      if (o.isPresent()){
+                          return o.get();
+                      }
+                      return -1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replace() {
         rewriteRun(
           java(
