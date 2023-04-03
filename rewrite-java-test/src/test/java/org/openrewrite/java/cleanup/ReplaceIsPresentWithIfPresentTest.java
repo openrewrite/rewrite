@@ -36,7 +36,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
@@ -56,7 +55,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
@@ -82,7 +80,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
@@ -107,7 +104,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
@@ -132,7 +128,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
@@ -147,7 +142,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
               }
               """,
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
@@ -170,7 +164,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
@@ -188,7 +181,6 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
               }
               """,
             """
-              package com.foobar;
               import java.util.Optional;
               import java.util.ArrayList;
               import java.util.List;
