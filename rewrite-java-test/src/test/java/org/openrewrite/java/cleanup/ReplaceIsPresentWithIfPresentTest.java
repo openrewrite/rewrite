@@ -128,12 +128,34 @@ public class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              package com.foobar;
               import java.util.Optional;
               public class A {
                   Integer method(Optional<Integer> o) {
                       if (o.isPresent()){
                           return o.get();
+                      }
+                      return -1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNothingWithNestedOptionalsUnlessHandledCorrectly() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+              public class A {
+                  Integer method(Optional<Integer> a, Optional<Integer> b, Optional<Integer> c) {
+                      if (a.isPresent()) {
+                          if (b.isPresent()) {
+                              if (c.isPresent()) {
+                                  return a.get() + b.get() + c.get();
+                              }
+                          }
                       }
                       return -1;
                   }
