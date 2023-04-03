@@ -980,6 +980,7 @@ class ReplaceLambdaWithMethodReferenceTest implements RewriteTest {
               """,
             """
               import java.net.URI;
+              import java.nio.file.Path;
               import java.nio.file.Paths;
               import java.util.Optional;
 
