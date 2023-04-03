@@ -25,6 +25,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.RecipeExample;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -208,7 +209,7 @@ public abstract class Recipe implements Cloneable {
 
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
                 getEstimatedEffortPerOccurrence(), options, getLanguages(), recipeList1, getDataTableDescriptors(),
-                getMaintainers(), getContributors(), recipeSource);
+                getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
     private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
@@ -271,6 +272,16 @@ public abstract class Recipe implements Cloneable {
             return emptyList();
         }
         return contributors;
+    }
+
+    @Setter
+    protected transient List<RecipeExample> examples;
+
+    public List<RecipeExample> getExamples() {
+        if(examples == null) {
+            return emptyList();
+        }
+        return examples;
     }
 
     /**

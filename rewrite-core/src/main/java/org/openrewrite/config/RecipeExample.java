@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 
+
 @Value
 public class RecipeExample {
     @Nullable
@@ -26,7 +27,7 @@ public class RecipeExample {
     @Nullable
     String description;
 
-    String recipe;
     String before;
     String after;
+    String language;
 }

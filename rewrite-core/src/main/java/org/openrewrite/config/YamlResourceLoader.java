@@ -68,6 +68,9 @@ public class YamlResourceLoader implements ResourceLoader {
     @Nullable
     private Map<String, List<Contributor>> contributors;
 
+    @Nullable
+    private Map<String, List<RecipeExample>> recipeNameToExamples;
+
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
@@ -311,10 +314,12 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return listRecipeDescriptors(emptyList(), listContributors());
+        return listRecipeDescriptors(emptyList(), listContributors(), listRecipeExamples());
     }
 
-    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes, Map<String, List<Contributor>> recipeNamesToContributors) {
+    public Collection<RecipeDescriptor> listRecipeDescriptors(Collection<Recipe> externalRecipes,
+                                                              Map<String, List<Contributor>> recipeNamesToContributors,
+                                                              Map<String, List<RecipeExample>> recipeNamesToExamples) {
         Collection<Recipe> internalRecipes = listRecipes();
         Collection<Recipe> allRecipes = Stream.concat(
                 Stream.concat(
@@ -329,6 +334,7 @@ public class YamlResourceLoader implements ResourceLoader {
             DeclarativeRecipe declarativeRecipe = (DeclarativeRecipe) recipe;
             declarativeRecipe.initialize(allRecipes, recipeNamesToContributors);
             declarativeRecipe.setContributors(recipeNamesToContributors.get(recipe.getName()));
+            declarativeRecipe.setExamples(recipeNamesToExamples.get(recipe.getName()));
             recipeDescriptors.add(declarativeRecipe.getDescriptor());
         }
         return recipeDescriptors;
@@ -431,15 +437,32 @@ public class YamlResourceLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<RecipeExample> listRecipeExamples() {
-        return loadResources(ResourceType.Example).stream()
-                .map(c -> new RecipeExample(
-                        (String) c.get("name"),
-                        (String) c.get("description"),
-                        (String) c.get("recipe"),
-                        (String) c.get("before"),
-                        (String) c.get("after"))
-                ).collect(toList());
+    public Map<String, List<RecipeExample>> listRecipeExamples() {
+        if (recipeNameToExamples == null) {
+            recipeNameToExamples = new HashMap<>();
+        }
+
+        Collection<Map<String, Object>> rawExamples = loadResources(ResourceType.Example);
+
+        for (Map<String, Object> examplesMap : rawExamples) {
+            String recipeName = (String) examplesMap.get("recipeName");
+            recipeNameToExamples.computeIfAbsent(recipeName, key -> new ArrayList<>());
+
+
+            List<Map<String, Object>> examples = (List<Map<String, Object>>) examplesMap.get("examples");
+
+            List<RecipeExample> newExamples = examples.stream().map(exam -> new RecipeExample(
+                (String) exam.get("name"),
+                (String) exam.get("description"),
+                (String) exam.get("before"),
+                (String) exam.get("after"),
+                (String) exam.get("language")
+            )).collect(toList());
+
+            recipeNameToExamples.get(recipeName).addAll(newExamples);
+        }
+
+        return recipeNameToExamples;
     }
 
     public Map<String, List<Contributor>> listContributors() {

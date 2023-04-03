@@ -58,5 +58,7 @@ public class RecipeDescriptor {
 
     List<Contributor> contributors;
 
+    List<RecipeExample> examples;
+
     URI source;
 }

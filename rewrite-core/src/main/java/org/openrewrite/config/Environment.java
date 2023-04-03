@@ -41,8 +41,10 @@ public class Environment {
             dependencyRecipes.addAll(dependencyResourceLoader.listRecipes());
         }
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
         for(ResourceLoader r : resourceLoaders) {
             if(r instanceof YamlResourceLoader) {
+                recipeExamples.putAll(((YamlResourceLoader) r).listRecipeExamples());
                 recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
             }
         }
@@ -58,6 +60,11 @@ public class Environment {
         }
         for (Recipe recipe : recipes) {
             recipe.setContributors(recipeToContributors.get(recipe.getName()));
+
+            if (recipeExamples.containsKey(recipe.getName())) {
+                recipe.setExamples(recipeExamples.get(recipe.getName()));
+            }
+
             if (recipe instanceof DeclarativeRecipe) {
                 List<Recipe> availableRecipes = new ArrayList<>();
                 availableRecipes.addAll(dependencyRecipes);
@@ -76,26 +83,23 @@ public class Environment {
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
         for(ResourceLoader r : resourceLoaders) {
             if(r instanceof YamlResourceLoader) {
                 recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
+                recipeToExamples.putAll(((YamlResourceLoader) r).listRecipeExamples());
             }
         }
+
         List<RecipeDescriptor> result = new ArrayList<>();
-        for(ResourceLoader r : resourceLoaders) {
-            if(r instanceof YamlResourceLoader) {
-                result.addAll((((YamlResourceLoader)r).listRecipeDescriptors(emptyList(), recipeToContributors)));
+        for (ResourceLoader r : resourceLoaders) {
+            if (r instanceof YamlResourceLoader) {
+                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToContributors, recipeToExamples)));
             } else {
                 result.addAll(r.listRecipeDescriptors());
             }
         }
         return result;
-    }
-
-    public Collection<RecipeExample> listRecipeExamples() {
-        return resourceLoaders.stream()
-                .flatMap(r -> r.listRecipeExamples().stream())
-                .collect(toList());
     }
 
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
