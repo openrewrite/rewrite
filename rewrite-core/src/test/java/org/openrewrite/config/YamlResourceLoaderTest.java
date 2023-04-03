@@ -333,7 +333,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertThat(example1.getBefore()).isEqualTo("""
           public class A {
               void method() {
-                  System.out.println("world");
+                  System.out.println("World");
               }
           }
           """);
