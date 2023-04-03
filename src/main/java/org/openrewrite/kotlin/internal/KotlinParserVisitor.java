@@ -1299,6 +1299,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(".");
         }
 
+        J.Annotation suspendModifier = null;
+        if (functionTypeRef.isSuspend()) {
+            Space suspendPrefix = whitespace();
+            suspendModifier = convertToAnnotation(mapModifier(suspendPrefix, emptyList()));
+        }
+
         Space prefix = whitespace();
         boolean parenthesized = source.charAt(cursor) == '(';
         skip("(");
@@ -1350,6 +1356,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new K.FunctionType(
                 randomId(),
                 lambda,
+                suspendModifier,
                 receiver);
     }
 
@@ -1493,7 +1500,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (j instanceof TypeTree) {
                     typeExpression = (TypeTree) j;
                 } else {
-                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null);
+                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
                 }
             }
         }
@@ -2162,7 +2169,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (j instanceof TypeTree) {
                     typeExpression = (TypeTree) j;
                 } else {
-                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null);
+                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
                 }
             }
         }
@@ -2904,7 +2911,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             null,
                             null
                     );
-                    element = new K.FunctionType(randomId(), newClass, null);
+                    element = new K.FunctionType(randomId(), newClass, null, null);
                 }
                 superTypes.add(JRightPadded.build(element)
                         .withAfter(i == regularClass.getSuperTypeRefs().size() - 1 ? EMPTY : sourceBefore(",")));

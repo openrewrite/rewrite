@@ -439,23 +439,18 @@ public interface K extends J {
     }
 
     @SuppressWarnings("unchecked")
-    @ToString
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
-    final class FunctionType implements K, Expression, Statement, TypeTree {
+    @With
+    class FunctionType implements K, Expression, Statement, TypeTree {
 
-        @With
-        @Getter
         UUID id;
-
-        @With
-        @Getter
         TypedTree typedTree;
 
         @Nullable
-        @With
-        @Getter
+        J.Annotation suspendModifier;
+
+        @Nullable
         JRightPadded<NameTree> receiver;
 
         @Override
