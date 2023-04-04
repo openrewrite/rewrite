@@ -702,14 +702,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
-            if (variables.size() > 1 && !containsTypeReceiver) {
-                p.append("(");
-            }
-
             // V1: Covers and unique case in `mapForLoop` of the KotlinParserVisitor caused by how the FirElement represents for loops.
             for (int i = variablePos; i < variables.size(); i++) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
                 beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
+                if (variables.size() > 1 && !containsTypeReceiver && i == 0) {
+                    p.append("(");
+                }
+
                 visit(variable.getElement().getName(), p);
 
                 if (multiVariable.getTypeExpression() != null) {
@@ -721,18 +721,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     visit(multiVariable.getTypeExpression(), p);
                 }
 
-                boolean implicitEquals = variable.getElement().getInitializer() instanceof K.StatementExpression &&
-                        ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration;
-                visitLeftPadded(implicitEquals ? "" : "=", variable.getElement().getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
-
                 visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
                 if (i < variables.size() - 1) {
                     p.append(",");
+                } else if (variables.size() > 1 && !containsTypeReceiver) {
+                    p.append(")");
                 }
-            }
 
-            if (variables.size() > 1 && !containsTypeReceiver) {
-                p.append(")");
+                boolean implicitEquals = variable.getElement().getInitializer() instanceof K.StatementExpression &&
+                        ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration;
+                visitLeftPadded(implicitEquals ? "" : "=", variable.getElement().getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
             }
 
             visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);

@@ -543,7 +543,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
-        for (FirElement firElement : firStatements) {
+        for (int i = 0; i < firStatements.size(); i++) {
+            FirElement firElement = firStatements.get(i);
             // Skip receiver of the unary post increment or decrement.
             if (firElement.getSource() != null && firElement.getSource().getKind() instanceof KtFakeSourceElementKind.DesugaredIncrementOrDecrement &&
                     !(firElement instanceof FirVariableAssignment)) {
@@ -606,6 +607,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     } else {
                         throw new IllegalArgumentException("Unexpected statement type.");
                     }
+                }
+
+                // Skip the implicitly added properties for destructuring declarations.
+                if (firElement instanceof FirProperty && "<destruct>".equals(((FirProperty) firElement).getName().asString()) &&
+                        ((FirProperty) firElement).getReturnTypeRef() instanceof FirResolvedTypeRef) {
+                    i += ((FirResolvedTypeRef) ((FirProperty) firElement).getReturnTypeRef()).getType().getTypeArguments().length;
                 }
             }
 
@@ -1478,72 +1485,130 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             ).withAfter(sourceBefore("."));
         }
 
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1 + (receiver == null ? 0 : 1)); // adjust size if necessary
+        boolean isDestruct = "<destruct>".equals(property.getName().asString()) && property.getReturnTypeRef() instanceof FirResolvedTypeRef;
+        int initialCapacity = isDestruct ?
+                ((FirResolvedTypeRef) property.getReturnTypeRef()).getType().getTypeArguments().length : 1 + (receiver == null ? 0 : 1);
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(initialCapacity); // adjust size if necessary
         if (receiver != null) {
-            vars.add(receiver);
+            variables.add(receiver);
         }
-
-        Space namePrefix = whitespace();
-        J.Identifier name = createIdentifier(property.getName().asString(), property);
 
         TypeTree typeExpression = null;
-        if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
-            FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
-            if (typeRef.getDelegatedTypeRef() != null) {
-                Space delimiterPrefix = whitespace();
-                boolean addTypeReferencePrefix = source.startsWith(":", cursor);
-                skip(":");
-                if (addTypeReferencePrefix) {
-                    markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
-                }
-                J j = visitElement(typeRef, ctx);
-                if (j instanceof TypeTree) {
-                    typeExpression = (TypeTree) j;
-                } else {
-                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
-                }
-            }
-        }
-
-        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
-        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
-
-        J expr = null;
-        int saveCursor = cursor;
-        Space exprPrefix = whitespace();
-        if (property.getInitializer() != null && source.startsWith("=", cursor)) {
-            skip("=");
-            expr = visitElement(property.getInitializer(), ctx);
-            if (expr instanceof Statement && !(expr instanceof Expression)) {
-                expr = new K.StatementExpression(randomId(), (Statement) expr);
-            }
-        } else {
-            exprPrefix = EMPTY;
+        if (isDestruct) {
+            // Destructuring declarations do not fit well into the `J.VariableDeclarations` model.
+            // So, the position of prefixes are slightly adjusted to preserve the prefix of `(` and the suffix of `)`.
+            Space destructPrefix = sourceBefore("(");
+            int saveCursor = cursor;
+            String params = sourceBefore(")").getWhitespace();
+            String[] paramNames = params.split(",");
             cursor(saveCursor);
-        }
 
-        if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
-            expr = visitElement(property.getGetter(), ctx);
-            if (expr instanceof Statement && !(expr instanceof Expression)) {
-                expr = new K.StatementExpression(randomId(), (Statement) expr);
+            ConeTypeProjection[] typeArguments = null;
+            if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+                FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
+                typeArguments = typeRef.getType().getTypeArguments();
             }
+
+            JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = null;
+            for (int j = 0; j < paramNames.length; j++) {
+                String paramName = paramNames[j].trim();
+                JavaType type = typeArguments == null ? null : typeMapping.type(typeArguments[j]);
+                J.Identifier name = createIdentifier(paramName, type, null);
+                namedVariable = maybeSemicolon(
+                        new J.VariableDeclarations.NamedVariable(
+                                randomId(),
+                                destructPrefix == null ? EMPTY : destructPrefix,
+                                Markers.EMPTY,
+                                name,
+                                emptyList(),
+                                null,
+                                typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
+                        ));
+                if (j != paramNames.length - 1) {
+                    namedVariable = namedVariable.withAfter(sourceBefore(","));
+                    variables.add(namedVariable);
+                } else {
+                    namedVariable = namedVariable.withAfter(sourceBefore(")"));
+                }
+                destructPrefix = null;
+            }
+
+            J expr = null;
+            saveCursor = cursor;
+            Space exprPrefix = whitespace();
+            if (property.getInitializer() != null && source.startsWith("=", cursor)) {
+                skip("=");
+                expr = visitElement(property.getInitializer(), ctx);
+                if (expr instanceof Statement && !(expr instanceof Expression)) {
+                    expr = new K.StatementExpression(randomId(), (Statement) expr);
+                }
+            } else {
+                exprPrefix = EMPTY;
+                cursor(saveCursor);
+            }
+            assert namedVariable != null;
+            namedVariable = namedVariable.withElement(namedVariable.getElement().getPadding().withInitializer(expr == null ? null : padLeft(exprPrefix, (Expression) expr)));
+            variables.add(namedVariable);
+        } else {
+            Space namePrefix = whitespace();
+            J.Identifier name = createIdentifier(property.getName().asString(), property);
+
+            if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+                FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
+                if (typeRef.getDelegatedTypeRef() != null) {
+                    Space delimiterPrefix = whitespace();
+                    boolean addTypeReferencePrefix = source.startsWith(":", cursor);
+                    skip(":");
+                    if (addTypeReferencePrefix) {
+                        markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
+                    }
+                    J j = visitElement(typeRef, ctx);
+                    if (j instanceof TypeTree) {
+                        typeExpression = (TypeTree) j;
+                    } else {
+                        typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
+                    }
+                }
+            }
+
+            J expr = null;
+            int saveCursor = cursor;
+            Space exprPrefix = whitespace();
+            if (property.getInitializer() != null && source.startsWith("=", cursor)) {
+                skip("=");
+                expr = visitElement(property.getInitializer(), ctx);
+                if (expr instanceof Statement && !(expr instanceof Expression)) {
+                    expr = new K.StatementExpression(randomId(), (Statement) expr);
+                }
+            } else {
+                exprPrefix = EMPTY;
+                cursor(saveCursor);
+            }
+
+            if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
+                expr = visitElement(property.getGetter(), ctx);
+                if (expr instanceof Statement && !(expr instanceof Expression)) {
+                    expr = new K.StatementExpression(randomId(), (Statement) expr);
+                }
+            }
+
+            JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
+                    new J.VariableDeclarations.NamedVariable(
+                            randomId(),
+                            namePrefix,
+                            Markers.EMPTY,
+                            name,
+                            emptyList(),
+                            expr == null ? null : padLeft(exprPrefix, (Expression) expr),
+                            typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
+                    ));
+
+            variables.add(namedVariable);
         }
 
         if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
             throw new IllegalArgumentException("Explicit setter initialization are not currently supported.");
         }
-
-        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
-                new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        namePrefix,
-                        Markers.EMPTY,
-                        name,
-                        dimensionsAfterName,
-                        expr == null ? null : padLeft(exprPrefix, (Expression) expr),
-                        typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
-                ));
-        vars.add(namedVariable);
 
         return new J.VariableDeclarations(
                 randomId(),
@@ -1553,8 +1618,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 emptyList(),
                 typeExpression,
                 null,
-                dimensionsAfterName,
-                vars);
+                emptyList(),
+                variables);
     }
 
     @Override
@@ -3606,7 +3671,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 FirStatement statement = statements.get(i);
                 J.VariableDeclarations part = (J.VariableDeclarations) visitElement(statement, ctx);
                 JRightPadded<J.VariableDeclarations.NamedVariable> named = part.getPadding().getVariables().get(0);
-                named = named.withElement(named.getElement().withPrefix(part.getPrefix()));
+                named = named.withElement(named.getElement().withName(named.getElement().getName().withPrefix(part.getPrefix())));
                 Space after = i == additionalVariables ? sourceBefore(")") : sourceBefore(",");
                 named = named.withAfter(after);
                 variables.add(named);
