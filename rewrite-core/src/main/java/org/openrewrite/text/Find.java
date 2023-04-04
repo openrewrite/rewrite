@@ -90,8 +90,10 @@ public class Find extends Recipe {
                     if(!newText.equals(rawText)) {
                         plainText = plainText.withText(newText);
                     }
+                    return plainText;
                 }
-                return plainText;
+
+                return sourceFile;
             }
         };
     }
