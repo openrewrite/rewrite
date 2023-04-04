@@ -293,7 +293,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         List<Input> inputs = acceptedInputs(sources);
         for (int i = 0; i < inputs.size(); i++) {
             Input source = inputs.get(i);
-            String fileName = "openRewriteFile.kt".equals(source.getPath().toString()) ? "openRewriteFile.kt" + i : source.getPath().toString();
+            String fileName = "openRewriteFile.kt".equals(source.getPath().toString()) ? "openRewriteFile" + i + ".kt" : source.getPath().toString();
             VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
             platformSources.add(new KtVirtualFileSourceFile(vFile));
         }
