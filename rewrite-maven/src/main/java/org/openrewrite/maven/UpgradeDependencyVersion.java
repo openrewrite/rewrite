@@ -297,9 +297,11 @@ public class UpgradeDependencyVersion extends Recipe {
 
         @Nullable
         private String findNewerVersion(String groupId, String artifactId, String version, ExecutionContext ctx) throws MavenDownloadingException {
+            String finalVersion = !Semver.isVersion(version) ? "0.0.0" : version;
+
             // in the case of "latest.patch", a new version can only be derived if the
             // current version is a semantic version
-            if (versionComparator instanceof LatestPatch && !versionComparator.isValid(version, version)) {
+            if (versionComparator instanceof LatestPatch && !versionComparator.isValid(finalVersion, finalVersion)) {
                 return null;
             }
 
@@ -307,11 +309,16 @@ public class UpgradeDependencyVersion extends Recipe {
                 MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                 List<String> versions = new ArrayList<>();
                 for (String v : mavenMetadata.getVersioning().getVersions()) {
-                    if (versionComparator.isValid(version, v)) {
+                    if (versionComparator.isValid(finalVersion, v)) {
                         versions.add(v);
                     }
                 }
-                return versionComparator.upgrade(version, versions).orElse(null);
+                // handle upgrades from non semver versions like "org.springframework.cloud:spring-cloud-dependencies:Camden.SR5"
+                if (!Semver.isVersion(finalVersion) && !versions.isEmpty()) {
+                    versions.sort(versionComparator);
+                    return versions.get(versions.size() - 1);
+                }
+                return versionComparator.upgrade(finalVersion, versions).orElse(null);
             } catch (IllegalStateException e) {
                 // this can happen when we encounter exotic versions
                 return null;
