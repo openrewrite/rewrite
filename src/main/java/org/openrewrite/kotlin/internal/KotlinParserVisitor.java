@@ -453,7 +453,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                padRight((Expression) visitElement(callableReferenceAccess.getExplicitReceiver(), ctx), sourceBefore("::")),
+                padRight(callableReferenceAccess.getExplicitReceiver() == null ?
+                        new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
+                        (Expression) visitElement(callableReferenceAccess.getExplicitReceiver(), ctx), sourceBefore("::")),
                 callableReferenceAccess.getTypeArguments().isEmpty() ? null : mapTypeArguments(callableReferenceAccess.getTypeArguments()),
                 padLeft(whitespace(), (J.Identifier) visitElement(callableReferenceAccess.getCalleeReference(), ctx)),
                 typeMapping.type(callableReferenceAccess.getCalleeReference()),

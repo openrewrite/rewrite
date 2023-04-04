@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -48,6 +49,20 @@ class MethodReferenceTest implements RewriteTest {
     void getJavaClass() {
         rewriteRun(
           kotlin("val a = Integer :: class . java ")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/64")
+    @Test
+    void noReceiver() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method() {
+                listOf(1, 2, 3).map(::println)
+            }
+            """
+          )
         );
     }
 }
