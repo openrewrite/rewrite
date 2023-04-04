@@ -108,8 +108,7 @@ class AddDependencyTest implements RewriteTest {
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                         <dependencies>
-                            <!--~~(Unable to download POM. Tried repositories:
-                    https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
+                            <dependency>
                                 <groupId>doesnotexist</groupId>
                                 <artifactId>doesnotexist</artifactId>
                                 <version>1</version>
