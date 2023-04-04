@@ -245,8 +245,8 @@ class AutodetectTest implements RewriteTest {
         var styles = Autodetect.detect(cus);
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
-        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
-        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(3);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(3);
     }
 
     @Test
