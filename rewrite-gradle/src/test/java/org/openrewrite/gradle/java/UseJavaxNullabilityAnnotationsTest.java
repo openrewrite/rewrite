@@ -1,16 +1,18 @@
 /*
-  ------------------------------------------------------------------------------
-        (c) by data experts gmbh
-              Postfach 1130
-              Woldegker Str. 12
-              17001 Neubrandenburg
-
-  Dieses Dokument und die hierin enthaltenen Informationen unterliegen
-  dem Urheberrecht und duerfen ohne die schriftliche Genehmigung des
-  Herausgebers weder als ganzes noch in Teilen dupliziert oder reproduziert
-  noch manipuliert werden.
-*/
-
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.gradle.java;
 
 import org.junit.jupiter.api.Test;
