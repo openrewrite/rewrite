@@ -239,9 +239,10 @@ public class JavaTemplateParser {
     private JavaSourceFile compileTemplate(@Language("java") String stub) {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        JavaParser jp = parser.clone().build();
         return stub.contains("@SubAnnotation") ?
-                parser.build().reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
-                parser.build().reset().parse(ctx, stub).get(0);
+                jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
+                jp.reset().parse(ctx, stub).get(0);
     }
 
     @SuppressWarnings("unchecked")
