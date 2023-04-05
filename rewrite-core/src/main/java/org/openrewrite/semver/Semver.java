@@ -29,6 +29,10 @@ public class Semver {
     private Semver() {
     }
 
+    public static boolean isVersion(String version) {
+        return LatestRelease.RELEASE_PATTERN.matcher(version).matches();
+    }
+
     public static Validated validate(String toVersion, @Nullable String metadataPattern) {
         return test(
                 "metadataPattern",

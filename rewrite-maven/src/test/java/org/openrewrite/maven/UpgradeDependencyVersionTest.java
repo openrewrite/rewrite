@@ -124,6 +124,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
     @Test
     void updateManagedDependencyVersion() {
         rewriteRun(
@@ -159,6 +160,52 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                               <artifactId>junit-jupiter-api</artifactId>
                               <version>5.7.2</version>
                               <scope>test</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void forceUpgradeNonSemverVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-dependencies", "2022.0.2", null,
+            false, null)),
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>Camden.SR5</version>
+                              <type>pom</type>
+                              <scope>import</scope>
+                          </dependency>
+                      </dependencies>
+                  </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                      <dependencies>
+                          <dependency>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dependencies</artifactId>
+                              <version>2022.0.2</version>
+                              <type>pom</type>
+                              <scope>import</scope>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
