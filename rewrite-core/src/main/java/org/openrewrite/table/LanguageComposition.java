@@ -23,8 +23,8 @@ import org.openrewrite.Recipe;
 public class LanguageComposition extends DataTable<LanguageComposition.Row> {
 
     public LanguageComposition(Recipe recipe) {
-        super(recipe, "Language composition",
-                "A list of files and their language composition.");
+        super(recipe, "Per-file language composition report",
+                "A list of individual files and their language composition.");
     }
 
     @Value
@@ -43,8 +43,9 @@ public class LanguageComposition extends DataTable<LanguageComposition.Row> {
                               "attribution nodes.")
         Long weight;
 
-        @Column(displayName = "Lines of code",
-                description = "The number of lines of code in the source file.")
-        Integer linesOfCode;
+        @Column(displayName = "Lines of text",
+                description = "The number of lines of text in the source file. " +
+                        "No language-specific knowledge to skip comments, blank lines, or any other non-code line.")
+        Integer linesOfText;
     }
 }

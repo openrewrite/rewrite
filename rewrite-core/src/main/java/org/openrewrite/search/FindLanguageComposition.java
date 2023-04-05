@@ -27,12 +27,12 @@ public class FindLanguageComposition extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find language composition";
+        return "Per-file language composition report";
     }
 
     @Override
     public String getDescription() {
-        return "Produce a table of files and their language composition.";
+        return "Produce a table of individual files, noting their language and size.";
     }
 
     @Override
