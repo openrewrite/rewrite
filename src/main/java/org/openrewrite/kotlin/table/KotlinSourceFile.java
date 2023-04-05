@@ -24,7 +24,7 @@ public class KotlinSourceFile extends DataTable<KotlinSourceFile.Row> {
 
     public KotlinSourceFile(Recipe recipe) {
         super(recipe, "Kotlin source files",
-                "Kotlin sources present in ASTs on the SAAS.");
+                "Kotlin sources present in LSTs on the SAAS.");
     }
 
     @Value
