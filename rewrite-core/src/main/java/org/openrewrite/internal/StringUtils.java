@@ -455,9 +455,9 @@ public class StringUtils {
         }
 
         // Process characters before first star
-        while (true) {
+        while (patIdxStart <= patIdxEnd && strIdxStart <= strIdxEnd) {
             char ch = pattern.charAt(patIdxStart);
-            if (ch == '*' || strIdxStart > strIdxEnd) {
+            if (ch == '*') {
                 break;
             }
             if (ch != '?'
@@ -471,12 +471,15 @@ public class StringUtils {
             // All characters in the string are used. Check if only '*'s are
             // left in the pattern. If so, we succeeded. Otherwise failure.
             return allStars(pattern, patIdxStart, patIdxEnd);
+        } else if (patIdxStart > patIdxEnd) {
+            // String not exhausted by pattern is. Failure
+            return false;
         }
 
         // Process characters after last star
-        while (true) {
+        while (patIdxStart <= patIdxEnd && strIdxStart <= strIdxEnd) {
             char ch = pattern.charAt(patIdxEnd);
-            if (ch == '*' || strIdxStart > strIdxEnd) {
+            if (ch == '*') {
                 break;
             }
             if (ch != '?' && different(caseSensitive, ch, str.charAt(strIdxEnd))) {

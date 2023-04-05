@@ -89,4 +89,34 @@ class FindSourceFilesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findDotfiles() {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles(".github/workflows/*.yml")),
+          text(
+            """
+              name: hello-world
+              on: push
+              jobs:
+                my-job:
+                  runs-on: ubuntu-latest
+                  steps:
+                    - name: my-step
+                      run: echo "Hello World!"
+              """,
+            """
+              ~~>name: hello-world
+              on: push
+              jobs:
+                my-job:
+                  runs-on: ubuntu-latest
+                  steps:
+                    - name: my-step
+                      run: echo "Hello World!"
+              """,
+            spec -> spec.path(".github/workflows/hello.yml")
+          )
+        );
+    }
 }

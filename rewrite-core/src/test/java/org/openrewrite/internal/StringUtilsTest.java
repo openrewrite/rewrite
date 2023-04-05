@@ -18,9 +18,8 @@ package org.openrewrite.internal;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 
-import static org.openrewrite.internal.StringUtils.*;
-
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.internal.StringUtils.*;
 
 class StringUtilsTest {
 
@@ -81,10 +80,39 @@ class StringUtilsTest {
 
     @Test
     void globMatching() {
-        assertThat(matchesGlob("expression", "expr*")).isTrue();
-        assertThat(matchesGlob("some/xpath", "some/*")).isTrue();
-        assertThat(matchesGlob("some/xpath/expression", "some/**")).isTrue();
-        assertThat(matchesGlob("//some/xpath/expression", "**/xpath/*")).isTrue();
+        // exact matches
+        assertThat(matchesGlob("test", null)).isFalse();
+        assertThat(matchesGlob("test", "")).isFalse();
+        assertThat(matchesGlob("", "")).isTrue();
+        assertThat(matchesGlob("test", "test")).isTrue();
+
+        // matches with ?'s
+        assertThat(matchesGlob("test", "t?st")).isTrue();
+        assertThat(matchesGlob("test", "??st")).isTrue();
+        assertThat(matchesGlob("test", "tes?")).isTrue();
+        assertThat(matchesGlob("test", "te??")).isTrue();
+        assertThat(matchesGlob("test", "?es?")).isTrue();
+        assertThat(matchesGlob("tes", "tes?")).isFalse();
+        assertThat(matchesGlob("testt", "tes?")).isFalse();
+        assertThat(matchesGlob("tsst", "tes?")).isFalse();
+
+        // matches with *
+        assertThat(matchesGlob("test", "*")).isTrue();
+        assertThat(matchesGlob("test", "test*")).isTrue();
+        assertThat(matchesGlob("testTest", "test*")).isTrue();
+        assertThat(matchesGlob("test", "*test")).isTrue();
+        assertThat(matchesGlob("testtest", "*test")).isTrue();
+        assertThat(matchesGlob("testtest", "test*test")).isTrue();
+        assertThat(matchesGlob("testtest", "tes*est")).isTrue();
+
+        // Exhaustive cases
+        assertThat(matchesGlob("testaaatestaaatest", "test*test*test")).isTrue();
+        assertThat(matchesGlob("bestabatest", "?est*test")).isTrue();
+        assertThat(matchesGlob("testabctestabctesabctest", "test*test*test")).isTrue();
+        assertThat(matchesGlob("test.txt", "*.txt")).isTrue();
+        assertThat(matchesGlob("test.txt", "test.*")).isTrue();
+        assertThat(matchesGlob("test.txt", "*.*")).isTrue();
+        assertThat(matchesGlob("test.test.txt", "*.*")).isTrue();
     }
 
     @SuppressWarnings("TextBlockMigration")
