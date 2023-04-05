@@ -499,14 +499,14 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
         private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
             for (Marker marker : markers.getMarkers()) {
-                p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+                p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
             }
             if (loc != null) {
                 visitSpace(prefix, loc, p);
             }
             visitMarkers(markers, p);
             for (Marker marker : markers.getMarkers()) {
-                p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+                p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
             }
         }
 
@@ -516,7 +516,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
         private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
             for (Marker marker : markers.getMarkers()) {
-                p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+                p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
             }
         }
     }
@@ -531,7 +531,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     private void beforeSyntax(Markers markers, PrintOutputCapture<P> p) {
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
         }
     }
 
@@ -541,7 +541,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
 
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVADOC_MARKER_WRAPPER));
         }
     }
 }

@@ -33,9 +33,9 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
     @Override
     public Json visitArray(Json.Array array, PrintOutputCapture<P> p) {
         beforeSyntax(array, p);
-        p.out.append('[');
+        p.append('[');
         visitRightPadded(array.getPadding().getValues(), ",", p);
-        p.out.append(']');
+        p.append(']');
         afterSyntax(array, p);
         return array;
     }
@@ -59,7 +59,7 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
     @Override
     public Json visitIdentifier(Json.Identifier ident, PrintOutputCapture<P> p) {
         beforeSyntax(ident, p);
-        p.out.append(ident.getName());
+        p.append(ident.getName());
         afterSyntax(ident, p);
         return ident;
     }
@@ -67,7 +67,7 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
     @Override
     public Json visitLiteral(Json.Literal literal, PrintOutputCapture<P> p) {
         beforeSyntax(literal, p);
-        p.out.append(literal.getSource());
+        p.append(literal.getSource());
         afterSyntax(literal, p);
         return literal;
     }
@@ -76,7 +76,7 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
     public Json visitMember(Json.Member member, PrintOutputCapture<P> p) {
         beforeSyntax(member, p);
         visitRightPadded(member.getPadding().getKey(), p);
-        p.out.append(':');
+        p.append(':');
         visit(member.getValue(), p);
         afterSyntax(member, p);
         return member;
@@ -85,24 +85,24 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
     @Override
     public Json visitObject(Json.JsonObject obj, PrintOutputCapture<P> p) {
         beforeSyntax(obj, p);
-        p.out.append('{');
+        p.append('{');
         visitRightPadded(obj.getPadding().getMembers(), ",", p);
-        p.out.append('}');
+        p.append('}');
         afterSyntax(obj, p);
         return obj;
     }
 
     public Space visitSpace(Space space, PrintOutputCapture<P> p) {
-        p.out.append(space.getWhitespace());
+        p.append(space.getWhitespace());
 
         for (Comment comment : space.getComments()) {
             visitMarkers(comment.getMarkers(), p);
             if (comment.isMultiline()) {
-                p.out.append("/*").append(comment.getText()).append("*/");
+                p.append("/*").append(comment.getText()).append("*/");
             } else {
-                p.out.append("//").append(comment.getText());
+                p.append("//").append(comment.getText());
             }
-            p.out.append(comment.getSuffix());
+            p.append(comment.getSuffix());
         }
         return space;
     }
@@ -113,7 +113,7 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), p);
             if (i < nodes.size() - 1) {
-                p.out.append(suffixBetween);
+                p.append(suffixBetween);
             }
         }
     }
@@ -127,12 +127,12 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
 
     private void beforeSyntax(Space prefix, Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JSON_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JSON_MARKER_WRAPPER));
         }
         visitSpace(prefix, p);
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JSON_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JSON_MARKER_WRAPPER));
         }
     }
 
@@ -142,7 +142,7 @@ public class JsonPrinter<P> extends JsonVisitor<PrintOutputCapture<P>> {
 
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JSON_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JSON_MARKER_WRAPPER));
         }
     }
 }

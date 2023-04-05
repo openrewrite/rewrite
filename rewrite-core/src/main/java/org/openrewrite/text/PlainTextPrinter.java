@@ -28,15 +28,15 @@ public class PlainTextPrinter<P> extends PlainTextVisitor<PrintOutputCapture<P>>
     @Override
     public PlainText visitText(PlainText text, PrintOutputCapture<P> p) {
         for (Marker marker : text.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
         }
         visitMarkers(text.getMarkers(), p);
         for (Marker marker : text.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
         }
-        p.out.append(text.getText());
+        p.append(text.getText());
         for (Marker marker : text.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
         }
         return text;
     }
