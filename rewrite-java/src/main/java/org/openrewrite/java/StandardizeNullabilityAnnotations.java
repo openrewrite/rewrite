@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.NonNullApi;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -27,7 +26,6 @@ import java.util.stream.Stream;
 
 
 @Value
-@NonNullApi
 @EqualsAndHashCode(callSuper = false)
 public class StandardizeNullabilityAnnotations extends Recipe {
 
