@@ -25,7 +25,10 @@ class AppendToSequenceTest implements RewriteTest {
     @Test
     void appendToSequenceHasDashTrue() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToSequence(
+          spec -> spec
+                .cycles(2)
+                .expectedCyclesThatMakeChanges(1)
+                .recipe(new AppendToSequence(
             "$.things.fruit",
             "strawberry",
             null

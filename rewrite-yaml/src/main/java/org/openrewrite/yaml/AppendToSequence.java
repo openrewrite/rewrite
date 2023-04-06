@@ -67,6 +67,6 @@ public class AppendToSequence extends Recipe {
     @Override
     public YamlVisitor<ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(sequencePath);
-        return new AppendToSequenceVisitor<ExecutionContext>(matcher, value);
+        return new AppendToSequenceVisitor(matcher, value);
     }
 }
