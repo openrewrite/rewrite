@@ -753,6 +753,20 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void typeInNestedPackageInheritingFromTypeInBasePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.util", "util", null)),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              public class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void method() {
         rewriteRun(
           java(testClassBefore, testClassAfter),

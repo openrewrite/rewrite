@@ -21,7 +21,6 @@ import lombok.With;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.SearchResult;
 
@@ -80,10 +79,21 @@ public class ChangePackage extends Recipe {
                         return SearchResult.found(cu);
                     }
                 }
-                if (recursive != null && recursive) {
-                    doAfterVisit(new UsesType<>(oldPackageName + "..*", false));
-                } else {
-                    doAfterVisit(new UsesType<>(oldPackageName + ".*", false));
+                boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
+                String recursivePackageNamePrefix = oldPackageName + ".";
+                for (J.Import anImport : cu.getImports()) {
+                    String importedPackage = anImport.getPackageName();
+                    if (importedPackage.equals(oldPackageName) || recursive && importedPackage.startsWith(recursivePackageNamePrefix)) {
+                        return SearchResult.found(cu);
+                    }
+                }
+                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                    if (type instanceof JavaType.FullyQualified) {
+                        String packageName = ((JavaType.FullyQualified) type).getPackageName();
+                        if (packageName.equals(oldPackageName) || recursive && packageName.startsWith(recursivePackageNamePrefix)) {
+                            return SearchResult.found(cu);
+                        }
+                    }
                 }
                 return cu;
             }
