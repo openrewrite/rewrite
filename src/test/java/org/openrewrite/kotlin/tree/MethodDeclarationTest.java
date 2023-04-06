@@ -210,4 +210,30 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/70")
+    @Test
+    void crossinline() {
+        rewriteRun(
+          kotlin(
+            """
+            inline fun example (
+              crossinline block : ( ) -> Unit
+            ) : Unit = Unit
+            """)
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/70")
+    @Test
+    void noinline() {
+        rewriteRun(
+          kotlin(
+            """
+            inline fun example (
+              noinline block : ( ) -> Unit
+            ) : Unit = Unit
+            """)
+        );
+    }
 }

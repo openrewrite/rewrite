@@ -736,6 +736,8 @@ public interface K extends J {
             Fun,
             Companion,
             Inline,
+            NoInline,
+            CrossInline,
             Value,
             Infix,
             Operator,

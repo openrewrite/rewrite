@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
@@ -214,7 +213,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void multipleBounds() {
         rewriteRun(
@@ -307,6 +306,53 @@ class ClassDeclarationTest implements RewriteTest {
             }
             object InvalidEmail : InvalidField {
               override val field : String = "email"
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/68")
+    @Test
+    void init() {
+        rewriteRun(
+          kotlin("""
+            class Test {
+                init {
+                    println( "Hello, world!" )
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void valueClass() {
+        rewriteRun(
+          kotlin("@JvmInline value class Wrapper ( val int : Int )")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/66")
+    @Test
+    void typeParameterReference() {
+        rewriteRun(
+          kotlin(
+            """
+            abstract class BaseSubProjectionNode < T , R > (
+                val parent : T,
+                val root : R
+            ) {
+            
+                constructor ( parent : T , root : R ) : this ( parent , root )
+            
+                fun parent ( ) : T {
+                    return parent
+                }
+            
+                fun root ( ) : R {
+                    return root
+                }
             }
             """
           )

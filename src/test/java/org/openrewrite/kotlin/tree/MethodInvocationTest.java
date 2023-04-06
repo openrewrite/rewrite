@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -291,6 +292,72 @@ class MethodInvocationTest implements RewriteTest {
                 return 1
             }
             val x: Map<String, String> = emptyMap()
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/65")
+    @Test
+    void trailingVarargParameter() {
+        rewriteRun(
+          kotlin(
+            """
+            fun asList (n : Int, vararg ns : Int) : List < Int > {
+                val result = ArrayList < Int > ( )
+                for ( t in ns ) // ns is an Array
+                    result . add ( t )
+                return result
+            }
+            
+            val list = asList ( 1 , 2 , 3 , 4 )
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/65")
+    @Test
+    void varargParameter() {
+        rewriteRun(
+          kotlin(
+            """
+            fun asList (vararg ns : Int) : List < Int > {
+                val result = ArrayList < Int > ( )
+                for ( t in ns ) // ns is an Array
+                    result . add ( t )
+                return result
+            }
+            
+            val list = asList ( 1 , 2 , 3 , 4 )
+            """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedInvocation() {
+        rewriteRun(
+          kotlin(
+            """
+            package some.org
+            fun fooBar ( ) { }
+            """
+          ),
+          kotlin(
+            """
+            val x = some . org . fooBar ( )
+            """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedMethodInvocationName() {
+        rewriteRun(
+          kotlin(
+            """
+            val x = some . qualified . fooBar ( )
             """
           )
         );
