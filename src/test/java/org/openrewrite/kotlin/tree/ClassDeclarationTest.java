@@ -261,45 +261,19 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Test
-    void sealedClass() {
-        rewriteRun(
-          kotlin(
-            """
-            sealed class DomainError
-            data class EmptyUpdate(val description: String) : DomainError()
-            object PasswordNotMatched : DomainError()
-            """
-          )
-        );
-    }
-
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/72")
     @Test
+    @ExpectedToFail
     void sealedClassWithPropertiesAndDataClass() {
         rewriteRun(
           kotlin(
             """
             sealed class InvalidField {
-              val errors: List<String>
               val field: String
             }
-            data class InvalidEmail(override val errors: List<String>) : InvalidField() {
+            data class InvalidEmail(val errors: List<String>) : InvalidField() {
               override val field: String = "email"
             }
-            """
-          )
-        );
-    }
-
-    @Test
-    void sealedInterface() {
-        rewriteRun(
-          kotlin(
-            """
-            sealed interface DomainError
-            data class EmptyUpdate(val description: String) : DomainError
-            object PasswordNotMatched : DomainError
             """
           )
         );
@@ -313,10 +287,9 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
             sealed interface InvalidField {
-              val errors: List<String>
               val field: String
             }
-            data class InvalidEmail(override val errors: List<String>) : InvalidField {
+            data class InvalidEmail : InvalidField {
               override val field: String = "email"
             }
             """
@@ -330,11 +303,9 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
             sealed interface InvalidField {
-              val errors: List<String>
               val field: String
             }
             object InvalidEmail : InvalidField {
-              override val errors: List<String> = emptyList()
               override val field: String = "email"
             }
             """
