@@ -219,9 +219,9 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """          
-            inline fun example(
-              crossinline block: () -> Unit
-            ): Unit = Unit
+            inline fun example (
+              crossinline block : ( ) -> Unit
+            ) : Unit = Unit
             """)
         );
     }
@@ -233,9 +233,9 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """          
-            inline fun example(
-              noinline block: () -> Unit
-            ): Unit = Unit
+            inline fun example (
+              noinline block : ( ) -> Unit
+            ) : Unit = Unit
             """)
         );
     }
