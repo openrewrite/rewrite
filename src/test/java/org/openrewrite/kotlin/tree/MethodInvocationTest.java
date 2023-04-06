@@ -300,7 +300,6 @@ class MethodInvocationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/78")
     @Test
-    @ExpectedToFail
     void infixTrailingLambdaDSL() {
         rewriteRun(
           kotlin(

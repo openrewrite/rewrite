@@ -872,7 +872,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
 
         FirNamedReference namedReference = functionCall.getCalleeReference();
-
         if (namedReference instanceof FirResolvedNamedReference &&
                 ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
             TypeTree name;
@@ -1079,8 +1078,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         } else {
             if (firExpressions.isEmpty()) {
-                args = JContainer.build(sourceBefore("("),
-                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+                int saveCursor = cursor;
+                Space before = whitespace();
+                if (source.startsWith("{", cursor)) {
+                    // function call arguments with no parens.
+                    cursor(saveCursor);
+                    args = JContainer.build(before,
+                            singletonList(padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), EMPTY)), Markers.EMPTY.addIfAbsent(new OmitParentheses(randomId())));
+                } else {
+                    skip("(");
+                    args = JContainer.build(before,
+                            singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+                }
             } else {
                 Space containerPrefix = sourceBefore("(");
                 List<FirExpression> flattenedExpressions = firExpressions.stream()
