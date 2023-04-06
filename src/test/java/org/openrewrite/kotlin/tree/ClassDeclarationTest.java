@@ -271,8 +271,8 @@ class ClassDeclarationTest implements RewriteTest {
             sealed class InvalidField {
               val field: String
             }
-            data class InvalidEmail(val errors: List<String>) : InvalidField() {
-              override val field: String = "email"
+            data class InvalidEmail( val errors : List<String> ) : InvalidField ( ) {
+              override val field : String = "email"
             }
             """
           )
@@ -287,10 +287,10 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
             sealed interface InvalidField {
-              val field: String
+              val field : String
             }
-            data class InvalidEmail : InvalidField {
-              override val field: String = "email"
+            data class InvalidEmail( val errors : List<String> ) : InvalidField {
+              override val field : String = "email"
             }
             """
           )
@@ -303,10 +303,10 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
             sealed interface InvalidField {
-              val field: String
+              val field : String
             }
             object InvalidEmail : InvalidField {
-              override val field: String = "email"
+              override val field : String = "email"
             }
             """
           )
