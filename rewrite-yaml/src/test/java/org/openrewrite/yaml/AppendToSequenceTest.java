@@ -36,9 +36,6 @@ class AppendToSequenceTest implements RewriteTest {
                     fruit:
                       - apple
                       - blueberry
-                    animals:
-                      - cat
-                      - dog
               """,
             """
                   things:
@@ -46,9 +43,6 @@ class AppendToSequenceTest implements RewriteTest {
                       - apple
                       - blueberry
                       - strawberry
-                    animals:
-                      - cat
-                      - dog
               """
           )
         );
@@ -137,7 +131,7 @@ class AppendToSequenceTest implements RewriteTest {
     @Test
     void modifyOnlyMatchingFile() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToSequence(".list", "newThing", "**/a.yml")),
+          spec -> spec.recipe(new AppendToSequence("$.list", "newThing", "**/a.yml")),
           yaml("list:\n  - existingThing\n", "list:\n  - existingThing\n  - newThing", spec -> spec.path("a.yml")),
           yaml("whatever: true", spec -> spec.path("b.yml"))
         );
