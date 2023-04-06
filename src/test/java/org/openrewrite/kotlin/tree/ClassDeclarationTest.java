@@ -268,7 +268,7 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("""
             class Test {
                 init {
-                    println("Hello, world!")
+                    println( "Hello, world!" )
                 }
             }
             """)
@@ -278,7 +278,7 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void valueClass() {
         rewriteRun(
-          kotlin("@JvmInline value class Wrapper(val int: Int)")
+          kotlin("@JvmInline value class Wrapper ( val int : Int )")
         );
     }
 }
