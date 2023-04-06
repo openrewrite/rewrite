@@ -59,9 +59,11 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -870,9 +872,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
 
         FirNamedReference namedReference = functionCall.getCalleeReference();
-        if (namedReference instanceof FirErrorNamedReference) {
-            throw new IllegalStateException("Unresolved name reference: " + ((FirErrorNamedReference) namedReference).getDiagnostic());
-        }
 
         if (namedReference instanceof FirResolvedNamedReference &&
                 ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
@@ -939,39 +938,60 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     body,
                     typeMapping.methodInvocationType(functionCall, getCurrentFile()));
 
-        } else if (namedReference instanceof FirResolvedNamedReference) {
+        } else {
             Markers markers = Markers.EMPTY;
             JRightPadded<Expression> select = null;
-
-            if (!(functionCall instanceof FirImplicitInvokeCall)) {
-                FirElement visit = getReceiver(functionCall.getDispatchReceiver());
-                if (visit == null) {
-                    visit = getReceiver(functionCall.getExtensionReceiver());
-                }
-                if (visit == null) {
-                    visit = getReceiver(functionCall.getExplicitReceiver());
-                }
-
-                if (visit != null) {
-                    Expression selectExpr = (Expression) visitElement(visit, ctx);
-                    Space after = whitespace();
-                    if (source.startsWith(".", cursor)) {
-                        skip(".");
-                    } else if (source.startsWith("?.", cursor)) {
-                        skip("?.");
-                        markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
-                    }
-
-                    select = JRightPadded.build(selectExpr)
-                            .withAfter(after);
-                }
-            }
 
             if (isInfix) {
                 markers = markers.addIfAbsent(new ReceiverType(randomId()));
             }
 
-            J.Identifier name = (J.Identifier) visitElement(namedReference, null);
+            J.Identifier name;
+            if (namedReference instanceof FirErrorNamedReference) {
+                // A FirErrorNamedReference implies an issue configuring the classpath.
+                // At this point we do not know if the function call is a constructor, so, resolving FirErrorNamedReferences will improve over time.
+                // The Java compiler preserves the elements and unknown types only affect the types.
+                // This is an effort to mimic the java LST and create the LST element without type attrubtion.
+                String cleanedName = namedReference.getName().asString().substring("<Unresolved name:".length(), namedReference.getName().asString().length() - 1).trim();
+                String fullName = source.substring(cursor, cursor + source.substring(cursor).indexOf(cleanedName) + cleanedName.length());
+                TypeTree maybeName = TypeTree.build(fullName);
+                skip(fullName);
+                if (maybeName instanceof J.FieldAccess) {
+                    J.FieldAccess fa = (J.FieldAccess) maybeName;
+                    select = JRightPadded.build(fa.getTarget())
+                            .withAfter(fa.getPadding().getName().getBefore());
+                    name = fa.getName();
+                } else {
+                    name = (J.Identifier) maybeName;
+                }
+            } else {
+                if (!(functionCall instanceof FirImplicitInvokeCall)) {
+                    FirElement visit = getReceiver(functionCall.getDispatchReceiver());
+                    if (visit == null) {
+                        visit = getReceiver(functionCall.getExtensionReceiver());
+                    }
+
+                    if (visit == null) {
+                        visit = getReceiver(functionCall.getExplicitReceiver());
+                    }
+
+                    if (visit != null) {
+                        Expression selectExpr = (Expression) visitElement(visit, ctx);
+                        Space after = whitespace();
+                        if (source.startsWith(".", cursor)) {
+                            skip(".");
+                        } else if (source.startsWith("?.", cursor)) {
+                            skip("?.");
+                            markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+                        }
+
+                        select = JRightPadded.build(selectExpr)
+                                .withAfter(after);
+                    }
+                }
+
+                name = (J.Identifier) visitElement(namedReference, null);
+            }
 
             JContainer<Expression> typeParams = null;
             if (!functionCall.getTypeArguments().isEmpty()) {
@@ -1006,15 +1026,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 args = JContainer.build(arguments);
             }
 
-            FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
-            FirBasedSymbol<?> owner = null;
-            if (symbol instanceof FirNamedFunctionSymbol) {
-                FirNamedFunctionSymbol namedFunctionSymbol = (FirNamedFunctionSymbol) symbol;
-                ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
-                if (lookupTag != null) {
-                    owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
-                } else if (currentFile != null) {
-                    owner = getCurrentFile();
+            FirBasedSymbol<?> owner = getCurrentFile();
+            if (namedReference instanceof FirResolvedNamedReference) {
+                FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
+                if (symbol instanceof FirNamedFunctionSymbol) {
+                    FirNamedFunctionSymbol namedFunctionSymbol = (FirNamedFunctionSymbol) symbol;
+                    ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
+                    if (lookupTag != null) {
+                        owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
+                    }
                 }
             }
 
@@ -1028,8 +1048,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     args,
                     typeMapping.methodInvocationType(functionCall, owner));
         }
-
-        throw new IllegalArgumentException("Unsupported function call.");
     }
 
     @Nullable
@@ -1065,10 +1083,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
             } else {
                 Space containerPrefix = sourceBefore("(");
-                List<JRightPadded<Expression>> expressions = new ArrayList<>(firExpressions.size());
+                List<FirExpression> flattenedExpressions = firExpressions.stream()
+                        .map(e -> e instanceof FirVarargArgumentsExpression ? ((FirVarargArgumentsExpression) e).getArguments() : singletonList(e))
+                        .flatMap(Collection::stream)
+                        .collect(toList());
+
+                List<JRightPadded<Expression>> expressions = new ArrayList<>(flattenedExpressions.size());
                 boolean isTrailingComma = false;
-                for (int i = 0; i < firExpressions.size(); i++) {
-                    FirExpression expression = firExpressions.get(i);
+                for (int i = 0; i < flattenedExpressions.size(); i++) {
+                    FirExpression expression = flattenedExpressions.get(i);
                     Expression expr = convert(expression, ctx);
                     if (isTrailingComma) {
                         expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
@@ -1077,10 +1100,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     }
 
                     Space padding = whitespace();
-                    if (i < firExpressions.size() - 1) {
+                    if (i < flattenedExpressions.size() - 1) {
                         if (source.startsWith(",", cursor)) {
                             skip(",");
-                        } else if (source.startsWith(")", cursor) && firExpressions.get(i + 1) instanceof FirLambdaArgumentExpression) {
+                        } else if (source.startsWith(")", cursor) && flattenedExpressions.get(i + 1) instanceof FirLambdaArgumentExpression) {
                             // Trailing comma: https://kotlinlang.org/docs/coding-conventions.html#trailing-commas
                             isTrailingComma = true;
                             skip(")");
@@ -1385,8 +1408,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space asPrefix = sourceBefore("as");
             Space aliasPrefix = whitespace();
             String aliasText = firImport.getAliasName().asString();
-            cursor += aliasText.length();
-            // This feels not quite right, could probably record type information here
+            skip(aliasText);
+            // FirImport does not contain type attribution information, so we cannot use the type mapping here.
             J.Identifier aliasId = createIdentifier(aliasText)
                     .withPrefix(aliasPrefix);
             alias = padLeft(asPrefix, aliasId);
@@ -2571,7 +2594,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitAnonymousInitializer(FirAnonymousInitializer anonymousInitializer, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirAnonymousInitializer is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        Space prefix = sourceBefore("init");
+        J.Block staticInit = (J.Block) visitElement(anonymousInitializer.getBody(), ctx);
+        staticInit = staticInit.getPadding().withStatic(staticInit.getPadding().getStatic().withAfter(staticInit.getPrefix()));
+        staticInit = staticInit.withPrefix(prefix);
+        return staticInit.withStatic(true);
     }
 
     @Override
@@ -2611,10 +2638,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(constructor.getAnnotations(), "constructor");
 
-        J.TypeParameters typeParameters = constructor.getTypeParameters().isEmpty() ? null :
-                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
-                        emptyList(),
-                        convertAll(constructor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
+//        J.TypeParameters typeParameters = constructor.getTypeParameters().isEmpty() ? null :
+//                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
+//                        emptyList(),
+//                        convertAll(constructor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
 
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (constructor.getReceiverTypeRef() != null) {
@@ -2670,7 +2697,40 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(":");
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
 
-            returnTypeExpression = (TypeTree) visitElement(constructor.getReturnTypeRef(), ctx);
+            int saveCursor2 = cursor;
+            Space thisPrefix = whitespace();
+            if (source.startsWith("this", cursor)) {
+                // 'this' is not represented in the FIR since it's implicit in the constructor.
+                TypeTree thisName = createIdentifier("this");
+                before = sourceBefore("(");
+
+                List<JRightPadded<Expression>> exprs = new ArrayList<>(constructor.getValueParameters().size());
+                List<FirValueParameter> valueParameters = constructor.getValueParameters();
+                for (int i = 0; i < valueParameters.size(); i++) {
+                    FirValueParameter valueParameter = valueParameters.get(i);
+                    Expression id = createIdentifier(valueParameter.getName().asString());
+                    id = id.withType(typeMapping.type(valueParameter, constructor.getSymbol()));
+                    Space after = i < valueParameters.size() - 1 ? sourceBefore(",") : sourceBefore(")");
+                    exprs.add(JRightPadded.build(id).withAfter(after));
+                }
+
+                JavaType type = typeMapping.type(constructor);
+                J.NewClass newClass = new J.NewClass(
+                        randomId(),
+                        thisPrefix,
+                        Markers.EMPTY,
+                        null,
+                        EMPTY,
+                        thisName,
+                        JContainer.build(exprs).withBefore(before),
+                        null,
+                        type instanceof JavaType.Method ? (JavaType.Method) type : null
+                );
+                returnTypeExpression = new K.FunctionType(randomId(), newClass, null, null);
+            } else {
+                cursor(saveCursor2);
+                returnTypeExpression = (TypeTree) visitElement(constructor.getReturnTypeRef(), ctx);
+            }
 
             saveCursor = cursor;
             before = whitespace();
@@ -2709,7 +2769,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers,
                 annotations,
                 emptyList(),
-                typeParameters,
+                null,
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params,
@@ -3157,6 +3217,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         J.Identifier name = createIdentifier(valueName, typeMapping.type(typeAlias.getExpandedTypeRef()), null);
 
+        TypeTree typeExpression = new J.Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                "",
+                typeMapping.type(typeAlias.getExpandedTypeRef()),
+                null
+        );
+
         // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
         List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
 
@@ -3181,7 +3250,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers,
                 annotations,
                 emptyList(),
-                null,
+                typeExpression,
                 null,
                 null,
                 vars);

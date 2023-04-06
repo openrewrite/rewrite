@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -262,7 +261,6 @@ class ClassDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/68")
     @Test
-    @ExpectedToFail
     void init() {
         rewriteRun(
           kotlin("""
@@ -279,6 +277,48 @@ class ClassDeclarationTest implements RewriteTest {
     void valueClass() {
         rewriteRun(
           kotlin("@JvmInline value class Wrapper ( val int : Int )")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/66")
+    @Test
+    void typeParameterReference() {
+        rewriteRun(
+          kotlin(
+            """
+            abstract class BaseSubProjectionNode < T , R > (
+                val parent : T,
+                val root : R
+            ) {
+            
+                constructor ( parent : T , root : R ) : this ( parent , root )
+            
+                fun parent ( ) : T {
+                    return parent
+                }
+            
+                fun root ( ) : R {
+                    return root
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/68")
+    @Test
+    void classWithInit() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test {
+                init {
+                    println("Hello, world!")
+                }
+            }
+            """
+          )
         );
     }
 }

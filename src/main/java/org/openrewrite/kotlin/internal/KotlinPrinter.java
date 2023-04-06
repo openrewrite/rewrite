@@ -229,7 +229,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
 
             if (block.isStatic()) {
-                p.append("static");
+                p.append("init");
                 visitRightPadded(block.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, p);
             }
 
