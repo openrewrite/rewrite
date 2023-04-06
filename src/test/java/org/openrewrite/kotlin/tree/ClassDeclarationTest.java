@@ -259,4 +259,17 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("interface B < out R >")
         );
     }
+
+    @Test
+    void init() {
+        rewriteRun(
+          kotlin("""
+            class Test {
+                init {
+                    println("Hello, world!")
+                }
+            }
+            """)
+        );
+    }
 }
