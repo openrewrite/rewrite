@@ -1408,8 +1408,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space asPrefix = sourceBefore("as");
             Space aliasPrefix = whitespace();
             String aliasText = firImport.getAliasName().asString();
-            cursor += aliasText.length();
-            // This feels not quite right, could probably record type information here
+            skip(aliasText);
+            // FirImport does not contain type attribution information, so we cannot use the type mapping here.
             J.Identifier aliasId = createIdentifier(aliasText)
                     .withPrefix(aliasPrefix);
             alias = padLeft(asPrefix, aliasId);
@@ -3213,6 +3213,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         J.Identifier name = createIdentifier(valueName, typeMapping.type(typeAlias.getExpandedTypeRef()), null);
 
+        TypeTree typeExpression = new J.Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                "",
+                typeMapping.type(typeAlias.getExpandedTypeRef()),
+                null
+        );
+
         // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
         List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
 
@@ -3237,7 +3246,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers,
                 annotations,
                 emptyList(),
-                null,
+                typeExpression,
                 null,
                 null,
                 vars);
