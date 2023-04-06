@@ -292,7 +292,7 @@ class MethodInvocationTest implements RewriteTest {
                 ensure ( false ) { "failure" }
                 return 1
             }
-            val x: Map<String, String> = emptyMap()
+            val x: Map < String , String > = emptyMap ( )
             """
           )
         );
@@ -305,13 +305,13 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class FreeSpec(private val init: FreeSpec.() -> Unit) {
-              infix fun String.modify(block: () -> Unit) = TODO()
+            class FreeSpec ( private val init : FreeSpec . ( ) -> Unit ) {
+              infix fun String . modify ( block : ( ) -> Unit ) : Nothing = TODO ( )
             }
             
             val spec = FreeSpec {
               "test" modify {
-                println("Hello, world!")
+                println ( "Hello, world!" )
               }
             }
             """
@@ -324,10 +324,10 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            infix fun String.modify(block: () -> Unit) = TODO()
+            infix fun String . modify ( block : ( ) -> Unit ) = TODO ( )
             
             val spec = "test" modify {
-              println("Hello, world!")
+              println ( "Hello, world!" )
             }
             """
           )
@@ -359,7 +359,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun asList (vararg ns : Int) : List < Int > {
+            fun asList ( vararg ns : Int ) : List < Int > {
                 val result = ArrayList < Int > ( )
                 for ( t in ns ) // ns is an Array
                     result . add ( t )
