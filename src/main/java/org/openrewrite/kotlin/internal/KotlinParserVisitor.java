@@ -2642,11 +2642,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(constructor.getAnnotations(), "constructor");
 
-//        J.TypeParameters typeParameters = constructor.getTypeParameters().isEmpty() ? null :
-//                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
-//                        emptyList(),
-//                        convertAll(constructor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
-
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (constructor.getReceiverTypeRef() != null) {
             // Infix functions are de-sugared during the backend phase of the compiler.
@@ -2701,22 +2696,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(":");
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
 
-            int saveCursor2 = cursor;
-            Space thisPrefix = whitespace();
-            if (source.startsWith("this", cursor)) {
-                // 'this' is not represented in the FIR since it's implicit in the constructor.
-                TypeTree thisName = createIdentifier("this");
-                before = sourceBefore("(");
-
-                List<JRightPadded<Expression>> exprs = new ArrayList<>(constructor.getValueParameters().size());
-                List<FirValueParameter> valueParameters = constructor.getValueParameters();
-                for (int i = 0; i < valueParameters.size(); i++) {
-                    FirValueParameter valueParameter = valueParameters.get(i);
-                    Expression id = createIdentifier(valueParameter.getName().asString());
-                    id = id.withType(typeMapping.type(valueParameter, constructor.getSymbol()));
-                    Space after = i < valueParameters.size() - 1 ? sourceBefore(",") : sourceBefore(")");
-                    exprs.add(JRightPadded.build(id).withAfter(after));
-                }
+            if (constructor.getDelegatedConstructor() != null &&
+                    (constructor.getDelegatedConstructor().isThis() || constructor.getDelegatedConstructor().isSuper())) {
+                Space thisPrefix = whitespace();
+                // The delegate constructor call is de-sugared during the backend phase of the compiler.
+                TypeTree delegateName = createIdentifier(constructor.getDelegatedConstructor().isThis() ? "this" : "super");
+                JContainer<Expression> args = mapFunctionalCallArguments(constructor.getDelegatedConstructor().getArgumentList().getArguments()).withBefore(before);
 
                 JavaType type = typeMapping.type(constructor);
                 J.NewClass newClass = new J.NewClass(
@@ -2725,14 +2710,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         Markers.EMPTY,
                         null,
                         EMPTY,
-                        thisName,
-                        JContainer.build(exprs).withBefore(before),
+                        delegateName,
+                        args,
                         null,
                         type instanceof JavaType.Method ? (JavaType.Method) type : null
                 );
                 returnTypeExpression = new K.FunctionType(randomId(), newClass, null, null);
             } else {
-                cursor(saveCursor2);
                 returnTypeExpression = (TypeTree) visitElement(constructor.getReturnTypeRef(), ctx);
             }
 
