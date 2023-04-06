@@ -36,6 +36,26 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
             .build();
 
     @Override
+    public J visitMethodDeclaration(J.MethodDeclaration method, P p) {
+        J md = super.visitMethodDeclaration(method, p);
+        while (md != method) {
+            method = (J.MethodDeclaration) md;
+            md = super.visitMethodDeclaration(method, p);
+        }
+        return md;
+    }
+
+    @Override
+    public J visitLambda(J.Lambda lambda, P p) {
+        J l = super.visitLambda(lambda, p);
+        while (l != lambda) {
+            lambda = (J.Lambda) l;
+            l = super.visitLambda(lambda, p);
+        }
+        return l;
+    }
+
+    @Override
     public J visitIf(J.If iff, P p) {
         J.If i = visitAndCast(iff, p, super::visitIf);
 

@@ -209,4 +209,32 @@ class SimplifyBooleanReturnTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multipleApplications() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public boolean test(Object o) {
+                      if (true) {
+                          return true;
+                      }
+                      if (false) {
+                          return true;
+                      }
+                      return false;
+                  }
+              }
+              """,
+            """
+              public class A {
+                  public boolean test(Object o) {
+                      return true;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
