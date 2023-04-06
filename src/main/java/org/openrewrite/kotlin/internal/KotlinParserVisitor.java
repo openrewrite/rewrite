@@ -1331,10 +1331,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(".");
         }
 
-        J.Annotation suspendModifier = null;
+        J.Annotation annotation = null;
         if (functionTypeRef.isSuspend()) {
             Space suspendPrefix = whitespace();
-            suspendModifier = convertToAnnotation(mapModifier(suspendPrefix, emptyList()));
+            annotation = convertToAnnotation(mapModifier(suspendPrefix, emptyList()));
+        } else if (source.startsWith("noinline", cursor)) {
+            annotation = convertToAnnotation(mapModifier(EMPTY, emptyList()));
+        } else if (source.startsWith("crossinline", cursor)) {
+            annotation = convertToAnnotation(mapModifier(EMPTY, emptyList()));
         }
 
         Space prefix = whitespace();
@@ -1388,7 +1392,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new K.FunctionType(
                 randomId(),
                 lambda,
-                suspendModifier,
+                annotation,
                 receiver);
     }
 
@@ -3910,6 +3914,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             type = K.Modifier.Type.Companion;
         } else if (source.startsWith("inline", cursor)) {
             type = K.Modifier.Type.Inline;
+        } else if (source.startsWith("noinline", cursor)) {
+            type = K.Modifier.Type.NoInline;
+        } else if (source.startsWith("crossinline", cursor)) {
+            type = K.Modifier.Type.CrossInline;
         } else if (source.startsWith("value", cursor)) {
             type = K.Modifier.Type.Value;
         } else if (source.startsWith("infix", cursor)) {
