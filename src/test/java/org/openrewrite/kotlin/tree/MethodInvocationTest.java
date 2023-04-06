@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -291,6 +293,42 @@ class MethodInvocationTest implements RewriteTest {
                 return 1
             }
             val x: Map<String, String> = emptyMap()
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/78")
+    @Test
+    @ExpectedToFail
+    void infixTrailingLambdaDSL() {
+        rewriteRun(
+          kotlin(
+            """
+            class FreeSpec(private val init: FreeSpec.() -> Unit) {
+              infix fun String.modify(block: () -> Unit) = TODO()
+            }
+            
+            val spec = FreeSpec {
+              "test" modify {
+                println("Hello, world!")
+              }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void infixTrailingLambda() {
+        rewriteRun(
+          kotlin(
+            """
+            infix fun String.modify(block: () -> Unit) = TODO()
+            
+            val spec = "test" modify {
+              println("Hello, world!")
+            }
             """
           )
         );
