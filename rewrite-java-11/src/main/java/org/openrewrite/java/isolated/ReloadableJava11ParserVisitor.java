@@ -447,9 +447,9 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
             enumSet = padRight(
                     new J.EnumValueSet(
                             randomId(),
-                            enumValues.get(0).getElement().getPrefix(),
+                            EMPTY,
                             Markers.EMPTY,
-                            ListUtils.map(enumValues, (i, ev) -> i == 0 ? ev.withElement(ev.getElement().withPrefix(EMPTY)) : ev),
+                            enumValues,
                             semicolonPresent.get()
                     ),
                     EMPTY

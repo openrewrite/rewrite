@@ -34,7 +34,6 @@ import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.mavenProject;
 
 class BlankLinesTest implements RewriteTest {
 
@@ -902,6 +901,24 @@ class BlankLinesTest implements RewriteTest {
               package com.intellij.samples;
               
               public class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3089")
+    void enumAnnotations() {
+        rewriteRun(
+          blankLines(),
+          java(
+            """
+              public enum Test {
+                  @Deprecated
+                  A,
+                  @Deprecated
+                  B
               }
               """
           )
