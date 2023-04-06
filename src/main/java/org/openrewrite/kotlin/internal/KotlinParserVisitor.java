@@ -3098,9 +3098,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             for (FirElement firElement : membersMultiVariablesSeparated) {
                 if (!(firElement instanceof FirEnumEntry)) {
-                    if (firElement.getSource() != null && (ClassKind.ENUM_CLASS == classKind &&
-                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.EnumGeneratedDeclaration ||
-                            firElement.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter)) {
+                    if (firElement.getSource() != null && firElement.getSource().getKind() instanceof KtFakeSourceElementKind) {
                         continue;
                     }
                     members.add(maybeSemicolon((Statement) visitElement(firElement, ctx)));

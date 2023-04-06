@@ -262,13 +262,12 @@ class ClassDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/72")
     @Test
-    @ExpectedToFail
     void sealedClassWithPropertiesAndDataClass() {
         rewriteRun(
           kotlin(
             """
             sealed class InvalidField {
-              val field: String
+              abstract val field: String
             }
             data class InvalidEmail( val errors : List<String> ) : InvalidField ( ) {
               override val field : String = "email"
@@ -280,7 +279,6 @@ class ClassDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/72")
     @Test
-    @ExpectedToFail
     void sealedInterfaceWithPropertiesAndDataClass() {
         rewriteRun(
           kotlin(
