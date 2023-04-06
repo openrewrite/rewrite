@@ -285,4 +285,20 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/68")
+    @Test
+    void classWithInit() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test {
+                init {
+                    println("Hello, world!")
+                }
+            }
+            """
+          )
+        );
+    }
 }

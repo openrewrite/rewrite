@@ -2594,7 +2594,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitAnonymousInitializer(FirAnonymousInitializer anonymousInitializer, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirAnonymousInitializer is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        Space prefix = sourceBefore("init");
+        J.Block staticInit = (J.Block) visitElement(anonymousInitializer.getBody(), ctx);
+        staticInit = staticInit.getPadding().withStatic(staticInit.getPadding().getStatic().withAfter(staticInit.getPrefix()));
+        staticInit = staticInit.withPrefix(prefix);
+        return staticInit.withStatic(true);
     }
 
     @Override
