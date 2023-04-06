@@ -500,7 +500,7 @@ public class ResolvedPom {
                                 .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
                         dependencyManagement.add(new ResolvedManagedDependency(
                                 getValues(defined.getGav()),
-                                Scope.fromName(getValue(defined.getScope())),
+                                defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
                                 getValue(defined.getType()),
                                 getValue(defined.getClassifier()),
                                 ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
@@ -625,7 +625,11 @@ public class ResolvedPom {
                         includedBy.getDependencies().add(resolved);
                     }
 
-                    dependencies.add(resolved);
+                    if (dd.getScope().transitiveOf(scope) == scope) {
+                        dependencies.add(resolved);
+                    } else {
+                        continue;
+                    }
 
                     nextDependency:
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
@@ -695,13 +699,10 @@ public class ResolvedPom {
         //noinspection ConstantConditions
         Scope scopeInThisProject = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
                 getValue(d2.getClassifier()));
-        if (scopeInThisProject == null) {
-            scopeInThisProject = Scope.Compile;
-        }
         // project POM's dependency management overrules the containingPom's dependencyManagement
         // IFF the dependency is in the runtime classpath of the containingPom;
         // if the dependency was not already in the classpath of the containingPom, then project POM cannot override scope / "promote" it into the classpath
-        return scopeInContainingPom.isInClasspathOf(scopeInThisProject) ? scopeInThisProject : scopeInContainingPom;
+        return scopeInThisProject == null ? scopeInContainingPom : (scopeInContainingPom.isInClasspathOf(scopeInThisProject) ? scopeInThisProject : scopeInContainingPom);
     }
 
     private Dependency getValues(Dependency dep, int depth) {
