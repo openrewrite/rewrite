@@ -334,4 +334,32 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fullyQualifiedInvocation() {
+        rewriteRun(
+          kotlin(
+            """
+            package some.org
+            fun fooBar ( ) { }
+            """
+          ),
+          kotlin(
+            """
+            val x = some . org . fooBar ( )
+            """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedMethodInvocationName() {
+        rewriteRun(
+          kotlin(
+            """
+            val x = some . qualified . fooBar ( )
+            """
+          )
+        );
+    }
 }

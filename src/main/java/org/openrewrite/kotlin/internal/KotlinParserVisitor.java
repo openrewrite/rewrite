@@ -872,9 +872,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
 
         FirNamedReference namedReference = functionCall.getCalleeReference();
-        if (namedReference instanceof FirErrorNamedReference) {
-            throw new IllegalStateException("Unresolved name reference: " + ((FirErrorNamedReference) namedReference).getDiagnostic());
-        }
 
         if (namedReference instanceof FirResolvedNamedReference &&
                 ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
@@ -941,39 +938,60 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     body,
                     typeMapping.methodInvocationType(functionCall, getCurrentFile()));
 
-        } else if (namedReference instanceof FirResolvedNamedReference) {
+        } else {
             Markers markers = Markers.EMPTY;
             JRightPadded<Expression> select = null;
-
-            if (!(functionCall instanceof FirImplicitInvokeCall)) {
-                FirElement visit = getReceiver(functionCall.getDispatchReceiver());
-                if (visit == null) {
-                    visit = getReceiver(functionCall.getExtensionReceiver());
-                }
-                if (visit == null) {
-                    visit = getReceiver(functionCall.getExplicitReceiver());
-                }
-
-                if (visit != null) {
-                    Expression selectExpr = (Expression) visitElement(visit, ctx);
-                    Space after = whitespace();
-                    if (source.startsWith(".", cursor)) {
-                        skip(".");
-                    } else if (source.startsWith("?.", cursor)) {
-                        skip("?.");
-                        markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
-                    }
-
-                    select = JRightPadded.build(selectExpr)
-                            .withAfter(after);
-                }
-            }
 
             if (isInfix) {
                 markers = markers.addIfAbsent(new ReceiverType(randomId()));
             }
 
-            J.Identifier name = (J.Identifier) visitElement(namedReference, null);
+            J.Identifier name;
+            if (namedReference instanceof FirErrorNamedReference) {
+                // A FirErrorNamedReference implies an issue configuring the classpath.
+                // At this point we do not know if the function call is a constructor, so, resolving FirErrorNamedReferences will improve over time.
+                // The Java compiler preserves the elements and unknown types only affect the types.
+                // This is an effort to mimic the java LST and create the LST element without type attrubtion.
+                String cleanedName = namedReference.getName().asString().substring("<Unresolved name:".length(), namedReference.getName().asString().length() - 1).trim();
+                String fullName = source.substring(cursor, cursor + source.substring(cursor).indexOf(cleanedName) + cleanedName.length());
+                TypeTree maybeName = TypeTree.build(fullName);
+                skip(fullName);
+                if (maybeName instanceof J.FieldAccess) {
+                    J.FieldAccess fa = (J.FieldAccess) maybeName;
+                    select = JRightPadded.build(fa.getTarget())
+                            .withAfter(fa.getPadding().getName().getBefore());
+                    name = fa.getName();
+                } else {
+                    name = (J.Identifier) maybeName;
+                }
+            } else {
+                if (!(functionCall instanceof FirImplicitInvokeCall)) {
+                    FirElement visit = getReceiver(functionCall.getDispatchReceiver());
+                    if (visit == null) {
+                        visit = getReceiver(functionCall.getExtensionReceiver());
+                    }
+
+                    if (visit == null) {
+                        visit = getReceiver(functionCall.getExplicitReceiver());
+                    }
+
+                    if (visit != null) {
+                        Expression selectExpr = (Expression) visitElement(visit, ctx);
+                        Space after = whitespace();
+                        if (source.startsWith(".", cursor)) {
+                            skip(".");
+                        } else if (source.startsWith("?.", cursor)) {
+                            skip("?.");
+                            markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+                        }
+
+                        select = JRightPadded.build(selectExpr)
+                                .withAfter(after);
+                    }
+                }
+
+                name = (J.Identifier) visitElement(namedReference, null);
+            }
 
             JContainer<Expression> typeParams = null;
             if (!functionCall.getTypeArguments().isEmpty()) {
@@ -1008,15 +1026,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 args = JContainer.build(arguments);
             }
 
-            FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
-            FirBasedSymbol<?> owner = null;
-            if (symbol instanceof FirNamedFunctionSymbol) {
-                FirNamedFunctionSymbol namedFunctionSymbol = (FirNamedFunctionSymbol) symbol;
-                ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
-                if (lookupTag != null) {
-                    owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
-                } else if (currentFile != null) {
-                    owner = getCurrentFile();
+            FirBasedSymbol<?> owner = getCurrentFile();
+            if (namedReference instanceof FirResolvedNamedReference) {
+                FirBasedSymbol<?> symbol = ((FirResolvedNamedReference) namedReference).getResolvedSymbol();
+                if (symbol instanceof FirNamedFunctionSymbol) {
+                    FirNamedFunctionSymbol namedFunctionSymbol = (FirNamedFunctionSymbol) symbol;
+                    ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(namedFunctionSymbol);
+                    if (lookupTag != null) {
+                        owner = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
+                    }
                 }
             }
 
@@ -1030,8 +1048,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     args,
                     typeMapping.methodInvocationType(functionCall, owner));
         }
-
-        throw new IllegalArgumentException("Unsupported function call.");
     }
 
     @Nullable
