@@ -143,7 +143,7 @@ class AppendToSequenceTest implements RewriteTest {
                     .cycles(1)
                     .recipe(new AppendToSequence("$.list", "newThing", "**/a.yml")),
           yaml("list:\n  - existingThing\n", "list:\n  - existingThing\n  - newThing", spec -> spec.path("a.yml")),
-          yaml("whatever: true", spec -> spec.path("b.yml"))
+          yaml("list:\n  - existingThing\n", spec -> spec.path("b.yml"))
         );
     }
 }
