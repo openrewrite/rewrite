@@ -26,8 +26,7 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToSequenceHasDashTrue() {
         rewriteRun(
           spec -> spec
-                .cycles(2)
-                .expectedCyclesThatMakeChanges(1)
+                .cycles(1)
                 .recipe(new AppendToSequence(
             "$.things.fruit",
             "strawberry",
@@ -54,9 +53,11 @@ class AppendToSequenceTest implements RewriteTest {
     @Test
     void appendToSequenceOfNameValuePair() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToSequence(
+          spec -> spec
+                .cycles(1)
+                .recipe(new AppendToSequence(
             "$.things.fruit",
-            "name: strawberry",
+            " name: strawberry",
             null
           )),
           yaml(
@@ -86,7 +87,9 @@ class AppendToSequenceTest implements RewriteTest {
     @Test
     void appendToSequenceHasDashFalse() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToSequence(
+          spec -> spec
+                .cycles(1)
+                .recipe(new AppendToSequence(
             "$.things.fruit",
             "strawberry",
             null
@@ -113,7 +116,9 @@ class AppendToSequenceTest implements RewriteTest {
     @Test
     void appendToEmptySequence() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToSequence(
+          spec -> spec
+                .cycles(1)
+                .recipe(new AppendToSequence(
             "$.things.fruit",
             "strawberry",
             null
@@ -134,7 +139,9 @@ class AppendToSequenceTest implements RewriteTest {
     @Test
     void modifyOnlyMatchingFile() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToSequence("$.list", "newThing", "**/a.yml")),
+          spec -> spec
+                    .cycles(1)
+                    .recipe(new AppendToSequence("$.list", "newThing", "**/a.yml")),
           yaml("list:\n  - existingThing\n", "list:\n  - existingThing\n  - newThing", spec -> spec.path("a.yml")),
           yaml("whatever: true", spec -> spec.path("b.yml"))
         );

@@ -28,8 +28,10 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
                 return s;
             }
             if (alreadyVisited(s, executionContext)) {
+                System.out.println("alreadyVisited: true");
                 return s;
             }
+            System.out.println("alreadyVisited: false");
             setVisited(s, executionContext);
 
             List<Yaml.Sequence.Entry> entries = sequence.getEntries();
