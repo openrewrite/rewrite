@@ -179,13 +179,15 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/74")
     @Test
+    @ExpectedToFail
     void secondaryConstructor() {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                constructor ( val answer : Int )
+            class Test ( val answer : Int ) {
+                constructor ( ) : this ( 42 )
             }
             """
           )
