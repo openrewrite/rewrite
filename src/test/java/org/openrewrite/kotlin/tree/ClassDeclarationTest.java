@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -213,7 +212,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void multipleBounds() {
         rewriteRun(
@@ -257,6 +256,27 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin("interface A < in R >"),
           kotlin("interface B < out R >")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/68")
+    @Test
+    void init() {
+        rewriteRun(
+          kotlin("""
+            class Test {
+                init {
+                    println( "Hello, world!" )
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void valueClass() {
+        rewriteRun(
+          kotlin("@JvmInline value class Wrapper ( val int : Int )")
         );
     }
 
