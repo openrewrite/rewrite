@@ -259,4 +259,30 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("interface B < out R >")
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/66")
+    @Test
+    void typeParameterReference() {
+        rewriteRun(
+          kotlin(
+            """
+            abstract class BaseSubProjectionNode < T , R > (
+                val parent : T,
+                val root : R
+            ) {
+            
+                constructor ( parent : T , root : R ) : this ( parent , root )
+            
+                fun parent ( ) : T {
+                    return parent
+                }
+            
+                fun root ( ) : R {
+                    return root
+                }
+            }
+            """
+          )
+        );
+    }
 }

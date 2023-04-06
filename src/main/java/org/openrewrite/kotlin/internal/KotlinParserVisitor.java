@@ -63,6 +63,7 @@ import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -1069,7 +1070,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 List<FirExpression> flattenedExpressions = firExpressions.stream()
                         .map(e -> e instanceof FirVarargArgumentsExpression ? ((FirVarargArgumentsExpression) e).getArguments() : singletonList(e))
                         .flatMap(Collection::stream)
-                        .collect(Collectors.toList());
+                        .collect(toList());
 
                 List<JRightPadded<Expression>> expressions = new ArrayList<>(flattenedExpressions.size());
                 boolean isTrailingComma = false;
@@ -2617,10 +2618,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(constructor.getAnnotations(), "constructor");
 
-        J.TypeParameters typeParameters = constructor.getTypeParameters().isEmpty() ? null :
-                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
-                        emptyList(),
-                        convertAll(constructor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
+//        J.TypeParameters typeParameters = constructor.getTypeParameters().isEmpty() ? null :
+//                new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
+//                        emptyList(),
+//                        convertAll(constructor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
 
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (constructor.getReceiverTypeRef() != null) {
@@ -2676,7 +2677,40 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(":");
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
 
-            returnTypeExpression = (TypeTree) visitElement(constructor.getReturnTypeRef(), ctx);
+            int saveCursor2 = cursor;
+            Space thisPrefix = whitespace();
+            if (source.startsWith("this", cursor)) {
+                // 'this' is not represented in the FIR since it's implicit in the constructor.
+                TypeTree thisName = createIdentifier("this");
+                before = sourceBefore("(");
+
+                List<JRightPadded<Expression>> exprs = new ArrayList<>(constructor.getValueParameters().size());
+                List<FirValueParameter> valueParameters = constructor.getValueParameters();
+                for (int i = 0; i < valueParameters.size(); i++) {
+                    FirValueParameter valueParameter = valueParameters.get(i);
+                    Expression id = createIdentifier(valueParameter.getName().asString());
+                    id = id.withType(typeMapping.type(valueParameter, constructor.getSymbol()));
+                    Space after = i < valueParameters.size() - 1 ? sourceBefore(",") : sourceBefore(")");
+                    exprs.add(JRightPadded.build(id).withAfter(after));
+                }
+
+                JavaType type = typeMapping.type(constructor);
+                J.NewClass newClass = new J.NewClass(
+                        randomId(),
+                        thisPrefix,
+                        Markers.EMPTY,
+                        null,
+                        EMPTY,
+                        thisName,
+                        JContainer.build(exprs).withBefore(before),
+                        null,
+                        type instanceof JavaType.Method ? (JavaType.Method) type : null
+                );
+                returnTypeExpression = new K.FunctionType(randomId(), newClass, null, null);
+            } else {
+                cursor(saveCursor2);
+                returnTypeExpression = (TypeTree) visitElement(constructor.getReturnTypeRef(), ctx);
+            }
 
             saveCursor = cursor;
             before = whitespace();
@@ -2715,7 +2749,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers,
                 annotations,
                 emptyList(),
-                typeParameters,
+                null,
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                 params,
