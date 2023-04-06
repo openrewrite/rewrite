@@ -2302,4 +2302,25 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3089")
+    @Test
+    void enumConstants() {
+        rewriteRun(
+          java(
+            """
+              public enum WorkflowStatus {
+                  @SuppressWarnings("value1")
+                  VALUE1,
+                  @SuppressWarnings("value2")
+                  VALUE2,
+                  @SuppressWarnings("value3")
+                  VALUE3,
+                  @SuppressWarnings("value4")
+                  VALUE4
+              }
+              """
+          )
+        );
+    }
 }

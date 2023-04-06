@@ -133,6 +133,12 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
+        J.EnumValue e = super.visitEnumValue(_enum, p);
+        return keepMaximumLines(e, style.getKeepMaximum().getInDeclarations());
+    }
+
+    @Override
     public J.Import visitImport(J.Import impoort, P p) {
         J.Import i = super.visitImport(impoort, p);
         JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
@@ -257,6 +263,9 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space minimumLines(Space prefix, int min) {
+        if (min == 0) {
+            return prefix;
+        }
         if (prefix.getComments().isEmpty() ||
             prefix.getWhitespace().contains("\n") ||
             prefix.getComments().get(0) instanceof Javadoc ||
