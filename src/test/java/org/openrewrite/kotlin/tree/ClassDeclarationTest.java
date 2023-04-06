@@ -274,4 +274,11 @@ class ClassDeclarationTest implements RewriteTest {
             """)
         );
     }
+
+    @Test
+    void valueClass() {
+        rewriteRun(
+          kotlin("@JvmInline value class Wrapper(val int: Int)")
+        );
+    }
 }
