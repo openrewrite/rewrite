@@ -15,8 +15,8 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -179,13 +179,14 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/74")
     @Test
     void secondaryConstructor() {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                constructor ( val answer : Int )
+            class Test ( val answer : Int ) {
+                constructor ( ) : this ( 42 )
             }
             """
           )
@@ -213,7 +214,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Test
     void multipleBounds() {
         rewriteRun(
@@ -257,6 +258,103 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin("interface A < in R >"),
           kotlin("interface B < out R >")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/72")
+    @Test
+    void sealedClassWithPropertiesAndDataClass() {
+        rewriteRun(
+          kotlin(
+            """
+            sealed class InvalidField {
+              abstract val field: String
+            }
+            data class InvalidEmail( val errors : List<String> ) : InvalidField ( ) {
+              override val field : String = "email"
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/72")
+    @Test
+    void sealedInterfaceWithPropertiesAndDataClass() {
+        rewriteRun(
+          kotlin(
+            """
+            sealed interface InvalidField {
+              val field : String
+            }
+            data class InvalidEmail( val errors : List<String> ) : InvalidField {
+              override val field : String = "email"
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void sealedInterfaceWithPropertiesAndObject() {
+        rewriteRun(
+          kotlin(
+            """
+            sealed interface InvalidField {
+              val field : String
+            }
+            object InvalidEmail : InvalidField {
+              override val field : String = "email"
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/68")
+    @Test
+    void init() {
+        rewriteRun(
+          kotlin("""
+            class Test {
+                init {
+                    println( "Hello, world!" )
+                }
+            }
+            """)
+        );
+    }
+
+    @Test
+    void valueClass() {
+        rewriteRun(
+          kotlin("@JvmInline value class Wrapper ( val int : Int )")
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/66")
+    @Test
+    void typeParameterReference() {
+        rewriteRun(
+          kotlin(
+            """
+            abstract class BaseSubProjectionNode < T , R > (
+                val parent : T,
+                val root : R
+            ) {
+            
+                constructor ( parent : T , root : R ) : this ( parent , root )
+            
+                fun parent ( ) : T {
+                    return parent
+                }
+            
+                fun root ( ) : R {
+                    return root
+                }
+            }
+            """
+          )
         );
     }
 }

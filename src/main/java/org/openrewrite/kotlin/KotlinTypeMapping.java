@@ -26,6 +26,7 @@ import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod;
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter;
+import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProviderKt;
@@ -384,7 +385,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
 
     @Nullable
     public JavaType.Method methodInvocationType(@Nullable FirFunctionCall functionCall, @Nullable FirBasedSymbol<?> ownerSymbol) {
-        if (functionCall == null) {
+        if (functionCall == null || functionCall.getCalleeReference() instanceof FirErrorNamedReference) {
             return null;
         }
 

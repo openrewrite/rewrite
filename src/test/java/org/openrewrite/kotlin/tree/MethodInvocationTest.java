@@ -333,4 +333,70 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/65")
+    @Test
+    void trailingVarargParameter() {
+        rewriteRun(
+          kotlin(
+            """
+            fun asList (n : Int, vararg ns : Int) : List < Int > {
+                val result = ArrayList < Int > ( )
+                for ( t in ns ) // ns is an Array
+                    result . add ( t )
+                return result
+            }
+            
+            val list = asList ( 1 , 2 , 3 , 4 )
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/65")
+    @Test
+    void varargParameter() {
+        rewriteRun(
+          kotlin(
+            """
+            fun asList (vararg ns : Int) : List < Int > {
+                val result = ArrayList < Int > ( )
+                for ( t in ns ) // ns is an Array
+                    result . add ( t )
+                return result
+            }
+            
+            val list = asList ( 1 , 2 , 3 , 4 )
+            """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedInvocation() {
+        rewriteRun(
+          kotlin(
+            """
+            package some.org
+            fun fooBar ( ) { }
+            """
+          ),
+          kotlin(
+            """
+            val x = some . org . fooBar ( )
+            """
+          )
+        );
+    }
+
+    @Test
+    void unresolvedMethodInvocationName() {
+        rewriteRun(
+          kotlin(
+            """
+            val x = some . qualified . fooBar ( )
+            """
+          )
+        );
+    }
 }
