@@ -363,6 +363,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitAnonymousInitializer(FirAnonymousInitializer anonymousInitializer, ExecutionContext ctx) {
+        Space prefix = sourceBefore("init");
+        J.Block staticInit = (J.Block) visitElement(anonymousInitializer.getBody(), ctx);
+        staticInit = staticInit.getPadding().withStatic(staticInit.getPadding().getStatic().withAfter(staticInit.getPrefix()));
+        staticInit = staticInit.withPrefix(prefix);
+        return staticInit.withStatic(true);
+    }
+
+    @Override
     public J visitAnonymousObject(FirAnonymousObject anonymousObject, ExecutionContext ctx) {
         Space objectPrefix = sourceBefore("object");
         Markers markers = Markers.EMPTY.addIfAbsent(new KObject(randomId(), objectPrefix));
@@ -1978,6 +1987,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitSmartCastExpression(FirSmartCastExpression smartCastExpression, ExecutionContext ctx) {
+        return visitElement(smartCastExpression.getOriginalExpression(), ctx);
+    }
+
+    @Override
     public J visitStarProjection(FirStarProjection starProjection, ExecutionContext ctx) {
         Space prefix = whitespace();
         skip("*");
@@ -2032,6 +2046,76 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 "this",
                 typeMapping.type(thisReceiverExpression),
                 null);
+    }
+
+    @Override
+    public J visitTypeAlias(FirTypeAlias typeAlias, ExecutionContext ctx) {
+        Space prefix = whitespace();
+
+        List<J> modifiers = emptyList();
+        Markers markers = Markers.EMPTY;
+
+        List<J.Annotation> annotations = mapModifiers(typeAlias.getAnnotations(), "typealias");
+        Space aliasPrefix = whitespace();
+        J.Annotation aliasAnnotation = new J.Annotation(
+                randomId(),
+                aliasPrefix,
+                Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
+                createIdentifier("typealias"),
+                JContainer.empty());
+        annotations.add(aliasAnnotation);
+
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
+        Space namePrefix = EMPTY;
+        String valueName = "";
+        if ("<no name provided>".equals(typeAlias.getName().toString())) {
+            KtSourceElement sourceElement = typeAlias.getSource();
+            if (sourceElement == null) {
+                throw new IllegalStateException("Unexpected null source.");
+            }
+        } else {
+            valueName = typeAlias.getName().asString();
+            namePrefix = whitespace();
+        }
+        J.Identifier name = createIdentifier(valueName, typeMapping.type(typeAlias.getExpandedTypeRef()), null);
+
+        TypeTree typeExpression = new J.Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                "",
+                typeMapping.type(typeAlias.getExpandedTypeRef()),
+                null
+        );
+
+        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
+        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
+
+        Space initializerPrefix = sourceBefore("=");
+        Expression expr = (Expression) visitElement(typeAlias.getExpandedTypeRef(), ctx);
+        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
+                new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        namePrefix,
+                        Markers.EMPTY,
+                        name,
+                        dimensionsAfterName,
+                        padLeft(initializerPrefix, expr),
+                        null
+                )
+        );
+        vars.add(namedVariable);
+
+        return new J.VariableDeclarations(
+                randomId(),
+                prefix,
+                markers,
+                annotations,
+                emptyList(),
+                typeExpression,
+                null,
+                null,
+                vars);
     }
 
     @Override
@@ -2632,15 +2716,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitAnonymousInitializer(FirAnonymousInitializer anonymousInitializer, ExecutionContext ctx) {
-        Space prefix = sourceBefore("init");
-        J.Block staticInit = (J.Block) visitElement(anonymousInitializer.getBody(), ctx);
-        staticInit = staticInit.getPadding().withStatic(staticInit.getPadding().getStatic().withAfter(staticInit.getPrefix()));
-        staticInit = staticInit.withPrefix(prefix);
-        return staticInit.withStatic(true);
-    }
-
-    @Override
     public J visitAnnotation(FirAnnotation annotation, ExecutionContext ctx) {
         throw new UnsupportedOperationException("FirAnnotation is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
     }
@@ -3171,11 +3246,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
-    public J visitSmartCastExpression(FirSmartCastExpression smartCastExpression, ExecutionContext ctx) {
-        return visitElement(smartCastExpression.getOriginalExpression(), ctx);
-    }
-
-    @Override
     public J visitSpreadArgumentExpression(FirSpreadArgumentExpression spreadArgumentExpression, ExecutionContext ctx) {
         throw new UnsupportedOperationException("FirSpreadArgumentExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
     }
@@ -3205,76 +3275,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Markers.EMPTY,
                 (Expression) visitElement(throwExpression.getException(), ctx)
         );
-    }
-
-    @Override
-    public J visitTypeAlias(FirTypeAlias typeAlias, ExecutionContext ctx) {
-        Space prefix = whitespace();
-
-        List<J> modifiers = emptyList();
-        Markers markers = Markers.EMPTY;
-
-        List<J.Annotation> annotations = mapModifiers(typeAlias.getAnnotations(), "typealias");
-        Space aliasPrefix = whitespace();
-        J.Annotation aliasAnnotation = new J.Annotation(
-                randomId(),
-                aliasPrefix,
-                Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
-                createIdentifier("typealias"),
-                JContainer.empty());
-        annotations.add(aliasAnnotation);
-
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
-        Space namePrefix = EMPTY;
-        String valueName = "";
-        if ("<no name provided>".equals(typeAlias.getName().toString())) {
-            KtSourceElement sourceElement = typeAlias.getSource();
-            if (sourceElement == null) {
-                throw new IllegalStateException("Unexpected null source.");
-            }
-        } else {
-            valueName = typeAlias.getName().asString();
-            namePrefix = whitespace();
-        }
-        J.Identifier name = createIdentifier(valueName, typeMapping.type(typeAlias.getExpandedTypeRef()), null);
-
-        TypeTree typeExpression = new J.Identifier(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                "",
-                typeMapping.type(typeAlias.getExpandedTypeRef()),
-                null
-        );
-
-        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
-        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
-
-        Space initializerPrefix = sourceBefore("=");
-        Expression expr = (Expression) visitElement(typeAlias.getExpandedTypeRef(), ctx);
-        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
-                new J.VariableDeclarations.NamedVariable(
-                        randomId(),
-                        namePrefix,
-                        Markers.EMPTY,
-                        name,
-                        dimensionsAfterName,
-                        padLeft(initializerPrefix, expr),
-                        null
-                )
-        );
-        vars.add(namedVariable);
-
-        return new J.VariableDeclarations(
-                randomId(),
-                prefix,
-                markers,
-                annotations,
-                emptyList(),
-                typeExpression,
-                null,
-                null,
-                vars);
     }
 
     @Override
@@ -3364,28 +3364,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         throw new UnsupportedOperationException("FirErrorTypeRef should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
     }
 
-    /* Visits to parent classes ... these should never be called */
-    @Override
-    public J visitStatement(FirStatement statement, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("visitStatement should not be called.");
-    }
-
-    @Override
-    public J visitVariable(FirVariable variable, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("visitVariable should not be called.");
-    }
-
-    /* Visits to control flow ... these should never be called */
-    @Override
-    public J visitControlFlowGraphOwner(FirControlFlowGraphOwner controlFlowGraphOwner, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("visitControlFlowGraphOwner should not be called.");
-    }
-
-    @Override
-    public J visitControlFlowGraphReference(FirControlFlowGraphReference controlFlowGraphReference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("visitControlFlowGraphReference should not be called.");
-    }
-
     /**
      * Delegate {@link FirElement} to the appropriate visit.
      *
@@ -3444,6 +3422,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitComparisonExpression((FirComparisonExpression) firElement, ctx);
         } else if (firElement instanceof FirConstExpression) {
             return visitConstExpression((FirConstExpression<?>) firElement, ctx);
+        } else if (firElement instanceof FirConstructor) {
+            return visitConstructor((FirConstructor) firElement, ctx);
         } else if (firElement instanceof FirContinueExpression) {
             return visitContinueExpression((FirContinueExpression) firElement, ctx);
         } else if (firElement instanceof FirDoWhileLoop) {
@@ -3488,18 +3468,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitCheckedSafeCallSubject((FirCheckedSafeCallSubject) firElement, ctx);
         } else if (firElement instanceof FirSimpleFunction) {
             return visitSimpleFunction((FirSimpleFunction) firElement, ctx);
+        } else if (firElement instanceof FirSmartCastExpression) {
+            return visitSmartCastExpression((FirSmartCastExpression) firElement, ctx);
         } else if (firElement instanceof FirStarProjection) {
             return visitStarProjection((FirStarProjection) firElement, ctx);
         } else if (firElement instanceof FirStringConcatenationCall) {
             return visitStringConcatenationCall((FirStringConcatenationCall) firElement, ctx);
         } else if (firElement instanceof FirThisReceiverExpression) {
             return visitThisReceiverExpression((FirThisReceiverExpression) firElement, ctx);
+        } else if (firElement instanceof FirThrowExpression) {
+            return visitThrowExpression((FirThrowExpression) firElement, ctx);
         } else if (firElement instanceof FirTypeOperatorCall) {
             return visitTypeOperatorCall((FirTypeOperatorCall) firElement, ctx);
         } else if (firElement instanceof FirTypeParameter) {
             return visitTypeParameter((FirTypeParameter) firElement, ctx);
         } else if (firElement instanceof FirTryExpression) {
             return visitTryExpression((FirTryExpression) firElement, ctx);
+        } else if (firElement instanceof FirTypeAlias) {
+            return visitTypeAlias((FirTypeAlias) firElement, ctx);
         } else if (firElement instanceof FirTypeProjectionWithVariance) {
             return visitTypeProjectionWithVariance((FirTypeProjectionWithVariance) firElement, ctx);
         } else if (firElement instanceof FirUserTypeRef) {
@@ -3541,8 +3527,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitContractDescription((FirContractDescription) firElement, ctx);
         } else if (firElement instanceof FirContextReceiver) {
             return visitContextReceiver((FirContextReceiver) firElement, ctx);
-        } else if (firElement instanceof FirConstructor) {
-            return visitConstructor((FirConstructor) firElement, ctx);
         } else if (firElement instanceof FirContractDescriptionOwner) {
             return visitContractDescriptionOwner((FirContractDescriptionOwner) firElement, ctx);
         } else if (firElement instanceof FirQualifiedAccessExpression) {
@@ -3553,8 +3537,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitContextReceiverArgumentListOwner((FirContextReceiverArgumentListOwner) firElement, ctx);
         } else if (firElement instanceof FirClassReferenceExpression) {
             return visitClassReferenceExpression((FirClassReferenceExpression) firElement, ctx);
-        } else if (firElement instanceof FirTypeAlias) {
-            return visitTypeAlias((FirTypeAlias) firElement, ctx);
         } else if (firElement instanceof FirClassLikeDeclaration) {
             return visitClassLikeDeclaration((FirClassLikeDeclaration) firElement, ctx);
         } else if (firElement instanceof FirCall) {
@@ -3593,16 +3575,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitResolvedImport((FirResolvedImport) firElement, ctx);
         } else if (firElement instanceof FirResolvedReifiedParameterReference) {
             return visitResolvedReifiedParameterReference((FirResolvedReifiedParameterReference) firElement, ctx);
-        } else if (firElement instanceof FirSmartCastExpression) {
-            return visitSmartCastExpression((FirSmartCastExpression) firElement, ctx);
         } else if (firElement instanceof FirSpreadArgumentExpression) {
             return visitSpreadArgumentExpression((FirSpreadArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirTypeRefWithNullability) {
             return visitTypeRefWithNullability((FirTypeRefWithNullability) firElement, ctx);
         } else if (firElement instanceof FirTypeRef) {
             return visitTypeRef((FirTypeRef) firElement, ctx);
-        } else if (firElement instanceof FirThrowExpression) {
-            return visitThrowExpression((FirThrowExpression) firElement, ctx);
         } else if (firElement instanceof FirTypeParameterRef) {
             return visitTypeParameterRef((FirTypeParameterRef) firElement, ctx);
         } else if (firElement instanceof FirTypeParametersOwner) {
@@ -3615,31 +3593,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitWrappedArgumentExpression((FirWrappedArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirWrappedExpression) {
             return visitWrappedExpression((FirWrappedExpression) firElement, ctx);
-        }
-
-        // Visits to parent classes that should not occur.
-        else if (firElement instanceof FirAnnotation) {
-            return visitAnnotation((FirAnnotation) firElement, ctx);
-        } else if (firElement instanceof FirVariable) {
-            return visitVariable((FirVariable) firElement, ctx);
-        } else if (firElement instanceof FirCallableDeclaration) {
-            return visitCallableDeclaration((FirCallableDeclaration) firElement, ctx);
-        } else if (firElement instanceof FirMemberDeclaration) {
-            return visitMemberDeclaration((FirMemberDeclaration) firElement, ctx);
-        } else if (firElement instanceof FirTypeParameterRefsOwner) {
-            return visitTypeParameterRefsOwner((FirTypeParameterRefsOwner) firElement, ctx);
-        } else if (firElement instanceof FirLoop) {
-            return visitLoop((FirLoop) firElement, ctx);
-        } else if (firElement instanceof FirTargetElement) {
-            return visitTargetElement((FirTargetElement) firElement, ctx);
-        } else if (firElement instanceof FirDeclaration) {
-            return visitDeclaration((FirDeclaration) firElement, ctx);
-        } else if (firElement instanceof FirStatement) {
-            return visitStatement((FirStatement) firElement, ctx);
-        } else if (firElement instanceof FirAnnotationContainer) {
-            return visitAnnotationContainer((FirAnnotationContainer) firElement, ctx);
-        } else if (firElement instanceof FirDiagnosticHolder) {
-            return visitDiagnosticHolder((FirDiagnosticHolder) firElement, ctx);
         }
 
         throw new IllegalArgumentException("Unsupported FirElement.");
