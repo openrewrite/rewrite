@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -104,6 +105,41 @@ class WhenTest implements RewriteTest {
                 when {
                     i . mod ( 2 ) . equals ( 0 ) -> return "even"
                     else -> return "odd"
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/81")
+    @Test
+    void typeOperatorCondition() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( i : Any ) : String {
+                when ( i ) {
+                    is Boolean -> return "is"
+                    !is Int -> return "is not"
+                    else -> return "42"
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/81")
+    @Test
+    void typeOperatorWithoutCondition() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( i : Any ) : String {
+                when {
+                    i is Boolean -> return "is"
+                    else -> return "is not"
                 }
             }
             """

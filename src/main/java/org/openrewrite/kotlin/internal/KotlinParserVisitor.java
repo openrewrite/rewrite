@@ -2025,10 +2025,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitTypeOperatorCall(FirTypeOperatorCall typeOperatorCall, ExecutionContext ctx) {
         Space prefix = whitespace();
-        FirElement target = typeOperatorCall.getArgumentList().getArguments().get(0) instanceof FirSmartCastExpression ?
-                ((FirSmartCastExpression) typeOperatorCall.getArgumentList().getArguments().get(0)).getOriginalExpression() :
-                typeOperatorCall.getArgumentList().getArguments().get(0);
-        Expression element = (Expression) visitElement(target, ctx);
+        FirExpression expression = typeOperatorCall.getArgumentList().getArguments().get(0);
+        Expression element;
+        // A when subject expression does not have a target because it's implicit
+        if (expression instanceof FirWhenSubjectExpression) {
+                element = new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+        } else {
+            FirElement target = expression instanceof FirSmartCastExpression ?
+                    ((FirSmartCastExpression) expression).getOriginalExpression() :
+                    expression;
+            element = (Expression) visitElement(target, ctx);
+        }
 
         Space after;
         Markers markers = Markers.EMPTY;
@@ -2457,7 +2464,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 } else if (whenBranch.getCondition() instanceof FirFunctionCall) {
                     expressions.add(padRight((Expression) visitElement(whenBranch.getCondition(), ctx), sourceBefore("->")));
                 } else if (whenBranch.getCondition() instanceof FirTypeOperatorCall) {
-                    throw new UnsupportedOperationException("Unsupported when condition type.");
+                    expressions.add(padRight((Expression) visitElement(whenBranch.getCondition(), ctx), sourceBefore("->")));
                 } else {
                     List<FirExpression> arguments = new ArrayList<>(((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size());
                     for (FirExpression argument : ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()) {
