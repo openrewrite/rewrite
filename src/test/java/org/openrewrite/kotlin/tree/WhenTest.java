@@ -146,4 +146,24 @@ class WhenTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/86")
+    @Test
+    void propertyAccessOnWhen() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test {
+                val property = false
+                fun method() {
+                    when {
+                        property -> {
+                        }
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
 }

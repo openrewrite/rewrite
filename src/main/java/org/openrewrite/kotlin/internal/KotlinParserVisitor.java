@@ -2569,11 +2569,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     expressions.add(padRight(createIdentifier("else"), sourceBefore("->")));
                 } else if (whenBranch.getCondition() instanceof FirBinaryLogicExpression) {
                     mapBinaryExpressions((FirBinaryLogicExpression) whenBranch.getCondition(), expressions);
-                } else if (whenBranch.getCondition() instanceof FirFunctionCall) {
-                    expressions.add(padRight((Expression) visitElement(whenBranch.getCondition(), ctx), sourceBefore("->")));
-                } else if (whenBranch.getCondition() instanceof FirTypeOperatorCall) {
-                    expressions.add(padRight((Expression) visitElement(whenBranch.getCondition(), ctx), sourceBefore("->")));
-                } else {
+                } else if (whenBranch.getCondition() instanceof FirEqualityOperatorCall) {
                     List<FirExpression> arguments = new ArrayList<>(((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size());
                     for (FirExpression argument : ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()) {
                         if (!(argument instanceof FirWhenSubjectExpression)) {
@@ -2587,6 +2583,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         Expression expr = (Expression) visitElement(whenBranch.getCondition(), ctx);
                         expressions.add(padRight(expr, sourceBefore("->")));
                     }
+                } else {
+                    expressions.add(padRight((Expression) visitElement(whenBranch.getCondition(), ctx), sourceBefore("->")));
                 }
 
                 JContainer<Expression> expressionContainer = JContainer.build(EMPTY, expressions, Markers.EMPTY);
