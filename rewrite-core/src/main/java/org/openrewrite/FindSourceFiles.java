@@ -17,10 +17,11 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.SourcesFiles;
+
+import java.nio.file.Path;
 
 
 @Value
@@ -51,15 +52,23 @@ public class FindSourceFiles extends Recipe {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
-                    String sourcePath = sourceFile.getSourcePath().toString();
-                    if (StringUtils.matchesGlob(sourcePath.matches("^\\.?[/\\\\]") ? sourcePath :
-                            "./" + sourcePath, filePattern)) {
-                        results.insertRow(ctx, new SourcesFiles.Row(sourcePath));
+                    Path sourcePath = sourceFile.getSourcePath();
+                    if (PathUtils.matchesGlob(sourcePath, normalize(filePattern))) {
+                        results.insertRow(ctx, new SourcesFiles.Row(sourcePath.toString()));
                         return SearchResult.found(sourceFile);
                     }
                 }
                 return tree;
             }
         };
+    }
+
+    private static String normalize(String filePattern) {
+        if (filePattern.startsWith("./") || filePattern.startsWith(".\\")) {
+            return filePattern.substring(2);
+        } else if (filePattern.startsWith("/") || filePattern.startsWith("\\")) {
+            return filePattern.substring(1);
+        }
+        return filePattern;
     }
 }
