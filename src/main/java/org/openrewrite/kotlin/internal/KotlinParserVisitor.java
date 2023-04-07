@@ -26,7 +26,6 @@ import org.jetbrains.kotlin.fir.declarations.*;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter;
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor;
-import org.jetbrains.kotlin.fir.diagnostics.FirDiagnosticHolder;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.expressions.impl.*;
 import org.jetbrains.kotlin.fir.references.*;
@@ -1505,14 +1504,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitNamedArgumentExpression(FirNamedArgumentExpression namedArgumentExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
-        J j = visitElement(namedArgumentExpression.getExpression(), ctx);
+        J.Identifier name = createIdentifier(namedArgumentExpression.getName().toString());
         Space exprPrefix = sourceBefore("=");
+        J j = visitElement(namedArgumentExpression.getExpression(), ctx);
         Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
         return new J.Assignment(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                createIdentifier(namedArgumentExpression.getName().toString()),
+                name,
                 padLeft(exprPrefix, expr),
                 typeMapping.type(namedArgumentExpression.getTypeRef()));
     }
@@ -2486,8 +2486,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         (Expression) visitElement(rhs, ctx),
                         typeMapping.type(variableAssignment));
             } else {
-                J j = convert(variableAssignment.getRValue(), ctx);
                 Space exprPrefix = sourceBefore("=");
+                J j = convert(variableAssignment.getRValue(), ctx);
                 Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
                 return new J.Assignment(
                         randomId(),
