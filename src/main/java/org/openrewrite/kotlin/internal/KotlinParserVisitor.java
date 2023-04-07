@@ -812,13 +812,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitElvisExpression(FirElvisExpression elvisExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
         J lhs = visitElement(elvisExpression.getLhs(), ctx);
+        Space before = sourceBefore("?:");
         J rhs = visitElement(elvisExpression.getRhs(), ctx);
         return new J.Ternary(randomId(),
                 prefix,
                 Markers.EMPTY,
                 new J.Empty(randomId(), EMPTY, Markers.EMPTY),
                 padLeft(EMPTY, lhs instanceof Expression ? (Expression) lhs : new K.StatementExpression(randomId(), (Statement) lhs)),
-                padLeft(sourceBefore("?:"), rhs instanceof Expression ? (Expression) rhs : new K.StatementExpression(randomId(), (Statement) rhs)),
+                padLeft(before, rhs instanceof Expression ? (Expression) rhs : new K.StatementExpression(randomId(), (Statement) rhs)),
                 typeMapping.type(elvisExpression));
     }
 
@@ -928,17 +929,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         sourceBefore("}"));
             }
 
-            JavaType.Method type = typeMapping.methodInvocationType(functionCall, getCurrentFile());
             return new J.NewClass(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     null,
                     EMPTY,
-                    name.withType(type),
+                    name,
                     args,
                     body,
-                    type);
+                    typeMapping.methodInvocationType(functionCall, getCurrentFile()));
 
         } else {
             Markers markers = Markers.EMPTY;
