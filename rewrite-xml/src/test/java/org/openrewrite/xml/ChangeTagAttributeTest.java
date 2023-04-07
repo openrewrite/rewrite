@@ -66,6 +66,27 @@ class ChangeTagAttributeTest implements RewriteTest {
     }
 
     @Test
+    void removeAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", null, "myBean.subpackage", null)),
+          xml(
+            """
+              <beans>
+                  <bean id='myBean.subpackage.subpackage2'/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """,
+            """
+              <beans>
+                  <bean/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
     void attributeNotMatched() {
         rewriteRun(
           spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched", null)),

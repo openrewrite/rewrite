@@ -524,6 +524,11 @@ public interface Xml extends Tree {
         public String getValueAsString() {
             return value.getValue();
         }
+
+        @Override
+        public String toString() {
+            return getKeyAsString() + "=" + getValueAsString();
+        }
     }
 
     @Value
