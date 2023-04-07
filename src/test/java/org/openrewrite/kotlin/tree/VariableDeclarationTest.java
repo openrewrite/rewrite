@@ -268,10 +268,10 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val first: String = "1"
-            val second: Int = 2
+            val first : String = "1"
+            val second : Int = 2
            
-            val l = listOf("foo" to first, "bar" to second)
+            val l = listOf ( "foo" to first , "bar" to second )
             """
           )
         );

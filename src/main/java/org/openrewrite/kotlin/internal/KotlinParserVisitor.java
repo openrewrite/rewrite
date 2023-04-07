@@ -59,7 +59,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.lang.Math.max;
 import static java.util.Collections.*;
@@ -184,7 +183,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         skip("@");
         if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.FILE) {
             skip("file");
-            markers = markers.addIfAbsent(new FileSuffix(randomId(), sourceBefore(":")));
+            markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "file", sourceBefore(":")));
+        }
+
+        if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.PROPERTY_GETTER) {
+            skip("get");
+            markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "get", sourceBefore(":")));
         }
 
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
@@ -1507,7 +1511,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
 
         List<J> modifiers = emptyList();
-        List<J.Annotation> annotations = mapModifiers(property.getAnnotations(), property.getName().asString());
+        List<FirAnnotation> mapAnnotations = new ArrayList<>(property.getAnnotations());
+        // Note: it might be possible to have annotations on both the property associated to the getter
+        // AND the getter itself. In that case, we to use a single list to avoid duplicates and add
+        // the target annotations to the appropriate LST element.
+        if (property.getGetter() != null && !property.getGetter().getAnnotations().isEmpty()) {
+            mapAnnotations.addAll(property.getGetter().getAnnotations());
+        }
+
+        List<J.Annotation> annotations = mapModifiers(mapAnnotations, property.getName().asString());
 
         JRightPadded<J.VariableDeclarations.NamedVariable> receiver = null;
         if (property.getReceiverTypeRef() != null) {
@@ -1699,7 +1711,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (propertyAccessor.isGetter()) {
             Markers markers = Markers.EMPTY;
             List<J> modifiers = emptyList();
-            List<J.Annotation> annotations = mapAnnotations(propertyAccessor.getAnnotations());
+            List<J.Annotation> annotations = emptyList();
 
             JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
 

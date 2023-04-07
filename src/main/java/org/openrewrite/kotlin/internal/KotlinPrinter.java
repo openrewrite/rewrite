@@ -210,10 +210,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("@");
             }
 
-            FileSuffix suffix = annotation.getMarkers().findFirst(FileSuffix.class).orElse(null);
-            if (suffix != null) {
-                p.append("file");
-                KotlinPrinter.this.visitSpace(suffix.getSuffix(), KSpace.Location.FILE_ANNOTATION_SUFFIX, p);
+            AnnotationCallSite callSite = annotation.getMarkers().findFirst(AnnotationCallSite.class).orElse(null);
+            if (callSite != null) {
+                p.append(callSite.getName());
+                KotlinPrinter.this.visitSpace(callSite.getSuffix(), KSpace.Location.FILE_ANNOTATION_SUFFIX, p);
                 p.append(":");
             }
             visit(annotation.getAnnotationType(), p);

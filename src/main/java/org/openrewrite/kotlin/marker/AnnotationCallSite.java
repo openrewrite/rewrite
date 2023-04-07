@@ -28,7 +28,8 @@ import java.util.UUID;
 @Incubating(since = "0.0")
 @Value
 @With
-public class FileSuffix implements Marker {
+public class AnnotationCallSite implements Marker {
     UUID id;
+    String name;
     Space suffix;
 }

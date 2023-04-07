@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
@@ -62,6 +63,21 @@ class AnnotationTest implements RewriteTest {
             """
             @Test( values = [ "a" , "b" , "c" ] )
             val a = 42
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/80")
+    @Test
+    void jvmNameAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+            import kotlin.jvm.JvmName
+            @get : JvmName ( "getCount" )
+            val count : Int ?
+                get ( ) = 1
             """
           )
         );
