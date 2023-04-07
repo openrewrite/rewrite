@@ -25,7 +25,7 @@ import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
 
-public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.ExecutionContext> {
+public class AppendToSequenceVisitor extends YamlVisitor<org.openrewrite.ExecutionContext> {
     private final JsonPathMatcher matcher;
     private final String value;
 
@@ -35,18 +35,17 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
     }
 
     @Override
-    public Yaml.Sequence visitSequence(Yaml.Sequence sequence, ExecutionContext executionContext) {
-        Yaml.Sequence s = super.visitSequence(sequence, executionContext);
-            Cursor parent = getCursor().getParent();
-            if (!matcher.matches(parent)) {
-                return s;
-            }
-            if (alreadyVisited(s, executionContext)) {
-                return s;
-            }
-            setVisited(s, executionContext);
+    public Yaml visitSequence(Yaml.Sequence existingSeq, ExecutionContext executionContext) {
+        Cursor parent = getCursor().getParent();
+        if (matcher.matches(parent) && !alreadyVisited(existingSeq, executionContext)) {
+            setVisited(existingSeq, executionContext);
+            return appendToSequence(existingSeq, this.value, executionContext);
+        }
+        return super.visitSequence(existingSeq, executionContext);
+    }
 
-            List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+    private Yaml.Sequence appendToSequence(Yaml.Sequence existingSequence, String value, ExecutionContext executionContext) {
+            List<Yaml.Sequence.Entry> entries = existingSequence.getEntries();
             boolean hasDash = false;
             Yaml.Scalar.Style style = Yaml.Scalar.Style.PLAIN;
             String entryPrefix = "";
@@ -67,11 +66,10 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
                     entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
                 }
             }
-            Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, this.value);
+            Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, value);
             Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
             entries.add(newEntry);
-            // return maybeAutoFormat(sequence, s.withEntries(entries), ec);
-            return s.withEntries(entries);
+            return maybeAutoFormat(existingSequence, existingSequence.withEntries(entries), executionContext);
     }
 
     private static void setVisited(Yaml.Sequence seq, ExecutionContext context) {
