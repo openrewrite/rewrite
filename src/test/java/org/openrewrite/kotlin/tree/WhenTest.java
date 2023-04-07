@@ -166,4 +166,43 @@ class WhenTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/86")
+    @Test
+    void logicalOperatorOnPropertyAccess() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method() {
+                val lhs = true
+                val rhs = true
+                when {
+                    lhs && rhs -> {
+                    }
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/86")
+    @Test
+    void logicalOperatorOnMixed() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method(i: Any) {
+                val lhs = true
+                val rhs = true
+                when (i) {
+                    1, (lhs && rhs || isTrue()) -> {
+                    }
+                }
+            }
+            fun isTrue() = true
+            """
+          )
+        );
+    }
 }

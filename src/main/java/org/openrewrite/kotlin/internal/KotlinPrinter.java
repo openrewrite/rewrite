@@ -225,6 +225,77 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitBinary(J.Binary binary, PrintOutputCapture<P> p) {
+            String keyword = "";
+            switch (binary.getOperator()) {
+                case Addition:
+                    keyword = "+";
+                    break;
+                case Subtraction:
+                    keyword = "-";
+                    break;
+                case Multiplication:
+                    keyword = "*";
+                    break;
+                case Division:
+                    keyword = "/";
+                    break;
+                case Modulo:
+                    keyword = "%";
+                    break;
+                case LessThan:
+                    keyword = "<";
+                    break;
+                case GreaterThan:
+                    keyword = ">";
+                    break;
+                case LessThanOrEqual:
+                    keyword = "<=";
+                    break;
+                case GreaterThanOrEqual:
+                    keyword = ">=";
+                    break;
+                case Equal:
+                    keyword = "==";
+                    break;
+                case NotEqual:
+                    keyword = "!=";
+                    break;
+                case BitAnd:
+                    keyword = "&";
+                    break;
+                case BitOr:
+                    keyword = "|";
+                    break;
+                case BitXor:
+                    keyword = "^";
+                    break;
+                case LeftShift:
+                    keyword = "<<";
+                    break;
+                case RightShift:
+                    keyword = ">>";
+                    break;
+                case UnsignedRightShift:
+                    keyword = ">>>";
+                    break;
+                case Or:
+                    keyword = (binary.getMarkers().findFirst(LogicalComma.class).isPresent()) ? "," : "||";
+                    break;
+                case And:
+                    keyword = "&&";
+                    break;
+            }
+            beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
+            visit(binary.getLeft(), p);
+            visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
+            p.append(keyword);
+            visit(binary.getRight(), p);
+            afterSyntax(binary, p);
+            return binary;
+        }
+
+        @Override
         public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
             beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
 

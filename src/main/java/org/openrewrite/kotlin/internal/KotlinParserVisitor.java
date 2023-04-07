@@ -491,15 +491,31 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitBinaryLogicExpression(FirBinaryLogicExpression binaryLogicExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
+
+        Space beforeParens = EMPTY;
+        boolean includeParentheses = false;
+        if (source.startsWith("(", cursor)) {
+            skip("(");
+            beforeParens = prefix;
+            prefix = whitespace();
+            includeParentheses = true;
+        }
+
         Expression left = (Expression) visitElement(binaryLogicExpression.getLeftOperand(), ctx);
 
+        Markers markers = Markers.EMPTY;
         Space opPrefix = whitespace();
         J.Binary.Type op;
         if (LogicOperationKind.AND == binaryLogicExpression.getKind()) {
             skip("&&");
             op = J.Binary.Type.And;
         } else if (LogicOperationKind.OR == binaryLogicExpression.getKind()) {
-            skip("||");
+            if (source.startsWith(",", cursor)) {
+                skip(",");
+                markers = Markers.build(singletonList(new LogicalComma(randomId())));
+            } else {
+                skip("||");
+            }
             op = J.Binary.Type.Or;
         } else {
             throw new IllegalArgumentException("Unsupported binary expression type " + binaryLogicExpression.getKind().name());
@@ -507,14 +523,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         Expression right = (Expression) visitElement(binaryLogicExpression.getRightOperand(), ctx);
 
-        return new J.Binary(
+        J.Binary binary = new J.Binary(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                markers,
                 left,
                 padLeft(opPrefix, op),
                 right,
                 typeMapping.type(binaryLogicExpression));
+
+        return includeParentheses ? new J.Parentheses<>(randomId(), beforeParens, Markers.EMPTY, JRightPadded.build(binary).withAfter(sourceBefore(")"))) : binary;
     }
 
     @Override
@@ -758,6 +776,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         FirElement left = equalityOperatorCall.getArgumentList().getArguments().get(0);
         FirOperation op = equalityOperatorCall.getOperation();
         FirElement right = equalityOperatorCall.getArgumentList().getArguments().get(1);
+
+        if (left instanceof FirWhenSubjectExpression || right instanceof FirWhenSubjectExpression) {
+            return (left instanceof FirWhenSubjectExpression) ? (Expression) visitElement(right, ctx) : (Expression) visitElement(left, ctx);
+        }
 
         if (op == FirOperation.IDENTITY || op == FirOperation.NOT_IDENTITY) {
             return new K.Binary(
@@ -2567,8 +2589,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
                 if (whenBranch.getCondition() instanceof FirElseIfTrueCondition) {
                     expressions.add(padRight(createIdentifier("else"), sourceBefore("->")));
-                } else if (whenBranch.getCondition() instanceof FirBinaryLogicExpression) {
-                    mapBinaryExpressions((FirBinaryLogicExpression) whenBranch.getCondition(), expressions);
                 } else if (whenBranch.getCondition() instanceof FirEqualityOperatorCall) {
                     List<FirExpression> arguments = new ArrayList<>(((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size());
                     for (FirExpression argument : ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()) {
@@ -2664,28 +2684,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return ifStatement;
-    }
-
-    private void mapBinaryExpressions(FirBinaryLogicExpression logicExpression, List<JRightPadded<Expression>> expressions) {
-        if (logicExpression.getLeftOperand() instanceof FirBinaryLogicExpression) {
-            mapBinaryExpressions((FirBinaryLogicExpression) logicExpression.getLeftOperand(), expressions);
-        } else if (logicExpression.getLeftOperand() instanceof FirEqualityOperatorCall) {
-            FirEqualityOperatorCall lhs = (FirEqualityOperatorCall) logicExpression.getLeftOperand();
-            Expression left = (Expression) visitElement(lhs.getArgumentList().getArguments().get(1), ctx);
-            expressions.add(padRight(left, sourceBefore(",")));
-        } else {
-            throw new IllegalArgumentException("Unsupported logical operator from when expression.");
-        }
-
-        FirEqualityOperatorCall rhs = (FirEqualityOperatorCall) logicExpression.getRightOperand();
-        Expression right = (Expression) visitElement(rhs.getArgumentList().getArguments().get(1), ctx);
-        Space after = whitespace();
-        if (source.startsWith(",", cursor)) {
-            skip(",");
-        } else {
-            skip("->");
-        }
-        expressions.add(padRight(right, after));
     }
 
     @Override
