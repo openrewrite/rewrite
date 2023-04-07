@@ -1505,12 +1505,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitNamedArgumentExpression(FirNamedArgumentExpression namedArgumentExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
+        J j = visitElement(namedArgumentExpression.getExpression(), ctx);
+        Space exprPrefix = sourceBefore("=");
+        Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
         return new J.Assignment(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 createIdentifier(namedArgumentExpression.getName().toString()),
-                padLeft(sourceBefore("="), convert(namedArgumentExpression.getExpression(), ctx)),
+                padLeft(exprPrefix, expr),
                 typeMapping.type(namedArgumentExpression.getTypeRef()));
     }
 
@@ -1576,7 +1579,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = null;
             for (int j = 0; j < paramNames.length; j++) {
                 String paramName = paramNames[j].trim();
-                JavaType type = typeArguments == null ? null : typeMapping.type(typeArguments[j]);
+                JavaType type = typeArguments == null  || j >= typeArguments.length ? null : typeMapping.type(typeArguments[j]);
                 J.Identifier name = createIdentifier(paramName, type, null);
                 namedVariable = maybeSemicolon(
                         new J.VariableDeclarations.NamedVariable(
@@ -2483,12 +2486,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         (Expression) visitElement(rhs, ctx),
                         typeMapping.type(variableAssignment));
             } else {
+                J j = convert(variableAssignment.getRValue(), ctx);
+                Space exprPrefix = sourceBefore("=");
+                Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
                 return new J.Assignment(
                         randomId(),
                         prefix,
                         Markers.EMPTY,
                         variable,
-                        padLeft(sourceBefore("="), convert(variableAssignment.getRValue(), ctx)),
+                        padLeft(exprPrefix, expr),
                         typeMapping.type(variableAssignment));
             }
         }
