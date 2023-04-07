@@ -38,7 +38,7 @@ import static java.util.stream.StreamSupport.*;
  *              ...
  * </pre>
  */
-public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
+public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
     private static final String TAB = "    ";
     private static final String ELEMENT_PREFIX = "\\---";
     private static final String CONTINUE_PREFIX = "----";
@@ -67,9 +67,9 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     /**
      * print tree with skip unvisited elements
      */
-    public static String printTree(J j) {
+    public static String printTree(Tree tree) {
         TreeVisitingPrinter visitor = new TreeVisitingPrinter(true);
-        visitor.visit(j, new InMemoryExecutionContext());
+        visitor.visit(tree, new InMemoryExecutionContext());
         return visitor.print();
     }
 
@@ -83,19 +83,19 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     /**
      * print tree including all unvisited elements
      */
-    public static String printTreeAll(J j) {
+    public static String printTreeAll(Tree tree) {
         TreeVisitingPrinter visitor = new TreeVisitingPrinter(false);
-        visitor.visit(j, new InMemoryExecutionContext());
+        visitor.visit(tree, new InMemoryExecutionContext());
         return visitor.print();
     }
 
-    private static Optional<J> findRootOfJType(Cursor cursor) {
+    private static Optional<Tree> findRootOfJType(Cursor cursor) {
         List<Object> cursorStack =
             stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
                 .collect(Collectors.toList());
         Collections.reverse(cursorStack);
-        return cursorStack.stream().filter(obj -> obj instanceof J)
-            .map(obj -> (J) obj)
+        return cursorStack.stream().filter(Tree.class::isInstance)
+            .map(Tree.class::cast)
             .findFirst();
     }
 
@@ -188,7 +188,7 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
         if (tree == null) {
             return super.visit((Tree) null, ctx);
         }
