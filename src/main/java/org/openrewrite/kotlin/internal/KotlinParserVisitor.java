@@ -811,12 +811,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitElvisExpression(FirElvisExpression elvisExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
+        J lhs = visitElement(elvisExpression.getLhs(), ctx);
+        J rhs = visitElement(elvisExpression.getRhs(), ctx);
         return new J.Ternary(randomId(),
                 prefix,
                 Markers.EMPTY,
                 new J.Empty(randomId(), EMPTY, Markers.EMPTY),
-                padLeft(EMPTY, (Expression) visitElement(elvisExpression.getLhs(), ctx)),
-                padLeft(sourceBefore("?:"), (Expression) visitElement(elvisExpression.getRhs(), ctx)),
+                padLeft(EMPTY, lhs instanceof Expression ? (Expression) lhs : new K.StatementExpression(randomId(), (Statement) lhs)),
+                padLeft(sourceBefore("?:"), rhs instanceof Expression ? (Expression) rhs : new K.StatementExpression(randomId(), (Statement) rhs)),
                 typeMapping.type(elvisExpression));
     }
 
@@ -1103,7 +1105,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 boolean isTrailingComma = false;
                 for (int i = 0; i < flattenedExpressions.size(); i++) {
                     FirExpression expression = flattenedExpressions.get(i);
-                    Expression expr = convert(expression, ctx);
+                    J j = convert(expression, ctx);
+                    Expression expr = !(j instanceof Expression) ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
                     if (isTrailingComma) {
                         expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
                         expressions.add(padRight(expr, EMPTY));
@@ -2453,6 +2456,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     mapBinaryExpressions((FirBinaryLogicExpression) whenBranch.getCondition(), expressions);
                 } else if (whenBranch.getCondition() instanceof FirFunctionCall) {
                     expressions.add(padRight((Expression) visitElement(whenBranch.getCondition(), ctx), sourceBefore("->")));
+                } else if (whenBranch.getCondition() instanceof FirTypeOperatorCall) {
+                    throw new UnsupportedOperationException("Unsupported when condition type.");
                 } else {
                     List<FirExpression> arguments = new ArrayList<>(((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size());
                     for (FirExpression argument : ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments()) {
@@ -3148,7 +3153,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitSmartCastExpression(FirSmartCastExpression smartCastExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirSmartCastExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        return visitElement(smartCastExpression.getOriginalExpression(), ctx);
     }
 
     @Override
@@ -3341,11 +3346,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     /* Visits to parent classes ... these should never be called */
-    @Override
-    public J visitExpression(FirExpression expression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("visitExpression should not be called.");
-    }
-
     @Override
     public J visitStatement(FirStatement statement, ExecutionContext ctx) {
         throw new UnsupportedOperationException("visitStatement should not be called.");
@@ -3601,8 +3601,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // Visits to parent classes that should not occur.
         else if (firElement instanceof FirAnnotation) {
             return visitAnnotation((FirAnnotation) firElement, ctx);
-        } else if (firElement instanceof FirExpression) {
-            return visitExpression((FirExpression) firElement, ctx);
         } else if (firElement instanceof FirVariable) {
             return visitVariable((FirVariable) firElement, ctx);
         } else if (firElement instanceof FirCallableDeclaration) {
