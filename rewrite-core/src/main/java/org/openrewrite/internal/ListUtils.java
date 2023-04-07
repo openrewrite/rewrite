@@ -74,6 +74,27 @@ public final class ListUtils {
         return newLs;
     }
 
+    /**
+     * Insert element to a list at the specified position in the list.
+     * Throws the same exceptions as List.add()
+     * @param ls The original list.
+     * @param t The element to add.
+     * @param index index at which the specified element is to be inserted
+     * @param <T> The type of elements in the list.
+     * @return A new list with the element inserted at the specified position.
+     */
+    public static <T> List<T> insert(@Nullable List<T> ls, @Nullable T t, int index) {
+        if (ls == null && t == null) {
+            return emptyList();
+        } else if (t == null) {
+            return ls;
+        }
+
+        List<T> newLs = ls == null ?  new ArrayList<>(1) : new ArrayList<>(ls);
+        newLs.add(index, t);
+        return newLs;
+    }
+
     public static <T> List<T> mapLast(@Nullable List<T> ls, UnaryOperator<T> mapLast) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
