@@ -155,24 +155,23 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitErrorNamedReference(FirErrorNamedReference errorNamedReference, ExecutionContext ctx) {
-        if (!(errorNamedReference.getSource() instanceof KtRealPsiSourceElement)) {
-            throw new IllegalStateException("Unexpected error reference source: " + errorNamedReference.getSource());
+        if (errorNamedReference.getSource() instanceof KtRealPsiSourceElement && ((KtRealPsiSourceElement) errorNamedReference.getSource()).getPsi() instanceof KtNameReferenceExpression) {
+            KtNameReferenceExpression nameReferenceExpression = (KtNameReferenceExpression) ((KtRealPsiSourceElement) errorNamedReference.getSource()).getPsi();
+            String name = nameReferenceExpression.getIdentifier() == null ? "{error}" : nameReferenceExpression.getIdentifier().getText();
+            Space prefix = sourceBefore(name);
+            return new J.Identifier(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    name,
+                    null,
+                    null);
+        } else {
+            String cleanedName = errorNamedReference.getName().asString().substring("<Unresolved name:".length(), errorNamedReference.getName().asString().length() - 1).trim();
+            String fullName = source.substring(cursor, cursor + source.substring(cursor).indexOf(cleanedName) + cleanedName.length());
+            skip(fullName);
+            return TypeTree.build(fullName);
         }
-
-        if (!(((KtRealPsiSourceElement) errorNamedReference.getSource()).getPsi() instanceof KtNameReferenceExpression)) {
-            throw new IllegalStateException("Unexpected error reference source: " + errorNamedReference.getSource());
-        }
-
-        KtNameReferenceExpression nameReferenceExpression = (KtNameReferenceExpression) ((KtRealPsiSourceElement) errorNamedReference.getSource()).getPsi();
-        String name = nameReferenceExpression.getIdentifier() == null ? "{error}" : nameReferenceExpression.getIdentifier().getText();
-        Space prefix = sourceBefore(name);
-        return new J.Identifier(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                name,
-                null,
-                null);
     }
 
     @Override
@@ -966,10 +965,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 // At this point we do not know if the function call is a constructor, so, resolving FirErrorNamedReferences will improve over time.
                 // The Java compiler preserves the elements and unknown types only affect the types.
                 // This is an effort to mimic the java LST and create the LST element without type attrubtion.
-                String cleanedName = namedReference.getName().asString().substring("<Unresolved name:".length(), namedReference.getName().asString().length() - 1).trim();
-                String fullName = source.substring(cursor, cursor + source.substring(cursor).indexOf(cleanedName) + cleanedName.length());
-                TypeTree maybeName = TypeTree.build(fullName);
-                skip(fullName);
+                TypeTree maybeName = (TypeTree) visitElement(namedReference, ctx);
                 if (maybeName instanceof J.FieldAccess) {
                     J.FieldAccess fa = (J.FieldAccess) maybeName;
                     select = JRightPadded.build(fa.getTarget())
