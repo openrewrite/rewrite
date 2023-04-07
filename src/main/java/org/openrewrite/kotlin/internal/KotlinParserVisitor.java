@@ -2121,10 +2121,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitTypeOperatorCall(FirTypeOperatorCall typeOperatorCall, ExecutionContext ctx) {
         Space prefix = whitespace();
         FirExpression expression = typeOperatorCall.getArgumentList().getArguments().get(0);
+        Markers markers = Markers.EMPTY;
+        boolean includeParentheses = false;
+        if (typeOperatorCall.getOperation() == FirOperation.AS && source.startsWith("(", cursor)) {
+            skip("(");
+            includeParentheses = true;
+        }
+
         Expression element;
         // A when subject expression does not have a target because it's implicit
         if (expression instanceof FirWhenSubjectExpression) {
-                element = new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+            element = new J.Empty(randomId(), EMPTY, Markers.EMPTY);
         } else {
             FirElement target = expression instanceof FirSmartCastExpression ?
                     ((FirSmartCastExpression) expression).getOriginalExpression() :
@@ -2133,7 +2140,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         Space after;
-        Markers markers = Markers.EMPTY;
         switch (typeOperatorCall.getOperation()) {
             case IS:
                 after = sourceBefore("is");
@@ -2154,6 +2160,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         if (typeOperatorCall.getOperation() == FirOperation.AS || typeOperatorCall.getOperation() == FirOperation.SAFE_AS) {
+            if (!includeParentheses) {
+                markers = markers.addIfAbsent(new OmitParentheses(randomId()));
+            }
             return new J.TypeCast(
                     randomId(),
                     prefix,
@@ -2162,7 +2171,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             randomId(),
                             after,
                             Markers.EMPTY,
-                            JRightPadded.build((TypeTree) visitElement(typeOperatorCall.getConversionTypeRef(), ctx))),
+                            JRightPadded.build((TypeTree) visitElement(typeOperatorCall.getConversionTypeRef(), ctx))
+                                    .withAfter(includeParentheses ? sourceBefore(")") : EMPTY)),
                     element);
         } else {
             JRightPadded<Expression> expr = JRightPadded.build(element).withAfter(after);

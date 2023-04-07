@@ -288,4 +288,25 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/84")
+    @Test
+    void varargArgumentExpression() {
+        rewriteRun(
+          kotlin(
+            """
+            class StringValue {
+                val value: String = ""
+            }
+            """
+          ),
+          kotlin(
+            """
+            fun method(input : Any) {
+                val split = (input as StringValue).value.split("-").toTypedArray()
+            }
+            """
+          )
+        );
+    }
 }

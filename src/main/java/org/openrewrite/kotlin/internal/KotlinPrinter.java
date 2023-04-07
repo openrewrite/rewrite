@@ -642,6 +642,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitTypeCast(J.TypeCast typeCast, PrintOutputCapture<P> p) {
             beforeSyntax(typeCast, Space.Location.TYPE_CAST_PREFIX, p);
+            boolean printParens = !typeCast.getMarkers().findFirst(OmitParentheses.class).isPresent();
+            if (printParens) {
+                p.append('(');
+            }
             visit(typeCast.getExpression(), p);
 
             J.ControlParentheses<TypeTree> controlParens = typeCast.getClazz();
@@ -651,7 +655,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(as);
 
             visit(controlParens.getTree(), p);
-
+            if (printParens) {
+                p.append(')');
+            }
             afterSyntax(typeCast, p);
             return typeCast;
         }
