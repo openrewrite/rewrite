@@ -926,16 +926,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         sourceBefore("}"));
             }
 
+            JavaType.Method type = typeMapping.methodInvocationType(functionCall, getCurrentFile());
             return new J.NewClass(
                     randomId(),
                     prefix,
                     Markers.EMPTY,
                     null,
                     EMPTY,
-                    name,
+                    name.withType(type),
                     args,
                     body,
-                    typeMapping.methodInvocationType(functionCall, getCurrentFile()));
+                    type);
 
         } else {
             Markers markers = Markers.EMPTY;
@@ -1037,15 +1038,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
             }
 
+            JavaType.Method type = typeMapping.methodInvocationType(functionCall, owner);
             return new J.MethodInvocation(
                     randomId(),
                     prefix,
                     markers,
                     select,
                     typeParams,
-                    name,
+                    name.withType(type),
                     args,
-                    typeMapping.methodInvocationType(functionCall, owner));
+                    type);
         }
     }
 
