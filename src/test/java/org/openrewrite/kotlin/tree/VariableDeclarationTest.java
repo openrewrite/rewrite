@@ -261,4 +261,19 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/82")
+    @Test
+    void genericIntersectionType() {
+        rewriteRun(
+          kotlin(
+            """
+            val first: String = "1"
+            val second: Int = 2
+           
+            val l = listOf("foo" to first, "bar" to second)
+            """
+          )
+        );
+    }
 }

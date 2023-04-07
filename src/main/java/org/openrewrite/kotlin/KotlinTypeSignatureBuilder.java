@@ -308,6 +308,14 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s.append("Generic{");
             s.append(type);
             s.append("}");
+        } else if (type instanceof ConeIntersectionType) {
+            s.append("Generic{");
+            StringJoiner boundSigs = new StringJoiner(" & ");
+            for (ConeKotlinType coneKotlinType : ((ConeIntersectionType) type).getIntersectedTypes()) {
+                boundSigs.add(signature(coneKotlinType));
+            }
+            s.append(boundSigs);
+            s.append("}");
         } else {
             throw new IllegalArgumentException("Unsupported ConeTypeProjection.");
         }
