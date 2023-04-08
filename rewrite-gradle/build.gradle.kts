@@ -30,7 +30,7 @@ dependencies {
 
     compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
 
-    compileOnly("org.gradle:gradle-tooling-api:latest.release")
+    implementation("org.gradle:gradle-tooling-api:latest.release")
 
     "parserClasspath"("org.gradle:gradle-base-services:latest.release")
     "parserClasspath"("org.gradle:gradle-core-api:latest.release")
@@ -44,8 +44,6 @@ dependencies {
     "parserClasspath"("org.gradle:gradle-testing-base:latest.release")
     "parserClasspath"("org.gradle:gradle-testing-jvm:latest.release")
     "parserClasspath"("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
-
-    testImplementation("org.gradle:gradle-tooling-api:latest.release")
 
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
