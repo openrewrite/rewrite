@@ -57,6 +57,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(classDeclaration.getLeadingAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
+        // TODO add imports if necessary
+        // TODO remove imports if no more necessary
         J.ClassDeclaration cleanClassDeclaration = classDeclaration.withLeadingAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanClassDeclaration,
@@ -83,6 +85,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(methodDeclaration.getLeadingAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
+        // TODO add imports if necessary
+        // TODO remove imports if no more necessary
         J.MethodDeclaration cleanedMethodDeclaration = methodDeclaration.withLeadingAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanedMethodDeclaration,
@@ -109,6 +113,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(jPackage.getAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
+        // TODO add imports if necessary
+        // TODO remove imports if no more necessary
         J.Package cleanedPackage = jPackage.withAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanedPackage,
@@ -135,6 +141,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(variableDeclarations.getLeadingAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
+        // TODO add imports if necessary
+        // TODO remove imports if no more necessary
         J.VariableDeclarations cleanedVariableDeclaration = variableDeclarations.withLeadingAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanedVariableDeclaration,
