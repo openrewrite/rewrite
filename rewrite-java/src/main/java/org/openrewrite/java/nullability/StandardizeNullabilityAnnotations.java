@@ -167,15 +167,14 @@ public class StandardizeNullabilityAnnotations extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<>();
-
+        return new StandardizeNullabilityAnnotationsVisitor(getKnownNullabilityAnnotations(), getNullabilityAnnotations());
     }
 
-    private Set<NullabilityAnnotation> getNullabilityAnnotations() {
+    private List<NullabilityAnnotation> getNullabilityAnnotations() {
         return getNullabilityAnnotationsFqn()
                 .stream()
                 .flatMap(fqn -> getKnownNullabilityAnnotations().stream().filter(annotation -> Objects.equals(fqn, annotation.getFqn())))
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
     }
 
     private Set<NullabilityAnnotation> getKnownNullabilityAnnotations() {
