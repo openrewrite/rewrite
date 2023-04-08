@@ -9,6 +9,9 @@ dependencies {
 
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
+    testImplementation("javax.annotation:javax.annotation-api:1.3.2") {
+        because("Used for StandardizeNullabilityAnnotationsTest")
+    }
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("junit:junit:4.13.2") {
         because("Used for RemoveUnneededAssertionTest")
@@ -18,9 +21,6 @@ dependencies {
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
-    testRuntimeOnly("javax.annotation:javax.annotation-api:1.3.2") {
-        because("Used for StandardizeNullabilityAnnotationsTest")
-    }
 }
 
 tasks.withType<Javadoc> {
