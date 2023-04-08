@@ -16,22 +16,16 @@
 package org.openrewrite.java.nullability;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.apache.commons.lang3.ObjectUtils;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.nullability.NullabilityAnnotation;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 
 import java.lang.annotation.ElementType;
-import java.util.*;
-import java.util.function.Function;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -43,6 +37,7 @@ import static org.openrewrite.java.nullability.NullabilityAnnotation.nullable;
 @EqualsAndHashCode(callSuper = false)
 public class StandardizeNullabilityAnnotations extends Recipe {
 
+    // TODO fill in targets and scopes for all annotations
     private static final Set<NullabilityAnnotation> KNOWN_NULLABILITY_ANNOTATIONS = Stream.of(
             nonNull("android.annotation.NonNull"),
             nonNull("android.support.annotation.NonNull"),
