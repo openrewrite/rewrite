@@ -276,6 +276,10 @@ public abstract class CoordinateBuilder {
             super(tree);
         }
 
+        public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.BEFORE, idealOrdering);
+        }
+
         public JavaCoordinates replace() {
             return replace(Space.Location.PACKAGE_PREFIX);
         }
