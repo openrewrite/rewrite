@@ -18,6 +18,9 @@ dependencies {
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
+    testRuntimeOnly("javax.annotation:javax.annotation-api:1.3.2") {
+        because("Used for StandardizeNullabilityAnnotationsTest")
+    }
 }
 
 tasks.withType<Javadoc> {
