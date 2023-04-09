@@ -26,7 +26,6 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToSequenceHasDashTrue() {
         rewriteRun(
           spec -> spec
-                .cycles(1)
                 .recipe(new AppendToSequence(
             "$.things.fruit",
             "strawberry",
@@ -54,7 +53,6 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToSequenceOfNameValuePair() {
         rewriteRun(
           spec -> spec
-                .cycles(1)
                 .recipe(new AppendToSequence(
             "$.things.fruit",
             " name: strawberry",
@@ -88,7 +86,6 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToSequenceHasDashFalse() {
         rewriteRun(
           spec -> spec
-                .cycles(1)
                 .recipe(new AppendToSequence(
             "$.things.fruit",
             "strawberry",
@@ -117,7 +114,6 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToEmptySequence() {
         rewriteRun(
           spec -> spec
-                .cycles(1)
                 .recipe(new AppendToSequence(
             "$.things.fruit",
             "strawberry",
@@ -140,7 +136,6 @@ class AppendToSequenceTest implements RewriteTest {
     void modifyOnlyMatchingFile() {
         rewriteRun(
           spec -> spec
-                    .cycles(1)
                     .recipe(new AppendToSequence("$.list", "newThing", "**/a.yml")),
           yaml("list:\n  - existingThing\n", "list:\n  - existingThing\n  - newThing", spec -> spec.path("a.yml")),
           yaml("list:\n  - existingThing\n", spec -> spec.path("b.yml"))

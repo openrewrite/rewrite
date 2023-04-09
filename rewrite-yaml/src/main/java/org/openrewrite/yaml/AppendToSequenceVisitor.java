@@ -25,7 +25,7 @@ import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
 
-public class AppendToSequenceVisitor extends YamlVisitor<org.openrewrite.ExecutionContext> {
+public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.ExecutionContext> {
     private final JsonPathMatcher matcher;
     private final String value;
 
@@ -35,41 +35,44 @@ public class AppendToSequenceVisitor extends YamlVisitor<org.openrewrite.Executi
     }
 
     @Override
-    public Yaml visitSequence(Yaml.Sequence existingSeq, ExecutionContext executionContext) {
+    public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext executionContext) {
         Cursor parent = getCursor().getParent();
         if (matcher.matches(parent) && !alreadyVisited(existingSeq, executionContext)) {
             setVisited(existingSeq, executionContext);
-            return appendToSequence(existingSeq, this.value, executionContext);
+            Yaml.Sequence newSeq = appendToSequence(existingSeq, this.value, executionContext);
+            setVisited(newSeq, executionContext);
+            return newSeq;
         }
         return super.visitSequence(existingSeq, executionContext);
     }
 
     private Yaml.Sequence appendToSequence(Yaml.Sequence existingSequence, String value, ExecutionContext executionContext) {
-            List<Yaml.Sequence.Entry> entries = existingSequence.getEntries();
-            boolean hasDash = false;
-            Yaml.Scalar.Style style = Yaml.Scalar.Style.PLAIN;
-            String entryPrefix = "";
-            String entryTrailingCommaPrefix = null;
-            String itemPrefix = "";
-            if (!entries.isEmpty()) {
-                final int lastEntryIndex = entries.size() - 1;
-                Yaml.Sequence.Entry existingEntry = entries.get(lastEntryIndex);
-                hasDash = existingEntry.isDash();
-                entryPrefix = existingEntry.getPrefix();
-                entryTrailingCommaPrefix = existingEntry.getTrailingCommaPrefix();
-                Yaml.Sequence.Block block = existingEntry.getBlock();
-                itemPrefix = block.getPrefix();
-                if (block instanceof Yaml.Sequence.Scalar) {
-                    style = ((Yaml.Sequence.Scalar) block).getStyle();
-                }
-                if (!existingEntry.isDash()) {
-                    entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
-                }
+        Yaml.Sequence newSequence = existingSequence.copyPaste();
+        List<Yaml.Sequence.Entry> entries = newSequence.getEntries();
+        boolean hasDash = false;
+        Yaml.Scalar.Style style = Yaml.Scalar.Style.PLAIN;
+        String entryPrefix = "";
+        String entryTrailingCommaPrefix = null;
+        String itemPrefix = "";
+        if (!entries.isEmpty()) {
+            final int lastEntryIndex = entries.size() - 1;
+            Yaml.Sequence.Entry existingEntry = entries.get(lastEntryIndex);
+            hasDash = existingEntry.isDash();
+            entryPrefix = existingEntry.getPrefix();
+            entryTrailingCommaPrefix = existingEntry.getTrailingCommaPrefix();
+            Yaml.Sequence.Block block = existingEntry.getBlock();
+            itemPrefix = block.getPrefix();
+            if (block instanceof Yaml.Sequence.Scalar) {
+                style = ((Yaml.Sequence.Scalar) block).getStyle();
             }
-            Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, value);
-            Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
-            entries.add(newEntry);
-            return maybeAutoFormat(existingSequence, existingSequence.withEntries(entries), executionContext);
+            if (!existingEntry.isDash()) {
+                entries.set(lastEntryIndex, existingEntry.withTrailingCommaPrefix(""));
+            }
+        }
+        Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, value);
+        Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
+        entries.add(newEntry);
+        return maybeAutoFormat(existingSequence, newSequence, executionContext);
     }
 
     private static void setVisited(Yaml.Sequence seq, ExecutionContext context) {
