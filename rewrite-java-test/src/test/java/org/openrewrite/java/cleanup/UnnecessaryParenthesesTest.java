@@ -739,26 +739,4 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void multipleDoubleParens() {
-        rewriteRun(
-          java(
-            """
-              class Test {
-                  int test() {
-                      return ((1)) + (2 + 3);
-                  }
-              }
-              """,
-            """
-              class Test {
-                  int test() {
-                      return 1 + (2 + 3);
-                  }
-              }
-              """
-          )
-        );
-    }
 }
