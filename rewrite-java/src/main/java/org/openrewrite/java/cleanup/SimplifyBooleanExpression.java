@@ -51,4 +51,9 @@ public class SimplifyBooleanExpression extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new SimplifyBooleanExpressionVisitor<>();
     }
+
+    @Override
+    public boolean causesAnotherCycle() {
+        return true;
+    }
 }
