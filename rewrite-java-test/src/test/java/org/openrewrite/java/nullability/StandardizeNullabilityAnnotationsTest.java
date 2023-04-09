@@ -59,7 +59,7 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
     @Test
     void addsImportIfNecessary() {
-        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(javax.annotation.Nullable.class.getName(), javax.annotation.Nonnull.class.getName()))), java("""
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of("javax.annotation.Nullable", "javax.annotation.Nonnull"))), java("""
             package org.openrewrite.internal.lang;
                           
             class Test {
