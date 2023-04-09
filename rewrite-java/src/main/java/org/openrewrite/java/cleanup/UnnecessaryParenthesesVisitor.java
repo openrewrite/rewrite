@@ -21,7 +21,6 @@ import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
 
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     private final UnnecessaryParenthesesStyle style;
@@ -36,15 +35,13 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         J par = super.visitParentheses(parens, p);
         Cursor c = getCursor().pollNearestMessage(UNNECESSARY_PARENTHESES_MARKER);
-        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
+        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier || c.getValue() instanceof J.Parentheses)) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, p, getCursor().getParentOrThrow());
         }
 
         assert par != null;
-        if (par instanceof J.Parentheses) {
-            if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
-                return ((J.Parentheses<?>) par).getTree().withPrefix(Space.EMPTY);
-            }
+        if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
+            getCursor().getParentTreeCursor().putMessage(UNNECESSARY_PARENTHESES_MARKER, new Cursor(getCursor().getParent(), par));
         }
 
         return par;

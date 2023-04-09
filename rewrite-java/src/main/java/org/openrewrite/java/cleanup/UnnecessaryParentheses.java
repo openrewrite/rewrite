@@ -65,9 +65,4 @@ public class UnnecessaryParentheses extends Recipe {
             }
         };
     }
-
-    @Override
-    public boolean causesAnotherCycle() {
-        return true;
-    }
 }
