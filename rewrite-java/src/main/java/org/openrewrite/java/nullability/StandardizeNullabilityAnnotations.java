@@ -55,7 +55,7 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             nonNull("io.micrometer.core.lang.NonNull"),
             nonNull("io.reactivex.annotations.NonNull"),
             nonNull("io.reactivex.rxjava3.annotations.NonNull"),
-            nonNull("javax.annotation.Nonnull").withAllTargets().withScopes(),
+            nonNull("javax.annotation.Nonnull").withAllTargets().withAllScopes(),
             nonNull("javax.validation.constraints.NotNull"),
             nonNull("libcore.util.NonNull"),
             nonNull("lombok.NonNull"),
