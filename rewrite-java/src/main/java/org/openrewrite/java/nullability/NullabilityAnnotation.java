@@ -17,6 +17,7 @@ package org.openrewrite.java.nullability;
 
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import org.apache.commons.lang3.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 
 import java.lang.annotation.ElementType;
@@ -39,7 +40,7 @@ class NullabilityAnnotation {
 
     enum Nullability {
         NULLABLE,
-        NONNULL;
+        NONNULL
     }
 
     /**
@@ -65,6 +66,10 @@ class NullabilityAnnotation {
         this(fqn, nullability);
         getTargets().addAll(targets);
         getScopes().addAll(scopes);
+    }
+
+    public String getSimpleName() {
+        return StringUtils.substringAfterLast(getFqn(), ".");
     }
 
     public boolean isNullable() {
