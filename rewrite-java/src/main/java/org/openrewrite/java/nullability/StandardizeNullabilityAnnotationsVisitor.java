@@ -78,7 +78,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanClassDeclaration,
                 (J.ClassDeclaration currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getFqn()).build(),
+                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
@@ -106,7 +106,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanedMethodDeclaration,
                 (J.MethodDeclaration currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getFqn()).build(),
+                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
@@ -134,7 +134,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanedPackage,
                 (J.Package currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getFqn()).build(),
+                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
@@ -162,7 +162,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanedVariableDeclaration,
                 (J.VariableDeclarations currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getFqn()).build(),
+                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
