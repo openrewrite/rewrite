@@ -37,8 +37,6 @@ dependencies {
 
     compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
 
-    implementation("org.gradle:gradle-tooling-api:latest.release")
-
     "parserClasspath"("org.gradle:gradle-base-services:latest.release")
     "parserClasspath"("org.gradle:gradle-core-api:latest.release")
     "parserClasspath"("org.gradle:gradle-language-groovy:latest.release")
