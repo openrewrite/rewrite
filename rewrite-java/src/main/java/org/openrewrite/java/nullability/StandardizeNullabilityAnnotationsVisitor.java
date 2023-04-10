@@ -29,6 +29,8 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+
 class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionContext> {
 
     private static final String NULLABILITY_ANNOTATION_MARKER = "nullabilityAnnotations";
@@ -169,9 +171,46 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
     }
 
     private List<NullabilityAnnotation> getAnnotationsForReplacement(ElementType targetType, Set<MatchedNullabilityAnnotation> matchedNullabilityAnnotations) {
-        Set<ElementType> scopesToCover = matchedNullabilityAnnotations.stream().flatMap(a -> a.getNullabilityAnnotation().getScopes().stream()).collect(Collectors.toSet());
+        Set<NullabilityAnnotation.Nullability> matchedNullabilities = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getNullabilityAnnotation).map(NullabilityAnnotation::getNullability).collect(Collectors.toSet());
+        if (matchedNullabilities.isEmpty()) {
+            // no nullabilities, nothing to do
+            return emptyList();
+        }
+        if (matchedNullabilities.size() > 1) {
+            // different nullabilities on a single element, we better do nothing
 
-        List<NullabilityAnnotation> usableNullabilityAnnotations = getNullabilityAnnotationsForTarget(targetType);
+            // TODO log useful information
+            // Thought:
+            // Maybe we should transfer the logging to the caller
+            // as that code knows more about the element we failed at
+            return emptyList();
+        }
+
+        NullabilityAnnotation.Nullability nullability = matchedNullabilities.stream().findFirst().orElse(null);
+        Set<ElementType> scopesToCover = matchedNullabilityAnnotations
+                .stream()
+                .map(MatchedNullabilityAnnotation::getNullabilityAnnotation)
+                .map(NullabilityAnnotation::getScopes)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toSet());
+        if (scopesToCover.isEmpty()) {
+            return emptyList();
+        }
+
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(nullability, targetType, scopesToCover);
+        if (annotationsForReplacement.isEmpty()) {
+            // we were not able to find a good replacement
+
+            // TODO log useful information
+            // Thought:
+            // Maybe we should transfer the logging to the caller
+            // as that code knows more about the element we failed at
+        }
+        return annotationsForReplacement;
+    }
+
+    private List<NullabilityAnnotation> getAnnotationsForReplacement(NullabilityAnnotation.Nullability nullability, ElementType targetType, Set<ElementType> scopesToCover) {
+        List<NullabilityAnnotation> usableNullabilityAnnotations = getNullabilityAnnotationsForTarget(nullability, targetType);
         Optional<NullabilityAnnotation> singleAnnotation = usableNullabilityAnnotations
                 .stream()
                 .filter(a -> Objects.equals(scopesToCover, a.getScopes()))
@@ -192,11 +231,15 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         }
         return Objects.equals(scopesToCover, coveredScopes)
                 ? usedAnnotations
-                : Collections.emptyList();
+                : emptyList();
     }
 
-    private List<NullabilityAnnotation> getNullabilityAnnotationsForTarget(ElementType target) {
-        return nullabilityAnnotations.stream().filter(a -> a.getTargets().contains(target)).collect(Collectors.toList());
+    private List<NullabilityAnnotation> getNullabilityAnnotationsForTarget(NullabilityAnnotation.Nullability nullability, ElementType target) {
+        return nullabilityAnnotations
+                .stream()
+                .filter(a -> a.getNullability() == nullability)
+                .filter(a -> a.getTargets().contains(target))
+                .collect(Collectors.toList());
     }
 
 
