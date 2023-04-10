@@ -61,8 +61,16 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
             entryPrefix = existingEntry.getPrefix();
             entryTrailingCommaPrefix = existingEntry.getTrailingCommaPrefix();
             Yaml.Sequence.Block block = existingEntry.getBlock();
-            itemPrefix = block.getPrefix();
-            if (block instanceof Yaml.Sequence.Scalar) {
+            if (block instanceof Yaml.Sequence.Mapping) {
+                Yaml.Sequence.Mapping mapping = (Yaml.Sequence.Mapping) block;
+                List<Yaml.Mapping.Entry> mappingEntries = mapping.getEntries();
+                if (!mappingEntries.isEmpty()) {
+                    Yaml.Mapping.Entry entry = mappingEntries.get(0);
+                    itemPrefix = entry.getPrefix();
+                }
+            }
+            else if (block instanceof Yaml.Sequence.Scalar) {
+                itemPrefix = block.getPrefix();
                 style = ((Yaml.Sequence.Scalar) block).getStyle();
             }
             if (!existingEntry.isDash()) {

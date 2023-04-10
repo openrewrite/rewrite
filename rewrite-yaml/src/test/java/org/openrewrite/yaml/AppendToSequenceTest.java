@@ -55,7 +55,7 @@ class AppendToSequenceTest implements RewriteTest {
           spec -> spec
                 .recipe(new AppendToSequence(
             "$.things.fruit",
-            " name: strawberry",
+            "name: strawberry",
             null
           )),
           yaml(
