@@ -50,4 +50,9 @@ public class SimplifyBooleanReturn extends Recipe {
     public SimplifyBooleanReturnVisitor<ExecutionContext> getVisitor() {
         return new SimplifyBooleanReturnVisitor<>();
     }
+
+    @Override
+    public boolean causesAnotherCycle() {
+        return true;
+    }
 }
