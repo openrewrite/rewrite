@@ -8,9 +8,15 @@ val parserClasspath = configurations.create("parserClasspath")
 repositories {
     maven {
         url = uri("https://repo.gradle.org/gradle/libs-releases/")
+        content {
+            excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
+        }
     }
     maven {
         url = uri("https://plugins.gradle.org/m2/")
+        content {
+            excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
+        }
     }
 }
 
