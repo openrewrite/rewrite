@@ -72,7 +72,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
         Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, value);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
-        return maybeAutoFormat(existingSequence, newSequence, executionContext);
+        return newSequence;
     }
 
     private static void setVisited(Yaml.Sequence seq, ExecutionContext context) {
