@@ -24,7 +24,6 @@ import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.java;
 
 class StandardizeNullabilityAnnotationsTest implements RewriteTest {
