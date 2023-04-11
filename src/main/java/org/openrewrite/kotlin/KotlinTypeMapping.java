@@ -30,6 +30,7 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.resolve.LookupTagUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.providers.FirSymbolProviderKt;
+import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
@@ -448,8 +449,13 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
             if (((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol() instanceof FirNamedFunctionSymbol) {
                 FirNamedFunctionSymbol resolvedSymbol = (FirNamedFunctionSymbol) ((FirResolvedNamedReference) functionCall.getCalleeReference()).getResolvedSymbol();
                 if (ClassMembersKt.containingClass(resolvedSymbol) != null) {
-                    //noinspection DataFlowIssue
-                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(LookupTagUtilsKt.toFirRegularClassSymbol(ClassMembersKt.containingClass(resolvedSymbol), firSession).getFir(), ownerSymbol));
+                    ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(resolvedSymbol);
+                    if (lookupTag != null) {
+                        FirRegularClassSymbol classSymbol = LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession);
+                        if (classSymbol != null) {
+                            resolvedDeclaringType = TypeUtils.asFullyQualified(type(classSymbol.getFir()));
+                        }
+                    }
                 } else if (resolvedSymbol.getOrigin() == FirDeclarationOrigin.Library.INSTANCE) {
                     if (resolvedSymbol.getFir().getContainerSource() instanceof JvmPackagePartSource) {
                         JvmPackagePartSource source = (JvmPackagePartSource) resolvedSymbol.getFir().getContainerSource();
@@ -469,6 +475,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                     }
                 }
             }
+        }
+
+        if (resolvedDeclaringType == null) {
+            return null;
         }
 
         JavaType returnType = type(functionCall.getTypeRef(), ownerSymbol);
