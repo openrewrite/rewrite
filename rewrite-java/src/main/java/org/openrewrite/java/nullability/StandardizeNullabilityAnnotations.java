@@ -99,7 +99,7 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             nullable("io.reactivex.annotations.Nullable"),
             nullable("io.reactivex.rxjava3.annotations.Nullable"),
             nullable("javax.annotation.CheckForNull"),
-            nullable("javax.annotation.Nullable").withAllTargets().withScopes(),
+            nullable("javax.annotation.Nullable").withAllTargets().withAllScopes(),
             nullable("junitparams.converters.Nullable"),
             nullable("libcore.util.Nullable"),
             nullable("org.apache.avro.reflect.Nullable"),
