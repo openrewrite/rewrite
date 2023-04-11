@@ -223,6 +223,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
             private boolean methodSelectMatchesFirstLambdaParameter(MethodCall method, J.Lambda lambda) {
                 if (!(method instanceof J.MethodInvocation) ||
                         !(((J.MethodInvocation) method).getSelect() instanceof J.Identifier) ||
+                        lambda.getParameters().getParameters().isEmpty() ||
                         !(lambda.getParameters().getParameters().get(0) instanceof J.VariableDeclarations)) {
                     return false;
                 }
