@@ -43,6 +43,12 @@ class NullabilityAnnotation {
         NONNULL
     }
 
+    enum Scope {
+        FIELD,
+        METHOD,
+        PARAMETER
+    }
+
     /**
      * Fully qualified name of this annotation
      */
@@ -58,11 +64,10 @@ class NullabilityAnnotation {
     Set<ElementType> targets = new HashSet<>();
     /**
      * Defines on what elements this nullability annotation applies.
-     * Any of {@link ElementType#FIELD}, {@link ElementType#METHOD}, {@link ElementType#PARAMETER}.
      */
-    Set<ElementType> scopes = new HashSet<>();
+    Set<Scope> scopes = new HashSet<>();
 
-    public NullabilityAnnotation(String fqn, Nullability nullability, Set<ElementType> targets, Set<ElementType> scopes) {
+    public NullabilityAnnotation(String fqn, Nullability nullability, Set<ElementType> targets, Set<Scope> scopes) {
         this(fqn, nullability);
         getTargets().addAll(targets);
         getScopes().addAll(scopes);
@@ -88,11 +93,11 @@ class NullabilityAnnotation {
         return withTargets(ElementType.values());
     }
 
-    public NullabilityAnnotation withScopes(@NonNull ElementType... scopes) {
+    public NullabilityAnnotation withScopes(@NonNull Scope... scopes) {
         return new NullabilityAnnotation(getFqn(), getNullability(), getTargets(), Arrays.stream(scopes).collect(Collectors.toSet()));
     }
 
     public NullabilityAnnotation withAllScopes() {
-        return withScopes(ElementType.values());
+        return withScopes(Scope.values());
     }
 }

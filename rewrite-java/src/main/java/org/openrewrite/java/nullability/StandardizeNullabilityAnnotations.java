@@ -71,8 +71,8 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             nonNull("org.jmlspecs.annotation.NonNull"),
             nonNull("org.netbeans.api.annotations.common.NonNull"),
             nonNull("org.openrewrite.internal.lang.NonNull").withAllTargets().withAllScopes(),
-            nonNull("org.openrewrite.internal.lang.NonNullFields").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(ElementType.FIELD),
-            nonNull("org.openrewrite.internal.lang.NonNullApi").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(ElementType.METHOD, ElementType.PARAMETER),
+            nonNull("org.openrewrite.internal.lang.NonNullFields").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(NullabilityAnnotation.Scope.FIELD),
+            nonNull("org.openrewrite.internal.lang.NonNullApi").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(NullabilityAnnotation.Scope.METHOD, NullabilityAnnotation.Scope.PARAMETER),
             nonNull("org.springframework.lang.NonNull"),
             nonNull("reactor.util.annotation.NonNull"),
 
@@ -120,7 +120,7 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             nullable("org.netbeans.api.annotations.common.NullAllowed"),
             nullable("org.netbeans.api.annotations.common.NullUnknown"),
             nullable("org.openrewrite.internal.lang.Nullable").withAllTargets().withAllScopes(),
-            nullable("org.openrewrite.internal.lang.NullFields").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(ElementType.FIELD),
+            nullable("org.openrewrite.internal.lang.NullFields").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(NullabilityAnnotation.Scope.FIELD),
             nullable("org.springframework.lang.Nullable"),
             nullable("reactor.util.annotation.Nullable")
     ).collect(Collectors.toSet());

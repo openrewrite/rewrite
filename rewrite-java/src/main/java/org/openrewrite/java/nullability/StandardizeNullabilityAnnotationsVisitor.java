@@ -187,7 +187,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         }
 
         NullabilityAnnotation.Nullability nullability = matchedNullabilities.stream().findFirst().orElse(null);
-        Set<ElementType> scopesToCover = matchedNullabilityAnnotations
+        Set<NullabilityAnnotation.Scope> scopesToCover = matchedNullabilityAnnotations
                 .stream()
                 .map(MatchedNullabilityAnnotation::getNullabilityAnnotation)
                 .map(NullabilityAnnotation::getScopes)
@@ -209,7 +209,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement;
     }
 
-    private List<NullabilityAnnotation> getAnnotationsForReplacement(NullabilityAnnotation.Nullability nullability, ElementType targetType, Set<ElementType> scopesToCover) {
+    private List<NullabilityAnnotation> getAnnotationsForReplacement(NullabilityAnnotation.Nullability nullability, ElementType targetType, Set<NullabilityAnnotation.Scope> scopesToCover) {
         List<NullabilityAnnotation> usableNullabilityAnnotations = getNullabilityAnnotationsForTarget(nullability, targetType);
         Optional<NullabilityAnnotation> singleAnnotation = usableNullabilityAnnotations
                 .stream()
@@ -220,7 +220,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return Collections.singletonList(singleAnnotation.get());
         }
 
-        Set<ElementType> coveredScopes = new HashSet<>();
+        Set<NullabilityAnnotation.Scope> coveredScopes = new HashSet<>();
         List<NullabilityAnnotation> usedAnnotations = new LinkedList<>();
         for (NullabilityAnnotation possibleAnnotation : usableNullabilityAnnotations) {
             if (Objects.equals(scopesToCover, coveredScopes)) {
