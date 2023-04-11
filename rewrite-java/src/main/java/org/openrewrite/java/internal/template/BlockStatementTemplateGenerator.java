@@ -264,7 +264,8 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "{\n");
             }
 
-            if (prior instanceof Statement) {
+            if (prior == insertionPoint && prior instanceof Expression) {
+                // the template represents an expression, so we need to wrap it in a statement
                 after.append(';');
             }
             after.append('}');

@@ -775,8 +775,8 @@ public final class ControlFlow {
             String type = iteratorType instanceof JavaType.Primitive ? ((JavaType.Primitive) iteratorType).getClassName() : iteratorType.toString();
             Supplier<Cursor> cursorSupplier = () -> getCursor().dropParentUntil(J.Block.class::isInstance);
             JavaTemplate fakeIterableVariableTemplate = iterable.getType() instanceof JavaType.Array ?
-                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = Arrays.stream(#{anyArray()}).iterator()").imports("java.util.Arrays").build() :
-                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = #{any(java.lang.Iterable)}.iterator()").build();
+                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = Arrays.stream(#{anyArray()}).iterator();").imports("java.util.Arrays").build() :
+                    JavaTemplate.builder(cursorSupplier, "final Iterator<" + type + "> " + variableName + " = #{any(java.lang.Iterable)}.iterator();").build();
             // Unfortunately, because J.NewArray isn't a statement, we have to find a place in the AST where a statement could be placed. This way a statement will always be generated.
             // Find the closes outer block to place our statement.
             J.Block block = getCursor().firstEnclosing(J.Block.class);

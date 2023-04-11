@@ -19,10 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.cleanup.IndexOfReplaceableByContains;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -260,6 +257,51 @@ class JavaTemplateTest implements RewriteTest {
               class T {
                   void m() {
                       for (String s : Collections.emptyList()) {}
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3102")
+    @SuppressWarnings({"ResultOfMethodCallIgnored"})
+    void expressionAsStatementWithoutTerminatingSemicolon() {
+        // NOTE: I am not convinced that we really need to support this case. It is not valid Java.
+        // But since this has been working up until now, I am leaving it in.
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                  if (classDecl.getBody().getStatements().size() > 1) {
+                      return classDecl;
+                  }
+                  return classDecl.withTemplate(JavaTemplate.builder(this::getCursor, """
+                      void m2() {
+                      	  #{any()}
+                      }
+                      """).build(),
+                    classDecl.getBody().getStatements().get(0).getCoordinates().after(),
+                    ((J.MethodDeclaration) classDecl.getBody().getStatements().get(0)).getBody().getStatements().get(0));
+              }
+          })),
+          java(
+            """
+              class T {
+                  void m() {
+                      hashCode();
+                  }
+              }
+              """,
+            """
+              class T {
+                  void m() {
+                      hashCode();
+                  }
+                  
+                  void m2() {
+                      hashCode();
                   }
               }
               """
