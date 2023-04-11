@@ -16,9 +16,11 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.withToolingApi;
 
@@ -62,4 +64,46 @@ class DependencyInsightTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void pattern() {
+        rewriteRun(
+          spec ->  spec.recipe(new DependencyInsight("*", "jackson-core", null))
+            .dataTable(DependenciesInUse.Row.class, rows -> {
+                assertThat(rows).isNotEmpty();
+                DependenciesInUse.Row row = rows.get(0);
+                assertThat(row.getGroupId()).isEqualTo("com.fasterxml.jackson.core");
+                assertThat(row.getArtifactId()).isEqualTo("jackson-core");
+                assertThat(row.getVersion()).isEqualTo("2.13.4");
+            }),
+          buildGradle("""
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-core:7.39.1'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(com.fasterxml.jackson.core:jackson-core:2.13.4)~~>*/implementation 'org.openrewrite:rewrite-core:7.39.1'
+              }
+              """
+          )
+        );
+    }
+
 }
