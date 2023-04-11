@@ -1552,37 +1552,32 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> annotations = mapModifiers(mapAnnotations, property.getName().asString());
 
-        J.VariableDeclarations receiver = null;
+        JRightPadded<J.VariableDeclarations.NamedVariable> receiver = null;
         if (property.getReceiverTypeRef() != null) {
-            // Generates a VariableDeclaration to represent the receiver similar to how it is done in the Kotlin compiler.
-            TypeTree receiverName = (TypeTree) visitElement(property.getReceiverTypeRef(), ctx);
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
-            J.VariableDeclarations.NamedVariable receiverVar = new J.VariableDeclarations.NamedVariable(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "", null, null),
-                    emptyList(),
-                    null,
-                    null
-            );
-            receiver = new J.VariableDeclarations(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    emptyList(),
-                    emptyList(),
-                    receiverName,
-                    null,
-                    emptyList(),
-                    singletonList(padRight(receiverVar, sourceBefore(".")))
-            );
+            J.Identifier receiverName = (J.Identifier) visitElement(property.getReceiverTypeRef(), ctx);
+
+            // Temporary wrapper to move forward ...
+            // The property receiver should be placed in the getter / setter.
+            receiver = JRightPadded.build(
+                    new J.VariableDeclarations.NamedVariable(
+                            randomId(),
+                            receiverName.getPrefix(),
+                            Markers.EMPTY,
+                            receiverName.withPrefix(EMPTY),
+                            emptyList(),
+                            null,
+                            null)
+            ).withAfter(sourceBefore("."));
         }
 
         boolean isDestruct = "<destruct>".equals(property.getName().asString()) && property.getReturnTypeRef() instanceof FirResolvedTypeRef;
         int initialCapacity = isDestruct ?
                 ((FirResolvedTypeRef) property.getReturnTypeRef()).getType().getTypeArguments().length : 1 + (receiver == null ? 0 : 1);
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(initialCapacity); // adjust size if necessary
+        if (receiver != null) {
+            variables.add(receiver);
+        }
 
         TypeTree typeExpression = null;
         if (isDestruct) {
@@ -1678,14 +1673,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
                 expr = visitElement(property.getGetter(), ctx);
-                if (receiver != null) {
-                    J.MethodDeclaration md = (J.MethodDeclaration) expr;
-                    List<Statement> statements = new ArrayList<>(md.getParameters().size() + 1);
-                    statements.add(receiver);
-                    statements.addAll(md.getParameters());
-                    md = md.withParameters(statements);
-                    expr = md;
-                }
                 if (expr instanceof Statement && !(expr instanceof Expression)) {
                     expr = new K.StatementExpression(randomId(), (Statement) expr);
                 }

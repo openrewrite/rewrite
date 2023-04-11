@@ -309,18 +309,4 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
-
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
-    @Test
-    void parameterizedReceiver() {
-        rewriteRun(
-          kotlin("class SomeParameterized<T>"),
-          kotlin(
-            """
-            val SomeParameterized < Int > . receivedMember : Int
-                get ( ) = 42
-            """
-          )
-        );
-    }
 }

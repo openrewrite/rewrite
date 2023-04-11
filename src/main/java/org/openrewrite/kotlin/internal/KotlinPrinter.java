@@ -34,7 +34,6 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
@@ -782,17 +781,17 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(ReceiverType.class).isPresent();
             // This may be changed after K.VariableDeclaration is added and getters and setters exist on the model.
             // The implicit receiver should be added to the first position of the methods.
+            int variablePos = 0;
             if (containsTypeReceiver) {
-                K.StatementExpression statementExpression = (K.StatementExpression) multiVariable.getVariables().get(0).getInitializer();
-                assert statementExpression != null;
-                J.MethodDeclaration md = (J.MethodDeclaration) statementExpression.getStatement();
-                visitRightPadded(md.getPadding().getParameters().getPadding().getElements().get(0), JRightPadded.Location.NAMED_VARIABLE, p);
+                JRightPadded<J.VariableDeclarations.NamedVariable> receiver = multiVariable.getPadding().getVariables().get(0);
+                visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, p);
                 p.append(".");
+                variablePos = 1;
             }
 
             List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
             // V1: Covers and unique case in `mapForLoop` of the KotlinParserVisitor caused by how the FirElement represents for loops.
-            for (int i = 0; i < variables.size(); i++) {
+            for (int i = variablePos; i < variables.size(); i++) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
                 beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
                 if (variables.size() > 1 && !containsTypeReceiver && i == 0) {
@@ -819,21 +818,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
                 boolean implicitEquals = variable.getElement().getInitializer() instanceof K.StatementExpression &&
                         ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration;
-
-                JLeftPadded<Expression> initializer;
-                if (containsTypeReceiver && variable.getElement().getInitializer() instanceof K.StatementExpression &&
-                        ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration &&
-                        ("get".equals(((J.MethodDeclaration) ((K.StatementExpression) variable.getElement().getInitializer()).getStatement()).getSimpleName()) ||
-                                "set".startsWith(((J.MethodDeclaration) ((K.StatementExpression) variable.getElement().getInitializer()).getStatement()).getSimpleName()))) {
-                    K.StatementExpression statementExpression = (K.StatementExpression) variable.getElement().getInitializer();
-                    J.MethodDeclaration md = (J.MethodDeclaration) statementExpression.getStatement();
-                    md = md.withParameters(md.getParameters().subList(1, md.getParameters().size()));
-                    initializer = Objects.requireNonNull(variable.getElement().getPadding().getInitializer()).withElement(statementExpression.withStatement(md));
-                }
-                else {
-                    initializer = variable.getElement().getPadding().getInitializer();
-                }
-                visitLeftPadded(implicitEquals ? "" : "=", initializer, JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                visitLeftPadded(implicitEquals ? "" : "=", variable.getElement().getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
             }
 
             visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);
