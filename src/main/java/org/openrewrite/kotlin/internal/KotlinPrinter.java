@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.internal;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
@@ -348,7 +349,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-            visit(classDecl.getLeadingAnnotations(), p);
+            classDecl.getLeadingAnnotations().forEach(a -> {
+                if (!a.getMarkers().findFirst(ExplicitInlineConstructor.class).isPresent()) {
+                    visit(a, p);
+                }
+            });
             for (J.Modifier m : classDecl.getModifiers()) {
                 visitModifier(m, p);
             }
@@ -366,6 +371,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append(kind);
                 visit(classDecl.getName(), p);
             }
+
+            classDecl.getLeadingAnnotations().forEach(a -> {
+                if (a.getMarkers().findFirst(ExplicitInlineConstructor.class).isPresent()) {
+                    visit(a, p);
+                }
+            });
 
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
 

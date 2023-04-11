@@ -193,6 +193,14 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/94")
+    @Test
+    void explicitInlineConstructor() {
+        rewriteRun(
+          kotlin("class Test internal constructor ()")
+        );
+    }
+
     @Test
     void implicitConstructorWithSuperType() {
         rewriteRun(

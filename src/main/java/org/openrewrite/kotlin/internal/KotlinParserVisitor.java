@@ -3110,8 +3110,23 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         Space before = whitespace();
         JContainer<Statement> primaryConstructor = null;
-        boolean inlineConstructor = source.startsWith("(", cursor) && firPrimaryConstructor != null;
+        boolean inlineConstructor = (source.startsWith("internal", cursor) || source.startsWith("constructor", cursor) || source.startsWith("(", cursor)) && firPrimaryConstructor != null;
         if (inlineConstructor) {
+            if (source.startsWith("internal", cursor)) {
+                J.Annotation annotation = convertToAnnotation(mapModifier(before, emptyList()));
+                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new ExplicitInlineConstructor(randomId())));
+                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
+                leadingAnnotation.add(annotation);
+                before = whitespace();
+            }
+
+            if (source.startsWith("constructor", cursor)) {
+                J.Annotation annotation = new J.Annotation(randomId(), before, Markers.EMPTY, createIdentifier("constructor", regularClass), null);
+                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new ExplicitInlineConstructor(randomId())));
+                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
+                leadingAnnotation.add(annotation);
+                before = whitespace();
+            }
             skip("(");
             primaryConstructor = JContainer.build(before,
                     firPrimaryConstructor.getValueParameters().isEmpty() ?
