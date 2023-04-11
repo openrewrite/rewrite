@@ -81,6 +81,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
 
     @Setter
     @Nullable
+    @Deprecated//(since = "7.40.0", forRemoval = true)
     protected String sourceSetName;
 
     protected Path dir = Paths.get("");
