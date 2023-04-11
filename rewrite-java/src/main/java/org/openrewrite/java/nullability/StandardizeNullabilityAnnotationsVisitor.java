@@ -252,7 +252,11 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
     }
 
     private void maybeAddReplacementAnnotationImports(Collection<NullabilityAnnotation> annotations) {
-        annotations.forEach(a -> maybeAddImport(a.getFqn(), true));
+        // Maybe add import does only check for uses. This currently does not work properly with used annotations.
+        // As work around we always add imports. We can safely do this, because
+        // a) we know the annotations are used
+        // b) we know that no fully qualified identifiers were used
+        annotations.forEach(a -> maybeAddImport(a.getFqn(), false));
     }
 
 
