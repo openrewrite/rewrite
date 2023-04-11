@@ -61,12 +61,10 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.internal.KotlinParserVisitor;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
@@ -187,27 +185,14 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         }
 
         Disposer.dispose(disposable);
-        JavaSourceSet sourceSet = getSourceSet(ctx);
-        if (!ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
-            for (K.CompilationUnit cu : mappedCus) {
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        classpath.add((JavaType.FullyQualified) type);
-                    }
-                }
-            }
-            sourceSetProvenance = sourceSet.withClasspath(classpath);
-        }
-        assert sourceSetProvenance != null;
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
+        return mappedCus;
     }
 
     /**
      * @param disposable disposable to use for the compiler environment. THIS MUST BE DISPOSED BY THE CALLER.
-     * @param sources input sources to parse.
+     * @param sources    input sources to parse.
      * @param relativeTo path to relativize input paths against.
-     * @param ctx Execution context to use for collecting parsing failures.
+     * @param ctx        Execution context to use for collecting parsing failures.
      * @return FirSession associated to type attributing the CompiledKotlinSources.
      */
     Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Disposable disposable, Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -372,11 +357,13 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         return this;
     }
 
+    @Deprecated//(since = "0.4.0", forRemoval = true)
     public void setSourceSet(String sourceSet) {
         this.sourceSetProvenance = null;
         this.sourceSet = sourceSet;
     }
 
+    @Deprecated//(since = "0.4.0", forRemoval = true)
     public JavaSourceSet getSourceSet(ExecutionContext ctx) {
         if (sourceSetProvenance == null) {
             if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
