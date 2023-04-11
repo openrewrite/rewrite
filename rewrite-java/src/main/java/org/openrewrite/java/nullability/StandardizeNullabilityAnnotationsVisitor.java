@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -70,12 +71,13 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return classDeclaration;
         }
 
+        maybeRemoveMatchedAnnotationImports(matchedNullabilityAnnotations);
+        maybeAddReplacementAnnotationImports(annotationsForReplacement);
+
         List<J.Annotation> currentNullabilityAnnotations = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getJAnnotation).collect(Collectors.toList());
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(classDeclaration.getLeadingAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
-        // TODO add imports if necessary
-        // TODO remove imports if no more necessary
         J.ClassDeclaration cleanClassDeclaration = classDeclaration.withLeadingAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanClassDeclaration,
@@ -98,12 +100,13 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return methodDeclaration;
         }
 
+        maybeRemoveMatchedAnnotationImports(matchedNullabilityAnnotations);
+        maybeAddReplacementAnnotationImports(annotationsForReplacement);
+
         List<J.Annotation> currentNullabilityAnnotations = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getJAnnotation).collect(Collectors.toList());
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(methodDeclaration.getLeadingAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
-        // TODO add imports if necessary
-        // TODO remove imports if no more necessary
         J.MethodDeclaration cleanedMethodDeclaration = methodDeclaration.withLeadingAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanedMethodDeclaration,
@@ -126,12 +129,13 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return jPackage;
         }
 
+        maybeRemoveMatchedAnnotationImports(matchedNullabilityAnnotations);
+        maybeAddReplacementAnnotationImports(annotationsForReplacement);
+
         List<J.Annotation> currentNullabilityAnnotations = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getJAnnotation).collect(Collectors.toList());
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(jPackage.getAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
-        // TODO add imports if necessary
-        // TODO remove imports if no more necessary
         J.Package cleanedPackage = jPackage.withAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanedPackage,
@@ -154,12 +158,13 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return variableDeclarations;
         }
 
+        maybeRemoveMatchedAnnotationImports(matchedNullabilityAnnotations);
+        maybeAddReplacementAnnotationImports(annotationsForReplacement);
+
         List<J.Annotation> currentNullabilityAnnotations = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getJAnnotation).collect(Collectors.toList());
         List<J.Annotation> cleanedAnnotations = new LinkedList<>(variableDeclarations.getLeadingAnnotations());
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
-        // TODO add imports if necessary
-        // TODO remove imports if no more necessary
         J.VariableDeclarations cleanedVariableDeclaration = variableDeclarations.withLeadingAnnotations(cleanedAnnotations);
         return annotationsForReplacement.stream().reduce(
                 cleanedVariableDeclaration,
@@ -240,6 +245,14 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
                 .filter(a -> a.getNullability() == nullability)
                 .filter(a -> a.getTargets().contains(target))
                 .collect(Collectors.toList());
+    }
+
+    private void maybeRemoveMatchedAnnotationImports(Collection<MatchedNullabilityAnnotation> matchedAnnotations) {
+        matchedAnnotations.forEach(a -> maybeRemoveImport(a.getNullabilityAnnotation().getFqn()));
+    }
+
+    private void maybeAddReplacementAnnotationImports(Collection<NullabilityAnnotation> annotations) {
+        annotations.forEach(a -> maybeAddImport(a.getFqn(), true));
     }
 
 
