@@ -93,7 +93,7 @@ public class DependencyInsight extends Recipe {
                     .map(JavaSourceSet::getName)
                     .orElse("main");
             Map<String, List<ResolvedDependency>> configToMatchingDependencies = gp.getConfigurations().stream()
-                    .filter(c -> configuration == null || c.getName().equals(configuration))
+                    .filter(c -> configuration == null || configuration.isEmpty() || c.getName().equals(configuration))
                     .collect(toMap(
                             GradleDependencyConfiguration::getName,
                             c -> c.getResolved().stream().filter(resolvedDependency -> {
