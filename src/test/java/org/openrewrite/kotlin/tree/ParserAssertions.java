@@ -21,7 +21,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.kotlin.Assertions;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;

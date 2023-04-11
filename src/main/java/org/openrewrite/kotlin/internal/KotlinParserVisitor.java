@@ -264,7 +264,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
                     for (int j = 0; j < paramNames.length; j++) {
                         String paramName = paramNames[j].trim();
-                        JavaType type = typeArguments == null ? null : typeMapping.type(typeArguments[j]);
+                        JavaType type = typeArguments == null  || j >= typeArguments.length ? null : typeMapping.type(typeArguments[j]);
                         J.Identifier param = createIdentifier(paramName, type, null);
                         JRightPadded<J> paramExpr = JRightPadded.build(param);
                         if (j != paramNames.length - 1) {
