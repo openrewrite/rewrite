@@ -29,8 +29,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
-    compileOnly("org.openrewrite.gradle.tooling:model:latest.release")
-    testRuntimeOnly("org.openrewrite.gradle.tooling:model:latest.release")
+    implementation("org.openrewrite.gradle.tooling:model:latest.release")
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
