@@ -1366,14 +1366,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionTypeRef(FirFunctionTypeRef functionTypeRef, ExecutionContext ctx) {
-        List<JRightPadded<J>> paramExprs = new ArrayList<>(functionTypeRef.getValueParameters().size());
-        JRightPadded<NameTree> receiver = null;
-        if (functionTypeRef.getReceiverTypeRef() != null) {
-            NameTree receiverName = (NameTree) visitElement(functionTypeRef.getReceiverTypeRef(), ctx);
-            receiver = JRightPadded.build(receiverName)
-                    .withAfter(whitespace());
-            skip(".");
-        }
 
         J.Annotation annotation = null;
         if (functionTypeRef.isSuspend()) {
@@ -1383,6 +1375,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             annotation = convertToAnnotation(mapModifier(EMPTY, emptyList()));
         } else if (source.startsWith("crossinline", cursor)) {
             annotation = convertToAnnotation(mapModifier(EMPTY, emptyList()));
+        }
+
+        List<JRightPadded<J>> paramExprs = new ArrayList<>(functionTypeRef.getValueParameters().size());
+        JRightPadded<NameTree> receiver = null;
+        if (functionTypeRef.getReceiverTypeRef() != null) {
+            NameTree receiverName = (NameTree) visitElement(functionTypeRef.getReceiverTypeRef(), ctx);
+            receiver = JRightPadded.build(receiverName)
+                    .withAfter(whitespace());
+            skip(".");
         }
 
         Space prefix = whitespace();

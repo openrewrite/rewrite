@@ -398,4 +398,19 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/92")
+    @Test
+    void receiverWithModifier() {
+        rewriteRun(
+          kotlin(
+            """
+            class SomeReceiver
+            suspend inline fun SomeReceiver.method(
+              crossinline body: suspend SomeReceiver.() -> Unit
+            ) {}
+            """
+          )
+        );
+    }
 }
