@@ -560,7 +560,7 @@ public class GroovyParserVisitor {
                     if (',' == source.charAt(cursor)) {
                         // In Groovy trailing "," are allowed
                         cursor += 1;
-                        converted = converted.withMarkers(Markers.EMPTY.add(new TrailingComma(randomId(), whitespace())));
+                        converted = converted.withMarkers(Markers.EMPTY.add(new org.openrewrite.java.marker.TrailingComma(randomId(), whitespace())));
                     }
                     ts.add(converted);
                     if (afterLast != null && source.startsWith(afterLast, cursor)) {
@@ -2090,15 +2090,6 @@ public class GroovyParserVisitor {
         String prefix = source.substring(cursor, delimIndex);
         cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
         return Space.format(prefix);
-    }
-
-    /**
-     * Strings in ConstantExpression have already replaced character sequences like "\n", so its value does not match
-     * the source code.
-     */
-    private String valueWithEscapes(ConstantExpression stringLiteral) {
-        String delimiter = "";
-        return delimiter;
     }
 
     /**

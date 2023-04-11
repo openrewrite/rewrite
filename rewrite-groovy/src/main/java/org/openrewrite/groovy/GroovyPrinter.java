@@ -201,10 +201,20 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (i < nodes.size() - 1) {
                 p.append(suffixBetween);
             } else {
-                node.getMarkers().findFirst(TrailingComma.class).ifPresent(trailingComma -> {
-                    p.append(suffixBetween);
-                    visitSpace(trailingComma.getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
-                });
+                for(Marker m : node.getMarkers().getMarkers()) {
+                    // Maintaining for backwards compatibility with old LSTs
+                    //noinspection deprecation
+                    if(m instanceof TrailingComma) {
+                        p.append(suffixBetween);
+                        //noinspection deprecation
+                        visitSpace(((TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
+                        break;
+                    } else if(m instanceof org.openrewrite.java.marker.TrailingComma) {
+                        p.append(suffixBetween);
+                        visitSpace(((org.openrewrite.java.marker.TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
+                        break;
+                    }
+                }
             }
         }
     }
