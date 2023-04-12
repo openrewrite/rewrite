@@ -1971,6 +1971,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitResolvedReifiedParameterReference(FirResolvedReifiedParameterReference resolvedReifiedParameterReference, ExecutionContext ctx) {
+        return createIdentifier(resolvedReifiedParameterReference.getSymbol().getFir().getName().asString(), typeMapping.type(resolvedReifiedParameterReference), null);
+    }
+
+    @Override
     public J visitResolvedQualifier(FirResolvedQualifier resolvedQualifier, ExecutionContext ctx) {
         String fieldAccess = resolvedQualifier.getPackageFqName().asString();
         String resolvedName = resolvedQualifier.getRelativeClassFqName() == null ? "" : "." + resolvedQualifier.getRelativeClassFqName().asString();
@@ -3379,11 +3384,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitResolvedImport(FirResolvedImport resolvedImport, ExecutionContext ctx) {
         throw new UnsupportedOperationException("FirResolvedImport is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
-    }
-
-    @Override
-    public J visitResolvedReifiedParameterReference(FirResolvedReifiedParameterReference resolvedReifiedParameterReference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirResolvedReifiedParameterReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
     }
 
     @Override

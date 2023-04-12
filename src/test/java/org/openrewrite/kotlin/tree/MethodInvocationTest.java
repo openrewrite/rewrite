@@ -413,4 +413,18 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/83")
+    @Test
+    void reifiedClassReference() {
+        rewriteRun(
+          kotlin(
+            """
+            protected inline fun <reified TClass> default(arg: String) {
+                val v = TClass::class.qualifiedName
+            }
+            """
+          )
+        );
+    }
 }
