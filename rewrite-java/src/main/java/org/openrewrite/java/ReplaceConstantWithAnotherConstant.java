@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -70,30 +71,33 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
-            if (isConstant(fieldAccess.getName().getFieldType())) {
-                maybeRemoveImport(existingOwningType);
-                maybeAddImport(owningType, false);
-                return fieldAccess
-                        .withTemplate(
-                                JavaTemplate.builder(this::getCursor, template).imports(owningType).build(),
-                                fieldAccess.getCoordinates().replace())
-                        .withPrefix(fieldAccess.getPrefix());
+            JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
+            if (isConstant(fieldType)) {
+                return replaceFieldAccess(fieldAccess, fieldType);
             }
             return super.visitFieldAccess(fieldAccess, executionContext);
         }
 
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
-            if (isConstant(ident.getFieldType()) && !isVariableDeclaration()) {
-                maybeRemoveImport(existingOwningType);
-                maybeAddImport(owningType, false);
-                return ident
-                        .withTemplate(
-                                JavaTemplate.builder(this::getCursor, template).imports(owningType).build(),
-                                ident.getCoordinates().replace())
-                        .withPrefix(ident.getPrefix());
+            JavaType.Variable fieldType = ident.getFieldType();
+            if (isConstant(fieldType) && !isVariableDeclaration()) {
+                return replaceFieldAccess(ident, fieldType);
             }
             return super.visitIdentifier(ident, executionContext);
+        }
+
+        private J replaceFieldAccess(Expression fieldAccess, JavaType.Variable fieldType) {
+            JavaType owner = fieldType.getOwner();
+            while (owner instanceof JavaType.FullyQualified) {
+                maybeRemoveImport(((JavaType.FullyQualified) owner).getFullyQualifiedName());
+                owner = ((JavaType.FullyQualified) owner).getOwningClass();
+            }
+            maybeAddImport(owningType, false);
+            return fieldAccess.withTemplate(
+                            JavaTemplate.builder(this::getCursor, template).imports(owningType).build(),
+                            fieldAccess.getCoordinates().replace())
+                    .withPrefix(fieldAccess.getPrefix());
         }
 
         private boolean isConstant(@Nullable JavaType.Variable varType) {
