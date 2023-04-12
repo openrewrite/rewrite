@@ -451,12 +451,15 @@ class RemoveUnneededBlockTest implements RewriteTest {
     }
 
     @Test
-    void removeOnlyBlockContainingVariableDeclarations() {
+    void inlineLastBlockContainingVariableDeclarations() {
         rewriteRun(
           java(
             """
               public class A {
                   static {
+                      {
+                          System.out.println("hello world!");
+                      }
                       {
                           int i = 0;
                       }
@@ -466,6 +469,7 @@ class RemoveUnneededBlockTest implements RewriteTest {
             """
               public class A {
                   static {
+                      System.out.println("hello world!");
                       int i = 0;
                   }
               }

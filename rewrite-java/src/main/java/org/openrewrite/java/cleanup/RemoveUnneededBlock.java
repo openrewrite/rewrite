@@ -61,7 +61,7 @@ public class RemoveUnneededBlock extends Recipe {
             // Else perform the flattening on this block.
             Statement lastStatement = statements.get(statements.size() - 1);
             J.Block flattened = bl.withStatements(ListUtils.flatMap(statements, (i, stmt) -> {
-                if (!(stmt instanceof J.Block) || statements.size() > 1 && ((J.Block) stmt).getStatements().stream().anyMatch(s -> s instanceof J.VariableDeclarations)) {
+                if (!(stmt instanceof J.Block) || i < statements.size() - 1 && ((J.Block) stmt).getStatements().stream().anyMatch(s -> s instanceof J.VariableDeclarations)) {
                     // blocks are relevant for scoping, so don't flatten them if they contain variable declarations
                     return stmt;
                 }
