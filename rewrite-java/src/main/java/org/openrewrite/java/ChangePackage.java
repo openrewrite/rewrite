@@ -105,7 +105,7 @@ public class ChangePackage extends Recipe {
         return new ChangePackageVisitor();
     }
 
-    private class ChangePackageVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private class ChangePackageVisitor extends JavaVisitor<ExecutionContext> {
         private static final String RENAME_TO_KEY = "renameTo";
         private static final String RENAME_FROM_KEY = "renameFrom";
 
@@ -113,10 +113,10 @@ public class ChangePackage extends Recipe {
         private final JavaType.Class newPackageType = JavaType.ShallowClass.build(newPackageName);
 
         @Override
-        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-            J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
+        public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            J f = super.visitFieldAccess(fieldAccess, ctx);
 
-            if (f.isFullyQualifiedClassReference(oldPackageName)) {
+            if (((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
                 Cursor parent = getCursor().getParent();
                 if (parent != null &&
                         // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
@@ -155,7 +155,7 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
+        public J visitImport(J.Import _import, ExecutionContext executionContext) {
             // Polls message before calling super to change the prefix of the first import if applicable.
             Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
             if (updatePrefix != null && updatePrefix) {
@@ -165,8 +165,8 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-            J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
+        public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            J c = super.visitClassDeclaration(classDecl, ctx);
 
             Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
             if (updatePrefix != null && updatePrefix) {

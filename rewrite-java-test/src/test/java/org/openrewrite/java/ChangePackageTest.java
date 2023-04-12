@@ -75,6 +75,29 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void renameUsingSimplePackageName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite",
+            "openrewrite",
+            false
+          )),
+          java(
+            """
+              import org.openrewrite.Foo;
+              class Test {
+              }
+              """,
+            """
+              import openrewrite.Foo;
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void dontAddImportWhenNoChangesWereMade() {
         rewriteRun(
           java(
