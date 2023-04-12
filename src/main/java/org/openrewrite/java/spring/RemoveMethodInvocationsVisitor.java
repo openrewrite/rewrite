@@ -52,6 +52,11 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
     }
 
     @Override
+    public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+        return cu instanceof J.CompilationUnit ? visitCompilationUnit((J.CompilationUnit) cu, ctx) : cu;
+    }
+
+    @Override
     public J visitMethodInvocation(J.MethodInvocation method,
                                    ExecutionContext ctx) {
         if (inMethodCallChain()) {
