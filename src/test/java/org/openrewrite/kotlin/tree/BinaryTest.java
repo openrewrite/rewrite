@@ -38,6 +38,76 @@ class BinaryTest implements RewriteTest {
     }
 
     @Test
+    void notEquals() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+              val n = 0
+              val b = n != 0
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void greaterThan() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+              val n = 0
+              val b = n > 0
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void greaterThanOrEqual() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+              val n = 0
+              val b = n >= 0
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void lessThan() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+              val n = 0
+              val b = n < 0
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void lessThanOrEqual() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+              val n = 0
+              val b = n <= 0
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void endOfLineBreaks() {
         rewriteRun(
           kotlin(
@@ -185,6 +255,20 @@ class BinaryTest implements RewriteTest {
             fun method ( ) {
               val n = 0
               val b = n == ( 1 - 1 )
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void rem() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method ( ) {
+              val n = 0
+              val b = n % 2 == 0
             }
             """
           )

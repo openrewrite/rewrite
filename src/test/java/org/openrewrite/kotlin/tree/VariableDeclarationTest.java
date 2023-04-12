@@ -234,7 +234,7 @@ class VariableDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/58")
     @Test
-    void destructuringVariableDecleration() {
+    void destructuringVariableDeclaration() {
         rewriteRun(
           kotlin(
             """

@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind;
+import org.jetbrains.kotlin.KtLightSourceElement;
 import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.descriptors.ClassKind;
@@ -166,11 +167,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     name,
                     null,
                     null);
-        } else {
-            String cleanedName = errorNamedReference.getName().asString().substring("<Unresolved name:".length(), errorNamedReference.getName().asString().length() - 1).trim();
-            String fullName = source.substring(cursor, cursor + source.substring(cursor).indexOf(cleanedName) + cleanedName.length());
+        } else if (errorNamedReference.getSource() instanceof KtLightSourceElement) {
+            String fullName = errorNamedReference.getSource().getLighterASTNode().toString();
+            Space prefix = whitespace();
             skip(fullName);
-            return TypeTree.build(fullName);
+            return TypeTree.build(fullName).withPrefix(prefix);
+        } else {
+            throw new UnsupportedOperationException("Unsupported error name reference type.");
         }
     }
 
@@ -257,7 +260,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     cursor(saveCursor);
 
                     ConeTypeProjection[] typeArguments = null;
-                    if (p.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+                    if (p.getReturnTypeRef() instanceof FirResolvedTypeRef && (p.getReturnTypeRef().getSource() == null || !(p.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
                         FirResolvedTypeRef typeRef = (FirResolvedTypeRef) p.getReturnTypeRef();
                         typeArguments = typeRef.getType().getTypeArguments();
                     }
@@ -267,11 +270,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         JavaType type = typeArguments == null  || j >= typeArguments.length ? null : typeMapping.type(typeArguments[j]);
                         J.Identifier param = createIdentifier(paramName, type, null);
                         JRightPadded<J> paramExpr = JRightPadded.build(param);
-                        if (j != paramNames.length - 1) {
-                            paramExpr = paramExpr.withAfter(sourceBefore(","));
-                        } else {
-                            paramExpr = paramExpr.withAfter(sourceBefore(")"));
-                        }
+                        Space after = j < paramNames.length - 1 ? sourceBefore(",") : sourceBefore(")");
+                        paramExpr = paramExpr.withAfter(after);
                         destructParams.add(paramExpr);
                     }
 
@@ -281,7 +281,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     J.Lambda.Parameters destructParamsExpr = new J.Lambda.Parameters(randomId(), destructPrefix, Markers.EMPTY, true, destructParams);
                     paramExprs.add(JRightPadded.build(destructParamsExpr));
                 } else {
-                    J expr = visitElement(p, ctx);
+                    J expr;
+                    if ("<unused var>".equals(p.getName().asString())) {
+                        expr = createIdentifier("_", typeMapping.type(p), null);
+                    } else {
+                        expr = visitElement(p, ctx);
+                    }
+
                     JRightPadded<J> param = JRightPadded.build(expr);
                     if (i != parameters.size() - 1) {
                         param = param.withAfter(sourceBefore(","));
@@ -604,6 +610,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
             }
 
+            int skipImplicitDestructs = 0;
+            if (firElement instanceof FirProperty && "<destruct>".equals(((FirProperty) firElement).getName().asString())) {
+                // Destructs are represented as FirProperty with the name "<destruct>".
+                // The destruct property does not the values declared in the destruct `(a, b, ..., c)`.
+                // However, the property initialization IS a part of the FirProperty.
+                // The Kotlin compiler adds the values `a, b, ..., c` in the FirBlock after the destruct property.
+                // So, we need to skip the destruct values when mapping the FirProperty.
+                saveCursor = cursor;
+                sourceBefore("(");
+                skipImplicitDestructs = sourceBefore(")").getWhitespace().split(",").length;
+                cursor(saveCursor);
+            }
+
             if (expr == null) {
                 Space returnPrefix = EMPTY;
                 boolean explicitReturn = false;
@@ -648,11 +667,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     }
                 }
 
-                // Skip the implicitly added properties for destructuring declarations.
-                if (firElement instanceof FirProperty && "<destruct>".equals(((FirProperty) firElement).getName().asString()) &&
-                        ((FirProperty) firElement).getReturnTypeRef() instanceof FirResolvedTypeRef) {
-                    i += ((FirResolvedTypeRef) ((FirProperty) firElement).getReturnTypeRef()).getType().getTypeArguments().length;
-                }
+                i += skipImplicitDestructs;
             }
 
             JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
@@ -987,49 +1002,32 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers = markers.addIfAbsent(new ReceiverType(randomId()));
             }
 
-            J.Identifier name;
-            if (namedReference instanceof FirErrorNamedReference) {
-                // A FirErrorNamedReference implies an issue configuring the classpath.
-                // At this point we do not know if the function call is a constructor, so, resolving FirErrorNamedReferences will improve over time.
-                // The Java compiler preserves the elements and unknown types only affect the types.
-                // This is an effort to mimic the java LST and create the LST element without type attrubtion.
-                TypeTree maybeName = (TypeTree) visitElement(namedReference, ctx);
-                if (maybeName instanceof J.FieldAccess) {
-                    J.FieldAccess fa = (J.FieldAccess) maybeName;
-                    select = JRightPadded.build(fa.getTarget())
-                            .withAfter(fa.getPadding().getName().getBefore());
-                    name = fa.getName();
-                } else {
-                    name = (J.Identifier) maybeName;
-                }
-            } else {
-                if (!(functionCall instanceof FirImplicitInvokeCall)) {
-                    FirElement visit = getReceiver(functionCall.getDispatchReceiver());
-                    if (visit == null) {
-                        visit = getReceiver(functionCall.getExtensionReceiver());
-                    }
-
-                    if (visit == null) {
-                        visit = getReceiver(functionCall.getExplicitReceiver());
-                    }
-
-                    if (visit != null) {
-                        Expression selectExpr = (Expression) visitElement(visit, ctx);
-                        Space after = whitespace();
-                        if (source.startsWith(".", cursor)) {
-                            skip(".");
-                        } else if (source.startsWith("?.", cursor)) {
-                            skip("?.");
-                            markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
-                        }
-
-                        select = JRightPadded.build(selectExpr)
-                                .withAfter(after);
-                    }
+            if (!(functionCall instanceof FirImplicitInvokeCall)) {
+                FirElement visit = getReceiver(functionCall.getDispatchReceiver());
+                if (visit == null) {
+                    visit = getReceiver(functionCall.getExtensionReceiver());
                 }
 
-                name = (J.Identifier) visitElement(namedReference, null);
+                if (visit == null) {
+                    visit = getReceiver(functionCall.getExplicitReceiver());
+                }
+
+                if (visit != null) {
+                    Expression selectExpr = (Expression) visitElement(visit, ctx);
+                    Space after = whitespace();
+                    if (source.startsWith(".", cursor)) {
+                        skip(".");
+                    } else if (source.startsWith("?.", cursor)) {
+                        skip("?.");
+                        markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+                    }
+
+                    select = JRightPadded.build(selectExpr)
+                            .withAfter(after);
+                }
             }
+
+            J.Identifier name = (J.Identifier) visitElement(namedReference, null);
 
             JContainer<Expression> typeParams = null;
             if (!functionCall.getTypeArguments().isEmpty()) {
@@ -1090,15 +1088,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Nullable
-    private FirElement getReceiver(FirElement firElement) {
+    private FirElement getReceiver(@Nullable FirElement firElement) {
+        if (firElement == null) {
+            return null;
+        }
+
         FirElement receiver = null;
-        if (firElement instanceof FirFunctionCall ||
-                firElement instanceof FirPropertyAccessExpression ||
-                firElement instanceof FirConstExpression ||
-                firElement instanceof FirResolvedQualifier) {
-            receiver = firElement;
-        } else if (firElement instanceof FirCheckedSafeCallSubject) {
+        if (firElement instanceof FirCheckedSafeCallSubject) {
             receiver = ((FirCheckedSafeCallSubject) firElement).getOriginalReceiverRef().getValue();
+        } else if (!(firElement instanceof FirNoReceiverExpression ||
+                firElement instanceof FirThisReceiverExpression)) {
+            receiver = firElement;
         }
 
         return receiver;
@@ -1350,6 +1350,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 javaBinaryType = J.Binary.Type.Addition;
                 opPrefix = sourceBefore("+");
                 break;
+            case "rem":
+                javaBinaryType = J.Binary.Type.Modulo;
+                opPrefix = sourceBefore("%");
+                break;
             case "times":
                 javaBinaryType = J.Binary.Type.Multiplication;
                 opPrefix = sourceBefore("*");
@@ -1401,7 +1405,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             List<FirValueParameter> parameters = functionTypeRef.getValueParameters();
             for (int i = 0; i < parameters.size(); i++) {
                 FirValueParameter p = parameters.get(i);
-                J expr = visitElement(p, ctx);
+                J expr;
+                if ("<unused var>".equals(p.getName().asString())) {
+                    expr = createIdentifier("_", typeMapping.type(p), null);
+                } else {
+                    expr = visitElement(p, ctx);
+                }
                 JRightPadded<J> param = JRightPadded.build(expr);
                 Space after = i < parameters.size() - 1 ? sourceBefore(",") : (parenthesized ? sourceBefore(")") : EMPTY);
                 param = param.withAfter(after);
@@ -1601,7 +1610,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             cursor(saveCursor);
 
             ConeTypeProjection[] typeArguments = null;
-            if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+            if (property.getReturnTypeRef() instanceof FirResolvedTypeRef && (property.getReturnTypeRef().getSource() == null || !(property.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
                 FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
                 typeArguments = typeRef.getType().getTypeArguments();
             }
@@ -1611,7 +1620,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 String paramName = paramNames[j].trim();
                 JavaType type = typeArguments == null  || j >= typeArguments.length ? null : typeMapping.type(typeArguments[j]);
                 J.Identifier name = createIdentifier(paramName, type, null);
-                namedVariable = maybeSemicolon(
+                namedVariable = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(
                                 randomId(),
                                 destructPrefix == null ? EMPTY : destructPrefix,
@@ -1625,6 +1634,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     namedVariable = namedVariable.withAfter(sourceBefore(","));
                     variables.add(namedVariable);
                 } else {
+                    // The variable is not added here, because an initializer might be present.
                     namedVariable = namedVariable.withAfter(sourceBefore(")"));
                 }
                 destructPrefix = null;
@@ -1672,7 +1682,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     throw new UnsupportedOperationException(generateUnsupportedMessage("Unexpected property delegation. FirProperty#delegate for name: " +
                             ((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString()));
                 }
-            } else if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+            } else if (property.getReturnTypeRef() instanceof FirResolvedTypeRef && (property.getReturnTypeRef().getSource() == null || !(property.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
                 FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
                 if (typeRef.getDelegatedTypeRef() != null) {
                     Space delimiterPrefix = whitespace();
@@ -2548,7 +2558,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Identifier name = createIdentifier(valueName, valueParameter);
 
         TypeTree typeExpression = null;
-        if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef && !(valueParameter.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind)) {
+        if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef && (valueParameter.getReturnTypeRef().getSource() == null || !(valueParameter.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
             FirResolvedTypeRef typeRef = (FirResolvedTypeRef) valueParameter.getReturnTypeRef();
             if (typeRef.getDelegatedTypeRef() != null) {
                 Space delimiterPrefix = whitespace();
@@ -4126,7 +4136,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 break;
             case LT_EQ:
                 skip("<=");
-                op = J.Binary.Type.LessThan;
+                op = J.Binary.Type.LessThanOrEqual;
                 break;
             default:
                 throw new IllegalArgumentException("Unsupported FirOperation " + op.name());
