@@ -126,7 +126,7 @@ public class RemoveMethodInvocationsVisitor extends JavaVisitor<ExecutionContext
                                                 p instanceof J.VariableDeclarations.NamedVariable ||
                                                 p instanceof J.Return ||
                                                 p instanceof JContainer ||
-                                                p instanceof J.CompilationUnit
+                                                p == Cursor.ROOT_VALUE
         ).getValue() instanceof J.Block;
     }
 
