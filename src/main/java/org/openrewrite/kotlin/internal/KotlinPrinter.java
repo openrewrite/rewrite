@@ -18,7 +18,6 @@ package org.openrewrite.kotlin.internal;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
@@ -552,6 +551,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
+            if (method.getMarkers().findFirst(Implicit.class).isPresent()) {
+                return method;
+            }
+
             beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
             visit(method.getLeadingAnnotations(), p);
@@ -585,6 +588,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             List<JRightPadded<Statement>> elements = params.getPadding().getElements();
             for (;i < elements.size(); i++) {
                 JRightPadded<Statement> element = elements.get(i);
+                if (element.getElement().getMarkers().findFirst(Implicit.class).isPresent()) {
+                    continue;
+                }
                 String suffix = i == elements.size() - 1 ? "" : ",";
                 visitRightPadded(element, JContainer.Location.METHOD_DECLARATION_PARAMETERS.getElementLocation(), suffix, p);
             }
@@ -781,17 +787,24 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(ReceiverType.class).isPresent();
             // This may be changed after K.VariableDeclaration is added and getters and setters exist on the model.
             // The implicit receiver should be added to the first position of the methods.
-            int variablePos = 0;
             if (containsTypeReceiver) {
-                JRightPadded<J.VariableDeclarations.NamedVariable> receiver = multiVariable.getPadding().getVariables().get(0);
-                visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, p);
-                p.append(".");
-                variablePos = 1;
+                Expression expression = multiVariable.getVariables().get(0).getInitializer();
+                if (expression instanceof K.NamedVariableInitializer) {
+                    for (J init : ((K.NamedVariableInitializer) expression).getInitializations()) {
+                        if (init instanceof J.MethodDeclaration && "get".equals(((J.MethodDeclaration) init).getSimpleName())) {
+                            J.MethodDeclaration getter = (J.MethodDeclaration) init;
+                            JRightPadded<Statement> receiver = getter.getPadding().getParameters().getPadding().getElements().get(0);
+                            visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, p);
+                            p.append(".");
+                            break;
+                        }
+                    }
+                }
             }
 
             List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = multiVariable.getPadding().getVariables();
             // V1: Covers and unique case in `mapForLoop` of the KotlinParserVisitor caused by how the FirElement represents for loops.
-            for (int i = variablePos; i < variables.size(); i++) {
+            for (int i = 0; i < variables.size(); i++) {
                 JRightPadded<J.VariableDeclarations.NamedVariable> variable = variables.get(i);
                 beforeSyntax(variable.getElement(), Space.Location.VARIABLE_PREFIX, p);
                 if (variables.size() > 1 && !containsTypeReceiver && i == 0) {
@@ -816,9 +829,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(")");
                 }
 
-                boolean implicitEquals = variable.getElement().getInitializer() instanceof K.StatementExpression &&
-                        ((K.StatementExpression) variable.getElement().getInitializer()).getStatement() instanceof J.MethodDeclaration;
-                visitLeftPadded(implicitEquals ? "" : "=", variable.getElement().getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
+                if (variable.getElement().getInitializer() != null && !variable.getElement().getInitializer().getMarkers().findFirst(OmitEquals.class).isPresent()) {
+                    visitSpace(variable.getElement().getPadding().getInitializer().getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+                    p.append("=");
+                }
+                visit(variable.getElement().getInitializer(), p);
             }
 
             visitMarkers(multiVariable.getPadding().getVariables().get(0).getMarkers(), p);

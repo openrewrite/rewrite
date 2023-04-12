@@ -309,4 +309,84 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
+    @Test
+    void parameterizedReceiver() {
+        rewriteRun(
+          kotlin("class SomeParameterized<T>"),
+          kotlin(
+            """
+            val SomeParameterized < Int > . receivedMember : Int
+                get ( ) = 42
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
+    @Test
+    void abstractReceiver() {
+        rewriteRun(
+          kotlin("class SomeParameterized<T>"),
+          kotlin(
+            """
+            abstract class Test {
+                abstract val SomeParameterized < Int > . receivedMember : Int
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
+    @Test
+    void setter() {
+        rewriteRun(
+          kotlin(
+            """
+            var s: String = ""
+                set ( value ) {
+                    field = value
+                }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
+    @Test
+    void getterBeforeSetter() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test {
+                var stringRepresentation : String = ""
+                    get ( ) = field
+                    set ( value ) {
+                        field = value
+                    }
+            }
+            """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
+    @Test
+    void setterBeforeGetter() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test {
+                var stringRepresentation : String = ""
+                    set ( value ) {
+                        field = value
+                    }
+                    get ( ) = field
+            }
+            """
+          )
+        );
+    }
 }

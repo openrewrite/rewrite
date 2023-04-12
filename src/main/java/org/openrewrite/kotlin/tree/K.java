@@ -745,6 +745,38 @@ public interface K extends J {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class NamedVariableInitializer implements K, Expression {
+
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        List<J> initializations;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            throw new UnsupportedOperationException("NamedVariableInitializer cannot have a type");
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitNamedVariableInitializer(this, p);
+        }
+    }
 
     /**
      * Kotlin defines certain java statements like J.If as expression.

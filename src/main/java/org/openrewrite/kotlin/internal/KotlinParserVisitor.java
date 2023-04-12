@@ -489,6 +489,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Override
+    public J visitBackingFieldReference(FirBackingFieldReference backingFieldReference, ExecutionContext ctx) {
+        String name = backingFieldReference.getName().asString().startsWith("$") ? backingFieldReference.getName().asString().substring(1) : backingFieldReference.getName().asString();
+        return createIdentifier(name, backingFieldReference);
+    }
+
+    @Override
     public J visitBinaryLogicExpression(FirBinaryLogicExpression binaryLogicExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
 
@@ -1552,32 +1558,37 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> annotations = mapModifiers(mapAnnotations, property.getName().asString());
 
-        JRightPadded<J.VariableDeclarations.NamedVariable> receiver = null;
+        J.VariableDeclarations receiver = null;
         if (property.getReceiverTypeRef() != null) {
+            // Generates a VariableDeclaration to represent the receiver similar to how it is done in the Kotlin compiler.
+            TypeTree receiverName = (TypeTree) visitElement(property.getReceiverTypeRef(), ctx);
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
-            J.Identifier receiverName = (J.Identifier) visitElement(property.getReceiverTypeRef(), ctx);
-
-            // Temporary wrapper to move forward ...
-            // The property receiver should be placed in the getter / setter.
-            receiver = JRightPadded.build(
-                    new J.VariableDeclarations.NamedVariable(
-                            randomId(),
-                            receiverName.getPrefix(),
-                            Markers.EMPTY,
-                            receiverName.withPrefix(EMPTY),
-                            emptyList(),
-                            null,
-                            null)
-            ).withAfter(sourceBefore("."));
+            J.VariableDeclarations.NamedVariable receiverVar = new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "", null, null),
+                    emptyList(),
+                    null,
+                    null
+            );
+            receiver = new J.VariableDeclarations(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    emptyList(),
+                    emptyList(),
+                    receiverName,
+                    null,
+                    emptyList(),
+                    singletonList(padRight(receiverVar, sourceBefore(".")))
+            ).withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
         }
 
         boolean isDestruct = "<destruct>".equals(property.getName().asString()) && property.getReturnTypeRef() instanceof FirResolvedTypeRef;
         int initialCapacity = isDestruct ?
-                ((FirResolvedTypeRef) property.getReturnTypeRef()).getType().getTypeArguments().length : 1 + (receiver == null ? 0 : 1);
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(initialCapacity); // adjust size if necessary
-        if (receiver != null) {
-            variables.add(receiver);
-        }
+                ((FirResolvedTypeRef) property.getReturnTypeRef()).getType().getTypeArguments().length : 1;
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(initialCapacity);
 
         TypeTree typeExpression = null;
         if (isDestruct) {
@@ -1657,24 +1668,141 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
             }
 
-            J expr = null;
+            J initializer = null;
             int saveCursor = cursor;
             Space exprPrefix = whitespace();
-            if (property.getInitializer() != null && source.startsWith("=", cursor)) {
+            List<J> expressions = null;
+            boolean omitEquals = !source.startsWith("=", cursor);
+            if (property.getInitializer() != null && !omitEquals) {
+                expressions = new ArrayList<>(1);
                 skip("=");
-                expr = visitElement(property.getInitializer(), ctx);
-                if (expr instanceof Statement && !(expr instanceof Expression)) {
-                    expr = new K.StatementExpression(randomId(), (Statement) expr);
+                initializer = visitElement(property.getInitializer(), ctx);
+                if (initializer instanceof Statement && !(initializer instanceof Expression)) {
+                    initializer = new K.StatementExpression(randomId(), (Statement) initializer);
                 }
+                expressions.add(initializer);
             } else {
                 exprPrefix = EMPTY;
                 cursor(saveCursor);
             }
 
-            if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
-                expr = visitElement(property.getGetter(), ctx);
-                if (expr instanceof Statement && !(expr instanceof Expression)) {
-                    expr = new K.StatementExpression(randomId(), (Statement) expr);
+            // ... the order of the getter and setter is not preserved by the FIR, so we have to sort them out.
+            J.MethodDeclaration getter;
+            J.MethodDeclaration setter;
+            if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter) &&
+                    property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+                if (expressions == null) {
+                    expressions = new ArrayList<>(2);
+                }
+
+                saveCursor = cursor;
+                whitespace();
+
+                String methodName = source.substring(cursor, cursor + 3);
+                switch (methodName) {
+                    case "get":
+                        cursor(saveCursor);
+                        if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
+                            getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
+                            if (receiver != null) {
+                                getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
+                            }
+                            expressions.add(getter);
+                        }
+                        break;
+                    case "set":
+                        cursor(saveCursor);
+                        if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+                            setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
+                            if (receiver != null) {
+                                setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
+                            }
+                            expressions.add(setter);
+                        }
+                        break;
+                    default:
+                        cursor(saveCursor);
+                        break;
+                }
+                saveCursor = cursor;
+                whitespace();
+
+                methodName = source.substring(cursor, cursor + 3);
+                switch (methodName) {
+                    case "get":
+                        cursor(saveCursor);
+                        if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
+                            getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
+                            if (receiver != null) {
+                                getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
+                            }
+                            expressions.add(getter);
+                        }
+                        break;
+                    case "set":
+                        cursor(saveCursor);
+                        if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+                            setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
+                            if (receiver != null) {
+                                setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
+                            }
+                            expressions.add(setter);
+                        }
+                        break;
+                    default:
+                        cursor(saveCursor);
+                        break;
+                }
+            } else if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter) &&
+                    !(property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter))) {
+                if (expressions == null) {
+                    expressions = new ArrayList<>(2);
+                }
+
+                getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
+                if (receiver != null) {
+                    getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
+
+                    setter = createImplicitMethodDeclaration("set").withParameters(singletonList(receiver));
+                    expressions.add(setter);
+                }
+                expressions.add(getter);
+            } else if (!(property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) &&
+                    property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+                if (expressions == null) {
+                    expressions = new ArrayList<>(2);
+                }
+
+                setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
+                if (receiver != null) {
+                    setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
+
+                    getter = createImplicitMethodDeclaration("get").withParameters(singletonList(receiver));
+                    expressions.add(getter);
+                }
+                expressions.add(setter);
+            } else if (receiver != null) {
+                if (expressions == null) {
+                    expressions = new ArrayList<>(2);
+                }
+
+                getter = createImplicitMethodDeclaration("get").withParameters(singletonList(receiver));
+                expressions.add(getter);
+
+                setter = createImplicitMethodDeclaration("set").withParameters(singletonList(receiver));
+                expressions.add(setter);
+            }
+
+            Expression expr = null;
+            if (expressions != null) {
+                expr = new K.NamedVariableInitializer(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        expressions
+                );
+                if (omitEquals) {
+                    expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new OmitEquals(randomId())));
                 }
             }
 
@@ -1685,15 +1813,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             Markers.EMPTY,
                             name,
                             emptyList(),
-                            expr == null ? null : padLeft(exprPrefix, (Expression) expr),
+                            expr == null ? null : padLeft(exprPrefix, expr),
                             typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
                     ));
 
             variables.add(namedVariable);
-        }
-
-        if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
-            throw new IllegalArgumentException("Explicit setter initialization are not currently supported.");
         }
 
         return new J.VariableDeclarations(
@@ -1739,24 +1863,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitPropertyAccessor(FirPropertyAccessor propertyAccessor, ExecutionContext ctx) {
         Space prefix = whitespace();
-        if (propertyAccessor.isGetter()) {
+        if (propertyAccessor.isGetter() || propertyAccessor.isSetter()) {
             Markers markers = Markers.EMPTY;
             List<J> modifiers = emptyList();
             List<J.Annotation> annotations = emptyList();
-
-            JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
 
             J.TypeParameters typeParameters = propertyAccessor.getTypeParameters().isEmpty() ? null :
                     new J.TypeParameters(randomId(), sourceBefore("<"), Markers.EMPTY,
                             emptyList(),
                             convertAll(propertyAccessor.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx));
 
-            String methodName = "get";
+            String methodName = propertyAccessor.isGetter() ? "get" : "set";
             J.Identifier name = createIdentifier(methodName, propertyAccessor);
 
-            JContainer<Statement> params;
-            Space paramFmt = sourceBefore("(");
-            params = JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+            JContainer<Statement> params = JContainer.build(sourceBefore("("), propertyAccessor.isGetter() ?
+                    singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
+                    convertAll(propertyAccessor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY);
 
             int saveCursor = cursor;
             Space nextPrefix = whitespace();
@@ -1791,7 +1913,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     randomId(),
                     prefix,
                     markers,
-                    annotations == null ? emptyList() : annotations,
+                    annotations,
                     emptyList(),
                     typeParameters,
                     returnTypeExpression,
@@ -2399,7 +2521,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Identifier name = createIdentifier(valueName, valueParameter);
 
         TypeTree typeExpression = null;
-        if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+        if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef && !(valueParameter.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind)) {
             FirResolvedTypeRef typeRef = (FirResolvedTypeRef) valueParameter.getReturnTypeRef();
             if (typeRef.getDelegatedTypeRef() != null) {
                 Space delimiterPrefix = whitespace();
@@ -2742,11 +2864,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitBackingField(FirBackingField backingField, ExecutionContext ctx) {
         throw new UnsupportedOperationException("FirBackingField is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
-    }
-
-    @Override
-    public J visitBackingFieldReference(FirBackingFieldReference backingFieldReference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirBackingFieldReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
     }
 
     @Override
@@ -3478,6 +3595,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitPropertyAccessExpression((FirPropertyAccessExpression) firElement, ctx);
         } else if (firElement instanceof FirPropertyAccessor) {
             return visitPropertyAccessor((FirPropertyAccessor) firElement, ctx);
+        } else if (firElement instanceof FirBackingFieldReference) {
+            return visitBackingFieldReference((FirBackingFieldReference) firElement, ctx);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return visitResolvedNamedReference((FirResolvedNamedReference) firElement, ctx);
         } else if (firElement instanceof FirResolvedTypeRef) {
@@ -3654,6 +3773,34 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 type,
                 fieldType
         );
+    }
+
+    private J.MethodDeclaration createImplicitMethodDeclaration(String name) {
+        return new J.MethodDeclaration(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+                new J.MethodDeclaration.IdentifierWithAnnotations(
+                        new J.Identifier(
+                                randomId(),
+                                EMPTY,
+                                Markers.EMPTY,
+                                name,
+                                null,
+                                null
+                        ),
+                        emptyList()
+                ),
+                JContainer.empty(),
+                null,
+                null,
+                null,
+                null
+        ).withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
     }
 
     private J.Annotation convertToAnnotation(K.Modifier modifier) {
