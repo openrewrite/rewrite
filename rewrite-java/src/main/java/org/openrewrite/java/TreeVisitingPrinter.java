@@ -21,6 +21,9 @@ import java.util.stream.Collectors;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
 
 import static java.util.stream.StreamSupport.*;
 
@@ -160,6 +163,8 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
             || tree instanceof J.Lambda
             || tree instanceof J.Lambda.Parameters
             || tree instanceof J.If
+            || tree instanceof J.EnumValueSet
+            || tree instanceof J.TypeParameter
         ) {
             return "";
         }
@@ -185,6 +190,16 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
             return content.substring(0, CONTENT_MAX_LENGTH - 3) + "...";
         }
         return content;
+    }
+
+    private static String printSpace(Space space) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(" whitespace=\"")
+            .append(space.getWhitespace()).append("\"");
+        sb.append(" comments=\"")
+            .append(String.join(",", space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.toList())))
+            .append("\"");;
+        return sb.toString().replace("\n", "\\s\n");
     }
 
     @Override
@@ -230,6 +245,19 @@ public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
                         .append(leftPadding(i))
                         .append(UNVISITED_PREFIX)
                         .append(element instanceof String ? element : element.getClass().getSimpleName());
+
+                    if (element instanceof JRightPadded) {
+                        JRightPadded rp = (JRightPadded) element;
+                        newLine.append(" | ");
+                        newLine.append(" after = ").append(printSpace(rp.getAfter()));
+                    }
+
+                    if (element instanceof JLeftPadded) {
+                        JLeftPadded lp = (JLeftPadded) element;
+                        newLine.append(" | ");
+                        newLine.append(" before = ").append(printSpace(lp.getBefore()));
+                    }
+
                     outputLines.add(newLine);
                 }
             }
