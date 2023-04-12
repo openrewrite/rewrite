@@ -24,6 +24,8 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
+import java.util.List;
+
 @Incubating(since = "7.21.0")
 public class RemoveUnneededBlock extends Recipe {
     @Override
@@ -47,18 +49,19 @@ public class RemoveUnneededBlock extends Recipe {
         public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
             J.Block bl = super.visitBlock(block, ctx);
             J directParent = getCursor().getParentTreeCursor().getValue();
+            List<Statement> statements = bl.getStatements();
             if (directParent instanceof J.NewClass || directParent instanceof J.ClassDeclaration) {
                 // If the direct parent is an initializer block or a static block, skip it
                 return bl;
-            } else if (bl.getStatements().isEmpty()) {
+            } else if (statements.isEmpty()) {
                 // Removal handled by `EmptyBlock`
                 return bl;
             }
 
             // Else perform the flattening on this block.
-            Statement lastStatement = bl.getStatements().get(bl.getStatements().size() - 1);
-            J.Block flattened = bl.withStatements(ListUtils.flatMap(bl.getStatements(), (i, stmt) -> {
-                if (!(stmt instanceof J.Block) || ((J.Block) stmt).getStatements().stream().anyMatch(s -> s instanceof J.VariableDeclarations)) {
+            Statement lastStatement = statements.get(statements.size() - 1);
+            J.Block flattened = bl.withStatements(ListUtils.flatMap(statements, (i, stmt) -> {
+                if (!(stmt instanceof J.Block) || statements.size() > 1 && ((J.Block) stmt).getStatements().stream().anyMatch(s -> s instanceof J.VariableDeclarations)) {
                     // blocks are relevant for scoping, so don't flatten them if they contain variable declarations
                     return stmt;
                 }

@@ -441,8 +441,32 @@ class RemoveUnneededBlockTest implements RewriteTest {
                   static {
                       {
                           int i = 0;
-                          System.out.println("hello world!");
                       }
+                      System.out.println("hello world!");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeOnlyBlockContainingVariableDeclarations() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static {
+                      {
+                          int i = 0;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static {
+                      int i = 0;
                   }
               }
               """
