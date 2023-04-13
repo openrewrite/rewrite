@@ -26,6 +26,8 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.*;
 
 class AddDependencyTest implements RewriteTest {
@@ -499,6 +501,37 @@ class AddDependencyTest implements RewriteTest {
           mavenProject("project2",
             buildGradle(
               ""
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependency() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.openrewrite:rewrite-core:1.0.0", "java.util.Date", "implementation")),
+          mavenProject("project",
+            srcMainGroovy(
+              groovy(
+                """
+                  import java.util.*;
+
+                  class MyClass {
+                      static void main(String[] args) {
+                          Date date = new Date();
+                          System.out.println("Hello world");
+                      }
+                  }
+                  """
+              )
+            ),
+            buildGradle(
+              "",
+              """
+                dependencies {
+                    implementation "org.openrewrite:rewrite-core:1.0.0"
+                }
+                """
             )
           )
         );

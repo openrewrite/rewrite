@@ -199,21 +199,7 @@ public class ReloadableJava11Parser implements JavaParser {
                 .filter(Objects::nonNull)
                 .collect(toList());
 
-        JavaSourceSet sourceSet = getSourceSet(ctx);
-        if (!ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
-            for (J.CompilationUnit cu : mappedCus) {
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        classpath.add((JavaType.FullyQualified) type);
-                    }
-                }
-            }
-            sourceSetProvenance = sourceSet.withClasspath(classpath);
-        }
-
-        assert sourceSetProvenance != null;
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
+        return mappedCus;
     }
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
