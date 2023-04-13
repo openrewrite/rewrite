@@ -25,7 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class ChangePackageTest implements RewriteTest {
+class ChangePackageTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangePackage("a.b", "x.y", false));
@@ -118,16 +118,48 @@ public class ChangePackageTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
           kotlin(
             """
-            package org.foo
-            class Test
-            """,
+              package org.foo
+              class Test
+              """,
             """
-            package x.y.z
-            class Test
-            """,
+              package x.y.z
+              class Test
+              """,
             spec -> spec.path("org/foo/Test.kt").afterRecipe(cu -> {
                 assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.kt");
                 assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
+            })
+          )
+        );
+    }
+
+    @Test
+    void changePackageNameWithInheritance() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("org.a", "org.b", false)),
+          kotlin(
+            """
+              package org.a
+
+              open class Animal() {
+              }
+
+              class Dog : Animal() {
+              }
+              """,
+            """
+              package org.b
+
+              open class Animal() {
+              }
+
+              class Dog : Animal() {
+              }
+              """,
+            spec -> spec.path("org/a/Dog.kt").afterRecipe(cu -> {
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("org/b/Dog.kt");
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "org.b.Animal")).isTrue();
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(1).getType(), "org.b.Dog")).isTrue();
             })
           )
         );
