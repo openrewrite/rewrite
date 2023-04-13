@@ -18,12 +18,16 @@ package org.openrewrite.kotlin;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
 import java.util.function.Consumer;
+
+import static org.openrewrite.java.Assertions.sourceSet;
+import static org.openrewrite.test.SourceSpecs.dir;
 
 public final class Assertions {
     private Assertions() {
@@ -62,6 +66,22 @@ public final class Assertions {
                 Assertions::customizeExecutionContext).after(s -> after);
         acceptSpec(spec, kotlin);
         return kotlin;
+    }
+
+    public static SourceSpecs srcMainKotlin(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... kotlinSources) {
+        return dir("src/main/kotlin", spec, kotlinSources);
+    }
+
+    public static SourceSpecs srcMainKotlin(SourceSpecs... kotlinSources) {
+        return srcMainKotlin(spec -> sourceSet(spec, "main"), kotlinSources);
+    }
+
+    public static SourceSpecs srcTestKotlin(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... kotlinSources) {
+        return dir("src/test/kotlin", spec, kotlinSources);
+    }
+
+    public static SourceSpecs srcTestKotlin(SourceSpecs... kotlinSources) {
+        return srcTestKotlin(spec -> sourceSet(spec, "test"), kotlinSources);
     }
 
     private static void acceptSpec(Consumer<SourceSpec<K.CompilationUnit>> spec, SourceSpec<K.CompilationUnit> kotlin) {
