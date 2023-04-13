@@ -19,7 +19,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -43,29 +42,47 @@ public class RemoveUnneededBlock extends Recipe {
         return new RemoveUnneededBlockStatementVisitor();
     }
 
-    static class RemoveUnneededBlockStatementVisitor extends JavaIsoVisitor<ExecutionContext> {
+    static class RemoveUnneededBlockStatementVisitor extends JavaVisitor<ExecutionContext> {
 
         @Override
         public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
-            J.Block bl = super.visitBlock(block, ctx);
+            J.Block bl = (J.Block) super.visitBlock(block, ctx);
             J directParent = getCursor().getParentTreeCursor().getValue();
-            List<Statement> statements = bl.getStatements();
             if (directParent instanceof J.NewClass || directParent instanceof J.ClassDeclaration) {
                 // If the direct parent is an initializer block or a static block, skip it
                 return bl;
-            } else if (statements.isEmpty()) {
+            }
+
+            return maybeInlineBlock(bl, ctx);
+        }
+
+        private J.Block maybeInlineBlock(J.Block block, ExecutionContext ctx) {
+            List<Statement> statements = block.getStatements();
+            if (statements.isEmpty()) {
                 // Removal handled by `EmptyBlock`
-                return bl;
+                return block;
             }
 
             // Else perform the flattening on this block.
             Statement lastStatement = statements.get(statements.size() - 1);
-            J.Block flattened = bl.withStatements(ListUtils.flatMap(statements, (i, stmt) -> {
-                if (!(stmt instanceof J.Block) || i < statements.size() - 1 && ((J.Block) stmt).getStatements().stream().anyMatch(s -> s instanceof J.VariableDeclarations)) {
-                    // blocks are relevant for scoping, so don't flatten them if they contain variable declarations
+            J.Block flattened = block.withStatements(ListUtils.flatMap(statements, (i, stmt) -> {
+                J.Block nested;
+                if (stmt instanceof J.Try) {
+                    J.Try _try = (J.Try) stmt;
+                    if (_try.getResources() != null || !_try.getCatches().isEmpty() || _try.getFinally() == null || !_try.getFinally().getStatements().isEmpty()) {
+                        return stmt;
+                    }
+                    nested = _try.getBody();
+                } else if (stmt instanceof J.Block) {
+                    nested = (J.Block) stmt;
+                } else {
                     return stmt;
                 }
-                J.Block nested = (J.Block) stmt;
+
+                // blocks are relevant for scoping, so don't flatten them if they contain variable declarations
+                if (i < statements.size() - 1 && nested.getStatements().stream().anyMatch(s -> s instanceof J.VariableDeclarations)) {
+                    return stmt;
+                }
 
                 return ListUtils.map(nested.getStatements(), (j, inlinedStmt) -> {
                     if (j == 0) {
@@ -76,8 +93,8 @@ public class RemoveUnneededBlock extends Recipe {
                 });
             }));
 
-            if (flattened == bl) {
-                return bl;
+            if (flattened == block) {
+                return block;
             } else if (lastStatement instanceof J.Block) {
                 flattened = flattened.withEnd(flattened.getEnd()
                         .withComments(ListUtils.concat(((J.Block) lastStatement).getEnd().getComments(), flattened.getEnd().getComments())));
