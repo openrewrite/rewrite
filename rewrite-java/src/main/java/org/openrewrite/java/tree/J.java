@@ -156,8 +156,8 @@ public interface J extends Tree {
 
         @Override
         @Transient
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
+        public CoordinateBuilder.AnnotatedType getCoordinates() {
+            return new CoordinateBuilder.AnnotatedType(this);
         }
     }
 

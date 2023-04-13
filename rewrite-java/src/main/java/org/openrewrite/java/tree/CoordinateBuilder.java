@@ -78,6 +78,17 @@ public abstract class CoordinateBuilder {
         }
     }
 
+    public static class AnnotatedType extends Expression {
+
+        AnnotatedType(J.AnnotatedType tree) {
+            super(tree);
+        }
+
+        public JavaCoordinates addAnnotation(Comparator<J.Annotation> idealOrdering) {
+            return new JavaCoordinates(tree, Space.Location.ANNOTATIONS, JavaCoordinates.Mode.BEFORE, idealOrdering);
+        }
+    }
+
     public static class Annotation extends Expression {
         Annotation(J.Annotation tree) {
             super(tree);
