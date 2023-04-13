@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.RemoveImport;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -176,7 +175,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
     }
 
     private List<NullabilityAnnotation> getAnnotationsForReplacement(ElementType targetType, Set<MatchedNullabilityAnnotation> matchedNullabilityAnnotations) {
-        Set<NullabilityAnnotation.Nullability> matchedNullabilities = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getNullabilityAnnotation).map(NullabilityAnnotation::getNullability).collect(Collectors.toSet());
+        Set<NullabilityAnnotation> usedNullabilityAnnotations = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getNullabilityAnnotation).collect(Collectors.toSet());
+        Set<NullabilityAnnotation.Nullability> matchedNullabilities = usedNullabilityAnnotations.stream().map(NullabilityAnnotation::getNullability).collect(Collectors.toSet());
         if (matchedNullabilities.isEmpty()) {
             // no nullabilities, nothing to do
             return emptyList();
@@ -192,9 +192,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         }
 
         NullabilityAnnotation.Nullability nullability = matchedNullabilities.stream().findFirst().orElse(null);
-        Set<NullabilityAnnotation.Scope> scopesToCover = matchedNullabilityAnnotations
+        Set<NullabilityAnnotation.Scope> scopesToCover = usedNullabilityAnnotations
                 .stream()
-                .map(MatchedNullabilityAnnotation::getNullabilityAnnotation)
                 .map(NullabilityAnnotation::getScopes)
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
@@ -204,12 +203,18 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
 
         List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(nullability, targetType, scopesToCover);
         if (annotationsForReplacement.isEmpty()) {
-            // we were not able to find a good replacement
+            // We were not able to find a good replacement.
 
             // TODO log useful information
             // Thought:
             // Maybe we should transfer the logging to the caller
-            // as that code knows more about the element we failed at
+            // as that code knows more about the element we failed at.
+        }
+        if (annotationsForReplacement.containsAll(usedNullabilityAnnotations) && usedNullabilityAnnotations.containsAll(annotationsForReplacement)) {
+            // Our replacement would not change used annotations.
+            // Only the order may have changed as we collect matched annotation in a set.
+            // Anyway, no semantic change -> we return an empty list.
+            return emptyList();
         }
         return annotationsForReplacement;
     }

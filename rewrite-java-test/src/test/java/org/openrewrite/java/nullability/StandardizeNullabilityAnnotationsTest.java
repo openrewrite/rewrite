@@ -190,6 +190,8 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
                 class Test {
                 }
                 """, """
+                package org.openrewrite.java;
+              
                 import org.openrewrite.internal.lang.NonNull;
 
                 @NonNull
@@ -307,7 +309,8 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
                 class Test {
                     public String getString() {
-                        @Nonnull String parameter = "";
+                        @Nonnull
+                        String parameter = "";
                         return parameter;
                     }
                 }
@@ -318,7 +321,8 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
                 class Test {
                     public String getString() {
-                        @NonNull String parameter = "";
+                        @NonNull
+                        String parameter = "";
                         return parameter;
                     }
                 }
