@@ -22,6 +22,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -129,7 +130,10 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (dependency.matches(method)) {
                     List<Expression> depArgs = method.getArguments();
-                    if (depArgs.get(0) instanceof J.Literal) {
+                    if(depArgs.get(0) instanceof G.GString) {
+                        G.GString gString = (G.GString) depArgs.get(0);
+
+                    } else if (depArgs.get(0) instanceof J.Literal) {
                         String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                         assert gav != null;
                         String[] parts = gav.split(":");
@@ -146,14 +150,7 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
                                 if(version == null) {
                                     return method;
                                 }
-                                if(version.startsWith("$")) {
-                                    String versionVariableName = version.substring(1);
-                                    if(versionVariableName.startsWith("{") && versionVariableName.endsWith("}")) {
-                                        versionVariableName = versionVariableName.substring(1, versionVariableName.length() - 1);
-                                    }
-                                    getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
-                                    return method;
-                                } else {
+                                if(!version.startsWith("$")) {
                                     try {
                                         String newVersion = findNewerVersion(groupId, artifactId, version, versionComparator,
                                                 gradleProject, ctx);

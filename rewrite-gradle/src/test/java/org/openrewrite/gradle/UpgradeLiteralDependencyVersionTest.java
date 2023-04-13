@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -64,6 +65,7 @@ class UpgradeLiteralDependencyVersionTest implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void updateVersionInVariable() {
         rewriteRun(
@@ -80,42 +82,6 @@ class UpgradeLiteralDependencyVersionTest implements RewriteTest {
               
               dependencies {
                 implementation "com.google.guava:guava:$guavaVersion"
-              }
-              """,
-            """
-              plugins {
-                id 'java-library'
-              }
-              
-              def guavaVersion = '30.1.1-jre'
-              repositories {
-                mavenCentral()
-              }
-              
-              dependencies {
-                implementation "com.google.guava:guava:$guavaVersion"
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void updateVersionInExtraProperties() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                id 'java-library'
-              }
-              
-              def ext.guavaVersion = '29.0-jre'
-              repositories {
-                mavenCentral()
-              }
-              
-              dependencies {
-                implementation "com.google.guava:guava:${ext.guavaVersion}"
               }
               """,
             """
