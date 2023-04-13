@@ -33,6 +33,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
@@ -829,9 +830,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(")");
                 }
 
-                if (variable.getElement().getInitializer() != null && !variable.getElement().getInitializer().getMarkers().findFirst(OmitEquals.class).isPresent()) {
-                    visitSpace(variable.getElement().getPadding().getInitializer().getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
-                    p.append("=");
+                if (variable.getElement().getInitializer() != null) {
+                    String equals = "=";
+                    for (Marker marker : variable.getElement().getInitializer().getMarkers().getMarkers()) {
+                        if (marker instanceof By) {
+                            equals = "by";
+                            break;
+                        } else if (marker instanceof OmitEquals) {
+                            equals = "";
+                            break;
+                        }
+                    }
+
+                    visitSpace(Objects.requireNonNull(variable.getElement().getPadding().getInitializer()).getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+                    p.append(equals);
                 }
                 visit(variable.getElement().getInitializer(), p);
             }

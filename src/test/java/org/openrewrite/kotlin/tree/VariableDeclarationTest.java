@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -249,7 +248,6 @@ class VariableDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/76")
     @Test
-    @ExpectedToFail
     void propertyDelegation() {
         rewriteRun(
           kotlin(

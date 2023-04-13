@@ -354,7 +354,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitAnonymousFunctionExpression(FirAnonymousFunctionExpression anonymousFunctionExpression, ExecutionContext ctx) {
         if (!anonymousFunctionExpression.getAnonymousFunction().isLambda()) {
-            throw new IllegalArgumentException("Unsupported anonymous function expression.");
+            throw new UnsupportedOperationException("Unsupported anonymous function expression.");
         }
 
         return visitAnonymousFunction(anonymousFunctionExpression.getAnonymousFunction(), ctx);
@@ -524,7 +524,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             op = J.Binary.Type.Or;
         } else {
-            throw new IllegalArgumentException("Unsupported binary expression type " + binaryLogicExpression.getKind().name());
+            throw new UnsupportedOperationException("Unsupported binary expression type " + binaryLogicExpression.getKind().name());
         }
 
         Expression right = (Expression) visitElement(binaryLogicExpression.getRightOperand(), ctx);
@@ -735,7 +735,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Binary.Type op = mapOperation(comparisonExpression.getOperation());
 
         if (functionCall.getArgumentList().getArguments().size() != 1) {
-            throw new IllegalArgumentException("Unsupported FirComparisonExpression argument size");
+            throw new UnsupportedOperationException("Unsupported FirComparisonExpression argument size");
         }
 
         Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
@@ -776,7 +776,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitEqualityOperatorCall(FirEqualityOperatorCall equalityOperatorCall, ExecutionContext ctx) {
         if (equalityOperatorCall.getArgumentList().getArguments().size() != 2) {
-            throw new IllegalArgumentException("Unsupported number of equality operator arguments.");
+            throw new UnsupportedOperationException("Unsupported number of equality operator arguments.");
         }
 
         FirElement left = equalityOperatorCall.getArgumentList().getArguments().get(0);
@@ -1251,7 +1251,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported unary operator type.");
+                throw new UnsupportedOperationException("Unsupported unary operator type.");
         }
 
         return new J.Unary(
@@ -1355,7 +1355,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 opPrefix = sourceBefore("*");
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported binary operator type.");
+                throw new UnsupportedOperationException("Unsupported binary operator type.");
         }
         Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
 
@@ -1650,7 +1650,29 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space namePrefix = whitespace();
             J.Identifier name = createIdentifier(property.getName().asString(), property);
 
-            if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
+            Space exprPrefix = EMPTY;
+            J initializer;
+            List<J> expressions = null;
+            Markers initMarkers = Markers.EMPTY;
+            if (property.getDelegate() != null) {
+                if (property.getDelegate() instanceof FirFunctionCall && "lazy".equals(((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString())) {
+                    exprPrefix = whitespace();
+                    String current = source.substring(cursor);
+                    J.Identifier delegateName = createIdentifier(current.substring(0, current.indexOf(((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString())).trim());
+                    skip(delegateName.getSimpleName());
+
+                    initializer = visitElement(property.getDelegate(), ctx);
+                    initMarkers = initMarkers.addIfAbsent(new By(randomId()));
+                    if (initializer instanceof Statement && !(initializer instanceof Expression)) {
+                        initializer = new K.StatementExpression(randomId(), (Statement) initializer);
+                    }
+                    expressions = new ArrayList<>(1);
+                    expressions.add(initializer);
+                } else {
+                    throw new UnsupportedOperationException(generateUnsupportedMessage("Unexpected property delegation. FirProperty#delegate for name: " +
+                            ((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString()));
+                }
+            } else if (property.getReturnTypeRef() instanceof FirResolvedTypeRef) {
                 FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
                 if (typeRef.getDelegatedTypeRef() != null) {
                     Space delimiterPrefix = whitespace();
@@ -1668,12 +1690,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
             }
 
-            J initializer = null;
-            int saveCursor = cursor;
-            Space exprPrefix = whitespace();
-            List<J> expressions = null;
-            boolean omitEquals = !source.startsWith("=", cursor);
-            if (property.getInitializer() != null && !omitEquals) {
+            if (property.getInitializer() != null && source.substring(cursor).trim().startsWith("=")) {
+                exprPrefix = whitespace();
                 expressions = new ArrayList<>(1);
                 skip("=");
                 initializer = visitElement(property.getInitializer(), ctx);
@@ -1681,28 +1699,27 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     initializer = new K.StatementExpression(randomId(), (Statement) initializer);
                 }
                 expressions.add(initializer);
-            } else {
-                exprPrefix = EMPTY;
-                cursor(saveCursor);
+            } else if (initMarkers.getMarkers().isEmpty()) {
+                initMarkers = initMarkers.addIfAbsent(new OmitEquals(randomId()));
             }
 
-            // ... the order of the getter and setter is not preserved by the FIR, so we have to sort them out.
+            // getters and setter may be auto-generated by the compiler, so we need to check if they are valid.
+            // ... the order of the getter and setter is not preserved by compiler, so we have to sort them out.
             J.MethodDeclaration getter;
             J.MethodDeclaration setter;
-            if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter) &&
-                    property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+            if (isValidGetter(property.getGetter()) && isValidSetter(property.getSetter())) {
                 if (expressions == null) {
                     expressions = new ArrayList<>(2);
                 }
 
-                saveCursor = cursor;
+                int saveCursor = cursor;
                 whitespace();
 
                 String methodName = source.substring(cursor, cursor + 3);
                 switch (methodName) {
                     case "get":
                         cursor(saveCursor);
-                        if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
+                        if (isValidGetter(property.getGetter())) {
                             getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
                             if (receiver != null) {
                                 getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
@@ -1712,7 +1729,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         break;
                     case "set":
                         cursor(saveCursor);
-                        if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+                        if (isValidSetter(property.getSetter())) {
                             setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
                             if (receiver != null) {
                                 setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
@@ -1731,7 +1748,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 switch (methodName) {
                     case "get":
                         cursor(saveCursor);
-                        if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) {
+                        if (isValidGetter(property.getGetter())) {
                             getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
                             if (receiver != null) {
                                 getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
@@ -1741,7 +1758,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         break;
                     case "set":
                         cursor(saveCursor);
-                        if (property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+                        if (isValidSetter(property.getSetter())) {
                             setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
                             if (receiver != null) {
                                 setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
@@ -1753,8 +1770,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         cursor(saveCursor);
                         break;
                 }
-            } else if (property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter) &&
-                    !(property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter))) {
+            } else if (isValidGetter(property.getGetter()) && !isValidSetter(property.getSetter())) {
                 if (expressions == null) {
                     expressions = new ArrayList<>(2);
                 }
@@ -1767,8 +1783,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     expressions.add(setter);
                 }
                 expressions.add(getter);
-            } else if (!(property.getGetter() != null && !(property.getGetter() instanceof FirDefaultPropertyGetter)) &&
-                    property.getSetter() != null && !(property.getSetter() instanceof FirDefaultPropertySetter)) {
+            } else if (!isValidGetter(property.getGetter()) && isValidSetter(property.getSetter())) {
                 if (expressions == null) {
                     expressions = new ArrayList<>(2);
                 }
@@ -1798,12 +1813,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 expr = new K.NamedVariableInitializer(
                         randomId(),
                         EMPTY,
-                        Markers.EMPTY,
+                        initMarkers,
                         expressions
                 );
-                if (omitEquals) {
-                    expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new OmitEquals(randomId())));
-                }
             }
 
             JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
@@ -1830,6 +1842,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 null,
                 emptyList(),
                 variables);
+    }
+
+    private boolean isValidGetter(@Nullable FirPropertyAccessor getter) {
+        return getter != null && !(getter instanceof FirDefaultPropertyGetter) &&
+                (getter.getSource() == null || !(getter.getSource().getKind() instanceof KtFakeSourceElementKind));
+    }
+
+    private boolean isValidSetter(FirPropertyAccessor setter) {
+        return setter != null && !(setter instanceof FirDefaultPropertySetter) &&
+                (setter.getSource() == null || !(setter.getSource().getKind() instanceof KtFakeSourceElementKind));
     }
 
     @Override
@@ -1925,7 +1947,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeMapping.methodDeclarationType(propertyAccessor, null, getCurrentFile()));
         }
 
-        throw new IllegalArgumentException("Unsupported property accessor.");
+        throw new UnsupportedOperationException("Unsupported property accessor.");
     }
 
     @Override
@@ -1967,7 +1989,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             return j;
         }
-        throw new IllegalArgumentException("Unsupported null delegated type reference.");
+        throw new UnsupportedOperationException("Unsupported null delegated type reference.");
     }
 
     @Override
@@ -2112,7 +2134,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 body = body.withPrefix(before);
                 body = body.withMarkers(body.getMarkers().addIfAbsent(singleExpressionBlock));
             } else {
-                throw new IllegalStateException("Unexpected single block expression.");
+                throw new IllegalStateException("Unexpected single block expression, cursor is likely at the wrong position.");
             }
         } else {
             cursor(saveCursor);
@@ -2306,7 +2328,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
                 break;
             default:
-                throw new IllegalArgumentException("Unsupported type operator " + typeOperatorCall.getOperation().name());
+                throw new UnsupportedOperationException("Unsupported type operator " + typeOperatorCall.getOperation().name());
         }
 
         if (typeOperatorCall.getOperation() == FirOperation.AS || typeOperatorCall.getOperation() == FirOperation.SAFE_AS) {
@@ -2838,42 +2860,42 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitArgumentList(FirArgumentList argumentList, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirArgumentList is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirArgumentList"));
     }
 
     @Override
     public J visitAugmentedArraySetCall(FirAugmentedArraySetCall augmentedArraySetCall, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirAugmentedArraySetCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirAugmentedArraySetCall"));
     }
 
     @Override
     public J visitAssignmentOperatorStatement(FirAssignmentOperatorStatement assignmentOperatorStatement, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirAssignmentOperatorStatement is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirAssignmentOperatorStatement"));
     }
 
     @Override
     public J visitAnnotation(FirAnnotation annotation, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirAnnotation is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirAnnotation"));
     }
 
     @Override
     public J visitAnnotationContainer(FirAnnotationContainer annotationContainer, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirAnnotationContainer is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirAnnotationContainer"));
     }
 
     @Override
     public J visitAnnotationArgumentMapping(FirAnnotationArgumentMapping annotationArgumentMapping, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirAnnotationArgumentMapping is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirAnnotationArgumentMapping"));
     }
 
     @Override
     public J visitBackingField(FirBackingField backingField, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirBackingField is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirBackingField"));
     }
 
     @Override
     public J visitContextReceiver(FirContextReceiver contextReceiver, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirContextReceiver is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirContextReceiver"));
     }
 
     @Override
@@ -3010,137 +3032,137 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitComponentCall(FirComponentCall componentCall, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirComponentCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirComponentCall"));
     }
 
     @Override
     public J visitContractDescriptionOwner(FirContractDescriptionOwner contractDescriptionOwner, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirContractDescriptionOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirContractDescriptionOwner"));
     }
 
     @Override
     public J visitContextReceiverArgumentListOwner(FirContextReceiverArgumentListOwner contextReceiverArgumentListOwner, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirContextReceiverArgumentListOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirContextReceiverArgumentListOwner"));
     }
 
     @Override
     public J visitClassReferenceExpression(FirClassReferenceExpression classReferenceExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirClassReferenceExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirClassReferenceExpression"));
     }
 
     @Override
     public J visitClassLikeDeclaration(FirClassLikeDeclaration classLikeDeclaration, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirClassLikeDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirClassLikeDeclaration"));
     }
 
     @Override
     public J visitCall(FirCall call, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirCall"));
     }
 
     @Override
     public J visitCallableDeclaration(FirCallableDeclaration callableDeclaration, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirCallableDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirCallableDeclaration"));
     }
 
     @Override
     public J visitDelegatedConstructorCall(FirDelegatedConstructorCall delegatedConstructorCall, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirDelegatedConstructorCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirDelegatedConstructorCall"));
     }
 
     @Override
     public J visitDeclaration(FirDeclaration declaration, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirDeclaration"));
     }
 
     @Override
     public J visitDynamicTypeRef(FirDynamicTypeRef dynamicTypeRef, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirDynamicTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirDynamicTypeRef"));
     }
 
     @Override
     public J visitDelegateFieldReference(FirDelegateFieldReference delegateFieldReference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirDelegateFieldReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirDelegateFieldReference"));
     }
 
     @Override
     public J visitDeclarationStatus(FirDeclarationStatus declarationStatus, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirDeclarationStatus is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirDeclarationStatus"));
     }
 
     @Override
     public J visitField(FirField field, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirField is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirField"));
     }
 
     @Override
     public J visitFunction(FirFunction function, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirFunction is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirFunction"));
     }
 
     @Override
     public J visitImplicitInvokeCall(FirImplicitInvokeCall implicitInvokeCall, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirImplicitInvokeCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirImplicitInvokeCall"));
     }
 
     @Override
     public J visitImplicitTypeRef(FirImplicitTypeRef implicitTypeRef, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirImplicitTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirImplicitTypeRef"));
     }
 
     @Override
     public J visitIntegerLiteralOperatorCall(FirIntegerLiteralOperatorCall integerLiteralOperatorCall, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirIntegerLiteralOperatorCall is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirIntegerLiteralOperatorCall"));
     }
 
     @Override
     public J visitIntersectionTypeRef(FirIntersectionTypeRef intersectionTypeRef, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirIntersectionTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirIntersectionTypeRef"));
     }
 
     @Override
     public <E extends FirTargetElement> J visitJump(FirJump<E> jump, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirJump is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirJump"));
     }
 
     @Override
     public J visitLoop(FirLoop loop, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirLoop is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirLoop"));
     }
 
     @Override
     public J visitLoopJump(FirLoopJump loopJump, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirLoopJump is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirLoopJump"));
     }
 
     @Override
     public J visitMemberDeclaration(FirMemberDeclaration memberDeclaration, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirMemberDeclaration is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirMemberDeclaration"));
     }
 
     @Override
     public J visitNamedReference(FirNamedReference namedReference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirNamedReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirNamedReference"));
     }
 
     @Override
     public J visitPlaceholderProjection(FirPlaceholderProjection placeholderProjection, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirPlaceholderProjection is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirPlaceholderProjection"));
     }
 
     @Override
     public J visitQualifiedAccess(FirQualifiedAccess qualifiedAccess, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirQualifiedAccess is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirQualifiedAccess"));
     }
 
     @Override
     public J visitQualifiedAccessExpression(FirQualifiedAccessExpression qualifiedAccessExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirQualifiedAccessExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirQualifiedAccessExpression"));
     }
 
     @Override
     public J visitReference(FirReference reference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirReference"));
     }
 
     @Override
@@ -3368,42 +3390,42 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitResolvable(FirResolvable resolvable, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirResolvable is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirResolvable"));
     }
 
     @Override
     public J visitResolvedCallableReference(FirResolvedCallableReference resolvedCallableReference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirResolvedCallableReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirResolvedCallableReference"));
     }
 
     @Override
     public J visitResolvedDeclarationStatus(FirResolvedDeclarationStatus resolvedDeclarationStatus, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirResolvedDeclarationStatus is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirResolvedDeclarationStatus"));
     }
 
     @Override
     public J visitResolvedImport(FirResolvedImport resolvedImport, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirResolvedImport is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirResolvedImport"));
     }
 
     @Override
     public J visitSpreadArgumentExpression(FirSpreadArgumentExpression spreadArgumentExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirSpreadArgumentExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirSpreadArgumentExpression"));
     }
 
     @Override
     public J visitTypeRef(FirTypeRef typeRef, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTypeRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirTypeRef"));
     }
 
     @Override
     public J visitTargetElement(FirTargetElement targetElement, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTargetElement is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirTargetElement"));
     }
 
     @Override
     public J visitThisReference(FirThisReference thisReference, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirThisReference is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirThisReference"));
     }
 
     @Override
@@ -3420,89 +3442,100 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitTypeParameterRef(FirTypeParameterRef typeParameterRef, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTypeParameterRef is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirTypeParameterRef"));
     }
 
     @Override
     public J visitTypeParameterRefsOwner(FirTypeParameterRefsOwner typeParameterRefsOwner, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTypeParameterRefsOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirTypeParameterRefsOwner"));
     }
 
     @Override
     public J visitTypeParametersOwner(FirTypeParametersOwner typeParametersOwner, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTypeParametersOwner is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirTypeParametersOwner"));
     }
 
     @Override
     public J visitTypeProjection(FirTypeProjection typeProjection, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTypeProjection is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirTypeProjection"));
     }
 
     @Override
     public J visitTypeRefWithNullability(FirTypeRefWithNullability typeRefWithNullability, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirTypeRefWithNullability is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirTypeRefWithNullability"));
     }
 
     @Override
     public J visitVarargArgumentsExpression(FirVarargArgumentsExpression varargArgumentsExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirVarargArgumentsExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirVarargArgumentsExpression"));
     }
 
     @Override
     public J visitWhenSubjectExpression(FirWhenSubjectExpression whenSubjectExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirWhenSubjectExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirWhenSubjectExpression"));
     }
 
     @Override
     public J visitWrappedArgumentExpression(FirWrappedArgumentExpression wrappedArgumentExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirWrappedArgumentExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirWrappedArgumentExpression"));
     }
 
     @Override
     public J visitWrappedDelegateExpression(FirWrappedDelegateExpression wrappedDelegateExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirWrappedDelegateExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirWrappedDelegateExpression"));
     }
 
     @Override
     public J visitWrappedExpression(FirWrappedExpression wrappedExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirWrappedExpression is not supported at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirWrappedExpression"));
     }
 
     /* Error element visits */
 
     @Override
     public J visitErrorExpression(FirErrorExpression errorExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirErrorExpression should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirErrorExpression"));
     }
 
     @Override
     public J visitErrorFunction(FirErrorFunction errorFunction, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirErrorFunction should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirErrorFunction"));
     }
 
     @Override
     public J visitErrorImport(FirErrorImport errorImport, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirErrorImport should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirErrorImport"));
     }
 
     @Override
     public J visitErrorLoop(FirErrorLoop errorLoop, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirErrorLoop should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirErrorLoop"));
     }
 
     @Override
     public J visitErrorProperty(FirErrorProperty errorProperty, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirErrorProperty should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirErrorProperty"));
     }
 
     @Override
     public J visitErrorResolvedQualifier(FirErrorResolvedQualifier errorResolvedQualifier, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirErrorResolvedQualifier should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirErrorResolvedQualifier"));
     }
 
     @Override
     public J visitErrorTypeRef(FirErrorTypeRef errorTypeRef, ExecutionContext ctx) {
-        throw new UnsupportedOperationException("FirErrorTypeRef should not be visited at cursor: " + source.substring(cursor, Math.min(source.length(), cursor + 20)));
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirErrorTypeRef"));
+    }
+
+    private String generateUnsupportedMessage(String typeName) {
+        StringBuilder msg = new StringBuilder(typeName);
+        msg.append(" is not supported at cursor: ");
+        msg.append(source, cursor, Math.min(source.length(), cursor + 30));
+        if (currentFile != null) {
+            msg.append("in file: ");
+            msg.append(currentFile.getName());
+        }
+        return msg.toString();
     }
 
     /**
