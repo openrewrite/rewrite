@@ -9,12 +9,13 @@ dependencies {
 
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
-    testImplementation("javax.annotation:javax.annotation-api:1.3.2") {
-        because("Used for StandardizeNullabilityAnnotationsTest")
-    }
+
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("junit:junit:4.13.2") {
         because("Used for RemoveUnneededAssertionTest")
+    }
+    testRuntimeOnly("com.google.code.findbugs:jsr305:3.0.2") {
+        because("Used for StandardizeNullabilityAnnotationsTest")
     }
     testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
