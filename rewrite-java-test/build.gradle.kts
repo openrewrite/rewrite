@@ -17,6 +17,9 @@ dependencies {
     testRuntimeOnly("com.google.code.findbugs:jsr305:3.0.2") {
         because("Used for StandardizeNullabilityAnnotationsTest")
     }
+    testRuntimeOnly("androidx.annotation:annotation-jvm:1.6.0") {
+        because("Used for StandardizeNullabilityAnnotationsTest")
+    }
     testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")

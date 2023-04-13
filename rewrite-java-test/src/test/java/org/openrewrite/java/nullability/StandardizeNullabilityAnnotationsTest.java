@@ -30,7 +30,7 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.parser(JavaParser.fromJavaVersion().classpath("jsr305", "rewrite-core"));
+        spec.parser(JavaParser.fromJavaVersion().classpath("rewrite-core", "jsr305", "annotation-jvm"));
     }
 
     @Test
@@ -168,7 +168,7 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
                 @NonNull
                 package org.openrewrite.java;
 
-                import android.annotation.NonNull;
+                import androidx.annotation.NonNull;
                 """, """
                 @Nonnull
                 package org.openrewrite.java;
