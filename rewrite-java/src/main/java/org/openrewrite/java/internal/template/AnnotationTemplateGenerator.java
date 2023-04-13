@@ -130,7 +130,8 @@ public class AnnotationTemplateGenerator {
                 before.insert(0, cu.getPackageDeclaration().withPrefix(Space.EMPTY).printTrimmed(cursor) + ";\n");
             }
             List<J.ClassDeclaration> classes = cu.getClasses();
-            if (!classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder")) {
+            boolean hasTrailingPlaceholderInterface = !classes.isEmpty() && classes.get(classes.size() - 1).getName().getSimpleName().equals("$Placeholder");
+            if (!hasTrailingPlaceholderInterface){
                 after.append("@interface $Placeholder {}");
             }
             return;
