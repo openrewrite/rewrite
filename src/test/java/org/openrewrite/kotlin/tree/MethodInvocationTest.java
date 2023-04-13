@@ -427,4 +427,30 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void errorNameRefOnSelect() {
+        rewriteRun(
+          kotlin(
+            """
+            fun test() {
+              "foo".foo()
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void errorNameRefOnSelectWithReference() {
+        rewriteRun(
+          kotlin(
+            """
+            fun test(bar: String) {
+              "foo $bar".foo()
+            }
+            """
+          )
+        );
+    }
 }

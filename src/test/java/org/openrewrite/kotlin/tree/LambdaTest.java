@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -91,6 +92,34 @@ class LambdaTest implements RewriteTest {
             """
             fun method ( ) {
                 val lambda: suspend ( Int ) -> Int = { number : Int -> number * number }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void ignored() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method() {
+                val list = listOf(1, 2, 3)
+                list.filterIndexed { index, ignored -> index % 2 == 0 }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
+    void underscore() {
+        rewriteRun(
+          kotlin(
+            """
+            fun method() {
+                val list = listOf(1, 2, 3)
+                list.filterIndexed { index, _ -> index % 2 == 0 }
             }
             """
           )
