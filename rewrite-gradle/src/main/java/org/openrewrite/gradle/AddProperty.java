@@ -72,7 +72,7 @@ public class AddProperty extends Recipe {
                 exists.set(true);
                 Tree t = !Boolean.TRUE.equals(overwrite) ?
                         sourceFile :
-                        new ChangePropertyValue(key, value, null, null, null)
+                        new ChangePropertyValue(key, value, null, false, null, null)
                                 .getVisitor().visitNonNull(sourceFile, ctx);
                 return (SourceFile) new org.openrewrite.properties.AddProperty(key, value, null, null)
                         .getVisitor()
