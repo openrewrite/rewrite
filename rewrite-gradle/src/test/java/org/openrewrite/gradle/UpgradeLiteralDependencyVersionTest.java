@@ -63,4 +63,77 @@ class UpgradeLiteralDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void updateVersionInVariable() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              def guavaVersion = '29.0-jre'
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              def guavaVersion = '30.1.1-jre'
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateVersionInExtraProperties() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              def ext.guavaVersion = '29.0-jre'
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation "com.google.guava:guava:${ext.guavaVersion}"
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              def guavaVersion = '30.1.1-jre'
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation "com.google.guava:guava:$guavaVersion"
+              }
+              """
+          )
+        );
+    }
+
 }
