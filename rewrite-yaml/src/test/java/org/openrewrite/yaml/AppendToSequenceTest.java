@@ -83,7 +83,7 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
-    void appendToSequenceHasDashFalse() {
+    void appendToSequenceOfLiteralsHasDashFalse() {
         rewriteRun(
           spec -> spec
                 .recipe(new AppendToSequence(
@@ -102,6 +102,62 @@ class AppendToSequenceTest implements RewriteTest {
             """
                   things:
                     fruit: [apple, blueberry, strawberry]
+                    animals:
+                      - cat
+                      - dog
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendToSequenceOfSingleQuotedValuesHasDashFalse() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "strawberry",
+              null
+            )),
+          yaml(
+            """
+                  things:
+                    fruit: ['apple', 'blueberry']
+                    animals:
+                      - cat
+                      - dog
+              """,
+            """
+                  things:
+                    fruit: ['apple', 'blueberry', 'strawberry']
+                    animals:
+                      - cat
+                      - dog
+              """
+          )
+        );
+    }
+
+    @Test
+    void appendToSequenceOfDoubleQuotedValuesHasDashFalse() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "strawberry",
+              null
+            )),
+          yaml(
+            """
+                  things:
+                    fruit: ["apple", "blueberry"]
+                    animals:
+                      - cat
+                      - dog
+              """,
+            """
+                  things:
+                    fruit: ["apple", "blueberry", "strawberry"]
                     animals:
                       - cat
                       - dog
