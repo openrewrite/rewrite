@@ -60,14 +60,16 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 if (annotatedType.isScope(insertionPoint) && loc == ANNOTATIONS) {
                     List<J.Annotation> generatedAnnotations = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
-                        return annotatedType.withAnnotations(generatedAnnotations);
+                        J.AnnotatedType after = annotatedType.withAnnotations(generatedAnnotations);
+                        return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
                     } else {
                         List<J.Annotation> newAnnotations = generatedAnnotations.stream().reduce(
                             annotatedType.getAnnotations(),
                             (currentAnnotations, a) -> ListUtils.insertInOrder(annotatedType.getAnnotations(), a, getComparatorOrThrow()),
                             (before, after) -> after
                         );
-                        return annotatedType.withAnnotations(newAnnotations);
+                        J.AnnotatedType after = annotatedType.withAnnotations(newAnnotations);
+                        return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
                     }
                 }
                 return super.visitAnnotatedType(annotatedType, integer);
@@ -459,11 +461,13 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     } else if (loc == ANNOTATIONS) {
                         List<J.Annotation> generatedAnnotations = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                         if (mode == JavaCoordinates.Mode.REPLACEMENT) {
-                            return pkg.withAnnotations(generatedAnnotations);
+                            J.Package after = pkg.withAnnotations(generatedAnnotations);
+                            return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
                         } else {
                             List<J.Annotation> newAnnotations = new LinkedList<>(pkg.getAnnotations());
                             generatedAnnotations.forEach(a -> ListUtils.insertInOrder(newAnnotations, a, getComparatorOrThrow()));
-                            return pkg.withAnnotations(newAnnotations);
+                            J.Package after = pkg.withAnnotations(newAnnotations);
+                            return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
                         }
                     }
                 }

@@ -296,4 +296,30 @@ public final class ListUtils {
     public static <T> List<T> nullIfEmpty(@Nullable List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
+
+    /**
+     * Return the first element of the given list if available
+     * @return the last element or {@code null} if the list is empty
+     */
+    @Nullable
+    public static <T> T first(@Nullable List<T> ls) {
+        if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        return ls.get(0);
+    }
+
+    /**
+     * Return the last element of the given list if available
+     * @return the last element or {@code null} if the list is empty
+     */
+    @Nullable
+    public static <T> T last(@Nullable List<T> ls) {
+        if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        return ls.get(ls.size() - 1);
+    }
 }
