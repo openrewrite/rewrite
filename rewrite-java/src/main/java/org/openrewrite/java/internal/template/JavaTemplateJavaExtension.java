@@ -437,8 +437,12 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
 
             @Override
             public J visitPackage(J.Package pkg, Integer integer) {
-                if (loc.equals(PACKAGE_PREFIX) && pkg.isScope(insertionPoint)) {
-                    return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(substitutedTemplate)));
+                if (pkg.isScope(insertionPoint)) {
+                    if (loc == PACKAGE_PREFIX) {
+                        return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(substitutedTemplate)));
+                    } else if (loc == ANNOTATIONS) {
+                        return pkg.withAnnotations(substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate)));
+                    }
                 }
                 return super.visitPackage(pkg, integer);
             }
