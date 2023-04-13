@@ -53,4 +53,20 @@ class WhileInsteadOfForTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noChangeForEmptyControlCondition() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  int m() {
+                      for (;;) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
