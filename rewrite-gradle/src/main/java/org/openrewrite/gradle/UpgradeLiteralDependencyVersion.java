@@ -132,6 +132,16 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
                     List<Expression> depArgs = method.getArguments();
                     if(depArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) depArgs.get(0);
+                        List<J> strings = gString.getStrings();
+                        if(strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                            return method;
+                        }
+                        G.GString.Value versionValue = (G.GString.Value) strings.get(1);
+                        if(!(versionValue.getTree() instanceof J.Identifier)) {
+                            return method;
+                        }
+                        String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                        getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
 
                     } else if (depArgs.get(0) instanceof J.Literal) {
                         String gav = (String) ((J.Literal) depArgs.get(0)).getValue();

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.gradle;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -65,7 +64,6 @@ class UpgradeLiteralDependencyVersionTest implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void updateVersionInVariable() {
         rewriteRun(
