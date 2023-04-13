@@ -30,7 +30,7 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.parser(JavaParser.fromJavaVersion().classpath("javax.annotation-api", "rewrite-core"));
+        spec.parser(JavaParser.fromJavaVersion().classpath("jsr305", "rewrite-core"));
     }
 
     @Test
