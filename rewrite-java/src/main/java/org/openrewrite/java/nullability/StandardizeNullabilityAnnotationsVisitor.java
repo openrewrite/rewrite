@@ -59,6 +59,35 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
     }
 
     @Override
+    public J.AnnotatedType visitAnnotatedType(J.AnnotatedType t, ExecutionContext executionContext) {
+        J.AnnotatedType annotatedType = super.visitAnnotatedType(t, executionContext);
+        Set<MatchedNullabilityAnnotation> matchedNullabilityAnnotations = getCursor().pollMessage(NULLABILITY_ANNOTATION_MARKER);
+        if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
+            return annotatedType;
+        }
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.TYPE, matchedNullabilityAnnotations);
+        if (annotationsForReplacement.isEmpty()) {
+            return annotatedType;
+        }
+
+        maybeRemoveMatchedAnnotationImports(matchedNullabilityAnnotations);
+        maybeAddReplacementAnnotationImports(annotationsForReplacement);
+
+        List<J.Annotation> currentNullabilityAnnotations = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getJAnnotation).collect(Collectors.toList());
+        List<J.Annotation> cleanedAnnotations = new LinkedList<>(annotatedType.getAnnotations());
+        cleanedAnnotations.removeAll(currentNullabilityAnnotations);
+
+        J.AnnotatedType cleanAnnotatedType = annotatedType.withAnnotations(cleanedAnnotations);
+        return annotationsForReplacement.stream().reduce(
+                cleanAnnotatedType,
+                (J.AnnotatedType currentType, NullabilityAnnotation annotation) -> currentType.withTemplate(
+                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
+                        currentType.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
+                ), (oldType, newType) -> newType
+        );
+    }
+
+    @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
         J.ClassDeclaration classDeclaration = super.visitClassDeclaration(classDecl, executionContext);
         Set<MatchedNullabilityAnnotation> matchedNullabilityAnnotations = getCursor().pollMessage(NULLABILITY_ANNOTATION_MARKER);
