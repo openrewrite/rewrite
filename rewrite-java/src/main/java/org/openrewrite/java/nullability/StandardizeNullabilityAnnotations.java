@@ -74,6 +74,8 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             nonNull("org.openrewrite.internal.lang.NonNullFields").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(NullabilityAnnotation.Scope.FIELD),
             nonNull("org.openrewrite.internal.lang.NonNullApi").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(NullabilityAnnotation.Scope.METHOD, NullabilityAnnotation.Scope.PARAMETER),
             nonNull("org.springframework.lang.NonNull"),
+            nonNull("org.springframework.lang.NonNullFields").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(NullabilityAnnotation.Scope.FIELD),
+            nonNull("org.springframework.lang.NonNullApi").withTargets(ElementType.PACKAGE, ElementType.TYPE).withScopes(NullabilityAnnotation.Scope.METHOD, NullabilityAnnotation.Scope.PARAMETER),
             nonNull("reactor.util.annotation.NonNull"),
 
             nullable("android.annotation.Nullable"),

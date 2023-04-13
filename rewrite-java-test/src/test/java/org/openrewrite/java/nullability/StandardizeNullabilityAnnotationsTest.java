@@ -17,6 +17,8 @@ package org.openrewrite.java.nullability;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
@@ -30,7 +32,7 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.parser(JavaParser.fromJavaVersion().classpath("rewrite-core", "jsr305", "annotation-jvm"));
+        spec.parser(JavaParser.fromJavaVersion().classpath("rewrite-core", "jsr305", "spring-core"));
     }
 
     @Test
@@ -137,7 +139,7 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
                 package org.openrewrite.java;
 
                 import javax.annotation.Nonnull;
-                import jakarta.annotation.Nullable;
+                import org.springframework.lang.Nullable;
 
                 class Test {
                     @Nonnull
@@ -164,16 +166,16 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
     @Test
     void shouldReplaceAnnotationsOnPackage() {
-        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of("javax.annotation.Nonnull"))), java("""
-                @NonNull
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(NonNullApi.class.getName()))), java("""
+                @NonNullApi
                 package org.openrewrite.java;
 
-                import androidx.annotation.NonNull;
+                import org.springframework.lang.NonNullApi;
                 """, """
-                @Nonnull
+                @NonNullApi
                 package org.openrewrite.java;
 
-                import javax.annotation.Nonnull;
+                import org.openrewrite.internal.lang.NonNullApi;
                 """));
     }
 
@@ -348,7 +350,7 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
     @Test
     void shouldReplaceOneAnnotationsWithTwo() {
-        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(NonNullApi.class.getName(), NonNullFields.class.getName()))), java("""        
                 package org.openrewrite.java;
 
                 import javax.annotation.Nonnull;
