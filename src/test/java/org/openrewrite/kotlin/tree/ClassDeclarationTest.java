@@ -365,4 +365,20 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/99")
+    @Test
+    void implicitThis() {
+        rewriteRun(
+          kotlin(
+            """
+            abstract class Test(arg: Test.() -> Unit = {}) {
+                init {
+                    arg()
+                }
+            }
+            """
+          )
+        );
+    }
 }

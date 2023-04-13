@@ -2217,8 +2217,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 typeMapping.type(stringConcatenationCall));
     }
 
+    @Nullable
     @Override
     public J visitThisReceiverExpression(FirThisReceiverExpression thisReceiverExpression, ExecutionContext ctx) {
+        if (thisReceiverExpression.isImplicit()) {
+            return null;
+        }
+
         Space prefix = sourceBefore("this");
 
         return new J.Identifier(randomId(),
@@ -3555,8 +3560,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
      * @param ctx        N/A. The FirVisitor requires a second parameter that is generally used for DataFlow analysis.
      * @return {@link J}
      */
+    @Nullable
     @Override
-    public J visitElement(FirElement firElement, ExecutionContext ctx) {
+    public J visitElement(@Nullable FirElement firElement, ExecutionContext ctx) {
         // FIR error elements
         if (firElement instanceof FirErrorNamedReference) {
             return visitErrorNamedReference((FirErrorNamedReference) firElement, ctx);
@@ -4185,10 +4191,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return (J2) visitElement(t, ctx);
     }
 
-    @SuppressWarnings("unchecked")
+    @Nullable
     private <J2 extends J> JRightPadded<J2> convert(FirElement t, Function<FirElement, Space> suffix, ExecutionContext ctx) {
+        //noinspection unchecked
         J2 j = (J2) visitElement(t, ctx);
-        @SuppressWarnings("ConstantConditions")
+
         JRightPadded<J2> rightPadded = j == null ? null :
                 new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
@@ -4209,9 +4216,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         List<JRightPadded<J2>> converted = new ArrayList<>(elements.size());
         for (int i = 0; i < elements.size(); i++) {
-            converted.add(convert(elements.get(i), i == elements.size() - 1 ? suffix : innerSuffix, ctx));
+            FirElement element = elements.get(i);
+            //noinspection unchecked
+            J2 j = (J2) visitElement(element, ctx);
+            Space after = i == elements.size() - 1 ? suffix.apply(element) : innerSuffix.apply(element);
+            if (j == null && i < elements.size() - 1) {
+                continue;
+            }
+            if (j == null) {
+                //noinspection unchecked
+                j = (J2) new J.Empty(randomId(), EMPTY, Markers.EMPTY);
+            }
+            JRightPadded<J2> rightPadded = padRight(j, after);
+            converted.add(rightPadded);
         }
-        return converted;
+        return converted.isEmpty() ? emptyList() : converted;
     }
 
     private <K2 extends J> JRightPadded<K2> maybeSemicolon(K2 k) {
@@ -4238,7 +4257,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new JLeftPadded<>(left, tree, Markers.EMPTY);
     }
 
-    @SuppressWarnings("SameParameterValue")
     private <T> JRightPadded<T> padRight(T tree, @Nullable Space right) {
         return new JRightPadded<>(tree, right == null ? EMPTY : right, Markers.EMPTY);
     }
@@ -4308,7 +4326,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
      * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
      * <code>untilDelim</code> return the empty String.
      */
-    @SuppressWarnings("SameParameterValue")
     private Space sourceBefore(String untilDelim, @Nullable Character stop) {
         int delimIndex = positionOfNext(untilDelim, stop);
         if (delimIndex < 0) {
