@@ -464,8 +464,11 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             J.Package after = pkg.withAnnotations(generatedAnnotations);
                             return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
                         } else {
-                            List<J.Annotation> newAnnotations = new LinkedList<>(pkg.getAnnotations());
-                            generatedAnnotations.forEach(a -> ListUtils.insertInOrder(newAnnotations, a, getComparatorOrThrow()));
+                            List<J.Annotation> newAnnotations = generatedAnnotations.stream().reduce(
+                                    pkg.getAnnotations(),
+                                    (currentAnnotations, a) -> ListUtils.insertInOrder(pkg.getAnnotations(), a, getComparatorOrThrow()),
+                                    (before, after) -> after
+                            );
                             J.Package after = pkg.withAnnotations(newAnnotations);
                             return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
                         }
