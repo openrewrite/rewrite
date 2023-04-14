@@ -24,6 +24,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.List;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class AppendToSequence extends Recipe {
@@ -36,6 +38,13 @@ public class AppendToSequence extends Recipe {
             description = "The new value to be appended to the sequence.",
             example = "earth")
     String value;
+
+    @Option(displayName = "existing sequence values",
+            description = "existing sequence values",
+            example = "a,b,c",
+            required = false)
+    @Nullable
+    List<String> existingSequenceValues;
 
     @Option(displayName = "Optional file matcher",
             description = "Matching files will be modified. This is a glob expression.",
@@ -65,6 +74,6 @@ public class AppendToSequence extends Recipe {
     @Override
     public YamlVisitor<ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(sequencePath);
-        return new AppendToSequenceVisitor(matcher, value);
+        return new AppendToSequenceVisitor(matcher, value, existingSequenceValues);
     }
 }

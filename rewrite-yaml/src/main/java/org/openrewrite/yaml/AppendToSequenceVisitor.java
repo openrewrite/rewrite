@@ -18,32 +18,50 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
 public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.ExecutionContext> {
     private final JsonPathMatcher matcher;
     private final String value;
+    private final @Nullable List<String> existingSequenceValues;
 
-    public AppendToSequenceVisitor(JsonPathMatcher matcher, String value) {
+    public AppendToSequenceVisitor(JsonPathMatcher matcher, String value, @Nullable List<String> existingSequenceValues) {
         this.matcher = matcher;
         this.value = value;
+        this.existingSequenceValues = existingSequenceValues;
     }
 
     @Override
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext executionContext) {
         Cursor parent = getCursor().getParent();
-        if (matcher.matches(parent) && !alreadyVisited(existingSeq, executionContext)) {
+        if (matcher.matches(parent) && !alreadyVisited(existingSeq, executionContext) && checkExistingSequenceValues(existingSeq)) {
             setVisited(existingSeq, executionContext);
             Yaml.Sequence newSeq = appendToSequence(existingSeq, this.value, executionContext);
             setVisited(newSeq, executionContext);
             return newSeq;
         }
         return super.visitSequence(existingSeq, executionContext);
+    }
+
+    protected boolean checkExistingSequenceValues(final Yaml.Sequence seq) {
+        if (null == this.existingSequenceValues) {
+            return true;
+        } else {
+            final List<String> scalarValues = seq.getEntries()
+                                                .stream()
+                                                .filter(entry -> entry.getBlock() instanceof Yaml.Scalar)
+                                                .map(entry -> (Yaml.Scalar) entry.getBlock())
+                                                .map(scalar -> scalar.getValue())
+                                                .collect(Collectors.toList());
+            return (scalarValues.equals(this.existingSequenceValues));
+        }
     }
 
     private Yaml.Sequence appendToSequence(Yaml.Sequence existingSequence, String value, ExecutionContext executionContext) {
