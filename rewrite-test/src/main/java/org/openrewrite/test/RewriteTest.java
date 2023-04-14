@@ -474,16 +474,19 @@ public interface RewriteTest extends SourceSpecs {
 
             // if we get here, there was no result.
             if (sourceSpec.after != null) {
-                String before = sourceSpec.noTrim ?
+                String actual = sourceSpec.noTrim ?
                         specForSourceFile.getKey().printAll(out.clone()) :
                         trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
+                String before = sourceSpec.noTrim ?
+                        sourceSpec.before :
+                        trimIndentPreserveCRLF(sourceSpec.before);
                 String expected = sourceSpec.noTrim ?
                         sourceSpec.after.apply(null) :
                         trimIndentPreserveCRLF(sourceSpec.after.apply(null));
                 assertThat(expected)
                         .as("To assert that a Recipe makes no change, supply only \"before\" source.")
                         .isNotEqualTo(before);
-                assertThat(before)
+                assertThat(actual)
                         .as("The recipe should have made the following change to \"" + specForSourceFile.getKey().getSourcePath() + "\"")
                         .isEqualTo(expected);
             }
