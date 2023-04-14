@@ -291,7 +291,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         // As work around we always add imports. We can safely do this, because
         // a) we know the annotations are used
         // b) we know that no fully qualified identifiers were used
-        annotations.forEach(a -> maybeAddImport(a.getFqn(), false));
+        annotations.forEach(a -> maybeAddImport(a.getFqn()));
     }
 
     private JavaTemplate annotationTemplate(NullabilityAnnotation annotation) {
