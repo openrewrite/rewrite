@@ -18,11 +18,13 @@ package org.openrewrite.java.nullability;
 import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.lang.annotation.ElementType;
@@ -79,13 +81,15 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         cleanedAnnotations.removeAll(currentNullabilityAnnotations);
 
         J.AnnotatedType cleanAnnotatedType = annotatedType.withAnnotations(cleanedAnnotations);
-        return annotationsForReplacement.stream().reduce(
+        J.AnnotatedType typeWithNewAnnotations = annotationsForReplacement.stream().reduce(
                 cleanAnnotatedType,
                 (J.AnnotatedType currentType, NullabilityAnnotation annotation) -> currentType.withTemplate(
                         annotationTemplate(annotation),
                         currentType.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldType, newType) -> newType
         );
+        Space originalTypePrefix = annotatedType.getTypeExpression().getPrefix();
+        return typeWithNewAnnotations.withAnnotations(ListUtils.mapFirst(typeWithNewAnnotations.getAnnotations(), a -> a.withPrefix(originalTypePrefix)));
     }
 
     @Override
