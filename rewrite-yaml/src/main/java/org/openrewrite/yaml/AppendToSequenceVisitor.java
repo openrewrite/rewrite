@@ -45,7 +45,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
     @Override
     public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext executionContext) {
         Cursor parent = getCursor().getParent();
-        if (matcher.matches(parent) && !alreadyVisited(existingSeq, executionContext) && checkExistingSequenceValues(existingSeq)) {
+        if (matcher.matches(parent) && !alreadyVisited(existingSeq, executionContext) && checkExistingSequenceValues(existingSeq, parent)) {
             setVisited(existingSeq, executionContext);
             Yaml.Sequence newSeq = appendToSequence(existingSeq, this.value, executionContext);
             setVisited(newSeq, executionContext);
@@ -54,23 +54,22 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
         return super.visitSequence(existingSeq, executionContext);
     }
 
-    protected boolean checkExistingSequenceValues(final Yaml.Sequence seq) {
+    protected boolean checkExistingSequenceValues(final Yaml.Sequence seq, final Cursor cursor) {
         if (null == this.existingSequenceValues) {
             return true;
         } else {
-            final List<String> scalarValues = seq.getEntries()
+            final List<String> values = seq.getEntries()
                                                 .stream()
-                                                .filter(entry -> entry.getBlock() instanceof Yaml.Scalar)
-                                                .map(entry -> (Yaml.Scalar) entry.getBlock())
-                                                .map(scalar -> scalar.getValue())
+                                                .map(entry -> entry.getBlock())
+                                                .map(block -> block.printTrimmed(cursor))
                                                 .collect(Collectors.toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
                 List<String> sorted = new ArrayList<String>(this.existingSequenceValues);
                 Collections.sort(sorted);
-                Collections.sort(scalarValues);
-                return (scalarValues.equals(sorted));
+                Collections.sort(values);
+                return (values.equals(sorted));
             } else {
-                return (scalarValues.equals(this.existingSequenceValues));
+                return (values.equals(this.existingSequenceValues));
             }
         }
     }

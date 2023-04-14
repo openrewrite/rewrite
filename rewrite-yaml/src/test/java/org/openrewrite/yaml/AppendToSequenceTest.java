@@ -169,6 +169,41 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
+    void appendToSequenceOfNameValuePairMatchExistingValuesInAnyOrder() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "name: strawberry",
+              List.of("name: blueberry", "name: apple"),
+              "true",
+              null
+            )),
+          yaml(
+            """
+                  things:
+                    fruit:
+                      - name: apple
+                      - name: blueberry
+                    animals:
+                      - cat
+                      - dog
+              """,
+            """
+                  things:
+                    fruit:
+                      - name: apple
+                      - name: blueberry
+                      - name: strawberry
+                    animals:
+                      - cat
+                      - dog
+              """
+          )
+        );
+    }
+
+    @Test
     void appendToSequenceOfLiteralsHasDashFalse() {
         rewriteRun(
           spec -> spec
