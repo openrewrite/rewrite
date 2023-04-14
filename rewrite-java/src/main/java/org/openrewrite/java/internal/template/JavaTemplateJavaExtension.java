@@ -61,7 +61,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     List<J.Annotation> generatedAnnotations = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                     if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                         J.AnnotatedType after = annotatedType.withAnnotations(generatedAnnotations);
-                        return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
+                        return autoFormat(after, integer);
                     } else {
                         List<J.Annotation> newAnnotations = generatedAnnotations.stream().reduce(
                             annotatedType.getAnnotations(),
@@ -69,7 +69,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             (before, after) -> after
                         );
                         J.AnnotatedType after = annotatedType.withAnnotations(newAnnotations);
-                        return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
+                        return autoFormat(after, integer);
                     }
                 }
                 return super.visitAnnotatedType(annotatedType, integer);
@@ -462,7 +462,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                         List<J.Annotation> generatedAnnotations = substitutions.unsubstitute(templateParser.parseAnnotations(getCursor(), substitutedTemplate));
                         if (mode == JavaCoordinates.Mode.REPLACEMENT) {
                             J.Package after = pkg.withAnnotations(generatedAnnotations);
-                            return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
+                            return autoFormat(after, integer);
                         } else {
                             List<J.Annotation> newAnnotations = generatedAnnotations.stream().reduce(
                                     pkg.getAnnotations(),
@@ -470,7 +470,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     (before, after) -> after
                             );
                             J.Package after = pkg.withAnnotations(newAnnotations);
-                            return autoFormat(after, ListUtils.last(after.getAnnotations()), integer, getCursor().getParentOrThrow());
+                            return autoFormat(after, integer);
                         }
                     }
                 }
