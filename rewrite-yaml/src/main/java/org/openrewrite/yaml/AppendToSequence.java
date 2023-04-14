@@ -39,8 +39,8 @@ public class AppendToSequence extends Recipe {
             example = "earth")
     String value;
 
-    @Option(displayName = "existing sequence values",
-            description = "existing sequence values",
+    @Option(displayName = "Optional: match existing sequence values",
+            description = "Rule applies only when existing sequence values match",
             example = "a,b,c",
             required = false)
     @Nullable
