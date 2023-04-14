@@ -66,6 +66,32 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parseErrorWhenReplacingAssert() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Assert visitAssert(J.Assert _assert, ExecutionContext ctx) {
+                  _assert.getCondition().withTemplate(JavaTemplate.builder(this::getCursor, "null").build(), _assert.getCondition().getCoordinates().replace());
+                  return super.visitAssert(_assert, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.List;
+              class Test {
+                  void m() {
+                      assert new ArrayList<>().size() != 0;
+                  }
+                  List<String> triggeredParsingError() {
+                      return null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("InstantiationOfUtilityClass")
     @Issue("https://github.com/openrewrite/rewrite-logging-frameworks/issues/66")
     @Test

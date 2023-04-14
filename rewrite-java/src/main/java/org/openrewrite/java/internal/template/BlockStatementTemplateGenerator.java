@@ -277,6 +277,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Assert) {
             before.insert(0, "assert ");
+            after.append(';');
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
             if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
