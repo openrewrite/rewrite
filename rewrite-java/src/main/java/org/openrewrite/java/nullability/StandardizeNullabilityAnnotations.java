@@ -132,8 +132,8 @@ public class StandardizeNullabilityAnnotations extends Recipe {
             example = "javax.annotation.Nullable")
     List<String> nullabilityAnnotationsFqn;
 
-    @Option(displayName = "Nullability annotations to use",
-            description = "All other nullability annotations will be replaced by these.",
+    @Option(displayName = "Additional nullability annotations that will be considered known to this recipe",
+            description = "This option enables the recipe user to migrate to or away from nullability annotations that are not contained within the base set of known nullability annotations.",
             required = false)
     Set<NullabilityAnnotation> additionalNullabilityAnnotations;
 
