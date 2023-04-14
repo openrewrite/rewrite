@@ -514,4 +514,40 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noChangeIfHasShallowVariableForAndWhileLoop() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void run(Runnable task) {}
+
+                  void method() {
+                      for (int i = 0 ; i < 10; i ++) {
+                          run(new Runnable() {
+                              @Override
+                              public void run() {
+                                  for (int i = 0 ; i < 10; i ++) {
+                                  }
+                              }
+                          });
+                      }
+                      
+                      int j = 0;
+                      while (j < 20) {
+                          run(new Runnable() {
+                              @Override
+                              public void run() {
+                                  for (int j = 0 ; j < 20; j ++) {
+                                  }
+                              }
+                          });
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

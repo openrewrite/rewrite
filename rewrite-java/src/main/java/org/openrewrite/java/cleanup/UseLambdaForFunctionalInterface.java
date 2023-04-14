@@ -33,17 +33,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singleton;
-import static java.util.Objects.requireNonNull;
 
 public class UseLambdaForFunctionalInterface extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Use lambdas where possible";
+        return "Use lambdas expression to replace anonymous class where possible";
     }
 
     @Override
     public String getDescription() {
-        return "Instead of anonymous class declarations, use a lambda where possible.";
+        return "Instead of anonymous class declarations, use a lambda where possible. Using lambdas to replace " +
+               "anonymous classes can lead to more expressive and maintainable code, improve code readability, reduce" +
+               " code duplication, and achieve better performance in some cases.";
     }
 
     @Override
@@ -300,46 +301,6 @@ public class UseLambdaForFunctionalInterface extends Recipe {
             }
 
             @Override
-            public J visitIf(J.If iff, List<String> variables) {
-                return iff;
-            }
-
-            @Override
-            public J visitForLoop(J.ForLoop forLoop, List<String> variables) {
-                return forLoop;
-            }
-
-            @Override
-            public J visitForEachLoop(J.ForEachLoop forLoop, List<String> variables) {
-                return forLoop;
-            }
-
-            @Override
-            public J visitWhileLoop(J.WhileLoop whileLoop, List<String> variables) {
-                return whileLoop;
-            }
-
-            @Override
-            public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, List<String> variables) {
-                return doWhileLoop;
-            }
-
-            @Override
-            public J visitSwitch(J.Switch switzh, List<String> variables) {
-                return switzh;
-            }
-
-            @Override
-            public J visitTry(J.Try tryable, List<String> variables) {
-                return tryable;
-            }
-
-            @Override
-            public J visitSynchronized(J.Synchronized synch, List<String> variables) {
-                return synch;
-            }
-
-            @Override
             public J visitNewClass(J.NewClass newClass, List<String> variables) {
                 if (newClass == n) {
                     getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
@@ -355,7 +316,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
                 }
                 return super.visit(tree, variables);
             }
-        }.visit(nameScope, localVariables, requireNonNull(cursor.dropParentUntil(J.Block.class::isInstance).getParent()));
+        }.visit(nameScope, localVariables);
 
         new JavaVisitor<Integer>() {
             @Override
