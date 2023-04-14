@@ -480,7 +480,10 @@ public interface K extends J {
 
         @Override
         public <J2 extends J> J2 withType(@Nullable JavaType type) {
-            return (J2) withTypedTree(typedTree.withType(type));
+            if (typedTree instanceof FunctionType) {
+                return (J2) withTypedTree(typedTree.withType(type));
+            }
+            return (J2) this;
         }
 
         @Override
