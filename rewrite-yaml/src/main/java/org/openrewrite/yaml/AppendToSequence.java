@@ -41,7 +41,7 @@ public class AppendToSequence extends Recipe {
 
     @Option(displayName = "Optional: match existing sequence values",
             description = "Recipe appends to sequence only when existing sequence values match",
-            example = "a,b,c",
+            example = "existingValue1",
             required = false)
     @Nullable
     List<String> existingSequenceValues;
