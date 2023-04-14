@@ -18,8 +18,8 @@ package org.openrewrite.java.nullability;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.lang3.ObjectUtils;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.annotation.ElementType;
 import java.util.HashSet;
@@ -142,9 +142,9 @@ public class StandardizeNullabilityAnnotations extends Recipe {
     }
 
     @JsonCreator
-    public StandardizeNullabilityAnnotations(List<String> nullabilityAnnotationsFqn, Set<NullabilityAnnotation> additionalNullabilityAnnotations) {
+    public StandardizeNullabilityAnnotations(List<String> nullabilityAnnotationsFqn, @Nullable Set<NullabilityAnnotation> additionalNullabilityAnnotations) {
         this.nullabilityAnnotationsFqn = nullabilityAnnotationsFqn;
-        this.additionalNullabilityAnnotations = ObjectUtils.defaultIfNull(additionalNullabilityAnnotations, new HashSet<>());
+        this.additionalNullabilityAnnotations = additionalNullabilityAnnotations != null ? additionalNullabilityAnnotations : new HashSet<>();
     }
 
     @Override
