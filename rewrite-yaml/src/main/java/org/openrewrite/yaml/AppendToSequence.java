@@ -46,7 +46,7 @@ public class AppendToSequence extends Recipe {
     @Nullable
     List<String> existingSequenceValues;
 
-    @Option(displayName = "match existing sequence values in any order",
+    @Option(displayName = "Optional boolean: match existing sequence values in any order",
             description = "match existing sequence values in any order",
             example = "true",
             required = false)
