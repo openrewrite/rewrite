@@ -13,13 +13,22 @@ import java.util.stream.Collectors;
 @AllArgsConstructor
 public enum KnownNullabilityAnnotations implements NullabilityAnnotation {
 
-    // TODO Android
+    ANDROID_SUPPORT_NULLABLE("android.support.annotation.Nullable", Nullability.NULLABLE, asSet(ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.ANNOTATION_TYPE, ElementType.PACKAGE), allScopes()),
+    ANDROID_SUPPORT_NON_NULL("android.support.annotation.NonNull", Nullability.NONNULL, asSet(ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.ANNOTATION_TYPE, ElementType.PACKAGE), allScopes()),
 
-    // TODO AndroidX
+    ANDROIDX_SUPPORT_NULLABLE("androidx.annotation.Nullable", Nullability.NULLABLE, asSet(ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.ANNOTATION_TYPE, ElementType.PACKAGE), allScopes()),
+    ANDROIDX_SUPPORT_NON_NULL("androidx.annotation.NonNull", Nullability.NONNULL, asSet(ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.LOCAL_VARIABLE, ElementType.ANNOTATION_TYPE, ElementType.PACKAGE), allScopes()),
 
-    // TODO Checkerframework
+    CHECKER_FRAMEWORK_NULLABLE("org.checkerframework.checker.nullness.qual.Nullable", Nullability.NULLABLE, asSet(ElementType.TYPE_USE, ElementType.TYPE_PARAMETER), allScopes()),
+    CHECKER_FRAMEWORK_NON_NULL("org.checkerframework.checker.nullness.qual.NonNull", Nullability.NONNULL, asSet(ElementType.TYPE_USE, ElementType.TYPE_PARAMETER), allScopes()),
 
-    // TODO Eclipse
+    ECLIPSE_JDT_NULLABLE("org.eclipse.jdt.annotation.Nullable", Nullability.NULLABLE, asSet(ElementType.TYPE_USE), allScopes()),
+    ECLIPSE_JDT_NON_NULL("org.eclipse.jdt.annotation.NonNull", Nullability.NONNULL, asSet(ElementType.TYPE_USE), allScopes()),
+    /*
+     * The following annotation is commented out, because scopes it applies to are dynamically configurable with parameters.
+     * To support this, we would need to convert the static scopes attribute to a provider function which takes the parsed annotation to work with its argument.
+     * ECLIPSE_JDT_NON_NULL_BY_DEFAULT("org.eclipse.jdt.annotation.NonNullByDefault", Nullability.NONNULL, allTargets(), annotation -> ...),
+     */
 
     FINDBUGS_CHECK_FOR_NULL("edu.umd.cs.findbugs.annotations.CheckForNull", Nullability.NULLABLE, asSet(ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.LOCAL_VARIABLE), allScopes()),
     FINDBUGS_NULLABLE("edu.umd.cs.findbugs.annotations.Nullable", Nullability.NULLABLE, asSet(ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.LOCAL_VARIABLE), allScopes()),
@@ -56,7 +65,7 @@ public enum KnownNullabilityAnnotations implements NullabilityAnnotation {
 
     OPEN_REWRITE_NULLABLE("org.openrewrite.internal.lang.Nullable", Nullability.NULLABLE, allTargets(), allScopes()),
     OPEN_REWRITE_NULL_FIELDS("org.openrewrite.internal.lang.NullFields", Nullability.NULLABLE, asSet(ElementType.PACKAGE, ElementType.TYPE), asSet(Scope.FIELD)),
-    OPEN_REWRITE_NON_NULL("org.openrewrite.internal.lang.NonNull", Nullability.NULLABLE, allTargets(), allScopes()),
+    OPEN_REWRITE_NON_NULL("org.openrewrite.internal.lang.NonNull", Nullability.NONNULL, allTargets(), allScopes()),
     OPEN_REWRITE_NON_NULL_FIELDS("org.openrewrite.internal.lang.NonNullFields", Nullability.NONNULL, asSet(ElementType.PACKAGE, ElementType.TYPE), asSet(Scope.FIELD)),
     OPEN_REWRITE_NON_NULL_API("org.openrewrite.internal.lang.NonNullApi", Nullability.NONNULL, asSet(ElementType.PACKAGE, ElementType.TYPE), asSet(Scope.METHOD, Scope.PARAMETER)),
 
