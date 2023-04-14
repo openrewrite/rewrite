@@ -2,7 +2,6 @@ package org.openrewrite.java.nullability;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NonNull;
 
 import java.lang.annotation.ElementType;
 import java.util.Arrays;
@@ -63,9 +62,9 @@ public enum KnownNullabilityAnnotations implements NullabilityAnnotation {
     NETBEANS_NON_NULL("org.netbeans.api.annotations.common.NonNull", Nullability.NONNULL, asSet(ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.LOCAL_VARIABLE), allScopes()),
     NETBEANS_NULL_UNKNOWN("org.netbeans.api.annotations.common.NullUnknown", Nullability.UNKNOWN, asSet(ElementType.FIELD, ElementType.METHOD, ElementType.PARAMETER, ElementType.LOCAL_VARIABLE), allScopes()),
 
-    OPEN_REWRITE_NULLABLE("org.openrewrite.internal.lang.Nullable", Nullability.NULLABLE, allTargets(), allScopes()),
+    OPEN_REWRITE_NULLABLE("org.openrewrite.internal.lang.Nullable", Nullability.NULLABLE, asSet(ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE, ElementType.TYPE_USE), allScopes()),
     OPEN_REWRITE_NULL_FIELDS("org.openrewrite.internal.lang.NullFields", Nullability.NULLABLE, asSet(ElementType.PACKAGE, ElementType.TYPE), asSet(Scope.FIELD)),
-    OPEN_REWRITE_NON_NULL("org.openrewrite.internal.lang.NonNull", Nullability.NONNULL, allTargets(), allScopes()),
+    OPEN_REWRITE_NON_NULL("org.openrewrite.internal.lang.NonNull", Nullability.NONNULL, asSet(ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE, ElementType.TYPE_USE), allScopes()),
     OPEN_REWRITE_NON_NULL_FIELDS("org.openrewrite.internal.lang.NonNullFields", Nullability.NONNULL, asSet(ElementType.PACKAGE, ElementType.TYPE), asSet(Scope.FIELD)),
     OPEN_REWRITE_NON_NULL_API("org.openrewrite.internal.lang.NonNullApi", Nullability.NONNULL, asSet(ElementType.PACKAGE, ElementType.TYPE), asSet(Scope.METHOD, Scope.PARAMETER)),
 

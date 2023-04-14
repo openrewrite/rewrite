@@ -1,0 +1,68 @@
+#
+# Copyright 2023 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.nullability.UseJavaxNullabilityAnnotations
+displayName: Use javax nullability annotations
+description: Replaces other known nullability annotations by javax annotations where possible.
+tags:
+  - nullability
+recipeList:
+  - org.openrewrite.java.nullability.StandardizeNullabilityAnnotations:
+      nullabilityAnnotationsFqn:
+        - javax.annotation.Nullable
+        - javax.annotation.Nonnull
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.nullability.UseJakartaNullabilityAnnotations
+displayName: Use jakarte nullability annotations
+description: Replaces other known nullability annotations by jakarta annotations where possible.
+tags:
+  - nullability
+recipeList:
+  - org.openrewrite.java.nullability.StandardizeNullabilityAnnotations:
+      nullabilityAnnotationsFqn:
+        - jakarta.annotation.Nullable
+        - jakarta.annotation.Nonnull
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.nullability.UseSpringNullabilityAnnotations
+displayName: Use spring nullability annotations
+description: Replaces other known nullability annotations by spring annotations where possible.
+tags:
+  - nullability
+recipeList:
+  - org.openrewrite.java.nullability.StandardizeNullabilityAnnotations:
+      nullabilityAnnotationsFqn:
+        - org.springframework.lang.Nullable
+        - org.springframework.lang.NonNull
+        - org.springframework.lang.NonNullFields
+        - org.springframework.lang.NonNullApi
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.nullability.UseOpenRewriteNullabilityAnnotations
+displayName: Use open rewrite nullability annotations
+description: Replaces other known nullability annotations by open rewrite annotations where possible.
+tags:
+  - nullability
+recipeList:
+  - org.openrewrite.java.nullability.StandardizeNullabilityAnnotations:
+      nullabilityAnnotationsFqn:
+        - org.openrewrite.internal.lang.Nullable
+        - org.openrewrite.internal.lang.NullFields
+        - org.openrewrite.internal.lang.NonNull
+        - org.openrewrite.internal.lang.NonNullFields
+        - org.openrewrite.internal.lang.NonNullApi

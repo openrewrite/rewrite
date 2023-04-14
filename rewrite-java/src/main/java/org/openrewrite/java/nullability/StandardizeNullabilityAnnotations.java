@@ -61,6 +61,11 @@ public class StandardizeNullabilityAnnotations extends Recipe {
     }
 
     @Override
+    public Set<String> getTags() {
+        return Stream.of("nullability").collect(Collectors.toSet());
+    }
+
+    @Override
     public Validated validate() {
         return super.validate().and(Validated.test("nullableAnnotationsFqn", "must be resolvable as known nullability annotations", this.nullabilityAnnotationsFqn, fqns -> fqns.size() == getNullabilityAnnotations().size()));
     }
