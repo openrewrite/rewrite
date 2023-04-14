@@ -90,7 +90,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         );
         Space originalPrefix = annotatedType.getAnnotations().isEmpty()
             ? annotatedType.getTypeExpression().getPrefix()
-            : ListUtils.first(annotatedType.getAnnotations()).getPrefix();
+            : annotatedType.getAnnotations().get(0).getPrefix();
         return typeWithNewAnnotations.withAnnotations(ListUtils.mapFirst(typeWithNewAnnotations.getAnnotations(), a -> a.withPrefix(originalPrefix)));
     }
 
