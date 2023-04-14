@@ -22,6 +22,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,11 +33,13 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
     private final JsonPathMatcher matcher;
     private final String value;
     private final @Nullable List<String> existingSequenceValues;
+    private final boolean matchExistingSequenceValuesInAnyOrder;
 
-    public AppendToSequenceVisitor(JsonPathMatcher matcher, String value, @Nullable List<String> existingSequenceValues) {
+    public AppendToSequenceVisitor(JsonPathMatcher matcher, String value, @Nullable List<String> existingSequenceValues, boolean matchExistingSequenceValuesInAnyOrder) {
         this.matcher = matcher;
         this.value = value;
         this.existingSequenceValues = existingSequenceValues;
+        this.matchExistingSequenceValuesInAnyOrder = matchExistingSequenceValuesInAnyOrder;
     }
 
     @Override
@@ -60,7 +64,14 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
                                                 .map(entry -> (Yaml.Scalar) entry.getBlock())
                                                 .map(scalar -> scalar.getValue())
                                                 .collect(Collectors.toList());
-            return (scalarValues.equals(this.existingSequenceValues));
+            if (this.matchExistingSequenceValuesInAnyOrder) {
+                List<String> sorted = new ArrayList<String>(this.existingSequenceValues);
+                Collections.sort(sorted);
+                Collections.sort(scalarValues);
+                return (scalarValues.equals(sorted));
+            } else {
+                return (scalarValues.equals(this.existingSequenceValues));
+            }
         }
     }
 

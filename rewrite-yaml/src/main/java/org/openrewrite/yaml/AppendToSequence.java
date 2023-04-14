@@ -40,11 +40,18 @@ public class AppendToSequence extends Recipe {
     String value;
 
     @Option(displayName = "Optional: match existing sequence values",
-            description = "Rule applies only when existing sequence values match",
+            description = "Recipe appends to sequence only when existing sequence values match",
             example = "a,b,c",
             required = false)
     @Nullable
     List<String> existingSequenceValues;
+
+    @Option(displayName = "match existing sequence values in any order",
+            description = "match existing sequence values in any order",
+            example = "true",
+            required = false)
+    @Nullable
+    String matchExistingSequenceValuesInAnyOrder;
 
     @Option(displayName = "Optional file matcher",
             description = "Matching files will be modified. This is a glob expression.",
@@ -74,6 +81,7 @@ public class AppendToSequence extends Recipe {
     @Override
     public YamlVisitor<ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(sequencePath);
-        return new AppendToSequenceVisitor(matcher, value, existingSequenceValues);
+        boolean anyOrder = (this.matchExistingSequenceValuesInAnyOrder == null) ? false : Boolean.valueOf(this.matchExistingSequenceValuesInAnyOrder);
+        return new AppendToSequenceVisitor(matcher, value, existingSequenceValues, anyOrder);
     }
 }
