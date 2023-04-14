@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HasSourcePath;
-import org.openrewrite.Incubating;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -38,7 +37,6 @@ public class AppendToSequence extends Recipe {
             example = "earth")
     String value;
 
-    @Incubating(since = "7.8.0")
     @Option(displayName = "Optional file matcher",
             description = "Matching files will be modified. This is a glob expression.",
             required = false,
