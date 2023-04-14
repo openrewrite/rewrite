@@ -299,7 +299,7 @@ public final class ListUtils {
 
     /**
      * Return the first element of the given list if available
-     * @return the last element or {@code null} if the list is empty
+     * @return the first element or {@code null} if the list is empty
      */
     @Nullable
     public static <T> T first(@Nullable List<T> ls) {
