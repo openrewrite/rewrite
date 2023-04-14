@@ -326,4 +326,37 @@ class AppendToSequenceTest implements RewriteTest {
           yaml("list:\n  - existingThing\n", spec -> spec.path("b.yml"))
         );
     }
+
+    @Test
+    void modifyRegionList() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.prod.regions",
+              "name: us-foo-2",
+              List.of("name: us-foo-1", "name: us-bar-1"),
+              "true",
+              null
+            )),
+          yaml(
+            """
+                  prod:
+                    regions:
+                      - name: us-bar-1
+                      - name: us-foo-1
+                    other:
+                      - name: outerspace-1
+              """,
+            """
+                  prod:
+                    regions:
+                      - name: us-bar-1
+                      - name: us-foo-1
+                      - name: us-foo-2
+                    other:
+                      - name: outerspace-1
+              """
+          )
+        );
+    }
 }
