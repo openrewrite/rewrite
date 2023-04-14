@@ -19,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -81,7 +82,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanAnnotatedType,
                 (J.AnnotatedType currentType, NullabilityAnnotation annotation) -> currentType.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
+                        annotationTemplate(annotation),
                         currentType.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldType, newType) -> newType
         );
@@ -110,7 +111,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanClassDeclaration,
                 (J.ClassDeclaration currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
+                        annotationTemplate(annotation),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
@@ -139,7 +140,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanedMethodDeclaration,
                 (J.MethodDeclaration currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
+                        annotationTemplate(annotation),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
@@ -168,7 +169,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanedPackage,
                 (J.Package currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
+                        annotationTemplate(annotation),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
@@ -197,7 +198,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement.stream().reduce(
                 cleanedVariableDeclaration,
                 (J.VariableDeclarations currentDeclaration, NullabilityAnnotation annotation) -> currentDeclaration.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName()).build(),
+                        annotationTemplate(annotation),
                         currentDeclaration.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldDeclaration, newDeclaration) -> newDeclaration
         );
@@ -293,6 +294,12 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         annotations.forEach(a -> maybeAddImport(a.getFqn(), false));
     }
 
+    private JavaTemplate annotationTemplate(NullabilityAnnotation annotation) {
+        return JavaTemplate.builder(this::getCursor, "@" + annotation.getSimpleName())
+                .imports(annotation.getFqn())
+                .javaParser(() -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build())
+                .build();
+    }
 
     @Value
     @AllArgsConstructor
