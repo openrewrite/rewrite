@@ -88,8 +88,10 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
                         currentType.getCoordinates().addAnnotation(Comparator.comparing(J.Annotation::getSimpleName))
                 ), (oldType, newType) -> newType
         );
-        Space originalTypePrefix = annotatedType.getTypeExpression().getPrefix();
-        return typeWithNewAnnotations.withAnnotations(ListUtils.mapFirst(typeWithNewAnnotations.getAnnotations(), a -> a.withPrefix(originalTypePrefix)));
+        Space originalPrefix = annotatedType.getAnnotations().isEmpty()
+            ? annotatedType.getTypeExpression().getPrefix()
+            : ListUtils.first(annotatedType.getAnnotations()).getPrefix();
+        return typeWithNewAnnotations.withAnnotations(ListUtils.mapFirst(typeWithNewAnnotations.getAnnotations(), a -> a.withPrefix(originalPrefix)));
     }
 
     @Override
