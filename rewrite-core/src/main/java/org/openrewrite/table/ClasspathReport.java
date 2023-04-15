@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
-
+import org.openrewrite.Column;
+import org.openrewrite.DataTable;
+import org.openrewrite.Recipe;
 
 @JsonIgnoreType
 public class ClasspathReport extends DataTable<ClasspathReport.Row> {

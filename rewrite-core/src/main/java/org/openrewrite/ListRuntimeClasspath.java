@@ -19,6 +19,7 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
+import org.openrewrite.table.ClasspathReport;
 
 import java.net.URI;
 import java.util.List;
