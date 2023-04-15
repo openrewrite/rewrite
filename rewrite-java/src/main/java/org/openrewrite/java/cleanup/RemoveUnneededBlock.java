@@ -87,7 +87,7 @@ public class RemoveUnneededBlock extends Recipe {
                 return ListUtils.map(nested.getStatements(), (j, inlinedStmt) -> {
                     if (j == 0) {
                         inlinedStmt = inlinedStmt.withPrefix(inlinedStmt.getPrefix()
-                                .withComments(ListUtils.concat(nested.getComments(), inlinedStmt.getComments())));
+                                .withComments(ListUtils.concatAll(nested.getComments(), inlinedStmt.getComments())));
                     }
                     return autoFormat(inlinedStmt, ctx, getCursor());
                 });
@@ -97,7 +97,7 @@ public class RemoveUnneededBlock extends Recipe {
                 return block;
             } else if (lastStatement instanceof J.Block) {
                 flattened = flattened.withEnd(flattened.getEnd()
-                        .withComments(ListUtils.concat(((J.Block) lastStatement).getEnd().getComments(), flattened.getEnd().getComments())));
+                        .withComments(ListUtils.concatAll(((J.Block) lastStatement).getEnd().getComments(), flattened.getEnd().getComments())));
             }
             return flattened;
         }
