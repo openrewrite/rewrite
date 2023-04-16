@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -135,5 +136,16 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             l = l.withParameters(l.getParameters().withParenthesized(false));
         }
         return l;
+    }
+
+    @Override
+    public J visitIf(J.If iff, P p) {
+        J.If i = visitAndCast(iff, p, super::visitIf);
+        // Unwrap when if condition is a single parenthesized expression
+        Expression expression = i.getIfCondition().getTree();
+        if (expression instanceof J.Parentheses) {
+            i = (J.If) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(i, p, getCursor().getParentOrThrow());
+        }
+        return i;
     }
 }
