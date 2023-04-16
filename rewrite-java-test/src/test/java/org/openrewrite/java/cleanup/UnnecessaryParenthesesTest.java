@@ -739,4 +739,81 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unwrapIfParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if ((s == null || s.isEmpty())) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String s) {
+                      if (s == null || s.isEmpty()) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotUnwrapIfNoParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if (s == null || s.isEmpty()) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotUnwrapNegatedIfParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if (!(s == null || s.isEmpty())) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotUnwrapIfParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if ((s == null || s.isEmpty()) || false) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
