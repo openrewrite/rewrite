@@ -68,6 +68,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return annotatedType;
         }
+        // TODO verify type is the right choice for annotated types
         List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.TYPE, matchedNullabilityAnnotations);
         if (annotationsForReplacement.isEmpty()) {
             return annotatedType;
@@ -184,6 +185,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return variableDeclarations;
         }
+        // TODO Target Type should not be method, rather FIELD, LOCAL_VARIABLE or PARAMETER depending on parent's scope
         List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.METHOD, matchedNullabilityAnnotations);
         if (annotationsForReplacement.isEmpty()) {
             return variableDeclarations;
