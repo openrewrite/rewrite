@@ -229,7 +229,6 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
     }
 
     @Test
-    //@Disabled("Replacement works properly, resulting code is correct but lacks a white space after visibility modifier")
     void shouldReplaceAnnotationsOnReturnType() {
         rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
                 package org.openrewrite.java;
@@ -372,6 +371,23 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
 
                 @NonNullApi
                 @NonNullFields
+                class Test {
+                }
+                """));
+    }
+
+    @Test
+    void shouldReplaceUsingFqnWhenCollidingTypeExists() {
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
+                package javax.annotation;
+
+                @Nonnull
+                class Test {
+                }
+                """, """
+                package javax.annotation;
+
+                @org.openrewrite.internal.lang.NonNull
                 class Test {
                 }
                 """));
