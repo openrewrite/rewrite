@@ -377,15 +377,20 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
     }
 
     @Test
-    void shouldReplaceUsingFqnWhenCollidingTypeExists() {
+    void shouldReplaceUsingFqnWhenCollidingImportExistsToNotBreakCode() {
         rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
-                package javax.annotation;
+                package org.openrewrite.java;
+
+                import javax.annotation.Nonnull;
+                import org.springframework.lang.NonNull;
 
                 @Nonnull
                 class Test {
                 }
                 """, """
-                package javax.annotation;
+                package org.openrewrite.java;
+                
+                import org.springframework.lang.NonNull;
 
                 @org.openrewrite.internal.lang.NonNull
                 class Test {
