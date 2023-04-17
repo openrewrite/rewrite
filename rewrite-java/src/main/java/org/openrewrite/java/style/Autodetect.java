@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -194,9 +195,8 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistic spaceContinuationIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
-        private int linesWithSpaceIndents = 0;
-        private int linesWithTabIndents = 0;
-
+        private final IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
+        private long accumulateDepthCount = 0;
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
 
@@ -228,27 +228,100 @@ public class Autodetect extends NamedStyles {
             continuationDepth--;
         }
 
-        public boolean isIndentedWithSpaces() {
-            return linesWithSpaceIndents >= linesWithTabIndents;
-        }
-
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
-            boolean useTabs = !isIndentedWithSpaces();
+            /**
+             * For each line, if the code follows an indentation style exactly,
+             * Assume :
+             *      nw = space count in prefix
+             *      nt = tabs count in prefix
+             *      d = block depth
+             *      X = tabSize, which means space count per tab, unknown to be solved here.
+             * So theoretically the formula is:
+             *      d = nt + (nw / X)                                                                       (1)
+             *      X = nw / (d - nt)                                                                       (2)
+             * Because this is a linear equation, it also applies to the sum of multiple values, that is:
+             *          d1 + d2 + .. + dn = (nt1 + nt2 + .. + ntn) + (nw1 +nw2 + ... + nwn) / X             (3)
+             * So let's define:
+             *      D = d1 + d2 + .. + dn, which is the total count of depth.
+             *      NT = nt1 + nt2 + .. + ntn, which is the total count of tabs.
+             *      NW = nw1 +nw2 + ... + nwn, which is the total count of spaces.
+             * So
+             *      D = NT + (NW / X)                                                                       (4)
+             *      X = NW / (D - NT)                                                                       (5)
+             * the more data (more lines of code), the more accuracy.
+             *
+             * (1) How to determine the `useTabs` boolean value?
+             * From formula #4, D is composed of two parts, the Tabs part (NT) and the spaces part (NW / X).
+             * so `useTabs` should be determined by which part is bigger (> 50%).
+             * define:
+             *      PT = (NT / D), which means the percentage of tabs.
+             * So
+             *      useTabs = PT > 0.5
+             */
+            if (this.accumulateDepthCount == 0) {
+                return IntelliJ.tabsAndIndents();
+            }
 
-            IndentStatistic indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
+            long d = this.accumulateDepthCount;                     // D in above comments
+            long nt = getTotalCharCount(tabIndentFrequencies);      // NT in above comments
+            double pt = nt / (double) d;                            // PT in above comments
+            boolean useTabs = pt >= 0.5;
+
+            // Calculate tabSize based on the frequency, pick up the biggest frequency group.
+            // Using frequency are less susceptible to outliers than means.
+            int moreFrequentTabSize = getBiggestGroupOfTabSize(deltaSpaceIndentFrequencies);
+            int tabSize = (moreFrequentTabSize == 0) ? 4 : moreFrequentTabSize;
+
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
 
-            int indent = indentFrequencies.commonIndent();
-            int continuationIndent = continuationFrequencies.continuationIndent(indent);
+            int continuationIndent = continuationFrequencies.continuationIndent(tabSize);
             return new TabsAndIndentsStyle(
                     useTabs,
-                    indent,
-                    indent,
+                    tabSize,
+                    tabSize,
                     continuationIndent,
                     false,
                     new TabsAndIndentsStyle.MethodDeclarationParameters(
                             multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
             );
+        }
+    }
+
+    private static long getTotalCharCount(IndentStatistic indentStatistic) {
+        return indentStatistic.depthToSpaceIndentFrequencies.entrySet()
+            .stream()
+            .flatMap(entry -> entry.getValue().entrySet().stream())
+            .mapToLong(entry -> entry.getKey() * entry.getValue())
+            .sum();
+    }
+
+    private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
+        Map<Integer, Integer> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
+            .filter(entry -> entry.getKey().indentDepth != 0)
+            .flatMap(entry -> entry.getValue().entrySet().stream()
+                .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
+                    (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
+                    spaceCountToFrequency.getValue().intValue())))
+            .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
+
+        return tabSizeToFrequencyMap.entrySet().stream()
+            .max(Map.Entry.comparingByValue())
+            .map(Map.Entry::getKey)
+            .orElse(0);
+    }
+
+    private static int getClosestEven(double num) {
+        int integerPart = (int) num;
+        if (integerPart % 2 == 0) {
+            return integerPart;
+        } else {
+            int lowerEven = integerPart - 1;
+            int upperEven = integerPart + 1;
+            if (Math.abs(num - lowerEven) < Math.abs(num - upperEven)) {
+                return lowerEven;
+            } else {
+                return upperEven;
+            }
         }
     }
 
@@ -260,13 +333,11 @@ public class Autodetect extends NamedStyles {
 
             for (int i = 0; i < chars.length; i++) {
                 char c = chars[i];
-                if (c == '\n' || c == '\r') {
-                    if (c == '\n') {
-                        if (i == 0 || chars[i - 1] != '\r') {
-                            stats.linesWithLFNewLines++;
-                        } else {
-                            stats.linesWithCRLFNewLines++;
-                        }
+                if (c == '\n') {
+                    if (i == 0 || chars[i - 1] != '\r') {
+                        stats.linesWithLFNewLines++;
+                    } else {
+                        stats.linesWithCRLFNewLines++;
                     }
                 }
             }
@@ -353,6 +424,15 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Statement visitStatement(Statement statement, IndentStatistics stats) {
+            boolean isInParentheses = getCursor().dropParentUntil(
+                    p -> p instanceof J.Block ||
+                            p instanceof JContainer ||
+                            p instanceof SourceFile).getValue() instanceof JContainer;
+            if (isInParentheses) {
+                // ignore statements in parentheses.
+                return statement;
+            }
+
             countIndents(statement.getPrefix().getWhitespace(), false, stats);
             return statement;
         }
@@ -421,20 +501,14 @@ public class Autodetect extends NamedStyles {
                     }
                 }
                 if (spaceIndent > 0 || tabIndent > 0) {
-                    if (!mixed) {
-                        if(isContinuation) {
-                            stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
-                            stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
-                        } else {
-                            stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
-                            stats.tabIndentFrequencies.record(depth, 0, tabIndent);
-                        }
-                    }
-
-                    if (spaceIndent > tabIndent) {
-                        stats.linesWithSpaceIndents++;
-                    } else {
-                        stats.linesWithTabIndents++;
+                    if (!isContinuation) {
+                        stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
+                        stats.tabIndentFrequencies.record(depth, 0, tabIndent);
+                        stats.deltaSpaceIndentFrequencies.record(depth - tabIndent, 0, spaceIndent);
+                        stats.accumulateDepthCount += depth;
+                    } else if (!mixed) {
+                        stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
+                        stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
                     }
                 }
             }

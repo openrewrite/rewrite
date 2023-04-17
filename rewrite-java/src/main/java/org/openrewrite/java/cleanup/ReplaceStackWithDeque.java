@@ -41,7 +41,7 @@ public class ReplaceStackWithDeque extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.util.Stack");
+        return new UsesType<>("java.util.Stack", false);
     }
 
     @Override

@@ -109,7 +109,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                             "package " + fullyQualified.getPackageName() + "; public class " +
                                     fullyQualified.getClassName();
                     JavaTemplate template = JavaTemplate.builder(this::getCursor, code)
-                            .javaParser(() -> JavaParser.fromJavaVersion().dependsOn(stub).build())
+                            .javaParser(JavaParser.fromJavaVersion().dependsOn(stub))
                             .imports(fullyQualified == null ? "" : fullyQualified.getFullyQualifiedName()).build();
                     return l.withTemplate(template, l.getCoordinates().replace(), identifier.getSimpleName());
                 } else if (body instanceof J.Binary) {
@@ -153,7 +153,9 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                         if (methodType.hasFlags(Flag.Static) ||
                                 methodSelectMatchesFirstLambdaParameter(method, lambda)) {
                             maybeAddImport(declaringType);
-                            return l.withTemplate(JavaTemplate.builder(this::getCursor, "#{}::#{}").build(),
+                            return l.withTemplate(JavaTemplate.builder(this::getCursor, "#{}::#{}")
+                                            .imports(declaringType.getFullyQualifiedName())
+                                            .build(),
                                     l.getCoordinates().replace(), declaringType.getClassName(),
                                     method.getMethodType().getName());
                         } else if (method instanceof J.NewClass) {
@@ -221,6 +223,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
             private boolean methodSelectMatchesFirstLambdaParameter(MethodCall method, J.Lambda lambda) {
                 if (!(method instanceof J.MethodInvocation) ||
                         !(((J.MethodInvocation) method).getSelect() instanceof J.Identifier) ||
+                        lambda.getParameters().getParameters().isEmpty() ||
                         !(lambda.getParameters().getParameters().get(0) instanceof J.VariableDeclarations)) {
                     return false;
                 }

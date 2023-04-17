@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -26,6 +27,107 @@ public class CompareEnumsWithEqualityOperatorTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new CompareEnumsWithEqualityOperator());
+    }
+
+    SourceSpecs enumA = java(
+      """
+        package a;
+        public enum A {
+            FOO, BAR, BUZ
+        }
+        """
+    );
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void changeEnumEquals() {
+        rewriteRun(
+          enumA,
+          java(
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (A.FOO.equals(arg0)) {
+                      }
+                      if (arg0.equals(A.FOO)) {
+                      }
+                  }
+              }
+              """,
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (A.FOO == arg0) {
+                      }
+                      if (arg0 == A.FOO) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void changeEnumNotEquals() {
+        rewriteRun(
+          enumA,
+          java(
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (!A.FOO.equals(arg0)) {
+                      }
+                      if (!arg0.equals(A.FOO)) {
+                      }
+                  }
+              }
+              """,
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (A.FOO != arg0) {
+                      }
+                      if (arg0 != A.FOO) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    @Test
+    void changeEnumNotEqualsWithParentheses() {
+        rewriteRun(
+          enumA,
+          java(
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (!(A.FOO.equals(arg0))) {
+                      }
+                  }
+              }
+              """,
+            """
+              import a.A;
+              class Test {
+                  void method(A arg0) {
+                      if (A.FOO != arg0) {
+                      }
+                  }
+              }
+              """
+          )
+        );
     }
 
     @Issue("https://github.com/moderneinc/support-public/issues/28")

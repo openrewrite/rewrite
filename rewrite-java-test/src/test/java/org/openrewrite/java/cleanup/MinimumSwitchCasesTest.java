@@ -70,6 +70,129 @@ class MinimumSwitchCasesTest implements RewriteTest {
         );
     }
 
+    @Test
+    void caseWithFallthrough() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      switch (variable) {
+                        case 0:
+                            doSomething();
+                        default:
+                            doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void caseWithReturnInsteadOfBreak() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  int test() {
+                      switch (variable) {
+                        case 0:
+                            return 0;
+                        default:
+                            doSomethingElse();
+                      }
+                      return 1;
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """,
+            """
+              class Test {
+                  int variable;
+                  int test() {
+                      if (variable == 0) {
+                          return 0;
+                      } else {
+                          doSomethingElse();
+                      }
+                      return 1;
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void caseWithFallthroughInDefault() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      switch (variable) {
+                        case 0:
+                            doSomething();
+                            break;
+                        default:
+                            doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """,
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      if (variable == 0) {
+                          doSomething();
+                      } else {
+                          doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      switch (variable) {
+                        case 0:
+                        case 1:
+                            doSomething();
+                            break;
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/800")
     @Test
     void twoPrimitives() {
@@ -300,6 +423,7 @@ class MinimumSwitchCasesTest implements RewriteTest {
                       switch(day) {
                           case MONDAY:
                               someMethod();
+                              break;
                           default:
                               someMethod();
                               break;
@@ -418,6 +542,64 @@ class MinimumSwitchCasesTest implements RewriteTest {
                       s = this.name();
                       return s;
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3076")
+    void switchExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      switch (variable) {
+                        case 0 -> doSomething();
+                        default -> doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """,
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      if (variable == 0) {
+                          doSomething();
+                      } else {
+                          doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3076")
+    void multipleSwitchExpressions() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int variable;
+                  void test() {
+                      switch (variable) {
+                        case 0, 1 -> doSomething();
+                        default -> doSomethingElse();
+                      }
+                  }
+                  void doSomething() {}
+                  void doSomethingElse() {}
               }
               """
           )

@@ -18,9 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
@@ -56,19 +54,13 @@ public class RemoveEmptyJavaDocParameters extends Recipe {
             final RemoveEmptyParamVisitor removeEmptyParamVisitor = new RemoveEmptyParamVisitor();
 
             @Override
-            public @Nullable J visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                return super.visitSourceFile(sourceFile, executionContext);
-            }
-
-            @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
-                                                              ExecutionContext executionContext) {
-                J.MethodDeclaration md = super.visitMethodDeclaration(method, executionContext);
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
                 if (md.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment)) {
                     md = md.withComments(ListUtils.map(md.getComments(), it -> {
                         if (it instanceof Javadoc.DocComment) {
                             Javadoc.DocComment docComment = (Javadoc.DocComment) it;
-                            return (Comment) removeEmptyParamVisitor.visitDocComment(docComment, executionContext);
+                            return (Comment) removeEmptyParamVisitor.visitDocComment(docComment, ctx);
                         }
                         return it;
                     }));
@@ -82,7 +74,7 @@ public class RemoveEmptyJavaDocParameters extends Recipe {
                 }
 
                 @Override
-                public Javadoc visitDocComment(Javadoc.DocComment javadoc, ExecutionContext executionContext) {
+                public Javadoc visitDocComment(Javadoc.DocComment javadoc, ExecutionContext ctx) {
                     List<Javadoc> newBody = new ArrayList<>(javadoc.getBody().size());
                     boolean useNewBody = false;
 
@@ -96,7 +88,7 @@ public class RemoveEmptyJavaDocParameters extends Recipe {
                         if (i + 1 < body.size()) {
                             Javadoc nextDoc = body.get(i + 1);
                             if (nextDoc instanceof Javadoc.Parameter) {
-                                Javadoc.Parameter parameter = (Javadoc.Parameter) visitParameter((Javadoc.Parameter) nextDoc, executionContext);
+                                Javadoc.Parameter parameter = (Javadoc.Parameter) visitParameter((Javadoc.Parameter) nextDoc, ctx);
                                 if (parameter == null) {
                                     // The `@param` being removed is the last item in the JavaDoc body, and contains
                                     // relevant whitespace via the JavaDoc.LineBreak.
@@ -111,7 +103,7 @@ public class RemoveEmptyJavaDocParameters extends Recipe {
                                     skipCurrentDoc = true;
                                 }
                             } else if (nextDoc instanceof Javadoc.Return) {
-                                Javadoc.Return aReturn = (Javadoc.Return) visitReturn((Javadoc.Return) nextDoc, executionContext);
+                                Javadoc.Return aReturn = (Javadoc.Return) visitReturn((Javadoc.Return) nextDoc, ctx);
                                 if (aReturn == null) {
                                     if (!newBody.isEmpty() && newBody.get(newBody.size() - 1) instanceof Javadoc.LineBreak) {
                                         newBody.remove(newBody.size() - 1);
@@ -130,7 +122,7 @@ public class RemoveEmptyJavaDocParameters extends Recipe {
                                     skipCurrentDoc = true;
                                 }
                             } else if (nextDoc instanceof Javadoc.Erroneous) {
-                                Javadoc.Erroneous erroneous = (Javadoc.Erroneous) visitErroneous((Javadoc.Erroneous) nextDoc, executionContext);
+                                Javadoc.Erroneous erroneous = (Javadoc.Erroneous) visitErroneous((Javadoc.Erroneous) nextDoc, ctx);
                                 if (erroneous == null) {
                                     if (!newBody.isEmpty() && newBody.get(newBody.size() - 1) instanceof Javadoc.LineBreak) {
                                         newBody.remove(newBody.size() - 1);
@@ -153,27 +145,27 @@ public class RemoveEmptyJavaDocParameters extends Recipe {
                     if (useNewBody) {
                         javadoc = javadoc.withBody(newBody);
                     }
-                    return super.visitDocComment(javadoc, executionContext);
+                    return super.visitDocComment(javadoc, ctx);
                 }
 
                 @Override
-                public Javadoc visitParameter(Javadoc.Parameter parameter, ExecutionContext executionContext) {
+                public Javadoc visitParameter(Javadoc.Parameter parameter, ExecutionContext ctx) {
                     if (parameter.getDescription().stream().allMatch(it -> it instanceof Javadoc.LineBreak)) {
                         return null;
                     }
-                    return super.visitParameter(parameter, executionContext);
+                    return super.visitParameter(parameter, ctx);
                 }
 
                 @Override
-                public Javadoc visitReturn(Javadoc.Return aReturn, ExecutionContext executionContext) {
+                public Javadoc visitReturn(Javadoc.Return aReturn, ExecutionContext ctx) {
                     if (aReturn.getDescription().stream().allMatch(it -> it instanceof Javadoc.LineBreak)) {
                         return null;
                     }
-                    return super.visitReturn(aReturn, executionContext);
+                    return super.visitReturn(aReturn, ctx);
                 }
 
                 @Override
-                public Javadoc visitErroneous(Javadoc.Erroneous erroneous, ExecutionContext executionContext) {
+                public Javadoc visitErroneous(Javadoc.Erroneous erroneous, ExecutionContext ctx) {
                     if (erroneous.getText().size() == 1 && erroneous.getText().get(0) instanceof Javadoc.Text) {
                         Javadoc.Text text = (Javadoc.Text) erroneous.getText().get(0);
                         // Empty throws result in an Erroneous type.
@@ -181,7 +173,7 @@ public class RemoveEmptyJavaDocParameters extends Recipe {
                             return null;
                         }
                     }
-                    return super.visitErroneous(erroneous, executionContext);
+                    return super.visitErroneous(erroneous, ctx);
                 }
             }
         };

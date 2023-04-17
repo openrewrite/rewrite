@@ -63,7 +63,7 @@ public class FindTypes extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(fullyQualifiedTypeName);
+        return new UsesType<>(fullyQualifiedTypeName, false);
     }
 
     @Override

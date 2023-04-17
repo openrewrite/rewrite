@@ -59,7 +59,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
 
     @Override
     protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.math.BigDecimal");
+        return new UsesType<>("java.math.BigDecimal", false);
     }
 
     @Override

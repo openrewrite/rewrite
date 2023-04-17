@@ -19,9 +19,11 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
+
+import java.util.List;
 
 @Incubating(since = "7.21.0")
 public class RemoveUnneededBlock extends Recipe {
@@ -40,36 +42,64 @@ public class RemoveUnneededBlock extends Recipe {
         return new RemoveUnneededBlockStatementVisitor();
     }
 
-    static class RemoveUnneededBlockStatementVisitor extends JavaIsoVisitor<ExecutionContext> {
+    static class RemoveUnneededBlockStatementVisitor extends JavaVisitor<ExecutionContext> {
 
         @Override
-        public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
-            // Determine the first enclosing NewClass or ClassDeclaration statement
-            J.NewClass newClass = getCursor().firstEnclosing(J.NewClass.class);
-            J.ClassDeclaration classDeclaration = getCursor().firstEnclosing(J.ClassDeclaration.class);
-            // Determine the direct parent
+        public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+            J.Block bl = (J.Block) super.visitBlock(block, ctx);
             J directParent = getCursor().getParentTreeCursor().getValue();
-
-            J.Block bl = super.visitBlock(block, executionContext);
-
-            if (classDeclaration == directParent || newClass == directParent) {
+            if (directParent instanceof J.NewClass || directParent instanceof J.ClassDeclaration) {
                 // If the direct parent is an initializer block or a static block, skip it
                 return bl;
             }
 
+            return maybeInlineBlock(bl, ctx);
+        }
+
+        private J.Block maybeInlineBlock(J.Block block, ExecutionContext ctx) {
+            List<Statement> statements = block.getStatements();
+            if (statements.isEmpty()) {
+                // Removal handled by `EmptyBlock`
+                return block;
+            }
+
             // Else perform the flattening on this block.
-            return block.withStatements(ListUtils.flatMap(bl.getStatements(), stmt -> {
-                if (!(stmt instanceof J.Block)) {
+            Statement lastStatement = statements.get(statements.size() - 1);
+            J.Block flattened = block.withStatements(ListUtils.flatMap(statements, (i, stmt) -> {
+                J.Block nested;
+                if (stmt instanceof J.Try) {
+                    J.Try _try = (J.Try) stmt;
+                    if (_try.getResources() != null || !_try.getCatches().isEmpty() || _try.getFinally() == null || !_try.getFinally().getStatements().isEmpty()) {
+                        return stmt;
+                    }
+                    nested = _try.getBody();
+                } else if (stmt instanceof J.Block) {
+                    nested = (J.Block) stmt;
+                } else {
                     return stmt;
                 }
-                J.Block nested = (J.Block) stmt;
-                return ListUtils.map(nested.getStatements(), inlinedStmt -> maybeAutoFormat(
-                        stmt,
-                        inlinedStmt,
-                        executionContext,
-                        getCursor()
-                ));
+
+                // blocks are relevant for scoping, so don't flatten them if they contain variable declarations
+                if (i < statements.size() - 1 && nested.getStatements().stream().anyMatch(s -> s instanceof J.VariableDeclarations)) {
+                    return stmt;
+                }
+
+                return ListUtils.map(nested.getStatements(), (j, inlinedStmt) -> {
+                    if (j == 0) {
+                        inlinedStmt = inlinedStmt.withPrefix(inlinedStmt.getPrefix()
+                                .withComments(ListUtils.concatAll(nested.getComments(), inlinedStmt.getComments())));
+                    }
+                    return autoFormat(inlinedStmt, ctx, getCursor());
+                });
             }));
+
+            if (flattened == block) {
+                return block;
+            } else if (lastStatement instanceof J.Block) {
+                flattened = flattened.withEnd(flattened.getEnd()
+                        .withComments(ListUtils.concatAll(((J.Block) lastStatement).getEnd().getComments(), flattened.getEnd().getComments())));
+            }
+            return flattened;
         }
     }
 }

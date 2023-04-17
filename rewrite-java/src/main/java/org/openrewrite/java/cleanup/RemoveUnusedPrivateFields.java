@@ -85,9 +85,15 @@ public class RemoveUnusedPrivateFields extends Recipe {
                     return cd;
                 }
 
+                J.ClassDeclaration outer = cd;
+                for (Cursor parent = getCursor().getParent(); parent != null; parent = parent.getParent()) {
+                    if (parent.getValue() instanceof J.ClassDeclaration) {
+                        outer = parent.getValue();
+                    }
+                }
                 for (J.VariableDeclarations fields : checkFields) {
                     // Find variable uses.
-                    Map<J.VariableDeclarations.NamedVariable, List<J.Identifier>> inUse = VariableUses.find(fields, cd);
+                    Map<J.VariableDeclarations.NamedVariable, List<J.Identifier>> inUse = VariableUses.find(fields, outer);
                     for (Map.Entry<J.VariableDeclarations.NamedVariable, List<J.Identifier>> entry : inUse.entrySet()) {
                         if (entry.getValue().isEmpty()) {
                             cd = (J.ClassDeclaration) new RemoveUnusedField(entry.getKey()).visitNonNull(cd, executionContext);

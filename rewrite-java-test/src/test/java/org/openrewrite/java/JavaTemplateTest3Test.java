@@ -367,7 +367,7 @@ class JavaTemplateTest3Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "acceptString(#{any()}.toString())")
-                .javaParser(() -> JavaParser.fromJavaVersion()
+                .javaParser(JavaParser.fromJavaVersion()
                   .dependsOn(
                     """
                           package org.openrewrite;
@@ -377,8 +377,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                               public A someOtherMethod() { return this; }
                           }
                       """
-                  )
-                  .build()).build();
+                  )).build();
 
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {

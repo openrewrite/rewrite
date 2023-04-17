@@ -34,6 +34,23 @@ class AddManagedDependencyTest implements RewriteTest {
     }
 
     @Test
+    void validationAllowsDashesInOnlyIfUsing()  {
+        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+          "pom", null, null, null, "something-with:dashes-is-ok*", true);
+        Validated validated = recipe.validate();
+        assertThat(validated).allMatch(Validated::isValid);
+    }
+
+    @Test
+    void badCharactersInOnlyIfUsingAreInvalid() {
+        AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
+          "pom", null, null, null, "spaced group:*", true);
+        Validated validated = recipe.validate();
+        assertThat(validated.isValid()).isFalse();
+        assertThat(validated.failures()).anyMatch(v -> "onlyIfUsing".equals(v.getProperty()));
+    }
+
+    @Test
     void doNotAddIfTypeNotUsed() {
         rewriteRun(
           spec -> spec.recipe(new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "2.17.2", "import",

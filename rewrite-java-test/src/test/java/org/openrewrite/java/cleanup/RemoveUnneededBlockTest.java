@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -338,9 +339,11 @@ class RemoveUnneededBlockTest implements RewriteTest {
           java(
             """
               public class A {
+                  static int[] a;
+                  static int[] b;
                   static {
-                      int[] a = new int[] { 1, 2, 3 };
-                      int[] b = new int[] {4,5,6};
+                      a = new int[] { 1, 2, 3 };
+                      b = new int[] {4,5,6};
                       {
                           System.out.println("hello static!");
                       }
@@ -349,9 +352,11 @@ class RemoveUnneededBlockTest implements RewriteTest {
               """,
             """
               public class A {
+                  static int[] a;
+                  static int[] b;
                   static {
-                      int[] a = new int[] { 1, 2, 3 };
-                      int[] b = new int[] {4,5,6};
+                      a = new int[] { 1, 2, 3 };
+                      b = new int[] {4,5,6};
                       System.out.println("hello static!");
                   }
               }
@@ -366,9 +371,11 @@ class RemoveUnneededBlockTest implements RewriteTest {
           java(
             """
               public class A {
+                  int[] a;
+                  int[] b;
                   static {
-                      int[] a = new int[] { 1, 2, 3 };
-                      int[] b = new int[] {4,5,6};
+                      a = new int[] { 1, 2, 3 };
+                      b = new int[] {4,5,6};
                       {
                           System.out.println("hello!");
                           System.out.println( "world!" );
@@ -378,9 +385,11 @@ class RemoveUnneededBlockTest implements RewriteTest {
               """,
             """
               public class A {
+                  int[] a;
+                  int[] b;
                   static {
-                      int[] a = new int[] { 1, 2, 3 };
-                      int[] b = new int[] {4,5,6};
+                      a = new int[] { 1, 2, 3 };
+                      b = new int[] {4,5,6};
                       System.out.println("hello!");
                       System.out.println("world!");
                   }
@@ -389,4 +398,149 @@ class RemoveUnneededBlockTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3073")
+    void preserveComments() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static {
+                      // comment before (outside)
+                      {
+                          // comment before (inside)
+                          System.out.println("hello world!");
+                          // comment after (inside)
+                      }
+                      // comment after (outside)
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static {
+                      // comment before (outside)
+                      // comment before (inside)
+                      System.out.println("hello world!");
+                      // comment after (inside)
+                      // comment after (outside)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveBlocksContainingVariableDeclarations() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static {
+                      {
+                          int i = 0;
+                      }
+                      System.out.println("hello world!");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inlineLastBlockContainingVariableDeclarations() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static {
+                      {
+                          System.out.println("hello world!");
+                      }
+                      {
+                          int i = 0;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static {
+                      System.out.println("hello world!");
+                      int i = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EmptyFinallyBlock")
+    void removeEmptyTryFinallyBlock() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public int foo() {
+                      try {
+                          int i = 1;
+                      } finally {
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  public int foo() {
+                      int i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepNonEmptyTryFinallyBlock() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public int foo() {
+                      try {
+                          int i = 1;
+                      } finally {
+                          System.out.println("hello world!");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EmptyFinallyBlock")
+    void keepNonEmptyTryFinallyBlock2() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public int foo() {
+                      try {
+                          int i = 1;
+                      } finally {
+                      }
+                      int i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

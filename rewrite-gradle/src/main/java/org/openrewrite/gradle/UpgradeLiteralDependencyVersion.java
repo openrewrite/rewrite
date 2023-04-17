@@ -19,6 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.search.FindGradleProject;
+import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -27,6 +29,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -38,6 +42,7 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -45,6 +50,9 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class UpgradeLiteralDependencyVersion extends Recipe {
+
+    private static final String VERSION_VARIABLE_KEY = "VERSION_VARIABLE_KEY";
+
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
@@ -91,9 +99,8 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
         return validated;
     }
 
-    @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
+        return new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor();
     }
 
     @Override
@@ -101,11 +108,42 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
         MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
         return new GroovyVisitor<ExecutionContext>() {
+
+            @Override
+            public J visitJavaSourceFile(JavaSourceFile sourceFile, ExecutionContext ctx) {
+                JavaSourceFile cu = (JavaSourceFile) super.visitJavaSourceFile(sourceFile, ctx);
+                String variableName = getCursor().getMessage(VERSION_VARIABLE_KEY);
+                if(variableName != null) {
+                    Optional<GradleProject> maybeGp = cu.getMarkers()
+                            .findFirst(GradleProject.class);
+                    if(!maybeGp.isPresent()) {
+                        return cu;
+                    }
+
+                    cu = (JavaSourceFile) new UpdateVariable(variableName, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
+                }
+
+                return cu;
+            }
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (dependency.matches(method)) {
                     List<Expression> depArgs = method.getArguments();
-                    if (depArgs.get(0) instanceof J.Literal) {
+                    if(depArgs.get(0) instanceof G.GString) {
+                        G.GString gString = (G.GString) depArgs.get(0);
+                        List<J> strings = gString.getStrings();
+                        if(strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                            return method;
+                        }
+                        G.GString.Value versionValue = (G.GString.Value) strings.get(1);
+                        if(!(versionValue.getTree() instanceof J.Identifier)) {
+                            return method;
+                        }
+                        String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                        getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
+
+                    } else if (depArgs.get(0) instanceof J.Literal) {
                         String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                         assert gav != null;
                         String[] parts = gav.split(":");
@@ -113,15 +151,19 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
                             if (StringUtils.matchesGlob(parts[0], groupId) &&
                                 StringUtils.matchesGlob(parts[1], artifactId)) {
 
-                                GradleProject gradleProject = getCursor().firstEnclosingOrThrow(G.CompilationUnit.class)
+                                GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
                                         .getMarkers()
                                         .findFirst(GradleProject.class)
                                         .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
 
                                 String version = parts[2];
-                                if (version != null && !version.startsWith("$")) {
+                                if(version == null) {
+                                    return method;
+                                }
+                                if(!version.startsWith("$")) {
                                     try {
-                                        String newVersion = findNewerVersion(groupId, artifactId, version, gradleProject, ctx);
+                                        String newVersion = findNewerVersion(groupId, artifactId, version, versionComparator,
+                                                gradleProject, ctx);
                                         if (newVersion == null || version.equals(newVersion)) {
                                             return method;
                                         }
@@ -142,36 +184,88 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
-
-            @Nullable
-            private String findNewerVersion(String groupId, String artifactId, String version,
-                                            GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
-                // in the case of "latest.patch", a new version can only be derived if the
-                // current version is a semantic version
-                if (versionComparator instanceof LatestPatch && !versionComparator.isValid(version, version)) {
-                    return null;
-                }
-
-                try {
-                    MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, gradleProject, ctx));
-                    List<String> versions = new ArrayList<>();
-                    for (String v : mavenMetadata.getVersioning().getVersions()) {
-                        if (versionComparator.isValid(version, v)) {
-                            versions.add(v);
-                        }
-                    }
-                    return versionComparator.upgrade(version, versions).orElse(null);
-                } catch (IllegalStateException e) {
-                    // this can happen when we encounter exotic versions
-                    return null;
-                }
-            }
-
-            public MavenMetadata downloadMetadata(String groupId, String artifactId, GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
-                return new MavenPomDownloader(emptyMap(), ctx, null, null)
-                        .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
-                                gradleProject.getMavenRepositories());
-            }
         };
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    private class UpdateVariable extends GroovyIsoVisitor<ExecutionContext> {
+        String versionVariableName;
+        VersionComparator versionComparator;
+        GradleProject gradleProject;
+        @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+            if(!versionVariableName.equals((v.getSimpleName()))) {
+                return v;
+            }
+            if(!(v.getInitializer() instanceof J.Literal)) {
+                return v;
+            }
+            J.Literal initializer = (J.Literal) v.getInitializer();
+            if(initializer.getType() != JavaType.Primitive.String) {
+                return v;
+            }
+            String version = (String) initializer.getValue();
+            if(version == null) {
+                return v;
+            }
+
+            try {
+                String newVersion = findNewerVersion(groupId, artifactId, version, versionComparator, gradleProject, ctx);
+                if(newVersion == null) {
+                    return v;
+                }
+                J.Literal newVersionLiteral = initializer.withValue(newVersion)
+                        .withValueSource("'" + newVersion + "'");
+                v = v.withInitializer(newVersionLiteral);
+            } catch (MavenDownloadingException e) {
+                return e.warn(v);
+            }
+            return v;
+        }
+
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext executionContext) {
+            J.Assignment v = super.visitAssignment(assignment, executionContext);
+            if(!(assignment.getAssignment() instanceof J.Identifier)) {
+                return v;
+            }
+            J.Identifier id = (J.Identifier) assignment.getAssignment();
+            if(!versionVariableName.equals((id.getSimpleName()))) {
+                return v;
+            }
+            return v;
+        }
+    }
+
+    @Nullable
+    private String findNewerVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,
+                                    GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+        // in the case of "latest.patch", a new version can only be derived if the
+        // current version is a semantic version
+        if (versionComparator instanceof LatestPatch && !versionComparator.isValid(version, version)) {
+            return null;
+        }
+
+        try {
+            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, gradleProject, ctx));
+            List<String> versions = new ArrayList<>();
+            for (String v : mavenMetadata.getVersioning().getVersions()) {
+                if (versionComparator.isValid(version, v)) {
+                    versions.add(v);
+                }
+            }
+            return versionComparator.upgrade(version, versions).orElse(null);
+        } catch (IllegalStateException e) {
+            // this can happen when we encounter exotic versions
+            return null;
+        }
+    }
+
+    public MavenMetadata downloadMetadata(String groupId, String artifactId, GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+        return new MavenPomDownloader(emptyMap(), ctx, null, null)
+                .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
+                        gradleProject.getMavenRepositories());
     }
 }

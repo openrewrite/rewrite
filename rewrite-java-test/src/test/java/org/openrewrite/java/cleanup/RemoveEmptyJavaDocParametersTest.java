@@ -17,10 +17,12 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.SourceSpecs.other;
 
 @SuppressWarnings("JavadocDeclaration")
 class RemoveEmptyJavaDocParametersTest implements RewriteTest {
@@ -47,6 +49,18 @@ class RemoveEmptyJavaDocParametersTest implements RewriteTest {
                   void method(int arg0) {
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3078")
+    void visitingQuarkMustNotFail() {
+        rewriteRun(
+          other(
+            """
+              foo
               """
           )
         );

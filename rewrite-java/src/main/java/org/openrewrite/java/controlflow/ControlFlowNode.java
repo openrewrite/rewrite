@@ -35,7 +35,7 @@ import static org.openrewrite.java.controlflow.ControlFlowIllegalStateException.
 
 /**
  * Represents a control flow graph.
- * <p
+ * <p>
  * To create an instance, call {@link ControlFlow#startingAt(Cursor)}.
  *
  * @implNote This class should be considered immutable by all API consumers outside this package.

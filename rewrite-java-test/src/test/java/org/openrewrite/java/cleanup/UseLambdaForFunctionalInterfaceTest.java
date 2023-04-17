@@ -417,4 +417,137 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arrayTypes() {
+        rewriteRun(
+          java(
+            """
+              class Temp {
+                  final TrustStrategy strategy = new TrustStrategy() {
+                      @Override
+                      public boolean isTrusted(Integer[] var1, String var2) {
+                          return true;
+                      }
+                  };
+                  public interface TrustStrategy {
+                      boolean isTrusted(Integer[] var1, String var2);
+                  }
+              }
+              """,
+            """
+              class Temp {
+                  final TrustStrategy strategy = (var1, var2) -> true;
+                  public interface TrustStrategy {
+                      boolean isTrusted(Integer[] var1, String var2);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeIfHasShallowVariable() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void run(Runnable task) {}
+
+                  void method() {
+                      String name = "foo";
+                      for (int i = 0 ; i < 10; i ++) {
+                          run(new Runnable() {
+                              @Override
+                              public void run() {
+                                  String name = "bar";
+                              }
+                          });
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void outOfNameScopesShallowVariable() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void run(Runnable task) {}
+
+                  void method() {
+                      {
+                          String name = "foo";
+                      }
+                      for (int i = 0 ; i < 10; i ++) {
+                          run(new Runnable() {
+                              @Override
+                              public void run() {
+                                  String name = "bar";
+                              }
+                          });
+                      }
+                  }
+              }
+              """,
+            """
+              class A {
+                  void run(Runnable task) {}
+
+                  void method() {
+                      {
+                          String name = "foo";
+                      }
+                      for (int i = 0 ; i < 10; i ++) {
+                          run(() -> {
+                              String name = "bar";
+                          });
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noChangeIfHasShallowVariableForAndWhileLoop() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void run(Runnable task) {}
+
+                  void method() {
+                      for (int i = 0 ; i < 10; i ++) {
+                          run(new Runnable() {
+                              @Override
+                              public void run() {
+                                  for (int i = 0 ; i < 10; i ++) {
+                                  }
+                              }
+                          });
+                      }
+                      
+                      int j = 0;
+                      while (j < 20) {
+                          run(new Runnable() {
+                              @Override
+                              public void run() {
+                                  for (int j = 0 ; j < 20; j ++) {
+                                  }
+                              }
+                          });
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

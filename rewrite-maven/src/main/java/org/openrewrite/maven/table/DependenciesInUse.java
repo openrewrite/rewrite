@@ -54,7 +54,7 @@ public class DependenciesInUse extends DataTable<DependenciesInUse.Row> {
         String version;
 
         @Column(displayName = "Dated snapshot version",
-                description = "The resolved dated snapshot version or null if this dependency is not a snapshot.")
+                description = "The resolved dated snapshot version or `null` if this dependency is not a snapshot.")
         @Nullable
         String datedSnapshotVersion;
 

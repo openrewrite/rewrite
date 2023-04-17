@@ -48,7 +48,7 @@ public class NoEmptyCollectionWithRawType extends Recipe {
     @Nullable
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.util.Collections");
+        return new UsesType<>("java.util.Collections", false);
     }
 
     @Override

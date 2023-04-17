@@ -22,9 +22,6 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.*;
 import org.codehaus.groovy.control.io.InputStreamReaderSource;
-import org.codehaus.groovy.control.messages.ExceptionMessage;
-import org.codehaus.groovy.control.messages.Message;
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.intellij.lang.annotations.Language;
@@ -256,12 +253,12 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
-        public Builder classpath(Collection<Path> classpath) {
+        public Builder classpath(@Nullable Collection<Path> classpath) {
             this.classpath = classpath;
             return this;
         }
 
-        public Builder classpath(String... classpath) {
+        public Builder classpath(@Nullable String... classpath) {
             this.classpath = JavaParser.dependenciesFromClasspath(classpath);
             return this;
         }

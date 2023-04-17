@@ -28,8 +28,13 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
+import static java.util.Collections.singleton;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 public class MinimumSwitchCases extends Recipe {
@@ -46,7 +51,7 @@ public class MinimumSwitchCases extends Recipe {
 
     @Override
     public Set<String> getTags() {
-        return Collections.singleton("RSPEC-1301");
+        return singleton("RSPEC-1301");
     }
 
     @Override
@@ -127,9 +132,22 @@ public class MinimumSwitchCases extends Recipe {
 
                     J.Case[] cases = new J.Case[2];
                     int i = 0;
-                    for (Statement statement : sortedSwitch.getCases().getStatements()) {
+                    List<Statement> statements = sortedSwitch.getCases().getStatements();
+                    for (int j = 0; j < statements.size(); j++) {
+                        Statement statement = statements.get(j);
                         if (statement instanceof J.Case) {
-                            cases[i++] = (J.Case) statement;
+                            J.Case aCase = (J.Case) statement;
+                            if (aCase.getType() == J.Case.Type.Rule) {
+                                if (aCase.getExpressions().size() > 1 || !(aCase.getBody() instanceof Statement)) {
+                                    return super.visitSwitch(switzh, ctx);
+                                }
+                            } else {
+                                Statement lastStatement = aCase.getStatements().isEmpty() ? null : aCase.getStatements().get(aCase.getStatements().size() - 1);
+                                if (j != statements.size() - 1 && !(lastStatement instanceof J.Break || lastStatement instanceof J.Return)) {
+                                    return super.visitSwitch(switzh, ctx);
+                                }
+                            }
+                            cases[i++] = aCase;
                         }
                     }
 
@@ -187,27 +205,20 @@ public class MinimumSwitchCases extends Recipe {
                     }
 
                     // move first case to "if"
-                    List<Statement> statements = new ArrayList<>();
-                    for (Statement statement : cases[0].getStatements()) {
-                        if (statement instanceof J.Block) {
-                            statements.addAll(((J.Block) statement).getStatements());
-                        } else {
-                            statements.add(statement);
-                        }
-                    }
+                    List<Statement> thenStatements = getStatements(cases[0]);
 
-                    generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(statements,
+                    generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(thenStatements,
                             s -> s instanceof J.Break ? null : s)));
 
                     // move second case to "else"
                     if (cases[1] != null) {
                         assert generatedIf.getElsePart() != null;
                         if (isDefault(cases[1])) {
-                            generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(((J.Block) generatedIf.getElsePart().getBody()).withStatements(ListUtils.map(cases[1].getStatements(),
+                            generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(((J.Block) generatedIf.getElsePart().getBody()).withStatements(ListUtils.map(getStatements(cases[1]),
                                     s -> s instanceof J.Break ? null : s))));
                         } else {
                             J.If elseIf = (J.If) generatedIf.getElsePart().getBody();
-                            generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(elseIf.withThenPart(((J.Block) elseIf.getThenPart()).withStatements(ListUtils.map(cases[1].getStatements(),
+                            generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(elseIf.withThenPart(((J.Block) elseIf.getThenPart()).withStatements(ListUtils.map(getStatements(cases[1]),
                                     s -> s instanceof J.Break ? null : s)))));
                         }
                     }
@@ -216,6 +227,18 @@ public class MinimumSwitchCases extends Recipe {
                 }
 
                 return super.visitSwitch(switzh, ctx);
+            }
+
+            private List<Statement> getStatements(J.Case aCase) {
+                List<Statement> statements = new ArrayList<>();
+                for (Statement statement : aCase.getType() == J.Case.Type.Rule ? singletonList((Statement) aCase.getBody()) : aCase.getStatements()) {
+                    if (statement instanceof J.Block) {
+                        statements.addAll(((J.Block) statement).getStatements());
+                    } else {
+                        statements.add(statement);
+                    }
+                }
+                return statements;
             }
 
             private boolean isDefault(J.Case caze) {

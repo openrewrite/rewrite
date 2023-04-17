@@ -54,7 +54,7 @@ public class ExternalizableHasNoArgsConstructor extends Recipe {
 
     @Override
     protected UsesType<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.io.Externalizable");
+        return new UsesType<>("java.io.Externalizable", false);
     }
 
     @Override

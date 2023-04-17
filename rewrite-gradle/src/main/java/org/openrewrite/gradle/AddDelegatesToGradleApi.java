@@ -56,7 +56,7 @@ public class AddDelegatesToGradleApi extends Recipe {
 
     @Override
     protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("groovy.lang.Closure");
+        return new UsesType<>("groovy.lang.Closure", true);
     }
 
     @Override
@@ -110,9 +110,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                     param = param.withTemplate(
                             JavaTemplate.builder(this::getCursor, "@DelegatesTo(#{}.class)")
                                     .imports(delegateType.getFullyQualifiedName(), DELEGATES_TO_TYPE.getFullyQualifiedName())
-                                    .javaParser(() -> JavaParser.fromJavaVersion()
-                                            .classpath("groovy")
-                                            .build())
+                                    .javaParser(JavaParser.fromJavaVersion().classpath("groovy"))
                                     .build(),
                             param.getCoordinates().addAnnotation(comparing(a -> 0)),
                             simpleName);

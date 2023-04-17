@@ -16,13 +16,13 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class RemoveUnusedPrivateFieldsTest implements RewriteTest {
-
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new RemoveUnusedPrivateFields());
@@ -183,6 +183,29 @@ class RemoveUnusedPrivateFieldsTest implements RewriteTest {
                       String removeAOne = aTwo + aThree;
                       String removeBTwo = bOne + bThree;
                       String removeCThree = cOne + cTwo;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3061")
+    void findReferencesInOuterScope() {
+        rewriteRun(
+          java(
+            """
+              public class Vehicle {
+                  private VehicleUsage vehicleUsage;
+              
+                  public class VehicleUsage {
+                      private final String vehicleId;
+                  }
+              
+                  public doSomethingWithAVehicle() {
+                      vehicleUsage = new VehicleUsage();
+                      vehicleUsage.vehicleId = "vu50";
                   }
               }
               """

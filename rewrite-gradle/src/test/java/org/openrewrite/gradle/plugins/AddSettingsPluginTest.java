@@ -15,9 +15,14 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.groovy.tree.G;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,28 +30,43 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class AddSettingsPluginTest implements RewriteTest {
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null));
+    }
+
+    @Test
+    void addPluginToEmptyFile() {
+        rewriteRun(
+          settingsGradle(
+            "",
+            interpolateResolvedVersion(
+              """
+                plugins {
+                    id 'com.gradle.enterprise' version '%s'
+                }
+                """
+            )
+          )
+        );
+    }
 
     @Test
     void addPluginToNewBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null)),
           settingsGradle(
             """
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> {
-                assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3.11(.\\d+)?").matcher(actual);
-                assertThat(version.find()).isTrue();
-                //language=groovy
-                return """
-                  plugins {
-                      id 'com.gradle.enterprise' version '%s'
-                  }
+            interpolateResolvedVersion(
+              """
+              plugins {
+                  id 'com.gradle.enterprise' version '%s'
+              }
 
-                  rootProject.name = 'my-project'
-                  """.formatted(version.group(0));
-            })
+              rootProject.name = 'my-project'
+              """
+            )
           )
         );
     }
@@ -54,7 +74,6 @@ class AddSettingsPluginTest implements RewriteTest {
     @Test
     void addPluginToExistingBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null)),
           settingsGradle(
             """
               plugins {
@@ -63,20 +82,16 @@ class AddSettingsPluginTest implements RewriteTest {
                             
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> {
-                assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
-                assertThat(version.find()).isTrue();
-                //language=groovy
-                return """
-                  plugins {
-                      id 'org.openrewrite' version '1'
-                      id 'com.gradle.enterprise' version '%s'
-                  }
+            interpolateResolvedVersion(
+              """
+              plugins {
+                  id 'org.openrewrite' version '1'
+                  id 'com.gradle.enterprise' version '%s'
+              }
                                     
-                  rootProject.name = 'my-project'
-                  """.formatted(version.group(0));
-            })
+              rootProject.name = 'my-project'
+              """
+            )
           )
         );
     }
@@ -84,7 +99,6 @@ class AddSettingsPluginTest implements RewriteTest {
     @Test
     void addPluginWithPluginManagementBlock() {
         rewriteRun(
-          spec -> spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null)),
           settingsGradle(
             """
               pluginManagement {
@@ -95,26 +109,31 @@ class AddSettingsPluginTest implements RewriteTest {
 
               rootProject.name = 'my-project'
               """,
-            spec -> spec.after(actual -> {
-                assertThat(actual).isNotNull();
-                Matcher version = Pattern.compile("3.11.\\d+").matcher(actual);
-                assertThat(version.find()).isTrue();
-                //language=groovy
-                return """
-                  pluginManagement {
-                      repositories {
-                          gradlePluginPortal()
-                      }
+            interpolateResolvedVersion(
+              """
+              pluginManagement {
+                  repositories {
+                      gradlePluginPortal()
                   }
+              }
 
-                  plugins {
-                      id 'com.gradle.enterprise' version '%s'
-                  }
+              plugins {
+                  id 'com.gradle.enterprise' version '%s'
+              }
 
-                  rootProject.name = 'my-project'
-                  """.formatted(version.group(0));
-            })
+              rootProject.name = 'my-project'
+              """
+            )
           )
         );
+    }
+
+    private static Consumer<SourceSpec<G.CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
+        return spec -> spec.after(actual -> {
+            assertThat(actual).isNotNull();
+            Matcher version = Pattern.compile("3\\.\\d+(\\.\\d+)?").matcher(actual);
+            assertThat(version.find()).isTrue();
+            return after.formatted(version.group(0));
+        });
     }
 }

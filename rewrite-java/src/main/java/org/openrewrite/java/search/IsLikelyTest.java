@@ -22,7 +22,6 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Locale;
-import java.util.regex.Pattern;
 
 @Incubating(since = "7.36.0")
 public class IsLikelyTest extends Recipe {
@@ -43,13 +42,13 @@ public class IsLikelyTest extends Recipe {
         return Applicability.or(
                 new HasSourceSet("test").getVisitor(),
                 new HasSourceSetNameContainingTestVisitor<>(),
-                new UsesType<>("org.junit..*"), // Covers both JUnit 4 and 5
-                new UsesType<>("org.testng..*"),
-                new UsesType<>("org.hamcrest..*"),
-                new UsesType<>("org.mockito..*"),
-                new UsesType<>("org.powermock..*"),
-                new UsesType<>("org.assertj..*"),
-                new UsesType<>("spock.lang..*")
+                new UsesType<>("org.junit..*", true), // Covers both JUnit 4 and 5
+                new UsesType<>("org.testng..*", true),
+                new UsesType<>("org.hamcrest..*", true),
+                new UsesType<>("org.mockito..*", true),
+                new UsesType<>("org.powermock..*", true),
+                new UsesType<>("org.assertj..*", true),
+                new UsesType<>("spock.lang..*", true)
         );
     }
 

@@ -52,14 +52,16 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(new UsesType<>("java.lang.Boolean"),
-                new UsesType<>("java.lang.Byte"),
-                new UsesType<>("java.lang.Character"),
-                new UsesType<>("java.lang.Double"),
-                new UsesType<>("java.lang.Float"),
-                new UsesType<>("java.lang.Integer"),
-                new UsesType<>("java.lang.Long"),
-                new UsesType<>("java.lang.Short"));
+        return Applicability.or(
+                new UsesType<>("java.lang.Boolean", false),
+                new UsesType<>("java.lang.Byte", false),
+                new UsesType<>("java.lang.Character", false),
+                new UsesType<>("java.lang.Double", false),
+                new UsesType<>("java.lang.Float", false),
+                new UsesType<>("java.lang.Integer", false),
+                new UsesType<>("java.lang.Long", false),
+                new UsesType<>("java.lang.Short", false)
+        );
     }
 
     @Override

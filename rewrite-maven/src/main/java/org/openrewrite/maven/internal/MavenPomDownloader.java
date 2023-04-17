@@ -722,19 +722,29 @@ public class MavenPomDownloader {
      */
     private byte[] requestAsAuthenticatedOrAnonymous(MavenRepository repo, String uriString) throws HttpSenderResponseException {
         try {
-            try {
-                return sendRequest.apply(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
-            } catch (HttpSenderResponseException e) {
-                if (hasCredentials(repo) && e.isClientSideException()) {
-                    return sendRequest.apply(httpSender.get(uriString).build());
-                } else {
-                    throw e;
-                }
-            }
+            return sendRequest.apply(applyAuthenticationToRequest(repo, httpSender.get(uriString)).build());
         } catch (HttpSenderResponseException e) {
-            throw e;
+            if (hasCredentials(repo) && e.isClientSideException()) {
+                return retryRequestAnonymously(uriString, e);
+            } else {
+                throw e;
+            }
         } catch (Throwable t) {
-            throw new RuntimeException(t); // unreachable
+            throw new RuntimeException(t);  // unreachable
+        }
+    }
+
+    private byte[] retryRequestAnonymously(String uriString, HttpSenderResponseException originalException) throws HttpSenderResponseException {
+        try {
+            return sendRequest.apply(httpSender.get(uriString).build());
+        } catch (HttpSenderResponseException retryException) {
+            if (retryException.isAccessDenied()) {
+                throw originalException;
+            } else {
+                throw retryException;
+            }
+        } catch (Throwable t) {
+            throw new RuntimeException(t);  // unreachable
         }
     }
 
@@ -781,6 +791,10 @@ public class MavenPomDownloader {
             return responseCode == null ?
                     requireNonNull(getCause()).getMessage() :
                     "HTTP " + responseCode;
+        }
+
+        public boolean isAccessDenied() {
+            return isClientSideException() && responseCode != 404;
         }
     }
 

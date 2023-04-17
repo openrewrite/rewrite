@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.internal.template;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
@@ -55,14 +57,14 @@ public class JavaTemplateParser {
     @Language("java")
     private static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
 
-    private final Supplier<JavaParser> parser;
+    private final JavaParser.Builder<?, ?> parser;
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
-    public JavaTemplateParser(Supplier<JavaParser> parser, Consumer<String> onAfterVariableSubstitution,
+    public JavaTemplateParser(JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
                               Consumer<String> onBeforeParseTemplate, Set<String> imports) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
@@ -237,19 +239,26 @@ public class JavaTemplateParser {
     private JavaSourceFile compileTemplate(@Language("java") String stub) {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        JavaParser jp = parser.clone().build();
         return stub.contains("@SubAnnotation") ?
-                parser.get().reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
-                parser.get().reset().parse(ctx, stub).get(0);
+                jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
+                jp.reset().parse(ctx, stub).get(0);
     }
 
     @SuppressWarnings("unchecked")
     private <J2 extends J> List<J2> cache(String stub, Supplier<List<? extends J>> ifAbsent) {
         List<J2> js;
         synchronized (templateCacheLock) {
+            Timer.Sample sample = Timer.start();
             js = (List<J2>) templateCache.get(stub);
             if (js == null) {
                 js = (List<J2>) ifAbsent.get();
                 templateCache.put(stub, js);
+                sample.stop(Timer.builder("rewrite.template.cache").tag("result", "miss")
+                        .register(Metrics.globalRegistry));
+            } else {
+                sample.stop(Timer.builder("rewrite.template.cache").tag("result", "hit")
+                        .register(Metrics.globalRegistry));
             }
         }
         return ListUtils.map(js, j -> (J2) new RandomizeIdVisitor<Integer>().visit(j, 0));

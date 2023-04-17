@@ -560,7 +560,7 @@ public class GroovyParserVisitor {
                     if (',' == source.charAt(cursor)) {
                         // In Groovy trailing "," are allowed
                         cursor += 1;
-                        converted = converted.withMarkers(Markers.EMPTY.add(new TrailingComma(randomId(), whitespace())));
+                        converted = converted.withMarkers(Markers.EMPTY.add(new org.openrewrite.java.marker.TrailingComma(randomId(), whitespace())));
                     }
                     ts.add(converted);
                     if (afterLast != null && source.startsWith(afterLast, cursor)) {
@@ -1520,6 +1520,65 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitStaticMethodCallExpression(StaticMethodCallExpression call) {
+            Space fmt = whitespace();
+
+            MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+            JavaType.Method methodType = typeMapping.methodType(methodNode);
+            J.Identifier name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
+                    call.getMethodAsString(), methodType, null);
+
+            // Method invocations may have type information that can enrich the type information of its parameters
+            Markers markers = Markers.EMPTY;
+            if (call.getArguments() instanceof ArgumentListExpression) {
+                ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
+                if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
+                    for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
+                        if (!(arg instanceof ClosureExpression)) {
+                            continue;
+                        }
+                        ClosureExpression cl = (ClosureExpression) arg;
+                        ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                        for (Parameter p : cl.getParameters()) {
+                            if (p.isDynamicTyped()) {
+                                p.setType(actualParamTypeRaw);
+                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            }
+                        }
+                        for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
+                            if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
+                                Parameter p = (Parameter) declaredVariable.getValue();
+                                p.setType(actualParamTypeRaw);
+                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            }
+                        }
+                    }
+                }
+                // handle the obscure case where there are empty parens ahead of a closure
+                if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
+                    int saveCursor = cursor;
+                    Space prefix = whitespace();
+                    if (source.charAt(cursor) == '(') {
+                        cursor += 1;
+                        Space infix = whitespace();
+                        if (source.charAt(cursor) == ')') {
+                            cursor += 1;
+                            markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), prefix, infix));
+                        } else {
+                            cursor = saveCursor;
+                        }
+                    } else {
+                        cursor = saveCursor;
+                    }
+                }
+            }
+            JContainer<Expression> args = visit(call.getArguments());
+
+            queue.add(new J.MethodInvocation(randomId(), fmt, markers,
+                    null, null, name, args, methodType));
+        }
+
+        @Override
         public void visitPropertyExpression(PropertyExpression prop) {
             Space fmt = whitespace();
             Expression target = visit(prop.getObjectExpression());
@@ -2031,15 +2090,6 @@ public class GroovyParserVisitor {
         String prefix = source.substring(cursor, delimIndex);
         cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
         return Space.format(prefix);
-    }
-
-    /**
-     * Strings in ConstantExpression have already replaced character sequences like "\n", so its value does not match
-     * the source code.
-     */
-    private String valueWithEscapes(ConstantExpression stringLiteral) {
-        String delimiter = "";
-        return delimiter;
     }
 
     /**

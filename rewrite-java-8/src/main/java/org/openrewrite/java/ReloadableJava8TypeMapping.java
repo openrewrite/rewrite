@@ -191,7 +191,7 @@ class ReloadableJava8TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if ("java.lang.String".equals(sym.flatName().toString()) && "serialPersistentFields".equals(sym.name.toString())) {
+                        if ("java.lang.String".equals(sym.flatName().toString()) && "serialPersistentFields".equals(elem.name.toString())) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.

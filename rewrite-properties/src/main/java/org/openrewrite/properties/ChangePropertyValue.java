@@ -19,8 +19,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
+
+import java.util.Objects;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -40,6 +43,12 @@ public class ChangePropertyValue extends Recipe {
             description = "Only change the property value if it matches the configured `oldValue`.")
     @Nullable
     String oldValue;
+
+    @Option(displayName = "Regex",
+            description = "Default false. If enabled, `oldValue` will be interepreted as a Regular Expression, and capture group contents will be available in `newValue`",
+            required = false)
+    @Nullable
+    Boolean regex;
 
     @Incubating(since = "7.17.0")
     @Option(displayName = "Use relaxed binding",
@@ -67,7 +76,7 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+    public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
         if (fileMatcher != null) {
             return new HasSourcePath<>(fileMatcher);
         }
@@ -86,11 +95,28 @@ public class ChangePropertyValue extends Recipe {
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
             if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
-                if (oldValue == null ? !entry.getValue().getText().equals(newValue) : oldValue.equals(entry.getValue().getText())) {
-                    entry = entry.withValue(entry.getValue().withText(newValue));
+                if (matchesOldValue(entry.getValue())) {
+                    Properties.Value updatedValue = updateValue(entry.getValue());
+                    if (updatedValue != null) {
+                        entry = entry.withValue(updatedValue);
+                    }
                 }
             }
             return super.visitEntry(entry, p);
+        }
+
+        @Nullable // returns null if value should not change
+        private Properties.Value updateValue(Properties.Value value) {
+            Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex)
+                    ? value.getText().replaceAll(Objects.requireNonNull(oldValue), newValue) : newValue);
+            return updatedValue.getText().equals(value.getText()) ? null : updatedValue;
+        }
+
+        private boolean matchesOldValue(Properties.Value value) {
+            return StringUtils.isNullOrEmpty(oldValue) ||
+                    (Boolean.TRUE.equals(regex)
+                            ? value.getText().matches(oldValue)
+                            : value.getText().equals(oldValue));
         }
     }
 

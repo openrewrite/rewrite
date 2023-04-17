@@ -29,7 +29,7 @@ import java.util.stream.Stream;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindBuildToolFailures extends Recipe {
-    BuildToolFailures failures = new BuildToolFailures(this);
+    transient BuildToolFailures failures = new BuildToolFailures(this);
 
     @Option(displayName = "Suppress log output",
             description = "Default false. If true, the `logOutput` column will be empty in the output table.",
@@ -90,7 +90,7 @@ class FailureLogAnalyzer {
 
     private static final Pattern BAD_OPTION_WAS_IGNORED = Pattern.compile("bad option '-target:(\\d+)' was ignored");
     private static final Pattern INCOMPATIBLE_COMPONENT = Pattern.compile("Incompatible because this component declares a component compatible with Java (\\d+)");
-    private static final Pattern INVALID_SOURCE_TARGET_RELEASE = Pattern.compile("invalid (?:source|target) release: (\\d+)");
+    private static final Pattern INVALID_SOURCE_TARGET_RELEASE = Pattern.compile("invalid (?:source|target) release: (?:1\\.)?(\\d+)");
     private static final Pattern RELEASE_VERSION_NOT_SUPPORTED = Pattern.compile("release version (\\d+) not supported");
     private static final Pattern SOURCE_TARGET_OBSOLETE = Pattern.compile("(?:source|target) value (?:1\\.)?(\\d+) is obsolete", Pattern.CASE_INSENSITIVE);
     private static final Pattern TOOLCHAIN = Pattern.compile("\\[ERROR] jdk \\[ version='(?:1\\.)?(\\d+)' ]");

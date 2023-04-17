@@ -146,8 +146,9 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
     private JavaType.FullyQualified classType(Type.ClassType classType, String signature) {
         Symbol.ClassSymbol sym = (Symbol.ClassSymbol) classType.tsym;
         Type.ClassType symType = (Type.ClassType) sym.type;
+        String fqn = sym.flatName().toString();
 
-        JavaType.FullyQualified fq = typeCache.get(sym.flatName().toString());
+        JavaType.FullyQualified fq = typeCache.get(fqn);
         JavaType.Class clazz = (JavaType.Class) (fq instanceof JavaType.Parameterized ? ((JavaType.Parameterized) fq).getType() : fq);
         if (clazz == null) {
             if (!sym.completer.isTerminal()) {
@@ -157,12 +158,12 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             clazz = new JavaType.Class(
                     null,
                     sym.flags_field,
-                    sym.flatName().toString(),
+                    fqn,
                     getKind(sym),
                     null, null, null, null, null, null, null
             );
 
-            typeCache.put(sym.flatName().toString(), clazz);
+            typeCache.put(fqn, clazz);
 
             JavaType.FullyQualified supertype = TypeUtils.asFullyQualified(type(symType.supertype_field));
 
@@ -190,7 +191,7 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                     if (elem instanceof Symbol.VarSymbol &&
                             (elem.flags_field & (Flags.SYNTHETIC | Flags.BRIDGE | Flags.HYPOTHETICAL |
                                     Flags.GENERATEDCONSTR | Flags.ANONCONSTR)) == 0) {
-                        if (sym.flatName().toString().equals("java.lang.String") && sym.name.toString().equals("serialPersistentFields")) {
+                        if (fqn.equals("java.lang.String") && elem.name.toString().equals("serialPersistentFields")) {
                             // there is a "serialPersistentFields" member within the String class which is used in normal Java
                             // serialization to customize how the String field is serialized. This field is tripping up Jackson
                             // serialization and is intentionally filtered to prevent errors.

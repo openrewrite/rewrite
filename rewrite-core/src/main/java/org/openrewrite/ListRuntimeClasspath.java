@@ -19,13 +19,14 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
+import org.openrewrite.table.ClasspathReport;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class ListRuntimeClasspath extends Recipe{
+public class ListRuntimeClasspath extends Recipe {
 
     transient ClasspathReport report = new ClasspathReport(this);
 
@@ -41,17 +42,16 @@ public class ListRuntimeClasspath extends Recipe{
 
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        try(ScanResult result = new ClassGraph().scan()) {
+        try (ScanResult result = new ClassGraph().scan()) {
             ResourceList resources = result.getResourcesWithExtension(".jar");
             Map<String, List<Resource>> classpathEntriesWithJarResources = resources.stream()
-                    .collect(Collectors
-                            .groupingBy(it -> it.getClasspathElementURI().toString()));
-            for(URI classPathUri : result.getClasspathURIs()) {
+                    .collect(Collectors.groupingBy(it -> it.getClasspathElementURI().toString()));
+            for (URI classPathUri : result.getClasspathURIs()) {
                 List<Resource> jarResources = classpathEntriesWithJarResources.get(classPathUri.toString());
-                if(jarResources == null || jarResources.isEmpty()) {
+                if (jarResources == null || jarResources.isEmpty()) {
                     report.insertRow(ctx, new ClasspathReport.Row(classPathUri.toString(), ""));
                 } else {
-                    for(Resource r : jarResources) {
+                    for (Resource r : jarResources) {
                         report.insertRow(ctx, new ClasspathReport.Row(classPathUri.toString(), r.getPath()));
                     }
                 }

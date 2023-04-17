@@ -75,6 +75,29 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    void renameUsingSimplePackageName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite",
+            "openrewrite",
+            false
+          )),
+          java(
+            """
+              import org.openrewrite.Foo;
+              class Test {
+              }
+              """,
+            """
+              import openrewrite.Foo;
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void dontAddImportWhenNoChangesWereMade() {
         rewriteRun(
           java(
@@ -748,6 +771,20 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.findType("org.openrewrite.Procedure")).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void typeInNestedPackageInheritingFromTypeInBasePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.util", "util", null)),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              public class Test {
+              }
+              """
           )
         );
     }

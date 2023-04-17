@@ -27,7 +27,7 @@ public class QuarkPrinter<P> extends QuarkVisitor<PrintOutputCapture<P>> {
     @Override
     public Quark visitQuark(Quark quark, PrintOutputCapture<P> p) {
         beforeSyntax(quark.getMarkers(), p);
-        if (!p.out.toString().isEmpty()) {
+        if (!p.getOut().isEmpty()) {
             p.append("⚛⚛⚛ The contents of this file are not visible. ⚛⚛⚛");
         }
         afterSyntax(quark.getMarkers(), p);
@@ -39,17 +39,17 @@ public class QuarkPrinter<P> extends QuarkVisitor<PrintOutputCapture<P>> {
 
     private void beforeSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), QUARK_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), QUARK_MARKER_WRAPPER));
         }
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), QUARK_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), QUARK_MARKER_WRAPPER));
         }
     }
 
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), QUARK_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), QUARK_MARKER_WRAPPER));
         }
     }
 }

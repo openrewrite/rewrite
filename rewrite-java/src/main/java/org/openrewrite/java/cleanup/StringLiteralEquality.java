@@ -53,7 +53,7 @@ public class StringLiteralEquality extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.lang.String");
+        return new UsesType<>("java.lang.String", false);
     }
 
     @Override

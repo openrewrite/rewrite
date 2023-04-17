@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -94,6 +95,15 @@ public class BlockStatementTemplateGenerator {
 
             @Nullable
             J.Block blockEnclosingTemplateComment;
+
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile && (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                    // don't visit the __P__ and __M__ classes declaring stubs
+                    return classDecl;
+                }
+                return super.visitClassDeclaration(classDecl, integer);
+            }
 
             @Override
             public J.Block visitBlock(J.Block block, Integer p) {
@@ -254,7 +264,8 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "{\n");
             }
 
-            if (prior instanceof Statement) {
+            if (prior == insertionPoint && prior instanceof Expression) {
+                // the template represents an expression, so we need to wrap it in a statement
                 after.append(';');
             }
             after.append('}');
@@ -266,6 +277,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Assert) {
             before.insert(0, "assert ");
+            after.append(';');
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
             if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
@@ -340,8 +352,11 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
-            if (c.getVariable() == prior) {
+            if (referToSameElement(prior, c.getVariable())) {
                 after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+            } else if (referToSameElement(prior, c.getIterable())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
             }
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;

@@ -17,12 +17,16 @@ package org.openrewrite.groovy;
 
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.SourceFile;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 
 import java.util.function.Consumer;
+
+import static org.openrewrite.java.Assertions.sourceSet;
+import static org.openrewrite.test.SourceSpecs.dir;
 
 public class Assertions {
 
@@ -51,5 +55,21 @@ public class Assertions {
         SourceSpec<G.CompilationUnit> groovy = new SourceSpec<>(G.CompilationUnit.class, null, GroovyParser.builder(), before, s -> after);
         spec.accept(groovy);
         return groovy;
+    }
+
+    public static SourceSpecs srcMainGroovy(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
+        return dir("src/main/groovy", spec, javaSources);
+    }
+
+    public static SourceSpecs srcMainGroovy(SourceSpecs... javaSources) {
+        return srcMainGroovy(spec -> sourceSet(spec, "main"), javaSources);
+    }
+
+    public static SourceSpecs srcTestGroovy(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
+        return dir("src/test/groovy", spec, javaSources);
+    }
+
+    public static SourceSpecs srcTestGroovy(SourceSpecs... javaSources) {
+        return srcTestGroovy(spec -> sourceSet(spec, "test"), javaSources);
     }
 }

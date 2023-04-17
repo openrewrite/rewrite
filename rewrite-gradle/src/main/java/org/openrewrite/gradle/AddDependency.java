@@ -78,7 +78,7 @@ public class AddDependency extends Recipe {
     String onlyIfUsing;
 
     @Option(displayName = "Classifier",
-            description = "A Maven classifier to add. Mostly commonly used to select shaded to test variants of a library.",
+            description = "A classifier to add. Commonly used to select variants of a library.",
             example = "test",
             required = false)
     @Nullable
@@ -126,7 +126,7 @@ public class AddDependency extends Recipe {
             return null;
         }
 
-        return new UsesType<>(onlyIfUsing);
+        return new UsesType<>(onlyIfUsing, true);
     }
 
     @Override
@@ -135,7 +135,7 @@ public class AddDependency extends Recipe {
         for (SourceFile source : before) {
             source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                     source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                        if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
+                        if (source != new UsesType<>(onlyIfUsing, true).visit(source, ctx)) {
                             configurationByProject.compute(javaProject, (jp, configuration) -> "implementation".equals(configuration) ?
                                     configuration :
                                     "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"

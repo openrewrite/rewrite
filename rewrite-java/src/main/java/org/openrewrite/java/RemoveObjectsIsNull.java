@@ -15,20 +15,19 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
+import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 public class RemoveObjectsIsNull extends Recipe {
-
-    @JsonCreator
-    public RemoveObjectsIsNull() {
-    }
+    private static final MethodMatcher IS_NULL = new MethodMatcher("java.util.Objects isNull(..)");
+    private static final MethodMatcher NON_NULL = new MethodMatcher("java.util.Objects nonNull(..)");
 
     @Override
     public String getDisplayName() {
@@ -37,39 +36,37 @@ public class RemoveObjectsIsNull extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace calls to `Objects.isNull(..)` and `Objects.nonNull(..)` with a simple null check. Using these methods outside of stream predicates is not idiomatic.";
+        return "Replace calls to `Objects.isNull(..)` and `Objects.nonNull(..)` with a simple null check. " +
+               "Using these methods outside of stream predicates is not idiomatic.";
+    }
+
+    @Override
+    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+        return Applicability.or(new UsesMethod<>(IS_NULL), new UsesMethod<>(NON_NULL));
     }
 
     @Override
     public JavaVisitor<ExecutionContext> getVisitor() {
-        return new TransformCallsToObjectsIsNullVisitor();
-    }
+        return new JavaVisitor<ExecutionContext>() {
 
-    private static final MethodMatcher isNullmatcher = new MethodMatcher("java.util.Objects isNull(..)");
-    private static final MethodMatcher nonNullmatcher = new MethodMatcher("java.util.Objects nonNull(..)");
-
-
-
-    private class TransformCallsToObjectsIsNullVisitor extends JavaVisitor<ExecutionContext> {
-        @Override
-        public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
-            if(isNullmatcher.matches(m)) {
-                return replace(executionContext, m, "(#{any(boolean)}) == null");
-            } else if(nonNullmatcher.matches(m)) {
-                return replace(executionContext, m, "(#{any(boolean)}) != null");
+            @Override
+            public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
+                if (IS_NULL.matches(m)) {
+                    return replace(executionContext, m, "(#{any(boolean)}) == null");
+                } else if (NON_NULL.matches(m)) {
+                    return replace(executionContext, m, "(#{any(boolean)}) != null");
+                }
+                return m;
             }
-            return m;
-        }
 
-        @NonNull
-        private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
-            JavaTemplate template = JavaTemplate.builder(this::getCursor, pattern).build();
-            Expression e = m.getArguments().get(0);
-            Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
-            UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
-            return (Expression) v.visitNonNull(replaced, executionContext, getCursor());
-        }
+            private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
+                JavaTemplate template = JavaTemplate.builder(this::getCursor, pattern).build();
+                Expression e = m.getArguments().get(0);
+                Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
+                UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
+                return (Expression) v.visitNonNull(replaced, executionContext, getCursor());
+            }
+        };
     }
-
 }

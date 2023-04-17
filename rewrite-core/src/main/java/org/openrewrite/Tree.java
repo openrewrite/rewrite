@@ -91,13 +91,13 @@ public interface Tree {
 
     default <P> String print(Cursor cursor, PrintOutputCapture<P> out) {
         this.<P>printer(cursor).visit(this, out, cursor);
-        return out.out.toString();
+        return out.getOut();
     }
 
     default <P> String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
         PrintOutputCapture<Integer> outputCapture = new PrintOutputCapture<>(0);
         printer.visit(this, outputCapture);
-        return outputCapture.out.toString();
+        return outputCapture.getOut();
     }
 
     default <P> String printTrimmed(P p, Cursor cursor) {

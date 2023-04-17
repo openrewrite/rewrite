@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
@@ -26,7 +27,6 @@ import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.java.tree.Space.Location;
 import org.openrewrite.template.SourceTemplate;
 
 import java.lang.reflect.InvocationTargetException;
@@ -44,13 +44,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(Supplier<Cursor> parentScopeGetter, Supplier<JavaParser> parser, String code, Set<String> imports,
+    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
+        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
     }
 
     public String getCode() {
@@ -67,10 +67,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Substitutions substitutions = new Substitutions(code, parameters);
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
-
-        Tree insertionPoint = coordinates.getTree();
-        Location loc = coordinates.getSpaceLocation();
-        JavaCoordinates.Mode mode = coordinates.getMode();
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
 
@@ -114,7 +110,33 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     @Incubating(since = "7.38.0")
     public boolean matches(J tree) {
-        return JavaTemplateSemanticallyEqual.matchesTemplate(this, tree);
+        return matcher(tree).find();
+    }
+
+    @Incubating(since = "7.38.0")
+    public Matcher matcher(J tree) {
+        return new Matcher(tree);
+    }
+
+    @Incubating(since = "7.38.0")
+    @Value
+    public class Matcher {
+        J tree;
+        @NonFinal
+        JavaTemplateSemanticallyEqual.TemplateMatchResult matchResult;
+
+        Matcher(J tree) {
+            this.tree = tree;
+        }
+
+        public boolean find() {
+            matchResult = JavaTemplateSemanticallyEqual.matchesTemplate(JavaTemplate.this, tree);
+            return matchResult.isMatch();
+        }
+
+        public J parameter(int i) {
+            return matchResult.getMatchedParameters().get(i);
+        }
     }
 
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
@@ -127,7 +149,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
-        private Supplier<JavaParser> javaParser = () -> JavaParser.fromJavaVersion().build();
+        private JavaParser.Builder<?, ?> javaParser = JavaParser.fromJavaVersion();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
         };
@@ -168,7 +190,29 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return true;
         }
 
+        /**
+         * A bridge for backwards compatibility of {@link #javaParser(Supplier)}.
+         */
+        private static class SupplierJavaParserBuilder extends JavaParser.Builder<JavaParser, SupplierJavaParserBuilder> {
+            private final Supplier<JavaParser> supplier;
+
+            SupplierJavaParserBuilder(Supplier<JavaParser> supplier) {
+                this.supplier = supplier;
+            }
+
+            @Override
+            public JavaParser build() {
+                return supplier.get();
+            }
+        }
+
+        @Deprecated
         public Builder javaParser(Supplier<JavaParser> javaParser) {
+            this.javaParser = new SupplierJavaParserBuilder(javaParser);
+            return this;
+        }
+
+        public Builder javaParser(JavaParser.Builder<?, ?> javaParser) {
             this.javaParser = javaParser;
             return this;
         }
