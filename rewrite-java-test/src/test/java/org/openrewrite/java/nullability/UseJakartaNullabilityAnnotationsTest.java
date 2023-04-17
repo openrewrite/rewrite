@@ -42,15 +42,14 @@ class UseJakartaNullabilityAnnotationsTest implements RewriteTest {
                 @Nonnull
                 String variable = "";
             }
-
             """,
           """
             package org.openrewrite.java;
 
-            import jakarta.annotation.NonNull;
+            import jakarta.annotation.Nonnull;
 
             class Test {
-                @NonNull
+                @Nonnull
                 String variable = "";
             }
             """));

@@ -148,6 +148,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         return j;
     }
 
+    @Override
+    public J.Package visitPackage(J.Package pkg, P p) {
+        J.Package j = super.visitPackage(pkg, p);
+        return j.withAnnotations(withNewlines(j.getAnnotations()));
+    }
+
     private List<J.Annotation> withNewlines(List<J.Annotation> annotations) {
         if (annotations.isEmpty()) {
             return annotations;

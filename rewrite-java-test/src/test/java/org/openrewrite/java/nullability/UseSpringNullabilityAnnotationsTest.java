@@ -17,13 +17,9 @@ package org.openrewrite.java.nullability;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
-import org.openrewrite.internal.lang.NonNullApi;
-import org.openrewrite.internal.lang.NonNullFields;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-
-import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -46,7 +42,6 @@ class UseSpringNullabilityAnnotationsTest implements RewriteTest {
                 @Nonnull
                 String variable = "";
             }
-
             """,
           """
             package org.openrewrite.java;
@@ -76,7 +71,7 @@ class UseSpringNullabilityAnnotationsTest implements RewriteTest {
           """
             package org.openrewrite.java;
                               
-            import org.openrewrite.internal.lang.Nullable;
+            import org.springframework.lang.Nullable;
 
             class Test {
                 @Nullable
@@ -86,23 +81,13 @@ class UseSpringNullabilityAnnotationsTest implements RewriteTest {
     }
 
     @Test
-    void replaceJavaxWithSpringAnnotationsNonNullClass() {
+    void shouldNotReplaceJavaxWithSpringAnnotationsNonNullClass() {
         rewriteRun(java("""
           package org.openrewrite.java;
 
           import javax.annotation.Nonnull;
 
           @Nonnull
-          class Test {
-          }
-          """, """
-          package org.openrewrite.java;
-
-          import org.springframework.lang.NonNullApi;
-          import org.springframework.lang.NonNullFields;
-          
-          @NonNullApi
-          @NonNullFields
           class Test {
           }
           """
