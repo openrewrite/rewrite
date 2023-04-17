@@ -27,33 +27,30 @@ class UseOpenRewriteNullabilityAnnotationsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.parser(JavaParser.fromJavaVersion().classpath("rewrite-core", "jsr305"))
-          .recipe(Environment.builder().scanRuntimeClasspath("org.openrewrite.java").build().activateRecipes("org.openrewrite.java.nullability.UseOpenRewriteNullabilityAnnotations"));
+        spec.parser(JavaParser.fromJavaVersion().classpath("rewrite-core", "jsr305")).recipe(Environment.builder().scanRuntimeClasspath("org.openrewrite.java").build().activateRecipes("org.openrewrite.java.nullability.UseOpenRewriteNullabilityAnnotations"));
     }
 
     @Test
     void replaceJavaxWithOpenRewriteAnnotationsNonNull() {
         rewriteRun(java("""
-            package org.openrewrite.java;
-                              
-            import javax.annotation.Nonnull;
+          package org.openrewrite.java;
+                            
+          import javax.annotation.Nonnull;
 
-            class Test {
-                @Nonnull
-                String variable = "";
-            }
+          class Test {
+              @Nonnull
+              String variable = "";
+          }
+          """, """
+          package org.openrewrite.java;
 
-            """,
-          """
-            package org.openrewrite.java;
+          import org.openrewrite.internal.lang.NonNull;
 
-            import org.openrewrite.internal.lang.NonNull;
-
-            class Test {
-                @NonNull
-                String variable = "";
-            }
-            """));
+          class Test {
+              @NonNull
+              String variable = "";
+          }
+          """));
     }
 
     @Test
@@ -79,6 +76,27 @@ class UseOpenRewriteNullabilityAnnotationsTest implements RewriteTest {
                 String variable;
             }
             """));
+    }
+
+    @Test
+    void replaceJavaxWithOpenRewriteAnnotationNonNullClass() {
+        rewriteRun(java("""
+          package org.openrewrite.java;
+
+          import javax.annotation.Nonnull;
+
+          @Nonnull
+          class Test {
+          }
+          """, """
+          package org.openrewrite.java;
+
+          import org.openrewrite.internal.lang.NonNull;
+
+          @NonNull
+          class Test {
+          }
+          """));
     }
 
     @Test

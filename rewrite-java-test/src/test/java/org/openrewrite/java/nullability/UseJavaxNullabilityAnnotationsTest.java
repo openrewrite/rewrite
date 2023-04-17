@@ -34,50 +34,50 @@ class UseJavaxNullabilityAnnotationsTest implements RewriteTest {
     @Test
     void replaceOpenRewriteWithJavaxAnnotationsNonNull() {
         rewriteRun(java("""
-                        package org.openrewrite.java;
+            package org.openrewrite.java;
 
-                        import org.openrewrite.internal.lang.NonNull;
+            import org.openrewrite.internal.lang.NonNull;
 
-                        class Test {
-                            @NonNull
-                            String variable = "";
-                        }
-                        """,
+            class Test {
+                @NonNull
+                String variable = "";
+            }
+            """,
 
           """
-                  package org.openrewrite.java;
-                  
-                  import javax.annotation.Nonnull;
+            package org.openrewrite.java;
+                              
+            import javax.annotation.Nonnull;
 
-                  class Test {
-                      @Nonnull
-                      String variable = "";
-                  }
-                  """));
+            class Test {
+                @Nonnull
+                String variable = "";
+            }
+            """));
     }
 
     @Test
     void replaceOpenRewriteWithJavaxAnnotationsNullable() {
         rewriteRun(java("""
-                        package org.openrewrite.java;
+            package org.openrewrite.java;
 
-                        import org.openrewrite.internal.lang.Nullable;
+            import org.openrewrite.internal.lang.Nullable;
 
-                        class Test {
-                            @Nullable
-                            String variable;
-                        }
-                        """,
+            class Test {
+                @Nullable
+                String variable;
+            }
+            """,
 
           """
-                  package org.openrewrite.java;
-                  
-                  import javax.annotation.Nullable;
+            package org.openrewrite.java;
+                              
+            import javax.annotation.Nullable;
 
-                  class Test {
-                      @Nullable
-                      String variable;
-                  }
-                  """));
+            class Test {
+                @Nullable
+                String variable;
+            }
+            """));
     }
 }
