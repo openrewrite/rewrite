@@ -20,6 +20,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.cleanup.ShortenFullyQualifiedTypeReferences;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -48,6 +49,9 @@ public class StandardizeNullabilityAnnotations extends Recipe {
     public StandardizeNullabilityAnnotations(List<String> nullabilityAnnotationsFqn, @Nullable Set<NullabilityAnnotation> additionalNullabilityAnnotations) {
         this.nullabilityAnnotationsFqn = nullabilityAnnotationsFqn;
         this.additionalNullabilityAnnotations = additionalNullabilityAnnotations != null ? additionalNullabilityAnnotations : new HashSet<>();
+        // During replacement we insert annotation using their fully qualified name
+        // To cleanup whereever possible afterwards we chain this recipe
+        doNext(new ShortenFullyQualifiedTypeReferences());
     }
 
     @Override
