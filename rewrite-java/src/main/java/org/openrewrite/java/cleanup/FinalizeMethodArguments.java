@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.Empty;
@@ -71,9 +72,8 @@ public class FinalizeMethodArguments extends Recipe {
                     return declarations;
                 }
 
-                List<Statement> list = new ArrayList<>();
-                declarations.getParameters().forEach(p -> updateFields(list, p));
-                declarations = declarations.withParameters(list);
+                List<Statement> parameters = ListUtils.map(declarations.getParameters(), p -> updateParam(p));
+                declarations = declarations.withParameters(parameters);
                 return declarations;
             }
 
@@ -144,36 +144,34 @@ public class FinalizeMethodArguments extends Recipe {
         }
     }
 
-    private static void updateFields(final List<Statement> list, final Statement p) {
+    private static Statement updateParam(final Statement p) {
         if (p instanceof VariableDeclarations) {
             VariableDeclarations variableDeclarations = (VariableDeclarations) p;
             if (variableDeclarations.getModifiers().isEmpty()) {
                 variableDeclarations = updateModifiers(variableDeclarations, !((VariableDeclarations) p).getLeadingAnnotations().isEmpty());
                 variableDeclarations = updateDeclarations(variableDeclarations);
-                list.add(variableDeclarations);
+                return variableDeclarations;
             }
         }
+        return p;
     }
 
     private static VariableDeclarations updateDeclarations(final VariableDeclarations variableDeclarations) {
-        return variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression() != null ? variableDeclarations.getTypeExpression().withPrefix(Space.build(" ", emptyList())) : null);
+        return variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression() != null ?
+            variableDeclarations.getTypeExpression().withPrefix(Space.SINGLE_SPACE) : null);
     }
 
     private static VariableDeclarations updateModifiers(final VariableDeclarations variableDeclarations, final boolean leadingAnnotations) {
-        if (leadingAnnotations) {
-            return variableDeclarations.withModifiers(Collections.singletonList(new Modifier(Tree.randomId(),
-                Space.build("",
-                    emptyList()),
-                Markers.EMPTY,
-                Type.Final,
-                emptyList()).withPrefix(Space.build(" ", emptyList()))));
-        }
-        return variableDeclarations.withModifiers(Collections.singletonList(new Modifier(Tree.randomId(),
-            Space.build("",
-                emptyList()),
+        List<Modifier> modifiers = variableDeclarations.getModifiers();
+        Modifier finalModifier = new Modifier(Tree.randomId(),
+            Space.EMPTY,
             Markers.EMPTY,
             Type.Final,
-            emptyList())));
+            emptyList());
+        if (leadingAnnotations) {
+            finalModifier = finalModifier.withPrefix(Space.SINGLE_SPACE);
+        }
+        return variableDeclarations.withModifiers(ListUtils.concat(finalModifier, modifiers));
     }
 
     private boolean hasFinalModifiers(final List<Statement> parameters) {

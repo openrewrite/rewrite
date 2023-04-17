@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,6 +27,29 @@ class FinalizeMethodArgumentsTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FinalizeMethodArguments());
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3133")
+    @Test
+    void twoParameters() {
+        rewriteRun(
+          java(
+            """
+              class Foo {
+                int test(final int a, int b) {
+                    return a + b;
+                }
+              }
+              """,
+            """
+              class Foo {
+                int test(final int a, final int b) {
+                    return a + b;
+                }
+              }
+              """
+          )
+        );
     }
 
     @Test
