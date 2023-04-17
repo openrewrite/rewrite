@@ -20,6 +20,12 @@ repositories {
     }
 }
 
+//val rewriteVersion = rewriteRecipe.rewriteVersion.get()
+val rewriteVersion = if(project.hasProperty("releasing")) {
+    "latest.release"
+} else {
+    "latest.integration"
+}
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-groovy")) {
@@ -29,7 +35,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
-    implementation("org.openrewrite.gradle.tooling:model:latest.release")
+    implementation("org.openrewrite.gradle.tooling:model:$rewriteVersion")
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())

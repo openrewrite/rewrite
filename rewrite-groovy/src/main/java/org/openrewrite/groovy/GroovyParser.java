@@ -253,12 +253,12 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
             return this;
         }
 
-        public Builder classpath(Collection<Path> classpath) {
+        public Builder classpath(@Nullable Collection<Path> classpath) {
             this.classpath = classpath;
             return this;
         }
 
-        public Builder classpath(String... classpath) {
+        public Builder classpath(@Nullable String... classpath) {
             this.classpath = JavaParser.dependenciesFromClasspath(classpath);
             return this;
         }
