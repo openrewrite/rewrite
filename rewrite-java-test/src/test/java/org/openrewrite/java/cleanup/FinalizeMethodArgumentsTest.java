@@ -52,6 +52,20 @@ class FinalizeMethodArgumentsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3135")
+    @Test
+    void ignoreAbstractMethod() {
+        rewriteRun(
+          java(
+            """
+              class Foo {
+              abstract void bar(String a);
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void doNotAddFinalIfAssigned() {
         rewriteRun(

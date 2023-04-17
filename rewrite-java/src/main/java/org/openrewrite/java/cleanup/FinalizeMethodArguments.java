@@ -61,7 +61,10 @@ public class FinalizeMethodArguments extends Recipe {
             public MethodDeclaration visitMethodDeclaration(MethodDeclaration methodDeclaration, ExecutionContext executionContext) {
                 MethodDeclaration declarations = super.visitMethodDeclaration(methodDeclaration, executionContext);
 
-                if (isWrongKind(methodDeclaration) || isEmpty(declarations.getParameters()) || hasFinalModifiers(declarations.getParameters())) {
+                if (isWrongKind(methodDeclaration) ||
+                    isEmpty(declarations.getParameters()) ||
+                    hasFinalModifiers(declarations.getParameters()) ||
+                    isAbstractMethod(methodDeclaration)) {
                     return declarations;
                 }
 
@@ -99,12 +102,16 @@ public class FinalizeMethodArguments extends Recipe {
         };
     }
 
-    private boolean isWrongKind(final MethodDeclaration methodDeclaration) {
+    private static boolean isWrongKind(final MethodDeclaration methodDeclaration) {
         return Optional.ofNullable(methodDeclaration.getMethodType())
             .map(Method::getDeclaringType)
             .map(FullyQualified::getKind)
             .filter(Kind.Interface::equals)
             .isPresent();
+    }
+
+    private static boolean isAbstractMethod(MethodDeclaration method) {
+        return method.getModifiers().stream().anyMatch(modifier -> modifier.getType() == Type.Abstract);
     }
 
     @Value
