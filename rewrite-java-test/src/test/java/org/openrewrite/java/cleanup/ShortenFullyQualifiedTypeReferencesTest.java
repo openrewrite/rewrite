@@ -50,6 +50,26 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
+    void nestedTypeReference() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  java.util.Map.Entry<String, String> mapEntry;
+              }
+              """,
+            """
+              import java.util.Map;
+              
+              class T {
+                  Map.Entry<String, String> mapEntry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void withinStaticFieldAccess() {
         rewriteRun(
           java(
