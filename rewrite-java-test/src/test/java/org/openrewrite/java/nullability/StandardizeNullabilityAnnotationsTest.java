@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.nullability;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.NonNullApi;
