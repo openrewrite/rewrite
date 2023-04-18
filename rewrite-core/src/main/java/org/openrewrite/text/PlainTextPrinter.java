@@ -18,6 +18,7 @@ package org.openrewrite.text;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
 
@@ -27,17 +28,33 @@ public class PlainTextPrinter<P> extends PlainTextVisitor<PrintOutputCapture<P>>
 
     @Override
     public PlainText visitText(PlainText text, PrintOutputCapture<P> p) {
-        for (Marker marker : text.getMarkers().getMarkers()) {
-            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
-        }
-        visitMarkers(text.getMarkers(), p);
-        for (Marker marker : text.getMarkers().getMarkers()) {
-            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
-        }
-        p.append(text.getText());
-        for (Marker marker : text.getMarkers().getMarkers()) {
-            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+        visitMarkableText(text.getMarkers(), text.getText(), p);
+        for (PlainText.Snippet snippet : text.getSnippets()) {
+            setCursor(new Cursor(getCursor(), snippet));
+            visitSnippet(snippet, p);
+            setCursor(getCursor().getParent());
         }
         return text;
+    }
+
+    @Override
+    public PlainText.Snippet visitSnippet(PlainText.Snippet text, PrintOutputCapture<P> p) {
+        visitMarkableText(text.getMarkers(), text.getText(), p);
+        return text;
+    }
+
+    private void visitMarkableText(Markers markers, String text, PrintOutputCapture<P> p) {
+        //noinspection DuplicatedCode
+        for (Marker marker : markers.getMarkers()) {
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+        }
+        visitMarkers(markers, p);
+        for (Marker marker : markers.getMarkers()) {
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+        }
+        p.append(text);
+        for (Marker marker : markers.getMarkers()) {
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), TEXT_MARKER_WRAPPER));
+        }
     }
 }

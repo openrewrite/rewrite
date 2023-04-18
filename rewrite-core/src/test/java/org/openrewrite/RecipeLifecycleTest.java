@@ -39,7 +39,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.Recipe.NOOP;
 import static org.openrewrite.Recipe.noop;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -125,7 +124,7 @@ class RecipeLifecycleTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .recipe(toRecipe()
-              .withVisit((before, ctx) -> ListUtils.concat(before, new PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test")))
+              .withVisit((before, ctx) -> ListUtils.concat(before, PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
               .withName("test.GeneratingRecipe")
             )
             .afterRecipe(run -> assertThat(run.getResults().stream()
@@ -153,7 +152,7 @@ class RecipeLifecycleTest implements RewriteTest {
             protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
                 return Collections.emptyList();
             }
-        }.run(List.of(new PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test"))).getResults();
+        }.run(List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build())).getResults();
 
         assertThat(results.stream().map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
           .containsExactly("test.DeletingRecipe");
@@ -465,7 +464,7 @@ class RecipeLifecycleTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/389")
     @Test
     void sourceFilesAcceptOnlyApplicableVisitors() {
-        var sources = List.of(new FooSource(), new PlainText(randomId(), Paths.get("test.txt"), Markers.build(List.of()), null, false, null, null, "Hello"));
+        var sources = List.of(new FooSource(), PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build());
         var fooVisitor = new FooVisitor<ExecutionContext>();
         var textVisitor = new PlainTextVisitor<ExecutionContext>();
         var ctx = new InMemoryExecutionContext();

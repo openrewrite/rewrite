@@ -17,7 +17,6 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 
@@ -27,7 +26,6 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -90,7 +88,12 @@ class EnvironmentTest implements RewriteTest {
         var recipe = env.activateRecipes("test.ChangeTextToHello");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
-        var results = recipe.run(List.of(new PlainText(Tree.randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "hello"))).getResults();
+        var results = recipe.run(List.of(
+            PlainText.builder()
+              .sourcePath(Paths.get("test.txt"))
+              .text("hello")
+              .build()))
+          .getResults();
         assertThat(results).hasSize(1);
     }
 
@@ -150,7 +153,12 @@ class EnvironmentTest implements RewriteTest {
         var recipe = env.activateRecipes("test.TextMigration");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
-        var results = recipe.run(List.of(new PlainText(Tree.randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "hello"))).getResults();
+        var results = recipe.run(List.of(
+            PlainText.builder()
+              .sourcePath(Paths.get("test.txt"))
+              .text("hello")
+              .build()))
+          .getResults();
         assertThat(results).hasSize(1);
     }
 
@@ -193,7 +201,12 @@ class EnvironmentTest implements RewriteTest {
         var recipe = env.activateRecipes("test.TextMigration");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
-        var results = recipe.run(List.of(new PlainText(Tree.randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "hello"))).getResults();
+        var results = recipe.run(List.of(
+            PlainText.builder()
+              .sourcePath(Paths.get("test.txt"))
+              .text("hello")
+              .build()))
+          .getResults();
         assertThat(results).hasSize(1);
     }
 

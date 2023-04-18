@@ -84,6 +84,7 @@ public final class ListUtils {
      * @return A new list with the element inserted at the specified position.
      */
     public static <T> List<T> insert(@Nullable List<T> ls, @Nullable T t, int index) {
+        //noinspection DuplicatedCode
         if (ls == null && t == null) {
             return emptyList();
         } else if (t == null) {
@@ -233,6 +234,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
+        //noinspection DuplicatedCode
         if (t == null && ls == null) {
             return emptyList();
         } else if (t == null) {

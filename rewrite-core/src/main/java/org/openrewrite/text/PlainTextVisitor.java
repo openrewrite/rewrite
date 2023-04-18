@@ -15,8 +15,10 @@
  */
 package org.openrewrite.text;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 
 public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
 
@@ -26,6 +28,17 @@ public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
     }
 
     public PlainText visitText(PlainText text, P p) {
-        return text.withMarkers(visitMarkers(text.getMarkers(), p));
+        PlainText t = text.withMarkers(visitMarkers(text.getMarkers(), p));
+        t = t.withSnippets(ListUtils.map(t.getSnippets(), snippet -> {
+            setCursor(new Cursor(getCursor(), snippet));
+            PlainText.Snippet s = visitSnippet(snippet, p);
+            setCursor(getCursor().getParent());
+            return s;
+        }));
+        return t;
+    }
+
+    public PlainText.Snippet visitSnippet(PlainText.Snippet snippet, P p) {
+        return snippet.withMarkers(visitMarkers(snippet.getMarkers(), p));
     }
 }

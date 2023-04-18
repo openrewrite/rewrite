@@ -72,7 +72,8 @@ public class PlainTextParser implements Parser<PlainText> {
                         is.isCharsetBomMarked(),
                         source.getFileAttributes(),
                         null,
-                        sourceStr);
+                        sourceStr,
+                        null);
                 plainTexts.add(plainText);
                 parsingListener.parsed(source, plainText);
             } catch (Throwable t) {
