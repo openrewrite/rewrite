@@ -93,6 +93,10 @@ public class UseDiamondOperator extends Recipe {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+            if (isAParameter()) {
+                return method;
+            }
+
             J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
             JavaType.Method methodType = mi.getMethodType();
             if (methodType != null) {
@@ -170,6 +174,13 @@ public class UseDiamondOperator extends Recipe {
                 }
             }
             return newClass;
+        }
+
+        private boolean isAParameter() {
+            return getCursor().dropParentUntil(p -> p instanceof J.MethodInvocation ||
+                                                    p instanceof J.ClassDeclaration ||
+                                                    p instanceof J.CompilationUnit ||
+                                                    p instanceof J.Block).getValue() instanceof J.MethodInvocation;
         }
     }
 }

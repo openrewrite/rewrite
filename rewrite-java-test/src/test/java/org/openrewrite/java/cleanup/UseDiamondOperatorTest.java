@@ -320,4 +320,49 @@ class UseDiamondOperatorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotChangeIfAsParam() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.BiFunction;
+              import java.util.function.Consumer;
+
+              public class Observable<T> {
+
+                  public static <T> Observable<T> from(Iterable<? extends T> iterable) {
+                      return new Observable();
+                  }
+
+                  public final <R> Observable<R> reduce(R initialValue, BiFunction<R, ? super T, R> accumulator) {
+                      return new Observable();
+                  }
+
+                  void subscribe(Consumer<? super T> onNext) {
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.ArrayList;
+              import java.util.List;
+
+              class A {
+                  void print(List<String> strs) {
+                  }
+
+                  void method() {
+                      List<String> regions = new ArrayList<>();
+                      Observable.from(regions)
+                          .reduce(new ArrayList<String>(), (list, t) -> list)
+                          .subscribe(result -> print(result)
+                      );
+                  }
+              }
+              """
+          )
+        );
+    }
 }
