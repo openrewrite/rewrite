@@ -16,10 +16,14 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     @Override
@@ -63,6 +67,30 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               
               class T {
                   Map.Entry<String, String> mapEntry;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void conflictingTypeInSamePackage() {
+        rewriteRun(
+          java(
+            """
+              package a;
+
+              class String {
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              class T {
+                  String s1;
+                  java.lang.String s2;
               }
               """
           )
@@ -154,6 +182,40 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
+    void visitSubtreeOnly() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              @SuppressWarnings("DataFlowIssue")
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("m1")) {
+                      return (J.MethodDeclaration) new ShortenFullyQualifiedTypeReferences().getVisitor().visit(method, ctx);
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          java(
+            """
+              class T {
+                  void m1(java.util.List<String> list) {
+                  }
+                  void m2(java.util.List<String> list) {
+                  }
+              }
+              """,
+            """
+              class T {
+                  void m1(List<String> list) {
+                  }
+                  void m2(java.util.List<String> list) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void conflictWithLocalType() {
         rewriteRun(
           java(
@@ -176,6 +238,39 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               import java.awt.List;
               class T {
                   java.util.List<String> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void conflictGenericVariable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class T<String> {
+                  java.lang.String s;
+                  List<String> list;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("TypeParameterHidesVisibleType")
+    void conflictGenericVariableOnMethod() {
+        rewriteRun(
+          java(
+            """
+              import java.util.List;
+
+              class T {
+                  <String> void m(java.lang.String s, List<String> list) {
+                  }
               }
               """
           )

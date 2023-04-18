@@ -15,21 +15,17 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 
@@ -53,48 +49,68 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-            final Set<String> localTypes = new HashSet<>();
-            final Map<String, JavaType> importedTypes = new HashMap<>();
-            final Map<String, JavaType> staticallyImportedMembers = new HashMap<>();
+            final Map<String, JavaType> usedTypes = new HashMap<>();
 
-            @Override
-            public @Nullable J visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
-                if (sourceFile instanceof J.CompilationUnit) {
-                    J.CompilationUnit cu = (J.CompilationUnit) sourceFile;
-                    JavaIsoVisitor<Set<String>> typeCollector = new JavaIsoVisitor<Set<String>>() {
+            private void ensureInitialized() {
+                if (!usedTypes.isEmpty()) {
+                    return;
+                }
+                SourceFile sourceFile = getCursor().firstEnclosing(SourceFile.class);
+                if (sourceFile instanceof JavaSourceFile) {
+                    JavaIsoVisitor<Map<String, JavaType>> typeCollector = new JavaIsoVisitor<Map<String, JavaType>>() {
                         @Override
-                        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Set<String> types) {
-                            types.add(classDecl.getSimpleName());
-                            return super.visitClassDeclaration(classDecl, types);
+                        public J.Import visitImport(J.Import impoort, Map<String, JavaType> types) {
+                            if (!impoort.isStatic() && isWellFormedType(impoort.getQualid().getType())) {
+                                types.put(impoort.getQualid().getSimpleName(), impoort.getQualid().getType());
+                            }
+                            return impoort;
+                        }
+
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Map<String, JavaType> types) {
+                            return fieldAccess;
+                        }
+
+                        @Override
+                        public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, Map<String, JavaType> types) {
+                            // using `null` since we don't have access to the type here
+                            types.put(((J.Identifier) typeParam.getName()).getSimpleName(), null);
+                            return typeParam;
+                        }
+
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Map<String, JavaType> types) {
+                            JavaType type = identifier.getType();
+                            if (type instanceof JavaType.FullyQualified && identifier.getFieldType() == null) {
+                                types.put(identifier.getSimpleName(), type);
+                            }
+                            return identifier;
                         }
                     };
-                    typeCollector.visit(cu, localTypes);
+                    typeCollector.visit(sourceFile, usedTypes);
                 }
-                return super.visitSourceFile(sourceFile, ctx);
             }
 
             @Override
             public J visitImport(J.Import impoort, ExecutionContext ctx) {
-                if (impoort.isStatic() && isWellFormedType(impoort.getQualid().getType())) {
-                    staticallyImportedMembers.put(impoort.getQualid().getSimpleName(), impoort.getQualid().getType());
-                } else if (!impoort.isStatic() && isWellFormedType(impoort.getQualid().getType())) {
-                    importedTypes.put(impoort.getQualid().getSimpleName(), impoort.getQualid().getType());
-                }
+                // stop recursion
                 return impoort;
             }
 
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                ensureInitialized();
+
                 JavaType type = fieldAccess.getType();
                 if (type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null) {
                     String simpleName = fieldAccess.getSimpleName();
-                    if (type.equals(importedTypes.get(simpleName))) {
+                    if (type.equals(usedTypes.get(simpleName))) {
                         return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
-                    } else if (!importedTypes.containsKey(simpleName) && !localTypes.contains(simpleName)) {
+                    } else if (!usedTypes.containsKey(simpleName)) {
                         maybeAddImport(((JavaType.FullyQualified) type).getFullyQualifiedName());
-                        importedTypes.put(simpleName, type);
+                        usedTypes.put(simpleName, type);
                         return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
                     }
                 }
