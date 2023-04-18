@@ -54,6 +54,35 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
+    void appendToSequenceOfSingleQuotedValuesHasDashTrue() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "strawberry",
+              List.of("apple", "blueberry"),
+              "true",
+              null
+            )),
+          yaml(
+            """
+                  things:
+                    fruit:
+                      - 'apple'
+                      - 'blueberry'
+              """,
+            """
+                  things:
+                    fruit:
+                      - 'apple'
+                      - 'blueberry'
+                      - 'strawberry'
+              """
+          )
+        );
+    }
+
+    @Test
     void appendToSequenceWhenExistingSequenceValuesMatchInExactOrder() {
         rewriteRun(
           spec -> spec
