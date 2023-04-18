@@ -28,22 +28,14 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Target;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
 
 class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionContext> {
-
-    private static final Logger logger = LoggerFactory.getLogger(StandardizeNullabilityAnnotationsVisitor.class);
 
     private static final String NULLABILITY_ANNOTATION_MARKER = "nullabilityAnnotations";
 
