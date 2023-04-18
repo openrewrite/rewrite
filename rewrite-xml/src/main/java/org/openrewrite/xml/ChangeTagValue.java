@@ -30,7 +30,7 @@ import org.openrewrite.xml.tree.Xml;
 public class ChangeTagValue extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Change XML Tag Value";
+        return "Change XML tag value";
     }
 
     @Override
