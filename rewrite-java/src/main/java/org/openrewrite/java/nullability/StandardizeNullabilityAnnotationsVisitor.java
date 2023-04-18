@@ -17,6 +17,7 @@ package org.openrewrite.java.nullability;
 
 import lombok.AllArgsConstructor;
 import lombok.Value;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -27,14 +28,22 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 
 class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+    private static final Logger logger = LoggerFactory.getLogger(StandardizeNullabilityAnnotationsVisitor.class);
 
     private static final String NULLABILITY_ANNOTATION_MARKER = "nullabilityAnnotations";
 
@@ -68,8 +77,17 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return annotatedType;
         }
-        // TODO verify type is the right choice for annotated types
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.TYPE, matchedNullabilityAnnotations);
+        Set<NullabilityAnnotation.Target> targetTypes = new HashSet<>();
+        targetTypes.add(NullabilityAnnotation.Target.TYPE_USE);
+        Cursor parentScopeCursor = getCursor().dropParentUntil(o -> o instanceof J.ClassDeclaration || o instanceof J.MethodDeclaration || Cursor.ROOT_VALUE.equals(o));
+        if (Cursor.ROOT_VALUE.equals(parentScopeCursor.getValue())) {
+            targetTypes.add(NullabilityAnnotation.Target.LOCAL_FIELD);
+        } else if (parentScopeCursor.getValue() instanceof J.MethodDeclaration) {
+            targetTypes.add(NullabilityAnnotation.Target.PARAMETER);
+        } else if (parentScopeCursor.getValue() instanceof J.ClassDeclaration) {
+            targetTypes.add(NullabilityAnnotation.Target.FIELD);
+        }
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, targetTypes);
         if (annotationsForReplacement.isEmpty()) {
             return annotatedType;
         }
@@ -101,7 +119,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return classDeclaration;
         }
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.TYPE, matchedNullabilityAnnotations);
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, Stream.of(NullabilityAnnotation.Target.TYPE, NullabilityAnnotation.Target.TYPE_USE).collect(Collectors.toSet()));
         if (annotationsForReplacement.isEmpty()) {
             return classDeclaration;
         }
@@ -129,7 +147,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return methodDeclaration;
         }
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.METHOD, matchedNullabilityAnnotations);
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, Stream.of(NullabilityAnnotation.Target.METHOD, NullabilityAnnotation.Target.TYPE_USE).collect(Collectors.toSet()));
         if (annotationsForReplacement.isEmpty()) {
             return methodDeclaration;
         }
@@ -157,7 +175,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return jPackage;
         }
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.PACKAGE, matchedNullabilityAnnotations);
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, Stream.of(NullabilityAnnotation.Target.PACKAGE).collect(Collectors.toSet()));
         if (annotationsForReplacement.isEmpty()) {
             return jPackage;
         }
@@ -185,8 +203,17 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return variableDeclarations;
         }
-        // TODO Target Type should not be method, rather FIELD, LOCAL_VARIABLE or PARAMETER depending on parent's scope
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(ElementType.METHOD, matchedNullabilityAnnotations);
+        Set<NullabilityAnnotation.Target> targetTypes = new HashSet<>();
+        targetTypes.add(NullabilityAnnotation.Target.TYPE_USE);
+        Cursor parentScopeCursor = getCursor().dropParentUntil(o -> o instanceof J.ClassDeclaration || o instanceof J.MethodDeclaration || Cursor.ROOT_VALUE.equals(o));
+        if (Cursor.ROOT_VALUE.equals(parentScopeCursor.getValue())) {
+            targetTypes.add(NullabilityAnnotation.Target.LOCAL_FIELD);
+        } else if (parentScopeCursor.getValue() instanceof J.MethodDeclaration) {
+            targetTypes.add(NullabilityAnnotation.Target.PARAMETER);
+        } else if (parentScopeCursor.getValue() instanceof J.ClassDeclaration) {
+            targetTypes.add(NullabilityAnnotation.Target.FIELD);
+        }
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, targetTypes);
         if (annotationsForReplacement.isEmpty()) {
             return variableDeclarations;
         }
@@ -207,7 +234,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         );
     }
 
-    private List<NullabilityAnnotation> getAnnotationsForReplacement(ElementType targetType, Set<MatchedNullabilityAnnotation> matchedNullabilityAnnotations) {
+    private List<NullabilityAnnotation> getAnnotationsForReplacement(Set<MatchedNullabilityAnnotation> matchedNullabilityAnnotations, Set<NullabilityAnnotation.Target> possibleTargetTypes) {
         Set<NullabilityAnnotation> usedNullabilityAnnotations = matchedNullabilityAnnotations.stream().map(MatchedNullabilityAnnotation::getNullabilityAnnotation).collect(Collectors.toSet());
         Set<NullabilityAnnotation.Nullability> matchedNullabilities = usedNullabilityAnnotations.stream().map(NullabilityAnnotation::getNullability).collect(Collectors.toSet());
         if (matchedNullabilities.isEmpty()) {
@@ -234,7 +261,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return emptyList();
         }
 
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(nullability, targetType, scopesToCover);
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(nullability, possibleTargetTypes, scopesToCover);
         if (annotationsForReplacement.isEmpty()) {
             // We were not able to find a good replacement.
 
@@ -252,8 +279,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         return annotationsForReplacement;
     }
 
-    private List<NullabilityAnnotation> getAnnotationsForReplacement(NullabilityAnnotation.Nullability nullability, ElementType targetType, Set<NullabilityAnnotation.Scope> scopesToCover) {
-        List<NullabilityAnnotation> usableNullabilityAnnotations = getNullabilityAnnotationsForTarget(nullability, targetType);
+    private List<NullabilityAnnotation> getAnnotationsForReplacement(NullabilityAnnotation.Nullability nullability, Set<NullabilityAnnotation.Target> targetTypes, Set<NullabilityAnnotation.Scope> scopesToCover) {
+        List<NullabilityAnnotation> usableNullabilityAnnotations = getNullabilityAnnotationsForTargets(nullability, targetTypes);
         Optional<NullabilityAnnotation> singleAnnotation = usableNullabilityAnnotations
                 .stream()
                 .filter(a -> Objects.equals(scopesToCover, a.getScopes()))
@@ -277,11 +304,11 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
                 : emptyList();
     }
 
-    private List<NullabilityAnnotation> getNullabilityAnnotationsForTarget(NullabilityAnnotation.Nullability nullability, ElementType target) {
+    private List<NullabilityAnnotation> getNullabilityAnnotationsForTargets(NullabilityAnnotation.Nullability nullability, Set<NullabilityAnnotation.Target> targets) {
         return nullabilityAnnotations
                 .stream()
                 .filter(a -> a.getNullability() == nullability)
-                .filter(a -> a.getTargets().contains(target))
+                .filter(a -> a.getTargets().stream().anyMatch(targets::contains))
                 .collect(Collectors.toList());
     }
 

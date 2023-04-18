@@ -28,6 +28,17 @@ public interface NullabilityAnnotation {
         UNKNOWN;
     }
 
+    enum Target {
+        TYPE,
+        PACKAGE,
+        MODULE,
+        TYPE_USE,
+        METHOD,
+        PARAMETER,
+        FIELD,
+        LOCAL_FIELD;
+    }
+
     enum Scope {
         FIELD,
         METHOD,
@@ -52,7 +63,7 @@ public interface NullabilityAnnotation {
      * Defines on what elements this nullability annotation ca be used.
      * @see ElementType
      */
-    Set<ElementType> getTargets();
+    Set<Target> getTargets();
 
     /**
      * Defines on what elements this nullability annotation applies.
