@@ -61,7 +61,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
             final List<String> values = seq.getEntries()
                                                 .stream()
                                                 .map(entry -> entry.getBlock())
-                                                .map(block -> block.printTrimmed(cursor))
+                                                .map(block -> convertBlockToString(block, cursor))
                                                 .collect(Collectors.toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
                 List<String> sorted = new ArrayList<String>(this.existingSequenceValues);
@@ -71,6 +71,15 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
             } else {
                 return (values.equals(this.existingSequenceValues));
             }
+        }
+    }
+
+    private String convertBlockToString(Yaml.Block block, Cursor cursor) {
+        if (block instanceof Yaml.Scalar) {
+           return ((Yaml.Scalar) block).getValue();
+        }
+        else {
+            return block.printTrimmed(cursor);
         }
     }
 
