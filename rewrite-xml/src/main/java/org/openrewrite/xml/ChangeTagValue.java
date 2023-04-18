@@ -30,16 +30,16 @@ import org.openrewrite.xml.tree.Xml;
 public class ChangeTagValue extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Change XML Tag Name";
+        return "Change XML Tag Value";
     }
 
     @Override
     public String getDescription() {
-        return "Alters the name of XML tags matching the provided expression.";
+        return "Alters the value of XML tags matching the provided expression.";
     }
 
     @Option(displayName = "Element name",
-            description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath Expression.",
+            description = "The name of the element whose value is to be changed. Interpreted as an XPath Expression.",
             example = "/settings/servers/server/username")
     String elementName;
 
