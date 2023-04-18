@@ -682,59 +682,19 @@ class FinalizePrivateFieldsTest implements RewriteTest {
         );
     }
 
+
     @Test
-    void innerClassFieldMadeFinal() {
+    void ignoreInnerClass() {
         rewriteRun(
           java(
             """
               class OuterClass {
-                  int a;
-
-                  class InnerClass {
-                      private int b = 1;
+                  void method() {
+                      new InnerStaticClass().innerPrivate = 2;
                   }
-              }
-              """,
-            """
-              class OuterClass {
-                  int a;
 
-                  class InnerClass {
-                      private final int b = 1;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void staticNestedClassFieldMadeFinal() {
-        rewriteRun(
-          java(
-            """
-              class OuterClass {
-                  int a;
-
-                  static class InnerClass {
-                      private int b = 1;
-
-                      int func() {
-                          return b;
-                      }
-                  }
-              }
-              """,
-            """
-              class OuterClass {
-                  int a;
-
-                  static class InnerClass {
-                      private final int b = 1;
-
-                      int func() {
-                          return b;
-                      }
+                  static class InnerStaticClass {
+                      private int innerPrivate = 1;
                   }
               }
               """

@@ -71,7 +71,7 @@ public class FinalizePrivateFields extends Recipe {
                 }
 
                 // skip if a class has multi constructor methods
-                if (getConstructorCount(classDecl) > 1) {
+                if (getConstructorCount(classDecl) > 1 || isInnerClass(classDecl)) {
                     return classDecl;
                 }
 
@@ -146,6 +146,10 @@ public class FinalizePrivateFields extends Recipe {
             .map(J.MethodDeclaration.class::cast)
             .filter(J.MethodDeclaration::isConstructor)
             .count();
+    }
+
+    private static boolean isInnerClass(J.ClassDeclaration classDecl) {
+        return classDecl.getType().getOwningClass() != null;
     }
 
     private static class CollectPrivateFieldsAssignmentCounts extends JavaIsoVisitor<Map<JavaType.Variable, Integer>> {
