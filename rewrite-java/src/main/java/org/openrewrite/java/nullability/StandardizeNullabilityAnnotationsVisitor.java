@@ -111,7 +111,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return classDeclaration;
         }
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, Stream.of(NullabilityAnnotation.Target.TYPE, NullabilityAnnotation.Target.TYPE_USE).collect(Collectors.toSet()));
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, EnumSet.of(NullabilityAnnotation.Target.TYPE, NullabilityAnnotation.Target.TYPE_USE));
         if (annotationsForReplacement.isEmpty()) {
             return classDeclaration;
         }
@@ -139,7 +139,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return methodDeclaration;
         }
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, Stream.of(NullabilityAnnotation.Target.METHOD, NullabilityAnnotation.Target.TYPE_USE).collect(Collectors.toSet()));
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, EnumSet.of(NullabilityAnnotation.Target.METHOD, NullabilityAnnotation.Target.TYPE_USE));
         if (annotationsForReplacement.isEmpty()) {
             return methodDeclaration;
         }
@@ -167,7 +167,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         if (matchedNullabilityAnnotations == null || matchedNullabilityAnnotations.isEmpty()) {
             return jPackage;
         }
-        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, Stream.of(NullabilityAnnotation.Target.PACKAGE).collect(Collectors.toSet()));
+        List<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(matchedNullabilityAnnotations, EnumSet.of(NullabilityAnnotation.Target.PACKAGE));
         if (annotationsForReplacement.isEmpty()) {
             return jPackage;
         }
