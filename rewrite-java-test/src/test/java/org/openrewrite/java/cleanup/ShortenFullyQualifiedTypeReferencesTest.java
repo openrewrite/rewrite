@@ -231,6 +231,22 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
+    void dontModifyThisReference() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  Object f;
+                  T() {
+                      this.f = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void conflictExistingImport() {
         rewriteRun(
           java(

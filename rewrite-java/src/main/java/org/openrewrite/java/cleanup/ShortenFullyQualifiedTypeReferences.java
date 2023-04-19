@@ -101,10 +101,10 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-                ensureInitialized();
-
                 JavaType type = fieldAccess.getType();
-                if (type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null) {
+                if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null) {
+                    ensureInitialized();
+
                     String simpleName = fieldAccess.getSimpleName();
                     if (type.equals(usedTypes.get(simpleName))) {
                         return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
