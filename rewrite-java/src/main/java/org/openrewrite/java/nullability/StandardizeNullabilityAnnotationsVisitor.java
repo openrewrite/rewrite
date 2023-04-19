@@ -232,11 +232,6 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
         }
         if (matchedNullabilities.size() > 1) {
             // different nullabilities on a single element, we better do nothing
-
-            // TODO log useful information
-            // Thought:
-            // Maybe we should transfer the logging to the caller
-            // as that code knows more about the element we failed at
             return new LinkedHashSet<>();
         }
 
@@ -252,12 +247,8 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
 
         LinkedHashSet<NullabilityAnnotation> annotationsForReplacement = getAnnotationsForReplacement(nullability, possibleTargetTypes, scopesToCover);
         if (annotationsForReplacement.isEmpty()) {
-            // We were not able to find a good replacement.
-
-            // TODO log useful information
-            // Thought:
-            // Maybe we should transfer the logging to the caller
-            // as that code knows more about the element we failed at.
+            // We were not able to find a good replacement
+            return new LinkedHashSet<>();
         }
         if (Objects.equals(usedNullabilityAnnotations, annotationsForReplacement)) {
             // Our replacement would not change used annotations.
