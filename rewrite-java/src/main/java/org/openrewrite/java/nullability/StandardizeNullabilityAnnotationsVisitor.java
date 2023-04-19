@@ -243,7 +243,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return emptyList();
         }
 
-        NullabilityAnnotation.Nullability nullability = matchedNullabilities.stream().findFirst().orElse(null);
+        NullabilityAnnotation.Nullability nullability = matchedNullabilities.stream().findFirst().get();
         Set<NullabilityAnnotation.Scope> scopesToCover = usedNullabilityAnnotations
                 .stream()
                 .map(NullabilityAnnotation::getScopes)
