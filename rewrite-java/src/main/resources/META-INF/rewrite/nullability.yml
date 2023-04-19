@@ -28,7 +28,7 @@ recipeList:
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.nullability.UseJakartaNullabilityAnnotations
-displayName: Use jakarte nullability annotations
+displayName: Use Jakarta nullability annotations
 description: Replaces other known nullability annotations by jakarta annotations where possible.
 tags:
   - nullability
