@@ -54,11 +54,7 @@ recipeList:
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.nullability.UseOpenRewriteNullabilityAnnotations
-<<<<<<< HEAD
-displayName: Use open rewrite nullability annotations
-=======
 displayName: Use OpenRewrite nullability annotations
->>>>>>> ab4f6ace8cf43e596750ad43a8df7bbd823a56a6
 description: Replaces other known nullability annotations by open rewrite annotations where possible.
 tags:
   - nullability
