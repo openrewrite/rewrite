@@ -31,9 +31,6 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static java.util.Collections.emptyList;
 
 class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionContext> {
 
@@ -243,7 +240,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
             return new LinkedHashSet<>();
         }
 
-        NullabilityAnnotation.Nullability nullability = matchedNullabilities.stream().findFirst().orElse(null);
+        NullabilityAnnotation.Nullability nullability = matchedNullabilities.stream().findFirst().get();
         Set<NullabilityAnnotation.Scope> scopesToCover = usedNullabilityAnnotations
                 .stream()
                 .map(NullabilityAnnotation::getScopes)
@@ -313,7 +310,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
     private JavaTemplate annotationTemplate(NullabilityAnnotation annotation) {
         return JavaTemplate.builder(this::getCursor, "@" + annotation.getFqn())
                 .imports(annotation.getFqn())
-                .javaParser(() -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build())
+                .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
                 .build();
     }
 
