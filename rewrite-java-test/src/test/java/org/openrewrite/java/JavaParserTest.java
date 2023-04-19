@@ -126,4 +126,25 @@ class JavaParserTest implements RewriteTest {
 
     }
 
+    @Test
+    void trialTest() {
+        String initialSource = """
+                
+                import java.io.Serializable;
+                public class A implements Serializable {
+                    class B {
+                    }
+                }
+                
+                """;
+
+        JavaParser parser = JavaParser.fromJavaVersion().build();
+        long start = System.currentTimeMillis();
+        List<J.CompilationUnit> cus = parser.parse(initialSource);
+        System.out.println("Rewrite parse took: " + (System.currentTimeMillis() - start));
+        J.CompilationUnit cu = cus.get(0);
+        assertThat(cu.printAll()).isEqualTo(initialSource);
+    }
+
+
 }

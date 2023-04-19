@@ -1,3 +1,7 @@
+plugins {
+    id("org.openrewrite.build.language-library")
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))

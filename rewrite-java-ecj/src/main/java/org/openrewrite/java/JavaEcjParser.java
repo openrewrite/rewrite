@@ -1,6 +1,22 @@
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -18,10 +34,13 @@ import org.eclipse.jdt.internal.compiler.env.ICompilationUnit;
 import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
 import org.eclipse.jdt.internal.compiler.problem.DefaultProblemFactory;
 import org.eclipse.jdt.internal.compiler.util.Util;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -69,7 +88,7 @@ public class JavaEcjParser implements JavaParser {
     // this.options.generateClassFiles
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sources, Path relativeTo) {
+    public List<J.CompilationUnit> parseInputs(Iterable<Input> sources, Path relativeTo, ExecutionContext ctx) {
         try {
             CompilerOptions compilerOptions = new CompilerOptions();
             compilerOptions.generateClassFiles = false;
@@ -109,6 +128,8 @@ public class JavaEcjParser implements JavaParser {
                     ))
                     .collect(Collectors.toCollection(Stack::new));
 
+            long start = System.currentTimeMillis();
+
             @SuppressWarnings("deprecation")
             Compiler compiler = new Compiler(
                     nameEnvironment,
@@ -128,17 +149,21 @@ public class JavaEcjParser implements JavaParser {
                 public void process(CompilationUnitDeclaration unit, int i) {
                     super.process(unit, i);
 
+                    logger.info("Batch compiler took: " + (System.currentTimeMillis() - start));
                     JavaEcjParserVisitor visitor = new JavaEcjParserVisitor(compilationUnitStack.pop());
                     cus.add(visitor.visit(unit));
+
+                    logger.info("Full Rewrite parse: " + (System.currentTimeMillis() - start));
+
                 }
             };
 
             compiler.compile(compilationUnitStack.toArray(new ICompilationUnit[0]));
+
+            return cus;
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
-
-        return null;
     }
 
 
@@ -146,6 +171,26 @@ public class JavaEcjParser implements JavaParser {
     @Override
     public JavaParser reset() {
         return this;
+    }
+
+    @Override
+    public JavaParser reset(Collection<URI> uris) {
+        return this;
+    }
+
+    @Override
+    public void setClasspath(Collection<Path> classpath) {
+
+    }
+
+    @Override
+    public void setSourceSet(String sourceSet) {
+
+    }
+
+    @Override
+    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
+        return null;
     }
 
     static IPath projectPath(Iterable<Input> sources) {
@@ -183,8 +228,8 @@ public class JavaEcjParser implements JavaParser {
 
         @Override
         public JavaEcjParser build() {
-            return new JavaEcjParser(languageLevel, classpath, charset, relaxedClassTypeMatching,
-                    meterRegistry, logCompilationWarningsAndErrors, styles);
+            return new JavaEcjParser(languageLevel, classpath, charset, true,
+                    new SimpleMeterRegistry(), logCompilationWarningsAndErrors, new ArrayList<>());
         }
     }
 

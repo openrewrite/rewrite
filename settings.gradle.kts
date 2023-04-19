@@ -20,6 +20,7 @@ val allProjects = listOf(
         "rewrite-java-tck",
         "rewrite-java-test",
         "rewrite-java-17",
+        "rewrite-java-ecj",
         "rewrite-json",
         "rewrite-maven",
         "rewrite-properties",

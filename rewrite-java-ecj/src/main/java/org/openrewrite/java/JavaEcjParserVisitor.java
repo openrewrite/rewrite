@@ -1,3 +1,18 @@
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java;
 
 import org.apache.logging.log4j.LogManager;
@@ -7,12 +22,13 @@ import org.eclipse.jdt.internal.compiler.ast.*;
 import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 import org.eclipse.jdt.internal.compiler.lookup.*;
-import org.openrewrite.Formatting;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.lang.reflect.Field;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
@@ -20,14 +36,12 @@ import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.EMPTY;
-import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 class JavaEcjParserVisitor {
+
     private static final Logger logger = LogManager.getLogger(JavaEcjParserVisitor.class);
 
     private final Visitor visitor = new Visitor();
@@ -45,11 +59,10 @@ class JavaEcjParserVisitor {
     private class Visitor extends ASTVisitor {
         private final Stack<Scope> scopes = new Stack<>();
 
-        private J tree;
+        private Object tree;
         private int pos = 0;
 
-        @Nullable
-        private <T extends J> T visit(ASTNode node) {
+        private <T> T visit(ASTNode node) {
             tree = null;
 
             if (node instanceof CompilationUnitDeclaration) {
@@ -62,8 +75,17 @@ class JavaEcjParserVisitor {
                 visit(n, (CompilationUnitScope) scopes.peek());
             } else if (node instanceof TypeDeclaration) {
                 TypeDeclaration n = (TypeDeclaration) node;
+                Scope localScope = scopes.peek();
                 scopes.push(n.scope);
-                visit(n, n.scope);
+                if (localScope instanceof CompilationUnitScope) {
+                    visit(n, (CompilationUnitScope) localScope);
+                } else if (localScope instanceof ClassScope) {
+                    visit(n, (ClassScope) localScope);
+                } else if (localScope instanceof BlockScope) {
+                    visit(n, (BlockScope) localScope);
+                } else {
+                    throw new IllegalStateException("Invalid scope for TypeDeclaration: " + localScope.getClass().getName());
+                }
                 scopes.pop();
             } else if (node instanceof SingleTypeReference) {
                 SingleTypeReference n = (SingleTypeReference) node;
@@ -79,8 +101,7 @@ class JavaEcjParserVisitor {
             return (T) tree;
         }
 
-        @Nullable
-        private <T extends J> List<T> visitAll(@Nullable ASTNode[] nodes) {
+        private <T> List<T> visitAll(ASTNode[] nodes) {
             if (nodes == null) {
                 return null;
             }
@@ -98,21 +119,41 @@ class JavaEcjParserVisitor {
 
             ImportReference pkg = compilationUnitDeclaration.currentPackage;
             if (pkg != null) {
+                Snip pkgSnip = snip(pkg.declarationSourceStart, pkg.sourceStart);
                 mappedPkg = new J.Package(randomId(),
-                        identOrFieldAccess(compilationUnitDeclaration.currentPackage.tokens),
-                        EMPTY);
+                        pkgSnip.prefix,
+                        Markers.EMPTY,
+                        identOrFieldAccess(pkg.tokens, pkgSnip.suffix),
+                        emptyList());
             }
 
             tree = new J.CompilationUnit(
                     randomId(),
-                    new String(compilationUnitDeclaration.getFileName()),
-                    emptyList(),
-                    mappedPkg,
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    Paths.get(new String(compilationUnitDeclaration.getFileName())),
+                    null,
+                    null,
+                    false,
+                    null,
+                    mappedPkg == null ? null : JRightPadded.build(mappedPkg),
                     visitAll(compilationUnitDeclaration.imports),
-                    visitAll(compilationUnitDeclaration.types),
-                    EMPTY,
-                    emptyList()
+                    visitAll(compilationUnitDeclaration.types).stream().map(J.ClassDeclaration.class::cast).collect(toList()),
+                    Space.format(sourceBefore(source.length()))
             );
+
+//            tree = new J.CompilationUnit(
+//                    randomId(),
+//                    Space.EMPTY,
+//                    Markers.EMPTY,
+//                    new String(compilationUnitDeclaration.getFileName()),
+//                    emptyList(),
+//                    JRightPadded.build(mappedPkg),
+//                    visitAll(compilationUnitDeclaration.imports),
+//                    visitAll(compilationUnitDeclaration.types),
+//                    emptyList(),
+//                    Space.EMPTY
+//            );
 
             return false;
         }
@@ -123,69 +164,90 @@ class JavaEcjParserVisitor {
 
             String prefix = sourceBefore(importRef.declarationSourceStart);
 
-            tree = new J.Import(randomId(),
-                    (J.FieldAccess) identOrFieldAccess(importRef.tokens),
-                    importRef.isStatic(),
-                    format(prefix));
+            Snip importKeyWordSnippet = snip(importRef.declarationSourceStart, importRef.sourceStart);
+            J.Import imp = new J.Import(randomId(), Space.format(prefix), Markers.EMPTY, JLeftPadded.build(importRef.isStatic()), (J.FieldAccess) identOrFieldAccess(importRef.tokens, importKeyWordSnippet.suffix), null);
 
-            pos = importRef.declarationSourceEnd;
-            tree = tree.withSuffix(sourceBefore(";"));
+            pos = importRef.sourceEnd + 1;
+            tree = JRightPadded.build(imp).withAfter(Space.format(sourceBefore(importRef.declarationSourceEnd)));
 
+            pos = importRef.declarationSourceEnd + 1;
             return false;
         }
 
-        @Override
-        public boolean visit(TypeDeclaration typeDeclaration, ClassScope scope) {
+        private int findEndingPositionOfLastIdentifier(TypeDeclaration typeDeclaration) {
+            int start = typeDeclaration.declarationSourceStart;
+            int end = start;
+            for (int i = 0; i < typeDeclaration.modifiers; i++) {
+                for (; Character.isWhitespace(source.charAt(end)) && end < typeDeclaration.sourceStart; end++) {}
+                for (; Character.isJavaIdentifierPart(source.charAt(end)) && end < typeDeclaration.sourceStart; end++) {}
+            }
+            return end;
+        }
+
+        private J.ClassDeclaration visitTypeDeclaration(TypeDeclaration typeDeclaration) {
             String prefix = sourceBefore(typeDeclaration.declarationSourceStart);
 
-            Snip kindSnip = snip(typeDeclaration.restrictedIdentifierStart, typeDeclaration.sourceStart);
-            J.ClassDecl.Kind kind;
+            int endOfIdentifiers = findEndingPositionOfLastIdentifier(typeDeclaration);
+
+            List<J.Modifier> modifiers = snip(typeDeclaration.declarationSourceStart, endOfIdentifiers)
+                    //TODO: handling for annotations over modifiers?
+                    .collectTokens((ident, p) -> new J.Modifier(randomId(), p, Markers.EMPTY, J.Modifier.Type.valueOf(StringUtils.capitalize(ident)), Collections.emptyList()));
+
+            Snip kindSnip = snip(endOfIdentifiers, typeDeclaration.sourceStart);
+            J.ClassDeclaration.Kind kind;
             switch (kindSnip.source) {
                 case "class":
-                    kind = new J.ClassDecl.Kind.Class(randomId(), kindSnip.formatting);
+                    kind = new J.ClassDeclaration.Kind(randomId(), kindSnip.prefix, Markers.EMPTY, Collections.emptyList(), J.ClassDeclaration.Kind.Type.Class);
                     break;
                 case "interface":
-                    kind = new J.ClassDecl.Kind.Interface(randomId(), kindSnip.formatting);
+                    kind = new J.ClassDeclaration.Kind(randomId(), kindSnip.prefix, Markers.EMPTY, Collections.emptyList(), J.ClassDeclaration.Kind.Type.Interface);
                     break;
                 case "@interface":
-                    kind = new J.ClassDecl.Kind.Annotation(randomId(), kindSnip.formatting);
+                    kind = new J.ClassDeclaration.Kind(randomId(), kindSnip.prefix, Markers.EMPTY, Collections.emptyList(), J.ClassDeclaration.Kind.Type.Annotation);
+                    break;
+                case "enum":
+                    kind = new J.ClassDeclaration.Kind(randomId(), kindSnip.prefix, Markers.EMPTY, Collections.emptyList(), J.ClassDeclaration.Kind.Type.Enum);
+                    break;
+                case "record":
+                    kind = new J.ClassDeclaration.Kind(randomId(), kindSnip.prefix, Markers.EMPTY, Collections.emptyList(), J.ClassDeclaration.Kind.Type.Record);
                     break;
                 default:
                     throw new IllegalArgumentException("Unexpected class kind '" + kindSnip.source + "'");
             }
-            pos = typeDeclaration.sourceStart;
+            pos = endOfIdentifiers + 1;
 
             diagram(typeDeclaration);
 
-            J.Ident name = J.Ident.build(randomId(), new String(typeDeclaration.name), null,
-                    format(kind.getSuffix()));
+            // TODO: specify type for the identifier!
+            J.Identifier name = new J.Identifier(randomId(), kindSnip.suffix, Markers.EMPTY, new String(typeDeclaration.name), null, null);
             skip(name.getSimpleName());
 
             List<J.Annotation> annotations = visitAll(typeDeclaration.annotations);
-            List<J.Modifier> modifiers = snip(typeDeclaration.modifiersSourceStart, typeDeclaration.restrictedIdentifierStart)
-                    .collectTokens(J.Modifier::buildModifier);
-            J.TypeParameters typeParameters = typeDeclaration.typeParameters == null ? null : new J.TypeParameters(randomId(),
-                    visitAll(typeDeclaration.typeParameters), EMPTY);
-            J.ClassDecl.Extends extendings = visit(typeDeclaration.superclass);
+            //TODO: white space prefix for type parameters
+            JContainer<J.TypeParameter> typeParameters = typeDeclaration.typeParameters == null ? null : JContainer.build(Space.EMPTY, visitAll(typeDeclaration.typeParameters), Markers.EMPTY);
+            JLeftPadded<TypeTree> extendings = null;
+            if (typeDeclaration.superclass != null) {
+                String extendsPrefix = sourceBefore("extends");
+                extendings = JLeftPadded.build((TypeTree)visit(typeDeclaration.superclass)).withBefore(Space.format(extendsPrefix));
+            }
 
-            J.ClassDecl.Implements implementings = null;
+            JContainer<TypeTree> implementings = null;
             if (typeDeclaration.superInterfaces != null) {
                 String implementsPrefix = sourceBefore("implements");
 
                 List<TypeTree> superInterfaces = visitAll(typeDeclaration.superInterfaces);
-                assert superInterfaces != null;
+                List<JRightPadded<TypeTree>> rightPaddedInterfaces = new ArrayList<>();
 
                 for (int i = 0; i < superInterfaces.size(); i++) {
                     TypeTree si = superInterfaces.get(i);
-                    si = si.withPrefix(sourceBefore(si.printTrimmed()));
+                    JRightPadded<TypeTree> rightPaddedInterface = JRightPadded.build(si);
                     if (i < superInterfaces.size() - 1) {
-                        si = si.withSuffix(sourceBefore(","));
+                        rightPaddedInterface = rightPaddedInterface.withAfter(Space.format(sourceBefore(",")));
                     }
-                    superInterfaces.set(i, si);
+                    rightPaddedInterfaces.add(rightPaddedInterface);
                 }
 
-                implementings = new J.ClassDecl.Implements(randomId(),
-                        superInterfaces, format(implementsPrefix));
+                implementings = JContainer.build(Space.format(implementsPrefix), rightPaddedInterfaces, Markers.EMPTY);
             }
 
             String blockPrefix = sourceBefore("{");
@@ -199,32 +261,48 @@ class JavaEcjParserVisitor {
                     )
             ).sorted(Comparator.comparing(node -> node.sourceStart)).toArray(ASTNode[]::new);
 
-            J.Block<J> block = new J.Block<>(
-                    randomId(),
-                    null,
-                    visitAll(blockStatements),
-                    format(blockPrefix),
-                    new J.Block.End(randomId(), format(sourceBefore("}")))
-            );
+            J.Block block = new J.Block(randomId(), Space.format(blockPrefix), Markers.EMPTY, JRightPadded.build(false), visitAll(blockStatements), Space.format(sourceBefore("}")));
 
-            visitAll(blockStatements);
+            pos = typeDeclaration.declarationSourceEnd + 1;
 
-            tree = new J.ClassDecl(
+            J.ClassDeclaration classDecl = new J.ClassDeclaration(
                     randomId(),
+                    Space.format(prefix),
+                    Markers.EMPTY,
                     annotations,
                     modifiers,
-                    kind.withSuffix(""),
+                    kind,
                     name,
                     typeParameters,
+                    null, // TODO: primary constructor
                     extendings,
                     implementings,
+                    null, // TODO: permitting?
                     block,
-                    TypeUtils.asClass(type(typeDeclaration.binding)),
-                    format(prefix)
+                    TypeUtils.asClass(type(typeDeclaration.binding))
             );
 
-            pos = typeDeclaration.declarationSourceEnd;
+            return classDecl;
+        }
 
+        @Override
+        public boolean visit(TypeDeclaration typeDeclaration, CompilationUnitScope scope) {
+            J.ClassDeclaration classDecl = visitTypeDeclaration(typeDeclaration);
+            tree = classDecl;
+            return false;
+        }
+
+        @Override
+        public boolean visit(TypeDeclaration typeDeclaration, BlockScope scope) {
+            Object classDecl = visitTypeDeclaration(typeDeclaration);
+            tree = JRightPadded.build(classDecl);
+            return false;
+        }
+
+        @Override
+        public boolean visit(TypeDeclaration typeDeclaration, ClassScope scope) {
+            Object classDecl = visitTypeDeclaration(typeDeclaration);
+            tree = JRightPadded.build(classDecl);
             return false;
         }
 
@@ -244,81 +322,88 @@ class JavaEcjParserVisitor {
             }
 
             String prefix = sourceBefore(singleTypeReference.sourceStart);
-            tree = TreeBuilder.buildName(new String(singleTypeReference.token))
-                    .withType(type(singleTypeReference.resolvedType))
-                    .withPrefix(prefix);
+
+
+            tree = TypeTree.build(prefix + new String(singleTypeReference.token)).withType(type(singleTypeReference.resolvedType));
+//            tree = TreeBuilder.buildName(new String(singleTypeReference.token))
+//                    .withType()
+//                    .withPrefix(prefix);
+            pos = singleTypeReference.sourceEnd + 1;
         }
 
-        @Nullable
         private JavaType type(Binding typeBinding) {
             if (typeBinding instanceof MissingTypeBinding || typeBinding instanceof ProblemBinding) {
                 return null;
             } else if (typeBinding instanceof BinaryTypeBinding) {
                 BinaryTypeBinding t = (BinaryTypeBinding) typeBinding;
-                return JavaType.Class.build(
-                        stream(t.compoundName).map(String::new).collect(joining(".")),
-                        stream(t.fields()).map(this::type)
-                                .map(JavaType.Var.class::cast)
-                                .collect(toList()),
-                        stream(t.typeVariables()).map(this::type).collect(toList()),
-                        stream(t.superInterfaces()).map(this::type).collect(toList()),
-                        stream(t.methods())
+                // TODO: annotations? constructors?
+                return JavaType.ShallowClass.build(stream(t.compoundName).map(String::new).collect(joining(".")))
+                        .withMembers(stream(t.fields()).map(this::type)
+                                .map(JavaType.Variable.class::cast)
+                                .collect(toList()))
+                        .withTypeParameters(stream(t.typeVariables()).map(this::type).collect(toList()))
+                        .withInterfaces(stream(t.superInterfaces()).map(this::type).map(JavaType.FullyQualified.class::cast).collect(toList()))
+                        .withMethods(stream(t.methods())
                                 .filter(MethodBinding::isConstructor)
                                 .map(this::type)
                                 .map(JavaType.Method.class::cast)
-                                .collect(toList()),
-                        TypeUtils.asClass(type(t.superclass())),
-                        false
-                );
+                                .collect(toList()))
+                        .withSupertype(TypeUtils.asClass(type(t.superclass())))
+                        .withFlags(Flag.bitMapToFlags(((BinaryTypeBinding) typeBinding).modifiers));
             } else if (typeBinding instanceof SourceTypeBinding) {
                 SourceTypeBinding t = (SourceTypeBinding) typeBinding;
-                return JavaType.Class.build(
-                        stream(t.compoundName).map(String::new).collect(joining(".")),
-                        stream(t.fields()).map(this::type)
-                                .map(JavaType.Var.class::cast)
-                                .collect(toList()),
-                        stream(t.typeVariables()).map(this::type).collect(toList()),
-                        stream(t.superInterfaces()).map(this::type).collect(toList()),
-                        stream(t.methods())
+                // TODO: annotations? constructors
+                return JavaType.ShallowClass.build(stream(t.compoundName).map(String::new).collect(joining(".")))
+                        .withMembers(stream(t.fields()).map(this::type)
+                                .map(JavaType.Variable.class::cast)
+                                .collect(toList()))
+                        .withTypeParameters(stream(t.typeVariables()).map(this::type).collect(toList()))
+                        .withInterfaces(stream(t.superInterfaces()).map(this::type).map(JavaType.FullyQualified.class::cast).collect(toList()))
+                        .withMethods(stream(t.methods())
                                 .filter(MethodBinding::isConstructor)
                                 .map(this::type)
                                 .map(JavaType.Method.class::cast)
-                                .collect(toList()),
-                        TypeUtils.asClass(type(t.superclass())),
-                        false
-                );
+                                .collect(toList()))
+                        .withSupertype(TypeUtils.asClass(type(t.superclass())))
+                        .withFlags(Flag.bitMapToFlags(((SourceTypeBinding) typeBinding).modifiers));
             } else if (typeBinding instanceof TypeVariableBinding) {
                 TypeVariableBinding t = (TypeVariableBinding) typeBinding;
+                // TODO: isn't there more boundary types in the list? Variance is hardcoded at the moment
+                JavaType.Class boundType = TypeUtils.asClass(type(t.firstBound));
+                //TODO: no support for COVARINAT ( extends Something) and CONTRAVARIANT (super Something)
                 return new JavaType.GenericTypeVariable(
+                        null,
                         stream(t.compoundName).map(String::new).collect(joining(".")),
-                        TypeUtils.asClass(type(t.firstBound))
+                        JavaType.GenericTypeVariable.Variance.INVARIANT,
+                        boundType == null ? Collections.emptyList() : Collections.singletonList(boundType)
                 );
             } else if (typeBinding instanceof ReferenceBinding) {
-                return JavaType.Class.build(
-                        stream(((ReferenceBinding) typeBinding).compoundName)
-                                .map(String::new)
-                                .collect(joining("."))
-                );
+                return JavaType.ShallowClass.build(stream(((ReferenceBinding) typeBinding).compoundName)
+                        .map(String::new)
+                        .collect(joining(".")));
+//                return JavaType.Class.build(
+//                        stream(((ReferenceBinding) typeBinding).compoundName)
+//                                .map(String::new)
+//                                .collect(joining("."))
+//                );
             } else if (typeBinding instanceof VariableBinding) {
                 VariableBinding t = (VariableBinding) typeBinding;
-                return new JavaType.Var(new String(t.name), type(t.type), t instanceof FieldBinding ?
-                        flags(((FieldBinding) t).getAccessFlags()) : emptySet());
+                List<JavaType.FullyQualified> annotations = stream(t.getAnnotations()).map(an -> (JavaType.FullyQualified) type(an.getAnnotationType())).collect(toList());
+                return new JavaType.Variable(null, t instanceof FieldBinding ? ((FieldBinding) t).getAccessFlags() : 0, new String(t.name), t instanceof FieldBinding ? type(((FieldBinding) t).declaringClass) : null, type(t.type), annotations);
             } else if (typeBinding instanceof MethodBinding) {
                 MethodBinding t = (MethodBinding) typeBinding;
 
-                return JavaType.Method.build(
+                return new JavaType.Method(
+                        null,
+                        t.getAccessFlags(),
                         TypeUtils.asClass(type(t.receiver)),
                         new String(t.selector),
-                        new JavaType.Method.Signature(
-                                type(t.genericMethod().returnType),
-                                stream(t.genericMethod().parameters).map(this::type).collect(toList())
-                        ),
-                        new JavaType.Method.Signature(
-                                type(t.returnType),
-                                stream(t.parameters).map(this::type).collect(toList())
-                        ),
+                        type(t.genericMethod().returnType),
                         stream(t.parameterNames).map(String::new).collect(toList()),
-                        flags(t.getAccessFlags())
+                        stream(t.genericMethod().parameters).map(this::type).collect(toList()),
+                        stream(t.thrownExceptions).map(this::type).map(TypeUtils::asFullyQualified).collect(toList()),
+                        stream(t.getAnnotations()).map(an -> (JavaType.FullyQualified) type(an.getAnnotationType())).collect(toList()),
+                        null //TODO: default value
                 );
             }
 
@@ -381,9 +466,11 @@ class JavaEcjParserVisitor {
                     .forEachOrdered(f -> {
                         try {
                             int pos = (int) f.get(node);
-                            min.set(Math.min(min.get(), pos));
-                            max.set(Math.max(max.get(), pos));
-                            logger.info("{}: {}", f.getName(), pos);
+                            if (pos >= 0) {
+                                min.set(Math.min(min.get(), pos));
+                                max.set(Math.max(max.get(), pos));
+                                logger.info("{}: {}", f.getName(), pos);
+                            }
                         } catch (IllegalAccessException e) {
                             throw new RuntimeException(e);
                         }
@@ -415,16 +502,18 @@ class JavaEcjParserVisitor {
             logger.info(chars.toString());
         }
 
-        private Expression identOrFieldAccess(char[][] names) {
+        private Expression identOrFieldAccess(char[][] names, Space prefix) {
             if (names.length == 0) {
                 return null;
             }
 
-            Expression fa = J.Ident.build(randomId(), new String(names[0]), null, EMPTY);
+            // TODO: prefix?
+            Expression fa = new J.Identifier(randomId(), prefix, Markers.EMPTY, new String(names[0]), null, null);
             for (int i = 1; i < names.length; i++) {
-                fa = new J.FieldAccess(randomId(), fa,
-                        J.Ident.build(randomId(), new String(names[i]), null, EMPTY),
-                        null, EMPTY);
+                //TODO: type, prefix?
+                fa = new J.FieldAccess(randomId(), Space.EMPTY, Markers.EMPTY, fa,
+                        JLeftPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, new String(names[i]), null, null)),
+                        null);
             }
             return fa;
         }
@@ -453,7 +542,8 @@ class JavaEcjParserVisitor {
 
         private class Snip {
             String source;
-            Formatting formatting = Formatting.EMPTY;
+            Space prefix = Space.EMPTY;
+            Space suffix = Space.EMPTY;
 
             Snip(String source) {
                 this.source = source.trim();
@@ -462,7 +552,7 @@ class JavaEcjParserVisitor {
                 char[] chars = source.toCharArray();
                 for (char c : chars) {
                     if (!Character.isWhitespace(c)) {
-                        formatting = formatting.withPrefix(format.toString());
+                        prefix = prefix.withWhitespace(format.toString());
                         break;
                     }
                     format.append(c);
@@ -472,24 +562,25 @@ class JavaEcjParserVisitor {
                 for (int i = chars.length - 1; i >= 0; i--) {
                     char c = chars[i];
                     if (!Character.isWhitespace(c)) {
-                        formatting = formatting.withSuffix(format.reverse().toString());
+                        suffix = suffix.withWhitespace(format.reverse().toString());
                         break;
                     }
                     format.append(c);
                 }
             }
 
-            <T> T map(BiFunction<String, Formatting, T> map) {
-                return map.apply(source, formatting);
-            }
+//            <T> T map(BiFunction<String, Formatting, T> map) {
+//                return map.apply(source, formatting);
+//            }
 
             Stream<Snip> tokenStream() {
                 return stream(source.split("((?<=\\s)|(?=\\s+))")).map(Snip::new);
             }
 
-            <T> List<T> collectTokens(BiFunction<String, Formatting, T> map) {
+            <T> List<T> collectTokens(BiFunction<String, Space, T> map) {
                 return tokenStream()
-                        .map(snip -> map.apply(snip.source, snip.formatting))
+                        .filter(snip -> !snip.source.isEmpty() || !snip.prefix.isEmpty() || !snip.suffix.isEmpty())
+                        .map(snip -> map.apply(snip.source, snip.prefix))
                         .collect(toList());
             }
         }
