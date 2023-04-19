@@ -311,7 +311,7 @@ class StandardizeNullabilityAnnotationsVisitor extends JavaIsoVisitor<ExecutionC
     private JavaTemplate annotationTemplate(NullabilityAnnotation annotation) {
         return JavaTemplate.builder(this::getCursor, "@" + annotation.getFqn())
                 .imports(annotation.getFqn())
-                .javaParser(() -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build())
+                .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
                 .build();
     }
 
