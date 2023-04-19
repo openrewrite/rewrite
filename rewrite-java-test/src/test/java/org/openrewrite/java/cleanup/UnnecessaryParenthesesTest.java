@@ -816,4 +816,30 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unwrapWhileParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      while ((s == null || s.isEmpty())) {
+                          s = "not empty";
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String s) {
+                      while (s == null || s.isEmpty()) {
+                          s = "not empty";
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

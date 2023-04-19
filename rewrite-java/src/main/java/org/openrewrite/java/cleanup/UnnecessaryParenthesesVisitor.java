@@ -148,4 +148,15 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         }
         return i;
     }
+
+    @Override
+    public J visitWhileLoop(J.WhileLoop whileLoop, P p) {
+        J.WhileLoop w = visitAndCast(whileLoop, p, super::visitWhileLoop);
+        // Unwrap when while condition is a single parenthesized expression
+        Expression expression = w.getCondition().getTree();
+        if (expression instanceof J.Parentheses) {
+            w = (J.WhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(w, p, getCursor().getParentOrThrow());
+        }
+        return w;
+    }
 }
