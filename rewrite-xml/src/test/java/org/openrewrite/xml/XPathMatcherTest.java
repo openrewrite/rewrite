@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class XPathMatcherTest {
 
-    private final Xml.Document x = new XmlParser().parse(
+    private final Xml.Document xmlDoc = new XmlParser().parse(
       """
         <?xml version="1.0" encoding="UTF-8"?>
         <dependencies>
@@ -42,39 +42,72 @@ class XPathMatcherTest {
         """
     ).get(0);
 
+    private final Xml.Document pomXml = new XmlParser().parse(
+      """
+        <project>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <build>
+            <plugins>
+              <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.0</version>
+                <configuration>
+                  <source>1.8</source>
+                  <target>1.8</target>
+                </configuration>
+              </plugin>
+            </plugins>
+          </build>
+        </project> 
+        """
+    ).get(0);
+
     @Test
     void matchAbsolute() {
-        assertThat(match("/dependencies/dependency")).isTrue();
-        assertThat(match("/dependencies/*/artifactId")).isTrue();
-        assertThat(match("/dependencies/*")).isTrue();
-        assertThat(match("/dependencies/dne")).isFalse();
+        assertThat(match("/dependencies/dependency", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/*/artifactId", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/*", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dne", xmlDoc)).isFalse();
     }
 
     @Test
     void matchAbsoluteAttribute() {
-        assertThat(match("/dependencies/dependency/artifactId/@scope")).isTrue();
-        assertThat(match("/dependencies/dependency/artifactId/@scope")).isTrue();
-        assertThat(match("/dependencies/dependency/artifactId/@*")).isTrue();
-        assertThat(match("/dependencies/dependency/groupId/@*")).isFalse();
+        assertThat(match("/dependencies/dependency/artifactId/@scope", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/artifactId/@scope", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/artifactId/@*", xmlDoc)).isTrue();
+        assertThat(match("/dependencies/dependency/groupId/@*", xmlDoc)).isFalse();
     }
 
     @Test
     void matchRelative() {
-        assertThat(match("dependencies")).isTrue();
-        assertThat(match("dependency")).isTrue();
-        assertThat(match("//dependency")).isTrue();
-        assertThat(match("dependency/*")).isTrue();
-        assertThat(match("dne")).isFalse();
+        assertThat(match("dependencies", xmlDoc)).isTrue();
+        assertThat(match("dependency", xmlDoc)).isTrue();
+        assertThat(match("//dependency", xmlDoc)).isTrue();
+        assertThat(match("dependency/*", xmlDoc)).isTrue();
+        assertThat(match("dne", xmlDoc)).isFalse();
     }
 
     @Test
     void matchRelativeAttribute() {
-        assertThat(match("dependency/artifactId/@scope")).isTrue();
-        assertThat(match("dependency/artifactId/@*")).isTrue();
-        assertThat(match("//dependency/artifactId/@scope")).isTrue();
+        assertThat(match("dependency/artifactId/@scope", xmlDoc)).isTrue();
+        assertThat(match("dependency/artifactId/@*", xmlDoc)).isTrue();
+        assertThat(match("//dependency/artifactId/@scope", xmlDoc)).isTrue();
     }
 
-    private boolean match(String xpath) {
+    @Test
+    void matchPom() {
+        assertThat(match("/project/build/plugins/plugin/configuration/source",
+          pomXml)).isTrue();
+        assertThat(match("/project/build/plugins/plugin[artifactId='maven-compiler-plugin']/configuration/source",
+          pomXml)).isTrue();
+        assertThat(match("/project/build/plugins/plugin[artifactId='somethingElse']/configuration/source",
+          pomXml)).isFalse();
+    }
+
+    private boolean match(String xpath, Xml.Document x) {
         XPathMatcher matcher = new XPathMatcher(xpath);
         return !TreeVisitor.collect(new XmlVisitor<>() {
             @Override
