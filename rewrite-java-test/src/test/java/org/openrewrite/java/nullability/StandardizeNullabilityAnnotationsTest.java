@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.nullability;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.NonNullApi;
@@ -180,14 +181,14 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
     }
 
     @Test
-    void shouldReplaceAnnotationsOnClass() {
+    void shouldReplaceLeadingAnnotationsOnClass() {
         rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
           package org.openrewrite.java;
 
           import javax.annotation.Nonnull;
 
           @Nonnull
-          class Test {
+          public class Test {
           }
           """, """
           package org.openrewrite.java;
@@ -195,7 +196,47 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
           import org.openrewrite.internal.lang.NonNull;
 
           @NonNull
-          class Test {
+          public class Test {
+          }
+          """));
+    }
+
+    @Test
+    @Disabled("annotation on kind not yet supported")
+    void shouldReplaceAnnotationsOnClass() {
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
+          package org.openrewrite.java;
+
+          import javax.annotation.Nonnull;
+         
+          public @Nonnull class Test {
+          }
+          """, """
+          package org.openrewrite.java;
+                        
+          import org.openrewrite.internal.lang.NonNull;
+
+          public @NonNull class Test {
+          }
+          """));
+    }
+
+    @Test
+    @Disabled("annotations on modifiers not yet support")
+    void shouldReplaceAnnotationsBetweenModifiersOnClass() {
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
+          package org.openrewrite.java;
+
+          import javax.annotation.Nonnull;
+
+          public @Nonnull final class Test {
+          }
+          """, """
+          package org.openrewrite.java;
+                        
+          import org.openrewrite.internal.lang.NonNull;
+
+          public @NonNull final class Test {
           }
           """));
     }
@@ -221,6 +262,32 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
           class Test {
               @NonNull
               public String getString() {
+                  return "";
+              }
+          }
+          """));
+    }
+
+    @Test
+    @Disabled("annotations on modifiers not yet support")
+    void shouldReplaceAnnotationsBetweenModifiersOnMethod() {
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
+          package org.openrewrite.java;
+
+          import javax.annotation.Nonnull;
+
+          class Test {
+              public @Nonnull static String getString() {
+                  return "";
+              }
+          }
+          """, """
+          package org.openrewrite.java;
+                          
+          import org.openrewrite.internal.lang.NonNull;
+
+          class Test {
+              public @NonNull static String getString() {
                   return "";
               }
           }
@@ -301,6 +368,28 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
     }
 
     @Test
+    @Disabled("annotations on modifiers not yet support")
+    void shouldReplaceAnnotationsBetweenModifiersOnField() {
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
+          package org.openrewrite.java;
+
+          import javax.annotation.Nonnull;
+
+          class Test {
+              public @Nonnull final String nonNullVariable = "";
+          }
+          """, """
+          package org.openrewrite.java;
+
+          import org.openrewrite.internal.lang.NonNull;
+
+          class Test {
+              public @NonNull final String nonNullVariable = "";
+          }
+          """));
+    }
+
+    @Test
     void shouldReplaceAnnotationsOnLocalField() {
         rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
           package org.openrewrite.java;
@@ -323,6 +412,34 @@ class StandardizeNullabilityAnnotationsTest implements RewriteTest {
               public String getString() {
                   @NonNull
                   String parameter = "";
+                  return parameter;
+              }
+          }
+          """));
+    }
+
+    @Test
+    @Disabled("annotations on modifiers not yet support")
+    void shouldReplaceAnnotationsBeforeModifierOnLocalField() {
+        rewriteRun(spec -> spec.recipe(new StandardizeNullabilityAnnotations(List.of(Nullable.class.getName(), NonNull.class.getName()))), java("""        
+          package org.openrewrite.java;
+
+          import javax.annotation.Nonnull;
+
+          class Test {
+              public String getString() {
+                  @Nonnull final String parameter = "";
+                  return parameter;
+              }
+          }
+          """, """
+          package org.openrewrite.java;
+
+          import org.openrewrite.internal.lang.NonNull;
+
+          class Test {
+              public String getString() {
+                  @NonNull final String parameter = "";
                   return parameter;
               }
           }
