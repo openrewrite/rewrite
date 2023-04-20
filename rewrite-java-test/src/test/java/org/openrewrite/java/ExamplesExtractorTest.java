@@ -7,24 +7,31 @@ import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class ExamplesExtractorTest implements RewriteTest {
+class ExamplesExtractorTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        Recipe recipe = toRecipe(() -> new ExamplesExtractor());
-        spec.recipe(recipe)
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
-    }
+//    @Override
+//    public void defaults(RecipeSpec spec) {
+//        Recipe recipe = toRecipe(() -> new ExamplesExtractor());
+//        spec.recipe(recipe)
+//          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+//    }
 
 
     @Test
     void extractJavaExample() {
+        ExamplesExtractor examplesExtractor = new ExamplesExtractor();
         rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> examplesExtractor))
+            .parser(JavaParser.fromJavaVersion()
+              .classpath(JavaParser.runtimeClasspath())),
           java(
             """
+            package org.openrewrite.java.cleanup;
+            
             import org.junit.jupiter.api.Test;
             import org.openrewrite.internal.DocumentExample;
             import org.openrewrite.test.RecipeSpec;
@@ -38,7 +45,7 @@ public class ExamplesExtractorTest implements RewriteTest {
                     spec.recipe(new ChainStringBuilderAppendCalls());
                 }
             
-                @DocumentExample
+                @DocumentExample(name = "Objects concatenation.")
                 @Test
                 void objectsConcatenation() {
                     rewriteRun(
@@ -70,6 +77,35 @@ public class ExamplesExtractorTest implements RewriteTest {
             """
           )
         );
+        String yaml = examplesExtractor.printRecipeExampleYaml();
+        assertThat(yaml).isEqualTo(
+          """
+            type: specs.openrewrite.org/v1beta/example
+            recipeName: org.openrewrite.java.cleanup.ChainStringBuilderAppendCalls
+            examples:
+            - description: "Objects concatenation."
+              before: |
+                class A {
+                    void method1() {
+                        StringBuilder sb = new StringBuilder();
+                        String op = "+";
+                        sb.append("A" + op + "B");
+                        sb.append(1 + op + 2);
+                    }
+                }
+              after: |
+                class A {
+                    void method1() {
+                        StringBuilder sb = new StringBuilder();
+                        String op = "+";
+                        sb.append("A").append(op).append("B");
+                        sb.append(1).append(op).append(2);
+                    }
+                }
+              language: "java"
+            """
+        );
+
     }
 
 
