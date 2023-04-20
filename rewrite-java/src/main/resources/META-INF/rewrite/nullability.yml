@@ -17,7 +17,7 @@
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.nullability.UseJavaxNullabilityAnnotations
 displayName: Use javax nullability annotations
-description: Replaces other known nullability annotations by javax annotations where possible.
+description: Replaces other known nullability annotations with Javax annotations where possible.
 tags:
   - nullability
 recipeList:
@@ -29,7 +29,7 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.nullability.UseJakartaNullabilityAnnotations
 displayName: Use Jakarta nullability annotations
-description: Replaces other known nullability annotations by jakarta annotations where possible.
+description: Replaces other known nullability annotations with Jakarta annotations where possible.
 tags:
   - nullability
 recipeList:
@@ -41,7 +41,7 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.nullability.UseSpringNullabilityAnnotations
 displayName: Use spring nullability annotations
-description: Replaces other known nullability annotations by spring annotations where possible.
+description: Replaces other known nullability annotations with Spring annotations where possible.
 tags:
   - nullability
 recipeList:
@@ -55,7 +55,7 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.java.nullability.UseOpenRewriteNullabilityAnnotations
 displayName: Use OpenRewrite nullability annotations
-description: Replaces other known nullability annotations by open rewrite annotations where possible.
+description: Replaces other known nullability annotations with OpenRewrite annotations where possible.
 tags:
   - nullability
 recipeList:

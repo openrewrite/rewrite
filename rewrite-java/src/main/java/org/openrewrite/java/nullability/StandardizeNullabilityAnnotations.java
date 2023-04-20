@@ -32,7 +32,7 @@ import java.util.stream.Stream;
 public class StandardizeNullabilityAnnotations extends Recipe {
 
     @Option(displayName = "Nullability annotations to use",
-            description = "All other nullability annotations will be replaced by these.",
+            description = "All other nullability annotations will be replaced with these.",
             example = "javax.annotation.Nullable")
     List<String> nullabilityAnnotationsFqn;
 
@@ -61,7 +61,7 @@ public class StandardizeNullabilityAnnotations extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Define one null and one non-null annotation to be used. All divergent annotations will be replaced.";
+        return "Define nullable and non-null annotations that are to be used troughout your project. All divergent annotations will be replaced where possible while preserving semantic.";
     }
 
     @Override
