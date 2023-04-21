@@ -15,14 +15,15 @@
  */
 package org.openrewrite.config;
 
-import lombok.Value;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 
-
-@Value
+@EqualsAndHashCode(callSuper = false)
+@Data
 public class RecipeExample {
     @Nullable
-    String name;
+    public String name;
 
     @Nullable
     String description;
