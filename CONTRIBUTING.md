@@ -1,7 +1,7 @@
 # Building & Developing OpenRewrite
 
 We use [Gradle](https://gradle.org/) to build this project.
-The gradle wrapper checked into this project defines the gradle version to use.  
+The gradle wrapper checked into this project defines the gradle version to use.
 When building from the command line invoke the wrapper with `./gradlew build` on unix-style terminals and `gradlew build` on windows-style terminals.
 
 NOTE: windows-style users should ensure that they configure `core.autocrlf = false` as Rewrite requires unix-style line endings. This can be done at clone time by using `git clone -c core.autocrlf=false https://github.com/openrewrite/rewrite.git`.
@@ -10,6 +10,30 @@ NOTE: windows-style users should ensure that they configure `core.autocrlf = fal
 
 * [JDK](https://adoptium.net/) version: 17
 * [Gradle](https://gradle.org/) version: Defined in wrapper
+
+## Pre-Commit Hooks
+
+We use [pre-commit](https://pre-commit.com/) to run checks before committing code.
+
+This project uses `pre-commit` to run a series of quick checks before each commit.
+Trust us, this will help you catch issues before they are committed and save you time.
+
+If you don't already have `pre-commit` installed, you can install globally with:
+
+```bash
+pip install pre-commit
+```
+Alternatively, you can use homebrew on macOS:
+
+```bash
+brew install pre-commit
+```
+
+Then, to install the pre-commit hooks, run:
+
+```bash
+pre-commit install
+```
 
 ## IDE Configuration
 
@@ -27,8 +51,8 @@ Add these to the "additional command line parameters" field in IntelliJ -> Prefe
 
 ### Optimizing your IDE only for modules you want to work on
 
-If you are only working on a subset of the modules in this project, you can optimize your 
+If you are only working on a subset of the modules in this project, you can optimize your
 IDE to only load those modules. Copy `IDE.properties.tmp` to `IDE.properties` and comment out
 any lines that correspond to modules you do not want to work on. This will cause Gradle to
-swap those project dependencies for binary dependencies resolved from either Maven local or 
+swap those project dependencies for binary dependencies resolved from either Maven local or
 the OSS snapshots repository, and speed up your IDE.

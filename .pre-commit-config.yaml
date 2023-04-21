@@ -1,0 +1,19 @@
+exclude: '.idea'
+repos:
+  -   repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.4.0
+      hooks:
+        -   id: check-yaml
+            args: [--allow-multiple-documents]
+        -   id: check-merge-conflict
+        -   id: check-symlinks
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.22.0
+    hooks:
+      - id: check-github-workflows
+      - id: check-dependabot
+  - repo: https://github.com/jguttman94/pre-commit-gradle
+    rev: v0.2.1  # Use the ref you want to point at
+    hooks:
+      - id: gradle-task
+        args: [-w, 'licenseFormat rewriteRun']

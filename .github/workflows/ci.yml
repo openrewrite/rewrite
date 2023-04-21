@@ -17,6 +17,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pre-commit-check:
+    runs-on: ubuntu-latest
+    name: pre-commit hooks
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - uses: pre-commit/action@v3.0.0
+
   build:
     uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
     secrets:
