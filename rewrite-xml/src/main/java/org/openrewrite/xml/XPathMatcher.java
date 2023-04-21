@@ -94,12 +94,12 @@ public class XPathMatcher {
                 Matcher matcher = pattern.matcher(part);
                 if (tag != null && matcher.matches()) {
                     String name = matcher.group(1);
-                    String sunTag = matcher.group(2);
-                    String sunTagValue = matcher.group(3);
+                    String subTag = matcher.group(2);
+                    String subTagValue = matcher.group(3);
 
                     boolean matchCondition =
-                        FindTags.find(tag, sunTag).stream().anyMatch(t ->
-                            t.getValue().map(v -> v.equals(sunTagValue)).orElse(false)
+                        FindTags.find(tag, subTag).stream().anyMatch(t ->
+                            t.getValue().map(v -> v.equals(subTagValue)).orElse(false)
                         );
                     if (!matchCondition) {
                         return false;
