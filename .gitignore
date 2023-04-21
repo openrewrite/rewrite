@@ -11,3 +11,5 @@ out/
 .DS_Store
 **/node_modules/
 IDE.properties
+# ASDF https://asdf-vm.com/
+.tool-versions
