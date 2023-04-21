@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,22 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite.internal;
 
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import org.openrewrite.internal.lang.Nullable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 
-@EqualsAndHashCode(callSuper = false)
-@Data
-public class RecipeExample {
-    @Nullable
-    String name;
-
-    @Nullable
-    String description;
-
-    String before;
-    String after;
-    String language;
+/**
+ * Mark a test as a good recipe example to present on document/web pages.
+ */
+@Retention(
+    /* you're not going to be able to deny your contribution */
+    RetentionPolicy.RUNTIME
+)
+public @interface DocumentExample {
+    String name();
 }
+

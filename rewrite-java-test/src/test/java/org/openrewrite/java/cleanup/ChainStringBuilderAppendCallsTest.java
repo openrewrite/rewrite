@@ -16,6 +16,8 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Recipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +29,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
         spec.recipe(new ChainStringBuilderAppendCalls());
     }
 
+    @DocumentExample(name = "Objects concatenation.")
     @Test
     void objectsConcatenation() {
         rewriteRun(

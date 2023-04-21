@@ -76,7 +76,6 @@ public class YamlResourceLoader implements ResourceLoader {
         Style("specs.openrewrite.org/v1beta/style"),
         Category("specs.openrewrite.org/v1beta/category"),
         Example("specs.openrewrite.org/v1beta/example"),
-
         Attribution("specs.openrewrite.org/v1beta/attribution");
 
         private final String spec;
@@ -451,13 +450,16 @@ public class YamlResourceLoader implements ResourceLoader {
 
             List<Map<String, Object>> examples = (List<Map<String, Object>>) examplesMap.get("examples");
 
-            List<RecipeExample> newExamples = examples.stream().map(exam -> new RecipeExample(
-                (String) exam.get("name"),
-                (String) exam.get("description"),
-                (String) exam.get("before"),
-                (String) exam.get("after"),
-                (String) exam.get("language")
-            )).collect(toList());
+            List<RecipeExample> newExamples = examples.stream().map(exam -> {
+                    RecipeExample recipeExample = new RecipeExample();
+                    recipeExample.setName((String) exam.get("name"));
+                    recipeExample.setDescription((String) exam.get("description"));
+                    recipeExample.setBefore((String) exam.get("before"));
+                    recipeExample.setAfter((String) exam.get("after"));
+                    recipeExample.setLanguage((String) exam.get("language"));
+                    return recipeExample;
+                }
+            ).collect(toList());
 
             recipeNameToExamples.get(recipeName).addAll(newExamples);
         }
