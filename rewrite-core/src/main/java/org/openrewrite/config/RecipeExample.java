@@ -23,7 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 @Data
 public class RecipeExample {
     @Nullable
-    public String name;
+    String name;
 
     @Nullable
     String description;
