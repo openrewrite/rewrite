@@ -22,6 +22,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -97,6 +98,12 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
             public J visitImport(J.Import impoort, ExecutionContext ctx) {
                 // stop recursion
                 return impoort;
+            }
+
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                // stop recursion into Javadoc comments
+                return space;
             }
 
             @Override

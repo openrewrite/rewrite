@@ -247,6 +247,23 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
+    void dontModifyJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * See {@link java.util.List}.
+               *
+               * @see java.util.List
+               */
+              class T {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void conflictExistingImport() {
         rewriteRun(
           java(
