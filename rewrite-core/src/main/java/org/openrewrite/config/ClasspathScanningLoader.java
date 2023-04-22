@@ -138,7 +138,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     Recipe recipe = constructRecipe(recipeClass);
                     recipeDescriptors.add(recipe.getDescriptor());
                     recipes.add(recipe);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     logger.warn("Unable to configure {}", recipeClass.getName(), e);
                 }
             }
@@ -150,7 +150,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                         constructor.setAccessible(true);
                         styles.add((NamedStyles) constructor.newInstance());
                     }
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
                 }
             }
