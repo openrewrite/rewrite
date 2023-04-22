@@ -116,9 +116,12 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                     if (type.equals(usedTypes.get(simpleName))) {
                         return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
                     } else if (!usedTypes.containsKey(simpleName)) {
-                        maybeAddImport(((JavaType.FullyQualified) type).getFullyQualifiedName());
-                        usedTypes.put(simpleName, type);
-                        return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                        String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();
+                        if (!fullyQualifiedName.startsWith("java.lang.")) {
+                            maybeAddImport(fullyQualifiedName);
+                            usedTypes.put(simpleName, type);
+                            return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
+                        }
                     }
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);

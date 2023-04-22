@@ -264,6 +264,21 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
     }
 
     @Test
+    void dontModifyQualifiedJavaLangTypes() {
+        rewriteRun(
+          java(
+            """
+              class T {
+                  java.lang.String s;
+                  java.lang.Integer i;
+                  java.lang.Object o;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void conflictExistingImport() {
         rewriteRun(
           java(
