@@ -16,7 +16,6 @@
 package org.openrewrite.tree;
 
 import org.openrewrite.*;
-import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -58,8 +57,10 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
     }
 
     public ParsingExecutionContextView parseFailure(Parser.Input input, @Nullable Path relativeTo, Parser<?> parser, Throwable t) {
-        PlainText pt = new PlainText(randomId(), input.getRelativePath(relativeTo), Markers.EMPTY, null, false,
-                null, null, input.getSource(this).readFully());
+        PlainText pt = PlainText.builder()
+                .sourcePath(input.getRelativePath(relativeTo))
+                .text(input.getSource(this).readFully())
+                .build();
         return parseFailure(pt, parser, t);
     }
 

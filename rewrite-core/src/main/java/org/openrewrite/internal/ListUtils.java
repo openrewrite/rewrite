@@ -74,6 +74,28 @@ public final class ListUtils {
         return newLs;
     }
 
+    /**
+     * Insert element to a list at the specified position in the list.
+     * Throws the same exceptions as List.add()
+     * @param ls The original list.
+     * @param t The element to add.
+     * @param index index at which the specified element is to be inserted
+     * @param <T> The type of elements in the list.
+     * @return A new list with the element inserted at the specified position.
+     */
+    public static <T> List<T> insert(@Nullable List<T> ls, @Nullable T t, int index) {
+        //noinspection DuplicatedCode
+        if (ls == null && t == null) {
+            return emptyList();
+        } else if (t == null) {
+            return ls;
+        }
+
+        List<T> newLs = ls == null ?  new ArrayList<>(1) : new ArrayList<>(ls);
+        newLs.add(index, t);
+        return newLs;
+    }
+
     public static <T> List<T> mapLast(@Nullable List<T> ls, UnaryOperator<T> mapLast) {
         if (ls == null || ls.isEmpty()) {
             //noinspection ConstantConditions
@@ -212,6 +234,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
+        //noinspection DuplicatedCode
         if (t == null && ls == null) {
             return emptyList();
         } else if (t == null) {
@@ -234,21 +257,6 @@ public final class ListUtils {
         if (ls != null) {
             newLs.addAll(ls);
         }
-        return newLs;
-    }
-
-    public static <T> List<T> concat(@Nullable List<T> ls1, @Nullable List<T> ls2) {
-        if (ls1 == null && ls2 == null) {
-            //noinspection ConstantConditions
-            return null;
-        } else if (ls2 == null || ls2.isEmpty()) {
-            return ls1 == null ? emptyList() : ls1;
-        } else if (ls1 == null || ls1.isEmpty()) {
-            return ls2;
-        }
-        List<T> newLs = new ArrayList<>(ls1.size() + ls2.size());
-        newLs.addAll(ls1);
-        newLs.addAll(ls2);
         return newLs;
     }
 

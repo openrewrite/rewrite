@@ -31,7 +31,7 @@ class FindTest implements RewriteTest {
               This is\ttext.
               """,
             """
-              ~~>(T)his~~>( )is~~>(\t)text.
+              ~~>This~~> is~~>\ttext.
               """
           )
         );
@@ -46,7 +46,7 @@ class FindTest implements RewriteTest {
             This i\\s text.
             """,
           """
-            This i~~>(\\s) text.
+            This i~~>\\s text.
             """
         )
       );

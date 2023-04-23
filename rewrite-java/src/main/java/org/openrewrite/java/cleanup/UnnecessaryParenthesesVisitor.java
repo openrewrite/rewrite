@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -135,5 +136,48 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
             l = l.withParameters(l.getParameters().withParenthesized(false));
         }
         return l;
+    }
+
+    @Override
+    public J visitIf(J.If iff, P p) {
+        J.If i = visitAndCast(iff, p, super::visitIf);
+        // Unwrap when if condition is a single parenthesized expression
+        Expression expression = i.getIfCondition().getTree();
+        if (expression instanceof J.Parentheses) {
+            i = (J.If) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(i, p, getCursor().getParentOrThrow());
+        }
+        return i;
+    }
+
+    @Override
+    public J visitWhileLoop(J.WhileLoop whileLoop, P p) {
+        J.WhileLoop w = visitAndCast(whileLoop, p, super::visitWhileLoop);
+        // Unwrap when while condition is a single parenthesized expression
+        Expression expression = w.getCondition().getTree();
+        if (expression instanceof J.Parentheses) {
+            w = (J.WhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(w, p, getCursor().getParentOrThrow());
+        }
+        return w;
+    }
+
+    @Override
+    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
+        J.DoWhileLoop dw = visitAndCast(doWhileLoop, p, super::visitDoWhileLoop);
+        // Unwrap when while condition is a single parenthesized expression
+        Expression expression = dw.getWhileCondition().getTree();
+        if (expression instanceof J.Parentheses) {
+            dw = (J.DoWhileLoop) new UnwrapParentheses<>((J.Parentheses<?>) expression).visitNonNull(dw, p, getCursor().getParentOrThrow());
+        }
+        return dw;
+    }
+
+    @Override
+    public J visitForControl(J.ForLoop.Control control, P p) {
+        J.ForLoop.Control fc = visitAndCast(control, p, super::visitForControl);
+        Expression condition = fc.getCondition();
+        if (condition instanceof J.Parentheses) {
+            fc = (J.ForLoop.Control) new UnwrapParentheses<>((J.Parentheses<?>) condition).visitNonNull(fc, p, getCursor().getParentOrThrow());
+        }
+        return fc;
     }
 }

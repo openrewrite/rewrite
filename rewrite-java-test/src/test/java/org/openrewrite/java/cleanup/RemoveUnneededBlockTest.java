@@ -441,6 +441,79 @@ class RemoveUnneededBlockTest implements RewriteTest {
                   static {
                       {
                           int i = 0;
+                      }
+                      System.out.println("hello world!");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void inlineLastBlockContainingVariableDeclarations() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  static {
+                      {
+                          System.out.println("hello world!");
+                      }
+                      {
+                          int i = 0;
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  static {
+                      System.out.println("hello world!");
+                      int i = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("EmptyFinallyBlock")
+    void removeEmptyTryFinallyBlock() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public int foo() {
+                      try {
+                          int i = 1;
+                      } finally {
+                      }
+                  }
+              }
+              """,
+            """
+              public class A {
+                  public int foo() {
+                      int i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepNonEmptyTryFinallyBlock() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public int foo() {
+                      try {
+                          int i = 1;
+                      } finally {
                           System.out.println("hello world!");
                       }
                   }
@@ -449,4 +522,25 @@ class RemoveUnneededBlockTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @SuppressWarnings("EmptyFinallyBlock")
+    void keepNonEmptyTryFinallyBlock2() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public int foo() {
+                      try {
+                          int i = 1;
+                      } finally {
+                      }
+                      int i = 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

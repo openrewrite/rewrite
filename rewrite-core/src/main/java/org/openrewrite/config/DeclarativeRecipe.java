@@ -168,7 +168,8 @@ public class DeclarativeRecipe extends CompositeRecipe {
         //noinspection deprecation
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
                 getTags(), getEstimatedEffortPerOccurrence(),
-                emptyList(), getLanguages(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(), source);
+                emptyList(), getLanguages(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
+                getExamples(), source);
     }
 
     @Value

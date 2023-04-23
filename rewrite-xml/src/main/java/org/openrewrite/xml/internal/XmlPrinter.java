@@ -30,7 +30,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
         beforeSyntax(document, p);
         document = (Xml.Document) super.visitDocument(document, p);
         afterSyntax(document, p);
-        p.out.append(document.getEof());
+        p.append(document.getEof());
         return document;
     }
 
@@ -45,10 +45,10 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitXmlDecl(Xml.XmlDecl xmlDecl, PrintOutputCapture<P> p) {
         beforeSyntax(xmlDecl, p);
-        p.out.append("<?")
+        p.append("<?")
                 .append(xmlDecl.getName());
         visit(xmlDecl.getAttributes(), p);
-        p.out.append(xmlDecl.getBeforeTagDelimiterPrefix())
+        p.append(xmlDecl.getBeforeTagDelimiterPrefix())
                 .append("?>");
         afterSyntax(xmlDecl, p);
         return xmlDecl;
@@ -57,16 +57,16 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitTag(Xml.Tag tag, PrintOutputCapture<P> p) {
         beforeSyntax(tag, p);
-        p.out.append('<')
+        p.append('<')
                 .append(tag.getName());
         visit(tag.getAttributes(), p);
-        p.out.append(tag.getBeforeTagDelimiterPrefix());
+        p.append(tag.getBeforeTagDelimiterPrefix());
         if (tag.getClosing() == null) {
-            p.out.append("/>");
+            p.append("/>");
         } else {
-            p.out.append('>');
+            p.append('>');
             visit(tag.getContent(), p);
-            p.out.append(tag.getClosing().getPrefix())
+            p.append(tag.getClosing().getPrefix())
                     .append("</")
                     .append(tag.getClosing().getName())
                     .append(tag.getClosing().getBeforeTagDelimiterPrefix())
@@ -86,7 +86,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
             valueDelim = '\'';
         }
         beforeSyntax(attribute, p);
-        p.out.append(attribute.getKey().getPrefix())
+        p.append(attribute.getKey().getPrefix())
                 .append(attribute.getKeyAsString())
                 .append(attribute.getBeforeEquals())
                 .append('=')
@@ -103,7 +103,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitComment(Xml.Comment comment, PrintOutputCapture<P> p) {
         beforeSyntax(comment, p);
-        p.out.append("<!--")
+        p.append("<!--")
                 .append(comment.getText())
                 .append("-->");
         afterSyntax(comment, p);
@@ -113,10 +113,10 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction processingInstruction, PrintOutputCapture<P> p) {
         beforeSyntax(processingInstruction, p);
-        p.out.append("<?")
+        p.append("<?")
                 .append(processingInstruction.getName());
         visit(processingInstruction.getProcessingInstructions(), p);
-        p.out.append(processingInstruction.getBeforeTagDelimiterPrefix())
+        p.append(processingInstruction.getBeforeTagDelimiterPrefix())
                 .append("?>");
         afterSyntax(processingInstruction, p);
         return processingInstruction;
@@ -126,13 +126,13 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     public Xml visitCharData(Xml.CharData charData, PrintOutputCapture<P> p) {
         beforeSyntax(charData, p);
         if (charData.isCdata()) {
-            p.out.append("<![CDATA[")
+            p.append("<![CDATA[")
                     .append(charData.getText())
                     .append("]]>");
         } else {
-            p.out.append(charData.getText());
+            p.append(charData.getText());
         }
-        p.out.append(charData.getAfterText());
+        p.append(charData.getAfterText());
         afterSyntax(charData, p);
         return charData;
     }
@@ -140,18 +140,18 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, PrintOutputCapture<P> p) {
         beforeSyntax(docTypeDecl, p);
-        p.out.append("<!DOCTYPE");
+        p.append("<!DOCTYPE");
         visit(docTypeDecl.getName(), p);
         visit(docTypeDecl.getExternalId(), p);
         visit(docTypeDecl.getInternalSubset(), p);
         if (docTypeDecl.getExternalSubsets() != null) {
-            p.out.append(docTypeDecl.getExternalSubsets().getPrefix())
+            p.append(docTypeDecl.getExternalSubsets().getPrefix())
                     .append('[');
             visit(docTypeDecl.getExternalSubsets().getElements(), p);
-            p.out.append(']');
+            p.append(']');
         }
-        p.out.append(docTypeDecl.getBeforeTagDelimiterPrefix());
-        p.out.append('>');
+        p.append(docTypeDecl.getBeforeTagDelimiterPrefix());
+        p.append('>');
         afterSyntax(docTypeDecl, p);
         return docTypeDecl;
     }
@@ -160,7 +160,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     public Xml visitElement(Xml.Element element, PrintOutputCapture<P> p) {
         beforeSyntax(element, p);
         visit(element.getSubset(), p);
-        p.out.append(element.getBeforeTagDelimiterPrefix());
+        p.append(element.getBeforeTagDelimiterPrefix());
         afterSyntax(element, p);
         return element;
     }
@@ -168,7 +168,7 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
     @Override
     public Xml visitIdent(Xml.Ident ident, PrintOutputCapture<P> p) {
         beforeSyntax(ident, p);
-        p.out.append(ident.getName());
+        p.append(ident.getName());
         afterSyntax(ident, p);
         return ident;
     }
@@ -178,18 +178,18 @@ public class XmlPrinter<P> extends XmlVisitor<PrintOutputCapture<P>> {
 
     private void beforeSyntax(Xml x, PrintOutputCapture<P> p) {
         for (Marker marker : x.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), XML_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), XML_MARKER_WRAPPER));
         }
-        p.out.append(x.getPrefix());
+        p.append(x.getPrefix());
         visitMarkers(x.getMarkers(), p);
         for (Marker marker : x.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), XML_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), XML_MARKER_WRAPPER));
         }
     }
 
     private void afterSyntax(Xml x, PrintOutputCapture<P> p) {
         for (Marker marker : x.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), XML_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), XML_MARKER_WRAPPER));
         }
     }
 }

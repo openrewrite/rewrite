@@ -114,7 +114,7 @@ public interface Remote extends SourceFile {
                 ExecutionContext ctx = p.getContext() instanceof ExecutionContext ? (ExecutionContext) p.getContext() :
                         new InMemoryExecutionContext();
                 HttpSender sender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-                p.out.append(StringUtils.readFully(getInputStream(sender), StandardCharsets.UTF_8));
+                p.append(StringUtils.readFully(getInputStream(sender), StandardCharsets.UTF_8));
                 return sourceFile;
             }
         };

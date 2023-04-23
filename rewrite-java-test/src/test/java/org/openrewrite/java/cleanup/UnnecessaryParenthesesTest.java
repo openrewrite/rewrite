@@ -739,4 +739,159 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unwrapIfParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if ((s == null || s.isEmpty())) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String s) {
+                      if (s == null || s.isEmpty()) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotUnwrapIfNoParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if (s == null || s.isEmpty()) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotUnwrapNegatedIfParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if (!(s == null || s.isEmpty())) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotUnwrapIfParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      if ((s == null || s.isEmpty()) || false) {
+                          System.out.println("empty");
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapWhileParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      while ((s == null || s.isEmpty())) {
+                          s = "not empty";
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String s) {
+                      while (s == null || s.isEmpty()) {
+                          s = "not empty";
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapDoWhileParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                       do {
+                          s = "not empty";
+                      } while ((s == null || s.isEmpty()));
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String s) {
+                       do {
+                          s = "not empty";
+                      } while (s == null || s.isEmpty());
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unwrapForControlParens() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void test(String s) {
+                      for (int i = 0; (i < 10); i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test(String s) {
+                      for (int i = 0; i < 10; i++) {
+                          System.out.println(i);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

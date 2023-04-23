@@ -89,7 +89,7 @@ public class UpdateMavenModel<P> extends MavenVisitor<P> {
                 List<Xml.Tag> eachDependency = dependencies.get().getChildren("dependency");
                 List<ManagedDependency> requestedManagedDependencies = new ArrayList<>(eachDependency.size());
                 for (Xml.Tag dependency : eachDependency) {
-                    String scope = dependency.getChildValue("scope").orElse("compile");
+                    String scope = dependency.getChildValue("scope").orElse(null);
                     GroupArtifactVersion gav = new GroupArtifactVersion(
                             dependency.getChildValue("groupId").orElse(null),
                             dependency.getChildValue("artifactId").orElseThrow(() -> new IllegalStateException("Dependency must have artifactId")),

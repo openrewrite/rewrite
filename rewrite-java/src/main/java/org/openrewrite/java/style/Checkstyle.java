@@ -96,6 +96,7 @@ public class Checkstyle extends NamedStyles {
     public static HideUtilityClassConstructorStyle hideUtilityClassConstructorStyle() {
         return new HideUtilityClassConstructorStyle(Arrays.asList(
                 "@lombok.experimental.UtilityClass",
+                "@lombok.NoArgsConstructor",
                 "@lombok.Data"
         ));
     }

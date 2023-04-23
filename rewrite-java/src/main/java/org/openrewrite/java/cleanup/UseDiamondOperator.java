@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -61,6 +62,10 @@ public class UseDiamondOperator extends Recipe {
     }
 
     private static class UseDiamondOperatorVisitor extends JavaIsoVisitor<ExecutionContext> {
+        @Override
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+            return cu instanceof J.CompilationUnit ? visitCompilationUnit((J.CompilationUnit) cu, ctx) : cu;
+        }
 
         @Override
         public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
@@ -93,6 +98,10 @@ public class UseDiamondOperator extends Recipe {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+            if (isAParameter()) {
+                return method;
+            }
+
             J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
             JavaType.Method methodType = mi.getMethodType();
             if (methodType != null) {
@@ -170,6 +179,14 @@ public class UseDiamondOperator extends Recipe {
                 }
             }
             return newClass;
+        }
+
+        private boolean isAParameter() {
+            return getCursor().dropParentUntil(p -> p instanceof J.MethodInvocation ||
+                                                    p instanceof J.ClassDeclaration ||
+                                                    p instanceof J.CompilationUnit ||
+                                                    p instanceof J.Block ||
+                                                    p == Cursor.ROOT_VALUE).getValue() instanceof J.MethodInvocation;
         }
     }
 }

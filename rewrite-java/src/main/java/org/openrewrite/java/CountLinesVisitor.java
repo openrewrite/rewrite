@@ -24,14 +24,6 @@ public class CountLinesVisitor extends JavaVisitor<AtomicInteger> {
 
     @Override
     public J visitJavaSourceFile(JavaSourceFile cu, AtomicInteger count) {
-        if(cu instanceof J.CompilationUnit) {
-            return super.visitJavaSourceFile(cu, count);
-        }
-        return cu;
-    }
-
-    @Override
-    public J visitCompilationUnit(J.CompilationUnit cu, AtomicInteger count) {
         // Skip compilation unit prefix and EOF
         if(cu.getPackageDeclaration() != null) {
             // Package often does not have a prefix to count newlines within

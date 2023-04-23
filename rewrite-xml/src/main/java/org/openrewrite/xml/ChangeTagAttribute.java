@@ -18,7 +18,9 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -45,8 +47,9 @@ public class ChangeTagAttribute extends Recipe {
     String attributeName;
 
     @Option(displayName = "New value",
-            description = "The new value to be used for key specified by `attributeName`.",
+            description = "The new value to be used for key specified by `attributeName`, Set to null if you want to remove the attribute.",
             example = "newfoo.bar.attribute.value.string")
+    @Nullable
     String newValue;
 
     @Option(displayName = "Old value",
@@ -73,6 +76,36 @@ public class ChangeTagAttribute extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangeTagAttributeVisitor<>(new XPathMatcher(elementName), attributeName, oldValue, newValue);
+        return new XmlVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                if (new XPathMatcher(elementName).matches(getCursor())) {
+                    t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
+                }
+                return t;
+            }
+
+            public Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
+                if(!attribute.getKeyAsString().equals(attributeName)) {
+                    return attribute;
+                }
+                if(oldValue != null && !attribute.getValueAsString().startsWith(oldValue)) {
+                    return attribute;
+                }
+
+                if (newValue == null) {
+                    return null;
+                }
+
+                String changedValue = (oldValue != null) ? attribute.getValueAsString().replace(oldValue, newValue): newValue;
+                return attribute.withValue(
+                    new Xml.Attribute.Value(attribute.getId(),
+                        "",
+                        attribute.getMarkers(),
+                        attribute.getValue().getQuote(),
+                        changedValue));
+            }
+        };
     }
 }

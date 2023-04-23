@@ -24,6 +24,7 @@ import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @param <Row> The model type for a single row of this extract.
@@ -76,7 +77,7 @@ public class DataTable<Row> {
 
     public void insertRow(ExecutionContext ctx, Row row) {
         if (enabled) {
-            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, HashMap::new, (extract, allDataTables) -> {
+            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
                 //noinspection unchecked
                 List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
                 dataTablesOfType.add(row);

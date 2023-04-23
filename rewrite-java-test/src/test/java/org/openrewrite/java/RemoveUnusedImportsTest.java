@@ -1203,4 +1203,115 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    // If multiple packages have conflicting class names,
+    // so have to explicitly import the specific class to avoid ambiguity.
+    @Test
+    void multiplePackagesHaveConflictingClassNames() {
+        rewriteRun(
+          java(
+            """
+              package org.b;
+              public class Pair<K, V> {
+                  K key;
+                  V value;
+              }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class Table<T> { }
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class Pair<K, V> {
+                  K key;
+                  V value;
+              }
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class Table<T> { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B1 { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B2 { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B3 { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B4 { }
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C1 {}
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C2 {}
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C3 {}
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C4 {}
+              """
+          ),
+          java(
+            """
+              package org.a;
+
+              import org.b.*;
+              import org.b.Pair;
+              import org.c.*;
+              import org.c.Table;
+
+              class A {
+                  void method() {
+                      Pair<String, String > pair = new Pair<>();
+                      Table<String> table = new Table<>();
+                      B1 b1 = new B1();
+                      B2 b2 = new B2();
+                      B3 b3 = new B3();
+                      B4 b4 = new B4();
+                      C1 c1 = new C1();
+                      C2 c2 = new C2();
+                      C3 c3 = new C3();
+                      C4 c4 = new C4();
+                  }
+              }
+              """
+          )
+        );
+    }
 }

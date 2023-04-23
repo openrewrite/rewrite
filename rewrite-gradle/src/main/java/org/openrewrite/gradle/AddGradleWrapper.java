@@ -156,16 +156,22 @@ public class AddGradleWrapper extends Recipe {
         }
         FileAttributes wrapperScriptAttributes = new FileAttributes(now, now, now, true, true, true, 1L);
         if (needsGradleShellScript) {
-            PlainText gradlew = new PlainText(randomId(), WRAPPER_SCRIPT_LOCATION, Markers.EMPTY, null, false,
-                    wrapperScriptAttributes, null,
-                    StringUtils.readFully(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew")), StandardCharsets.UTF_8));
+            PlainText gradlew = PlainText.builder()
+                    .sourcePath(WRAPPER_SCRIPT_LOCATION)
+                    .fileAttributes(wrapperScriptAttributes)
+                    .text(StringUtils.readFully(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew")), StandardCharsets.UTF_8))
+                    .charsetName(StandardCharsets.UTF_8.name())
+                    .build();
             gradleWrapperFiles.add(gradlew);
         }
 
         if (needsGradleBatchScript) {
-            PlainText gradlewBat = new PlainText(randomId(), WRAPPER_BATCH_LOCATION, Markers.EMPTY, null, false,
-                    wrapperScriptAttributes, null,
-                    StringUtils.readFully(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")), StandardCharsets.UTF_8));
+            PlainText gradlewBat = PlainText.builder()
+                    .sourcePath(WRAPPER_BATCH_LOCATION)
+                    .fileAttributes(wrapperScriptAttributes)
+                    .text(StringUtils.readFully(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")), StandardCharsets.UTF_8))
+                    .charsetName(StandardCharsets.UTF_8.name())
+                    .build();
             gradleWrapperFiles.add(gradlewBat);
         }
 

@@ -456,6 +456,11 @@ public interface Xml extends Tree {
              * Space before '&gt;'
              */
             String beforeTagDelimiterPrefix;
+
+            @Override
+            public String toString() {
+                return "</" + name + ">";
+            }
         }
     }
 
@@ -519,6 +524,11 @@ public interface Xml extends Tree {
         public String getValueAsString() {
             return value.getValue();
         }
+
+        @Override
+        public String toString() {
+            return getKeyAsString() + "=" + getValueAsString();
+        }
     }
 
     @Value
@@ -546,6 +556,16 @@ public interface Xml extends Tree {
         @Override
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitCharData(this, p);
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append("text = \"").append(text).append("\"");
+            if (afterText != null && !afterText.isEmpty()) {
+                sb.append(" afterText = \"").append(afterText).append("\"");
+            }
+            return sb.toString();
         }
     }
 

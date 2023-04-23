@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
-import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("rawtypes")
@@ -963,37 +963,37 @@ class AddImportTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/880")
     @Test
     void doNotFoldNormalImportWithNamespaceConflict() {
-        ExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false);
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false)))
-            .executionContext(ctx),
-          java(
-            """
-              import java.awt.*; // contains a List class
-              import java.util.Collection;
-              import java.util.Collections;
-              import java.util.Map;
-              import java.util.Set;
-                            
-              @SuppressWarnings("ALL")
-              class Test {
-                  List list;
-              }
-              """,
-            """
-              import java.awt.*; // contains a List class
-              import java.util.Collection;
-              import java.util.Collections;
-              import java.util.List;
-              import java.util.Map;
-              import java.util.Set;
-                            
-              @SuppressWarnings("ALL")
-              class Test {
-                  List list;
-              }
+            .beforeRecipe(addTypesToSourceSet("main")),
+          srcMainJava(
+            java(
               """
+                import java.awt.*; // contains a List class
+                import java.util.Collection;
+                import java.util.Collections;
+                import java.util.Map;
+                import java.util.Set;
+
+                @SuppressWarnings("ALL")
+                class Test {
+                    List list;
+                }
+                """,
+              """
+                import java.awt.*; // contains a List class
+                import java.util.Collection;
+                import java.util.Collections;
+                import java.util.List;
+                import java.util.Map;
+                import java.util.Set;
+
+                @SuppressWarnings("ALL")
+                class Test {
+                    List list;
+                }
+                """
+            )
           )
         );
     }

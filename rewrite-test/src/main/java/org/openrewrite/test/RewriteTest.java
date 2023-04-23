@@ -20,13 +20,11 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.SourceSet;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.scheduling.DirectScheduler;
@@ -272,16 +270,6 @@ public interface RewriteTest extends SourceSpecs {
                 }
                 sourceFile = sourceFile.withMarkers(markers);
 
-                // Update the default 'main' SourceSet Marker added by the JavaParser with the specs sourceSetName
-                if (nextSpec.sourceSetName != null) {
-                    sourceFile = sourceFile.withMarkers((markers.withMarkers(ListUtils.map(markers.getMarkers(), m -> {
-                        if (m instanceof SourceSet) {
-                            m = ((SourceSet) m).withName(nextSpec.sourceSetName);
-                        }
-                        return m;
-                    }))));
-                }
-
                 // Validate that printing a parsed AST yields the same source text
                 int j = 0;
                 for (Parser.Input input : inputs.values()) {
@@ -486,16 +474,19 @@ public interface RewriteTest extends SourceSpecs {
 
             // if we get here, there was no result.
             if (sourceSpec.after != null) {
-                String before = sourceSpec.noTrim ?
+                String actual = sourceSpec.noTrim ?
                         specForSourceFile.getKey().printAll(out.clone()) :
                         trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
+                String before = sourceSpec.noTrim ?
+                        sourceSpec.before :
+                        trimIndentPreserveCRLF(sourceSpec.before);
                 String expected = sourceSpec.noTrim ?
                         sourceSpec.after.apply(null) :
                         trimIndentPreserveCRLF(sourceSpec.after.apply(null));
                 assertThat(expected)
                         .as("To assert that a Recipe makes no change, supply only \"before\" source.")
                         .isNotEqualTo(before);
-                assertThat(before)
+                assertThat(actual)
                         .as("The recipe should have made the following change to \"" + specForSourceFile.getKey().getSourcePath() + "\"")
                         .isEqualTo(expected);
             }

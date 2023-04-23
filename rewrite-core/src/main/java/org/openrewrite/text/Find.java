@@ -20,18 +20,19 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class Find extends Recipe {
-
-    private static final String SR_PREFIX = "~~>(";
-    private static final int SR_LENGTH = SR_PREFIX.length();
 
     @Override
     public String getDisplayName() {
@@ -40,7 +41,7 @@ public class Find extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Search for text in a plain text file. Wraps the results in \"~~>( )\".";
+        return "Search for text, treating all textual sources as plain text.";
     }
 
     @Option(displayName = "Find",
@@ -49,7 +50,7 @@ public class Find extends Recipe {
     String find;
 
     @Option(displayName = "Regex",
-            description = "Default false. If true, `find` will be interpreted as a Regular Expression.",
+            description = "If true, `find` will be interpreted as a Regular Expression. Default false.",
             required = false)
     @Nullable
     Boolean regex;
@@ -70,30 +71,26 @@ public class Find extends Recipe {
                 Pattern pattern = Pattern.compile(searchStr);
                 Matcher matcher = pattern.matcher(plainText.getText());
                 String rawText = plainText.getText();
-                StringBuilder result = new StringBuilder();
-                boolean anyFound = false;
+                if(!matcher.find()) {
+                    return sourceFile;
+                }
+                matcher.reset();
+                List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
                 while(matcher.find()) {
-                    anyFound = true;
                     int matchStart = matcher.start();
-                    result.append(rawText, previousEnd, matchStart);
-                    if(matchStart >= SR_LENGTH && rawText.substring(matchStart - SR_LENGTH, matchStart).equals(SR_PREFIX)) {
-                        result.append(rawText, matchStart, matcher.end());
-                    } else {
-                        result.append(SR_PREFIX).append(rawText, matchStart, matcher.end()).append(")");
-                    }
+                    snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
+                    snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
                     previousEnd = matcher.end();
                 }
-                if(anyFound) {
-                    result.append(rawText.substring(previousEnd));
-                    String newText = result.toString();
-                    if(!newText.equals(rawText)) {
-                        plainText = plainText.withText(newText);
-                    }
-                }
-                return plainText;
+                snippets.add(snippet(rawText.substring(previousEnd)));
+                return plainText.withText("").withSnippets(snippets);
             }
         };
     }
 
+
+    private static PlainText.Snippet snippet(String text) {
+        return new PlainText.Snippet(Tree.randomId(), Markers.EMPTY, text);
+    }
 }

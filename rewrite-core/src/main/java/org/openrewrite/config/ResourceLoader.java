@@ -19,6 +19,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.style.NamedStyles;
 
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 public interface ResourceLoader {
     Collection<Recipe> listRecipes();
@@ -29,5 +31,5 @@ public interface ResourceLoader {
 
     Collection<CategoryDescriptor> listCategoryDescriptors();
 
-    Collection<RecipeExample> listRecipeExamples();
+    Map<String, List<RecipeExample>> listRecipeExamples();
 }

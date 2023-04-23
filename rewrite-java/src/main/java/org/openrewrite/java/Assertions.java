@@ -27,12 +27,11 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -177,7 +176,7 @@ public class Assertions {
 
     public static SourceSpecs version(SourceSpecs sourceSpec, int version) {
         for (SourceSpec<?> spec : sourceSpec) {
-            spec.markers((javaVersion(version)));
+            spec.markers(javaVersion(version));
         }
         return sourceSpec;
     }
@@ -187,8 +186,55 @@ public class Assertions {
     }
 
     public static SourceSpec<?> sourceSet(SourceSpec<?> sourceSpec, String sourceSet) {
-        sourceSpec.setSourceSetName(sourceSet);
+        sourceSpec.markers(javaSourceSet(sourceSet));
         return sourceSpec;
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom, List<Path> classpath) {
+        return sourceFiles -> {
+            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, null, false);
+            List<JavaType.FullyQualified> types = sourceSet.getClasspath();
+            for (SourceFile sourceFile : sourceFiles) {
+                if (!(sourceFile instanceof JavaSourceFile)) {
+                    continue;
+                }
+
+                Optional<JavaSourceSet> maybeCurrentSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class);
+                if (!maybeCurrentSourceSet.isPresent()) {
+                    continue;
+                }
+
+                JavaSourceSet currentSourceSet = maybeCurrentSourceSet.get();
+                if (!currentSourceSet.getName().equals(sourceSetName) && !extendsFrom.contains(currentSourceSet.getName())) {
+                    continue;
+                }
+
+                for (JavaType type : ((JavaSourceFile) sourceFile).getTypesInUse().getTypesInUse()) {
+                    if (type instanceof JavaType.FullyQualified) {
+                        types.add((JavaType.FullyQualified) type);
+                    }
+                }
+            }
+            sourceSet = sourceSet.withClasspath(types);
+
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sourceFile = sourceFiles.get(i);
+                Optional<JavaSourceSet> maybeCurrentSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class);
+                if (!maybeCurrentSourceSet.isPresent() || !maybeCurrentSourceSet.get().getName().equals(sourceSetName)) {
+                    continue;
+                }
+
+                sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().computeByType(sourceSet, (original, updated) -> updated)));
+            }
+        };
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom) {
+        return addTypesToSourceSet(sourceSetName, extendsFrom, Collections.emptyList());
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName) {
+        return addTypesToSourceSet(sourceSetName, Collections.emptyList(), Collections.emptyList());
     }
 
     public static JavaVersion javaVersion(int version) {

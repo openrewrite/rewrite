@@ -150,6 +150,25 @@ class EmptyBlockTest implements RewriteTest {
     }
 
     @Test
+    void emptyTryFinallyBlock() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  public int foo() {
+                      try {
+                          int i = 1;
+                      } finally {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("RedundantFileCreation")
+    @Test
     void emptyCatchBlockWithExceptionAndEmptyFinally() {
         rewriteRun(
           java(

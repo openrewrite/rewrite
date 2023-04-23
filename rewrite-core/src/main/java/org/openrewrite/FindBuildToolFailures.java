@@ -29,7 +29,7 @@ import java.util.stream.Stream;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindBuildToolFailures extends Recipe {
-    BuildToolFailures failures = new BuildToolFailures(this);
+    transient BuildToolFailures failures = new BuildToolFailures(this);
 
     @Option(displayName = "Suppress log output",
             description = "Default false. If true, the `logOutput` column will be empty in the output table.",

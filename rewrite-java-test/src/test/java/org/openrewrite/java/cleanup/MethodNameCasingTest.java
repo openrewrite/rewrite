@@ -24,8 +24,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
-import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.srcTestJava;
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @Issue("https://github.com/openrewrite/rewrite/issues/466")
@@ -83,21 +82,23 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void correctMethodNameCasing() {
         rewriteRun(
-          java(
-            """
-              class Test {
-                  private String getFoo_bar() {
-                      return "foobar";
-                  }
-              }
-              """,
-            """
-              class Test {
-                  private String getFooBar() {
-                      return "foobar";
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                class Test {
+                    private String getFoo_bar() {
+                        return "foobar";
+                    }
+                }
+                """,
+              """
+                class Test {
+                    private String getFooBar() {
+                        return "foobar";
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -136,17 +137,19 @@ class MethodNameCasingTest implements RewriteTest {
     void okToRenamePublicMethods() {
         rewriteRun(
           spec -> spec.recipe(new MethodNameCasing(true, true)),
-          java(
-            """
-              class Test {
-                  public void getFoo_bar(){}
-              }
-              """,
-            """
-              class Test {
-                  public void getFooBar(){}
-              }
+          srcTestJava(
+            java(
               """
+                class Test {
+                    public void getFoo_bar(){}
+                }
+                """,
+              """
+                class Test {
+                    public void getFooBar(){}
+                }
+                """
+            )
           )
         );
     }
@@ -195,19 +198,21 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void changeMethodDeclaration() {
         rewriteRun(
-          java(
-            """
-              class Test {
-                  void MyMethod_with_über() {
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void myMethodWithUber() {
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                class Test {
+                    void MyMethod_with_über() {
+                    }
+                }
+                """,
+              """
+                class Test {
+                    void myMethodWithUber() {
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -215,19 +220,21 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void changeCamelCaseMethodWithFirstLetterUpperCase() {
         rewriteRun(
-          java(
-            """
-              class Test {
-                  void MyMethod() {
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void myMethod() {
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                class Test {
+                    void MyMethod() {
+                    }
+                }
+                """,
+              """
+                class Test {
+                    void myMethod() {
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -235,34 +242,36 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void changeMethodInvocations() {
         rewriteRun(
-          java(
-            """
-              class Test {
-                  void MyMethod_with_über() {
-                  }
-              }
-              """, """
-              class Test {
-                  void myMethodWithUber() {
-                  }
-              }
+          srcMainJava(
+            java(
               """
-          ),
-          java(
-            """
-              class A {
-                  void test() {
-                      new Test().MyMethod_with_über();
-                  }
-              }
-              """,
-            """
-              class A {
-                  void test() {
-                      new Test().myMethodWithUber();
-                  }
-              }
+                class Test {
+                    void MyMethod_with_über() {
+                    }
+                }
+                """, """
+                class Test {
+                    void myMethodWithUber() {
+                    }
+                }
+                """
+            ),
+            java(
               """
+                class A {
+                    void test() {
+                        new Test().MyMethod_with_über();
+                    }
+                }
+                """,
+              """
+                class A {
+                    void test() {
+                        new Test().myMethodWithUber();
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -284,35 +293,37 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void changeMethodNameWhenOverride() {
         rewriteRun(
-          java(
-            """
-              class ParentClass {
-                  void Method() {
-                  }
-              }
-              """,
-            """
-              class ParentClass {
-                  void method() {
-                  }
-              }
+          srcMainJava(
+            java(
               """
-          ),
-          java(
-            """
-              class Test extends ParentClass {
-                  @Override
-                  void Method() {
-                  }
-              }
-              """,
-            """
-              class Test extends ParentClass {
-                  @Override
-                  void method() {
-                  }
-              }
+                class ParentClass {
+                    void Method() {
+                    }
+                }
+                """,
               """
+                class ParentClass {
+                    void method() {
+                    }
+                }
+                """
+            ),
+            java(
+              """
+                class Test extends ParentClass {
+                    @Override
+                    void Method() {
+                    }
+                }
+                """,
+              """
+                class Test extends ParentClass {
+                    @Override
+                    void method() {
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -336,25 +347,27 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void nameExistsInInnerClass() {
         rewriteRun(
-          java(
-            """
-              class T {
-                  void Method(){}
-                  
-                  private static class M {
-                      void Method(){}
-                  }
-              }
-              """,
-            """
-              class T {
-                  void method(){}
-                  
-                  private static class M {
-                      void method(){}
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                class T {
+                    void Method(){}
+
+                    private static class M {
+                        void Method(){}
+                    }
+                }
+                """,
+              """
+                class T {
+                    void method(){}
+
+                    private static class M {
+                        void method(){}
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -364,43 +377,45 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void snakeCaseToCamelCase() {
         rewriteRun(
-          java(
-            """
-              class T {
-                  private static int SOME_METHOD() {
-                    return 1;
-                  }
-                  private static int some_method_2() {
-                    return 1;
-                  }
-                  private static int some_über_method() {
-                    return 1;
-                  }
-                  public static void anotherMethod() {
-                    int i = SOME_METHOD();
-                    i = some_method_2();
-                    i = some_über_method();
-                  }
-              }
-              """,
-            """
-              class T {
-                  private static int someMethod() {
-                    return 1;
-                  }
-                  private static int someMethod2() {
-                    return 1;
-                  }
-                  private static int someUberMethod() {
-                    return 1;
-                  }
-                  public static void anotherMethod() {
-                    int i = someMethod();
-                    i = someMethod2();
-                    i = someUberMethod();
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                class T {
+                    private static int SOME_METHOD() {
+                      return 1;
+                    }
+                    private static int some_method_2() {
+                      return 1;
+                    }
+                    private static int some_über_method() {
+                      return 1;
+                    }
+                    public static void anotherMethod() {
+                      int i = SOME_METHOD();
+                      i = some_method_2();
+                      i = some_über_method();
+                    }
+                }
+                """,
+              """
+                class T {
+                    private static int someMethod() {
+                      return 1;
+                    }
+                    private static int someMethod2() {
+                      return 1;
+                    }
+                    private static int someUberMethod() {
+                      return 1;
+                    }
+                    public static void anotherMethod() {
+                      int i = someMethod();
+                      i = someMethod2();
+                      i = someUberMethod();
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -443,21 +458,23 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void keepCamelCase() {
         rewriteRun(
-          java(
-            """
-              class Test {
-                  private void Method() {
-                  
-                  }
-              }
-              """,
-            """
-              class Test {
-                  private void method() {
-                  
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                class Test {
+                    private void Method() {
+
+                    }
+                }
+                """,
+              """
+                class Test {
+                    private void method() {
+
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -465,45 +482,47 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void keepCamelCase2() {
         rewriteRun(
-          java(
-            """
-              import java.util.*;
-                            
-              class Test {
-                  private List<String> GetNames() {
-                      List<String> result = new ArrayList<>();
-                      result.add("Alice");
-                      result.add("Bob");
-                      result.add("Carol");
-                      return result;
-                  }
-                  
-                  public void run() {
-                      for (String n: GetNames()) {
-                          System.out.println(n);
-                      }
-                  }
-              }
-              """,
-            """
-              import java.util.*;
-                            
-              class Test {
-                  private List<String> getNames() {
-                      List<String> result = new ArrayList<>();
-                      result.add("Alice");
-                      result.add("Bob");
-                      result.add("Carol");
-                      return result;
-                  }
-                  
-                  public void run() {
-                      for (String n: getNames()) {
-                          System.out.println(n);
-                      }
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                import java.util.*;
+
+                class Test {
+                    private List<String> GetNames() {
+                        List<String> result = new ArrayList<>();
+                        result.add("Alice");
+                        result.add("Bob");
+                        result.add("Carol");
+                        return result;
+                    }
+
+                    public void run() {
+                        for (String n: GetNames()) {
+                            System.out.println(n);
+                        }
+                    }
+                }
+                """,
+              """
+                import java.util.*;
+
+                class Test {
+                    private List<String> getNames() {
+                        List<String> result = new ArrayList<>();
+                        result.add("Alice");
+                        result.add("Bob");
+                        result.add("Carol");
+                        return result;
+                    }
+
+                    public void run() {
+                        for (String n: getNames()) {
+                            System.out.println(n);
+                        }
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -512,27 +531,29 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void changeNameOfMethodWithArrayArgument() {
         rewriteRun(
-          java(
-            """
-              import java.util.*;
-                            
-              class Test {
-                  private List<String> GetNames(String[] names) {
-                      List<String> result = new ArrayList<>(Arrays.asList(names));
-                      return result;
-                  }
-              }
-              """,
-            """
-              import java.util.*;
-                            
-              class Test {
-                  private List<String> getNames(String[] names) {
-                      List<String> result = new ArrayList<>(Arrays.asList(names));
-                      return result;
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                import java.util.*;
+
+                class Test {
+                    private List<String> GetNames(String[] names) {
+                        List<String> result = new ArrayList<>(Arrays.asList(names));
+                        return result;
+                    }
+                }
+                """,
+              """
+                import java.util.*;
+
+                class Test {
+                    private List<String> getNames(String[] names) {
+                        List<String> result = new ArrayList<>(Arrays.asList(names));
+                        return result;
+                    }
+                }
+                """
+            )
           )
         );
     }
@@ -542,19 +563,21 @@ class MethodNameCasingTest implements RewriteTest {
     void unknownParameterTypes() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.none()),
-          java(
-            """
-              class Test {
-                  private void Foo(Unknown u) {
-                  }
-              }
-              """,
-            """
-              class Test {
-                  private void foo(Unknown u) {
-                  }
-              }
+          srcMainJava(
+            java(
               """
+                class Test {
+                    private void Foo(Unknown u) {
+                    }
+                }
+                """,
+              """
+                class Test {
+                    private void foo(Unknown u) {
+                    }
+                }
+                """
+            )
           )
         );
     }

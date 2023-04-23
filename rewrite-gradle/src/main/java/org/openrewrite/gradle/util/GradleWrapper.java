@@ -56,7 +56,7 @@ public class GradleWrapper {
         if (cachedValidation != null) {
             return cachedValidation;
         }
-        String distributionTypeName = distribution != null ? distribution : DistributionType.Bin.name().toLowerCase();
+        String distributionTypeName = distribution != null && !distribution.isEmpty() ? distribution : DistributionType.Bin.name().toLowerCase();
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
 
         //noinspection unchecked

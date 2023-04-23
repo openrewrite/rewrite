@@ -275,4 +275,82 @@ class YamlResourceLoaderTest implements RewriteTest {
         Optional<Contributor> maybeJon = recipe.getContributors().stream().filter(c -> c.getName().equals("Jonathan Schneider")).findFirst();
         assertThat(maybeJon).isPresent();
     }
+
+    @Test
+    void recipeExamples() {
+        Environment env = Environment.builder()
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: test.ChangeTextToHello
+              displayName: Change text to hello
+              recipeList:
+                  - org.openrewrite.text.ChangeText:
+                      toText: Hello!
+              """.getBytes()
+          ), URI.create("rewrite.yml"), new Properties()))
+          .load(new YamlResourceLoader(new ByteArrayInputStream(
+            //language=yml
+            """
+              type: specs.openrewrite.org/v1beta/example
+              recipeName: test.ChangeTextToHello
+              examples:
+                - description: "Change World to Hello in a text file"
+                  before: "World"
+                  after: "Hello!"
+                  language: "text"
+                - description: "Change World to Hello in a java file"
+                  before: |
+                    public class A {
+                        void method() {
+                            System.out.println("World");
+                        }
+                    }
+                  after: |
+                    public class A {
+                        void method() {
+                            System.out.println("Hello!");
+                        }
+                    }
+                  language: "java"
+              """.getBytes()
+          ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
+          .build();
+
+        Collection<Recipe> recipes = env.listRecipes();
+        assertThat(recipes).singleElement().satisfies(r -> {
+            assertThat(r.getExamples()).hasSize(2);
+            assertThat(r.getExamples()).first().satisfies(e -> {
+                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
+                assertThat(e.getBefore()).isEqualTo("World");
+                assertThat(e.getAfter()).isEqualTo("Hello!");
+                assertThat(e.getLanguage()).isEqualTo("text");
+            });
+            assertThat(r.getExamples().get(1)).satisfies(e -> {
+                assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
+                assertThat(e.getBefore()).isEqualTo("""
+                  public class A {
+                      void method() {
+                          System.out.println("World");
+                      }
+                  }
+                  """);
+                assertThat(e.getAfter()).isEqualTo("""
+                  public class A {
+                      void method() {
+                          System.out.println("Hello!");
+                      }
+                  }
+                  """);
+                assertThat(e.getLanguage()).isEqualTo("java");
+            });
+        });
+
+        Collection<RecipeDescriptor> recipeDescriptors = env.listRecipeDescriptors();
+        assertThat(recipeDescriptors).singleElement().satisfies(descriptor -> {
+            List<RecipeExample> descriptorExamples = descriptor.getExamples();
+            assertThat(descriptorExamples).containsExactlyElementsOf(recipes.iterator().next().getExamples());
+        });
+    }
 }

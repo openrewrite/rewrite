@@ -142,7 +142,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                 String reqGroup = req.getGroupId();
                 if (reqGroup.equals(tag.getChildValue("groupId").orElse(null)) &&
                         req.getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)) &&
-                        dm.getScope() == Scope.fromName(tag.getChildValue("scope").orElse("compile"))) {
+                        dm.getScope() == tag.getChildValue("scope").map(Scope::fromName).orElse(null)) {
                     return true;
                 }
             }
@@ -261,8 +261,8 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
 
     @Nullable
     public ResolvedManagedDependency findManagedDependency(Xml.Tag tag, @Nullable Scope inClasspathOf) {
-        Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse("compile"));
-        if (inClasspathOf != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
+        Scope tagScope = Scope.fromName(tag.getChildValue("scope").orElse(null));
+        if (inClasspathOf != null && tagScope != null && tagScope != inClasspathOf && !tagScope.isInClasspathOf(inClasspathOf)) {
             return null;
         }
         return findManagedDependency(tag);

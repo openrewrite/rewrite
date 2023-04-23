@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec
@@ -63,6 +64,40 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   void foo() {
                       System.out.println(B.UTF_8);
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeTopLevelClassImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("foo.Bar.Baz.QUX", "Test.FOO")),
+          java(
+            """
+              package foo;
+
+              public class Bar {
+                  public enum Baz {
+                      QUX
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import foo.Bar;
+
+              class Test {
+                  static final String FOO = "foo";
+                  Object o = Bar.Baz.QUX;
+              }
+              """,
+            """
+              class Test {
+                  static final String FOO = "foo";
+                  Object o = Test.FOO;
               }
               """
           )

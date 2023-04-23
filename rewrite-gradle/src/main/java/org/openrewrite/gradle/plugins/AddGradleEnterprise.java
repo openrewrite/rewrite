@@ -196,7 +196,7 @@ public class AddGradleEnterprise extends Recipe {
         boolean versionIsAtLeast3_2 = versionComparator.compare(null, newVersion, "3.2") >= 0;
         boolean versionIsAtLeast3_7 = versionComparator.compare(null, newVersion, "3.7") >= 0;
         StringBuilder ge = new StringBuilder("\ngradleEnterprise {\n");
-        if(server != null) {
+        if(server != null && !server.isEmpty()) {
             ge.append(indent).append("server = '").append(server).append("'\n");
         }
         if(allowUntrustedServer != null && versionIsAtLeast3_2) {

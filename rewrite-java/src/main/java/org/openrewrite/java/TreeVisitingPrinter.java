@@ -21,6 +21,9 @@ import java.util.stream.Collectors;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
 
 import static java.util.stream.StreamSupport.*;
 
@@ -38,7 +41,7 @@ import static java.util.stream.StreamSupport.*;
  *              ...
  * </pre>
  */
-public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
+public class TreeVisitingPrinter extends TreeVisitor<Tree, ExecutionContext> {
     private static final String TAB = "    ";
     private static final String ELEMENT_PREFIX = "\\---";
     private static final String CONTINUE_PREFIX = "----";
@@ -67,9 +70,9 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     /**
      * print tree with skip unvisited elements
      */
-    public static String printTree(J j) {
+    public static String printTree(Tree tree) {
         TreeVisitingPrinter visitor = new TreeVisitingPrinter(true);
-        visitor.visit(j, new InMemoryExecutionContext());
+        visitor.visit(tree, new InMemoryExecutionContext());
         return visitor.print();
     }
 
@@ -83,19 +86,19 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
     /**
      * print tree including all unvisited elements
      */
-    public static String printTreeAll(J j) {
+    public static String printTreeAll(Tree tree) {
         TreeVisitingPrinter visitor = new TreeVisitingPrinter(false);
-        visitor.visit(j, new InMemoryExecutionContext());
+        visitor.visit(tree, new InMemoryExecutionContext());
         return visitor.print();
     }
 
-    private static Optional<J> findRootOfJType(Cursor cursor) {
+    private static Optional<Tree> findRootOfJType(Cursor cursor) {
         List<Object> cursorStack =
             stream(Spliterators.spliteratorUnknownSize(cursor.getPath(), 0), false)
                 .collect(Collectors.toList());
         Collections.reverse(cursorStack);
-        return cursorStack.stream().filter(obj -> obj instanceof J)
-            .map(obj -> (J) obj)
+        return cursorStack.stream().filter(Tree.class::isInstance)
+            .map(Tree.class::cast)
             .findFirst();
     }
 
@@ -160,6 +163,8 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
             || tree instanceof J.Lambda
             || tree instanceof J.Lambda.Parameters
             || tree instanceof J.If
+            || tree instanceof J.EnumValueSet
+            || tree instanceof J.TypeParameter
         ) {
             return "";
         }
@@ -187,8 +192,18 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
         return content;
     }
 
+    private static String printSpace(Space space) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(" whitespace=\"")
+            .append(space.getWhitespace()).append("\"");
+        sb.append(" comments=\"")
+            .append(String.join(",", space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.toList())))
+            .append("\"");;
+        return sb.toString().replace("\n", "\\s\n");
+    }
+
     @Override
-    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
         if (tree == null) {
             return super.visit((Tree) null, ctx);
         }
@@ -230,6 +245,19 @@ public class TreeVisitingPrinter extends JavaIsoVisitor<ExecutionContext> {
                         .append(leftPadding(i))
                         .append(UNVISITED_PREFIX)
                         .append(element instanceof String ? element : element.getClass().getSimpleName());
+
+                    if (element instanceof JRightPadded) {
+                        JRightPadded rp = (JRightPadded) element;
+                        newLine.append(" | ");
+                        newLine.append(" after = ").append(printSpace(rp.getAfter()));
+                    }
+
+                    if (element instanceof JLeftPadded) {
+                        JLeftPadded lp = (JLeftPadded) element;
+                        newLine.append(" | ");
+                        newLine.append(" before = ").append(printSpace(lp.getBefore()));
+                    }
+
                     outputLines.add(newLine);
                 }
             }

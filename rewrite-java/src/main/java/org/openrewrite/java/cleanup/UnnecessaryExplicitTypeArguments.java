@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -76,7 +77,7 @@ public class UnnecessaryExplicitTypeArguments extends Recipe {
                         }
                         enclosingType = ((NameTree) enclosing).getType();
                     } else if (enclosing instanceof J.Return) {
-                        Object e = getCursor().dropParentUntil(p -> p instanceof J.MethodDeclaration || p instanceof J.Lambda).getValue();
+                        Object e = getCursor().dropParentUntil(p -> p instanceof J.MethodDeclaration || p instanceof J.Lambda || p.equals(Cursor.ROOT_VALUE)).getValue();
                         if (e instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) e;
                             if (methodDeclaration.getReturnTypeExpression() != null) {

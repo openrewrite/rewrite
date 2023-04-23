@@ -264,7 +264,8 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "{\n");
             }
 
-            if (prior instanceof Statement) {
+            if (prior == insertionPoint && prior instanceof Expression) {
+                // the template represents an expression, so we need to wrap it in a statement
                 after.append(';');
             }
             after.append('}');
@@ -276,6 +277,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Assert) {
             before.insert(0, "assert ");
+            after.append(';');
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
             if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
