@@ -24,14 +24,12 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.VariableNameUtils;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -47,6 +45,7 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
 
     @Override
     public String getDescription() {
+        System.out.println();
         return "Replace Optional#isPresent with Optional#IfPresent. Please note that this recipe is only suitable for if-blocks that lack an Else-block and have a single condition applied.";
     }
 
@@ -66,22 +65,35 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
         public J visitIf(J.If _if, ExecutionContext context) {
             J.If __if = (J.If) super.visitIf(_if, context);
             if (__if != _if) {
-                /* handle J.If ancestors */
-                if (!(__if.getIfCondition().getTree() instanceof J.MethodInvocation) || !OPTIONAL_IS_PRESENT.matches((J.MethodInvocation) __if.getIfCondition().getTree())) {
-                    return __if;
+                /* if else part is present */
+                if (Objects.nonNull(_if.getElsePart())) {
+                    return _if;
                 }
+
                 /* check if parent is else-if */
                 if (getCursor().getParent().getParent().getValue() instanceof J.If.Else) {
                     return _if;
                 }
-                /* check if return statement is present */
-                if(isReturnPresentVisitor.isReturnPresent(__if).get()){
+
+                /* handle J.If ancestors */
+                if (!(__if.getIfCondition().getTree() instanceof J.MethodInvocation) || !OPTIONAL_IS_PRESENT.matches((J.MethodInvocation) __if.getIfCondition().getTree())) {
+                    return __if;
+                }
+
+                /* handle nested ifs with optional#IsPresent mi */
+                if (isParentWithOptionalIsPresentMi()) {
+                    return _if;
+                }
+
+                J.Identifier optionalVariable = (J.Identifier) ((J.MethodInvocation) __if.getIfCondition().getTree()).getSelect();
+                if (!IsBlockLambdaConvertibleVisitor.isBlockLambdaConvertible((J.Block) __if.getThenPart(), getCursor(), optionalVariable).get()) {
                     return _if;
                 }
 
                 /* replace if block with Optional#ifPresent and lambda expression */
-                String methodSelector = ((J.MethodInvocation) __if.getIfCondition().getTree()).getSelect().toString();
-                String template = String.format("%s.ifPresent((obj) -> #{any()})", methodSelector);
+                String methodSelector = optionalVariable.getSimpleName();
+                String uniqueLambdaParameterName = VariableNameUtils.generateVariableName("obj", getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER);
+                String template = String.format("%s.ifPresent((%s) -> #{any()})", methodSelector, uniqueLambdaParameterName);
                 J ifPresentMi = __if.withTemplate(JavaTemplate.builder(this::getCursor, template).build(), __if.getCoordinates().replace(), __if.getThenPart());
 
                 /* replace Optional#get to lambda parameter */
@@ -101,21 +113,8 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
             if (!OPTIONAL_IS_PRESENT.matches(mi) || !isIfCondition()) {
                 return mi;
             }
-            /* Do nothing if J.If has Else part OR J.If control parentheses has multiple conditions */
-            J.If _if = getJIF();
-            if (!Objects.isNull(_if.getElsePart()) || !(_if.getIfCondition().getTree() instanceof J.MethodInvocation)) {
-                return mi;
-            }
-            /* Check for assignments to variable declared ouside the scope of J.If block*/
-            if (!isVariableAssignmentLambdaCompatible(_if)) {
-                return mi;
-            }
             /* Add marker to notify visitIf that the method is found. */
             return SearchResult.found(mi);
-        }
-
-        private J.If getJIF() {
-            return (getCursor().dropParentUntil(is -> is instanceof J.If || is instanceof J.CompilationUnit)).getValue();
         }
 
         private boolean isIfCondition() {
@@ -124,22 +123,10 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
             return maybeControlParentheses.getValue() instanceof J.ControlParentheses && maybeControlParentheses.getParent().getValue() instanceof J.If;
         }
 
-        private boolean isVariableAssignmentLambdaCompatible(J.If __if) {
-            /* Check if any assignments to variables declared outside the scope of If Block*/
-            Set<String> declaredVariables = new HashSet<>();
-            for (J statement : ((J.Block) __if.getThenPart()).getStatements()) {
-                if (statement instanceof J.VariableDeclarations) {
-                    ((J.VariableDeclarations) statement).getVariables().forEach((namedVariable -> declaredVariables.add(namedVariable.getName().getSimpleName())));
-                }
-                if (statement instanceof J.Assignment) {
-                    if (!declaredVariables.contains(((J.Identifier) ((J.Assignment) statement).getVariable()).getSimpleName())) {
-                        return false;
-                    }
-                }
-            }
-            return true;
+        private boolean isParentWithOptionalIsPresentMi() {
+            Cursor maybeIf = getCursor().dropParentUntil(is -> is instanceof J.If || is instanceof J.CompilationUnit);
+            return maybeIf.getValue() instanceof J.If && ((J.If) maybeIf.getValue()).getIfCondition().getTree() instanceof J.MethodInvocation && OPTIONAL_IS_PRESENT.matches((J.MethodInvocation) ((J.If) maybeIf.getValue()).getIfCondition().getTree());
         }
-
     }
 
     @Value
@@ -150,7 +137,7 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
         String methodSelector;
 
         static J replace(J subtree, ExecutionContext p, J.Identifier lambdaParameterIdentifier, String methodSelector) {
-            return new ReplaceMethodCallWithStringVisitor(lambdaParameterIdentifier,methodSelector).visit(subtree, p);
+            return new ReplaceMethodCallWithStringVisitor(lambdaParameterIdentifier, methodSelector).visit(subtree, p);
         }
 
         @Override
@@ -159,7 +146,7 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
 
             /* Only replace method invocations that has same method selector as present in if condition */
             if (OPTIONAL_GET.matches(mi)) {
-                if(mi.getSelect().toString().equals(methodSelector))
+                if (mi.getSelect().toString().equals(methodSelector))
                     return lambdaParameterIdentifier;
             }
             return mi;
@@ -167,21 +154,4 @@ public class ReplaceIsPresentWithIfPresent extends Recipe {
 
     }
 
-    @Value
-    @EqualsAndHashCode(callSuper = true)
-    public static class isReturnPresentVisitor extends JavaVisitor<AtomicBoolean> {
-
-        static AtomicBoolean isReturnPresent(J subtree) {
-            return new isReturnPresentVisitor().reduce(subtree,new AtomicBoolean());
-        }
-
-        @Override
-        public J visitReturn(J.Return _return, AtomicBoolean isPresent){
-            if(isPresent.get()){
-                return _return;
-            }
-            isPresent.set(true);
-            return _return;
-        }
-    }
 }

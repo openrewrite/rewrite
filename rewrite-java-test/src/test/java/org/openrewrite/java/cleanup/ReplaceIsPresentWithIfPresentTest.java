@@ -100,7 +100,26 @@ class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
     }
 
     @Test
-    void doNothingIfNotLambdaCompatible() {
+    void doNothingIfContainsReturn() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+              public class A {
+                  Integer method(Optional<Integer> o) {
+                      if (o.isPresent()){
+                          return o.get();
+                      }
+                      return -1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNothingIfLocalVariableAssignedInsideIfBlock() {
         rewriteRun(
           java(
             """
@@ -124,17 +143,43 @@ class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
     }
 
     @Test
-    void doNothingIfContainsReturn() {
+    void doNothingIfNonEffectivelyFinalVariableAccessed() {
         rewriteRun(
           java(
             """
               import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
               public class A {
-                  Integer method(Optional<Integer> o) {
-                      if (o.isPresent()){
-                          return o.get();
+                  void method() {
+                      int x=10;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      if(o.isPresent()){
+                          int y=x;
+                          list.add(o.get());
                       }
-                      return -1;
+                      x=20;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class B {
+                  void method() {
+                      int x;
+                      x=10;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      if(o.isPresent()){
+                          int y=x;
+                          list.add(o.get());
+                      }
+                      x=20;
                   }
               }
               """
@@ -160,10 +205,26 @@ class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
                       return -1;
                   }
               }
+              """,
+            """
+              import java.util.Optional;
+              public class A {
+                  Integer method(Optional<Integer> a, Optional<Integer> b, Optional<Integer> c) {
+                      a.ifPresent((obj) -> {
+                          if (b.isPresent()) {
+                              if (c.isPresent()) {
+                                  int x = obj + b.get() + c.get();
+                              }
+                          }
+                      });
+                      return -1;
+                  }
+              }
               """
           )
         );
     }
+
 
     @Test
     void replace() {
@@ -197,9 +258,203 @@ class ReplaceIsPresentWithIfPresentTest implements RewriteTest {
                   }
               }
               """
+          ),
+          java(
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class B {
+                  void method() {
+                      final int z=12;
+                      int x;
+                      x=10;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      if(o.isPresent()){
+                          int y = x;
+                          list.add(o.get());
+                          System.out.println(o.get() + y + z);
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class B {
+                  void method() {
+                      final int z=12;
+                      int x;
+                      x=10;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      o.ifPresent((obj) -> {
+                          int y = x;
+                          list.add(obj);
+                          System.out.println(obj + y + z);
+                      });
+                  }
+              }
+              """
+
           )
         );
     }
+
+    @Test
+    void replaceIfStaticVariableAccessedORAssigned() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class A {
+                  static int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      if(o.isPresent()){
+                          z = 30;
+                          list.add(o.get());
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class A {
+                  static int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      o.ifPresent((obj) -> {
+                          z = 30;
+                          list.add(obj);
+                      });
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class B {
+                  static int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      if(o.isPresent()){
+                          list.add(o.get() + z);
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class B {
+                  static int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      o.ifPresent((obj) -> {
+                          list.add(obj + z);
+                      });
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceIfInstanceVariableAssignedORAccessed() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class A {
+                  int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      if(o.isPresent()){
+                          z = 30;
+                          list.add(o.get());
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class A {
+                  int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      o.ifPresent((obj) -> {
+                          z = 30;
+                          list.add(obj);
+                      });
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class B {
+                  int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      if(o.isPresent()){
+                          list.add(o.get() + z);
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.Optional;
+              import java.util.ArrayList;
+              import java.util.List;
+              public class B {
+                  int z = 10;
+                  void method() {
+                      z=20;
+                      List<Integer> list = new ArrayList<>();
+                      Optional<Integer> o = Optional.of(2);
+                      o.ifPresent((obj) -> {
+                          list.add(obj + z);
+                      });
+                  }
+              }
+              """
+          )
+        );
+    }
+
 
     @Test
     void replaceNestedIf() {
