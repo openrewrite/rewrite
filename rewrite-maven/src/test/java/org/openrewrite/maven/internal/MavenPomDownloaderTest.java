@@ -135,6 +135,41 @@ class MavenPomDownloaderTest {
     }
 
     @Test
+    void useSnapshotTimestampVersion() {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        var gav = new GroupArtifactVersion("fred", "fred", "2020.0.2-20210127.131051-2");
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    return !recordedRequest.getPath().endsWith("fred/fred/2020.0.2-SNAPSHOT/fred-2020.0.2-20210127.131051-2.pom") ?
+                      new MockResponse().setResponseCode(404).setBody("") :
+                      new MockResponse().setResponseCode(200).setBody(
+                        //language=xml
+                        """
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """);
+                }
+            });
+            mockRepo.start();
+            var repositories = List.of(MavenRepository.builder()
+              .id("id")
+              .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+              .username("user")
+              .password("pass")
+              .build());
+
+            assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
     void usesAnonymousRequestIfRepositoryRejectsCredentials() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");

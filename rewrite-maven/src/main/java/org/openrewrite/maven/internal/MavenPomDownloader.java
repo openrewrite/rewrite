@@ -48,6 +48,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
@@ -63,6 +65,11 @@ public class MavenPomDownloader {
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
 
     private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
+
+    private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile( "^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$" );
+
+    private static final String SNAPSHOT = "SNAPSHOT";
+
 
     private final MavenPomCache mavenCache;
     private final Map<Path, Pom> projectPoms;
@@ -475,6 +482,9 @@ public class MavenPomDownloader {
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
+        GroupArtifactVersion originalGav = gav;
+        gav = handleSnapshotTimestampVersion(gav);
+
         for (MavenRepository repo : normalizedRepos) {
             if (!repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
                 continue;
@@ -555,11 +565,30 @@ public class MavenPomDownloader {
 
         sample.stop(timer.tags("outcome", "unavailable").register(Metrics.globalRegistry));
         if (containingPom != null) {
-            ctx.getResolutionListener().downloadError(gav, containingPom.getRequested());
+            ctx.getResolutionListener().downloadError(originalGav, containingPom.getRequested());
         }
 
-        throw new MavenDownloadingException("Unable to download POM.", null, gav)
+        throw new MavenDownloadingException("Unable to download POM.", null, originalGav)
                 .setRepositoryResponses(repositoryResponses);
+    }
+
+    /**
+     *
+     * Gets the base version from snapshot timestamp version.
+     *
+     * @param gav
+     * @return gav
+     */
+    private GroupArtifactVersion handleSnapshotTimestampVersion(GroupArtifactVersion gav) {
+
+        Matcher m = SNAPSHOT_TIMESTAMP.matcher(gav.getVersion());
+        if (m.matches()) {
+            if (m.group(1) != null) {
+                String baseVersion = m.group(1) + SNAPSHOT;
+                return gav.withVersion(baseVersion);
+            }
+        }
+        return gav;
     }
 
     @Nullable
