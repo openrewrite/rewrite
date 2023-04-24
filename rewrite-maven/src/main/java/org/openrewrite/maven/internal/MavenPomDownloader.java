@@ -583,10 +583,13 @@ public class MavenPomDownloader {
 
         Matcher m = SNAPSHOT_TIMESTAMP.matcher(gav.getVersion());
         if (m.matches()) {
+            String baseVersion;
             if (m.group(1) != null) {
-                String baseVersion = m.group(1) + SNAPSHOT;
-                return gav.withVersion(baseVersion);
+                baseVersion = m.group(1) + SNAPSHOT;
+            } else {
+                baseVersion = SNAPSHOT;
             }
+            return gav.withVersion(baseVersion);
         }
         return gav;
     }
