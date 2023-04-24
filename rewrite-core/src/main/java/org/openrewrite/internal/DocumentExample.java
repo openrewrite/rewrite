@@ -15,17 +15,15 @@
  */
 package org.openrewrite.internal;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.*;
 
 /**
  * Mark a test as a good recipe example to present on document/web pages.
  */
-@Retention(
-    /* you're not going to be able to deny your contribution */
-    RetentionPolicy.RUNTIME
-)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface DocumentExample {
-    String name();
+    String value() default "";
 }
 

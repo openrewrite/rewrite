@@ -230,6 +230,10 @@ public class StringUtils {
         return string == null || string.isEmpty();
     }
 
+    public static boolean isNotEmpty(@Nullable String string) {
+        return string != null && !string.isEmpty();
+    }
+
     public static String readFully(@Nullable InputStream inputStream) {
         if (inputStream == null) {
             return "";

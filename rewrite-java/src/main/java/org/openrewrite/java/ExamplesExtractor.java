@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.config.RecipeExample;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -114,10 +115,17 @@ public class ExamplesExtractor extends JavaIsoVisitor<ExecutionContext> {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                 if (DOCUMENT_EXAMPLE_ANNOTATION_MATCHER.matches(annotation)) {
                     List<Expression> args = annotation.getArguments();
-                    if (args.size() == 1 && args.get(0) instanceof J.Assignment) {
-                        J.Assignment assignment = (J.Assignment) args.get(0);
-                        if (assignment.getAssignment() instanceof J.Literal) {
-                            exampleDescription = (String) ((J.Literal) assignment.getAssignment()).getValue();
+
+
+                    if (args.size() == 1) {
+                        Expression arg = args.get(0);
+                        if (arg instanceof J.Assignment) {
+                            J.Assignment assignment = (J.Assignment) args.get(0);
+                            if (assignment.getAssignment() instanceof J.Literal) {
+                                exampleDescription = (String) ((J.Literal) assignment.getAssignment()).getValue();
+                            }
+                        } else if (arg instanceof J.Literal) {
+                            exampleDescription = (String) ((J.Literal) args.get(0)).getValue();
                         }
                     }
                 }
@@ -170,12 +178,21 @@ public class ExamplesExtractor extends JavaIsoVisitor<ExecutionContext> {
             output.append("recipeName: ").append(recipeName).append("\n");
             output.append("examples:\n");
             for (RecipeExample example : examples) {
-                output.append("- description: \"").append(example.getDescription()).append("\"\n");
+
+                if (StringUtils.isNotEmpty(example.getDescription())) {
+                    output.append("- description: \"").append(example.getDescription()).append("\"\n");
+                }
                 output.append("  before: |\n");
                 output.append(indentTextBlock(example.getBefore()));
-                output.append("  after: |\n");
-                output.append(indentTextBlock(example.getAfter()));
-                output.append("  language: \"").append(example.getLanguage()).append("\"\n");
+
+                if (StringUtils.isNotEmpty(example.getAfter())) {
+                    output.append("  after: |\n");
+                    output.append(indentTextBlock(example.getAfter()));
+                }
+
+                if (StringUtils.isNotEmpty(example.getLanguage())) {
+                    output.append("  language: \"").append(example.getLanguage()).append("\"\n");
+                }
             }
             return output.toString();
         }

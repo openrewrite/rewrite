@@ -29,7 +29,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
         spec.recipe(new ChainStringBuilderAppendCalls());
     }
 
-    @DocumentExample(name = "Objects concatenation.")
+    @DocumentExample(value="Objects concatenation.")
     @Test
     void objectsConcatenation() {
         rewriteRun(
@@ -74,6 +74,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
         );
     }
 
+    @DocumentExample("Grouping concatenation.")
     @Test
     void groupedStringsConcatenation() {
         rewriteRun(

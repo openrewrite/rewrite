@@ -50,7 +50,7 @@ class ExamplesExtractorTest implements RewriteTest {
                     spec.recipe(recipe);
                 }
 
-                @DocumentExample(name = "Objects concatenation.")
+                @DocumentExample(value = "Objects concatenation.")
                 @Test
                 void objectsConcatenation() {
                     rewriteRun(
@@ -133,7 +133,7 @@ class ExamplesExtractorTest implements RewriteTest {
             
             class ChainStringBuilderAppendCallsTest implements RewriteTest {
 
-                @DocumentExample(name = "Objects concatenation.")
+                @DocumentExample("Objects concatenation.")
                 @Test
                 void objectsConcatenation() {
                     rewriteRun(
