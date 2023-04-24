@@ -66,7 +66,7 @@ public class MavenPomDownloader {
 
     private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
 
-    private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile( "^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$" );
+    private static final Pattern SNAPSHOT_TIMESTAMP = Pattern.compile("^(.*-)?([0-9]{8}\\.[0-9]{6}-[0-9]+)$");
 
     private static final String SNAPSHOT = "SNAPSHOT";
 
