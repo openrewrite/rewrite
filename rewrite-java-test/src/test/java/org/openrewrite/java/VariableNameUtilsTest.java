@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
@@ -26,6 +27,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static java.util.Collections.emptySet;
@@ -457,6 +459,53 @@ class VariableNameUtilsTest implements RewriteTest {
                   int name = 0;
                   void method(int name1) {
                       int name3 = 0;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void conflictsInModifiedContents() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                  lambda = super.visitLambda(lambda, ctx);
+                  if (((J.VariableDeclarations) lambda.getParameters().getParameters().get(0)).getVariables().get(0).getSimpleName().startsWith("i")) {
+                      J.VariableDeclarations declarations = (J.VariableDeclarations) lambda.getParameters().getParameters().get(0);
+                      J.VariableDeclarations.NamedVariable variable = declarations.getVariables().get(0);
+                      variable = variable.withName(variable.getName().withSimpleName(VariableNameUtils.generateVariableName("j", new Cursor(getCursor(), lambda), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER)));
+                      lambda = lambda.withParameters(lambda.getParameters().withParameters(List.of(declarations.withVariables(List.of(variable)))));
+                  }
+                  return lambda;
+              }
+          })),
+          java(
+            """
+              @SuppressWarnings("all")
+              class Test {
+                  void m() {
+                      Consumer<Integer> c1 = i1 -> {
+                          Consumer<Integer> c2 = i2 -> {
+                            Consumer<Integer> c3 = i3 -> {
+                            };
+                          };
+                      };
+                  }
+              }
+              """,
+            """
+              @SuppressWarnings("all")
+              class Test {
+                  void m() {
+                      Consumer<Integer> c1 = j2 -> {
+                          Consumer<Integer> c2 = j1 -> {
+                            Consumer<Integer> c3 = j -> {
+                            };
+                          };
+                      };
                   }
               }
               """

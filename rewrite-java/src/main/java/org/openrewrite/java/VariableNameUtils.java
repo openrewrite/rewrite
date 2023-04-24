@@ -32,9 +32,13 @@ public class VariableNameUtils {
 
     /**
      * Generates a variable name without namespace conflicts in the scope of a cursor.
-     *
+     * <p>
      * A JavaSourceFile must be available in the Cursor path to account for all names
      * available in the cursor scope.
+     * <p>
+     * Since the client recipe may have modified the LST element represented by {@code scope}, this method will
+     * visit the value held by {@code scope} once it encounters it in the tree. For this to work, the client recipe
+     * must use {@link Cursor#Cursor(Cursor, Object)} to pass a cursor holding the modified LST element.
      *
      * @param baseName baseName for the variable.
      * @param scope The cursor position of a JavaVisitor, {@link org.openrewrite.java.JavaVisitor#getCursor()}.
@@ -103,7 +107,7 @@ public class VariableNameUtils {
 
     /**
      * Collects class field names inherited from super classes.
-     *
+     * <p>
      * Note: Does not currently account for {@link JavaType.Unknown}.
      */
     public static Set<String> findInheritedNames(J.ClassDeclaration classDeclaration) {
@@ -175,6 +179,12 @@ public class VariableNameUtils {
                 currentScope.push(aggregatedScope);
             }
             return s;
+        }
+
+        @Override
+        public @Nullable J preVisit(J tree, Set<String> namesInScope) {
+            // visit value from scope rather than `tree`, since calling recipe may have modified it already
+            return scope.<J> getValue().isScope(tree) ? scope.getValue() : super.preVisit(tree, namesInScope);
         }
 
         // Stop after the tree has been processed to ensure all the names in scope have been collected.
