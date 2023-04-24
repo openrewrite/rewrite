@@ -62,18 +62,6 @@ class NoStaticImportTest implements RewriteTest {
                 method0();
             }
         }
-        """, """
-        package org.openrewrite.java;
-
-        public class TestNoStaticImport{
-
-            public static void method0() {
-            }
-
-            public static void method1() {
-                method0();
-            }
-        }
         """));
     }
 }
