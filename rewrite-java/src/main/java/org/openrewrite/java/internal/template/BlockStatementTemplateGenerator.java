@@ -269,6 +269,28 @@ public class BlockStatementTemplateGenerator {
                 after.append(';');
             }
             after.append('}');
+        } else if (j instanceof J.Annotation) {
+            J.Annotation annotation = (J.Annotation) j;
+            Optional<Expression> arg = annotation.getArguments().stream().filter(a -> a == prior).findFirst();
+            if (arg.isPresent()) {
+                StringBuilder beforeBuffer = new StringBuilder();
+                beforeBuffer.append('@').append(((JavaType.Class) annotation.getType()).getFullyQualifiedName()).append('(');
+                before.insert(0, beforeBuffer);
+                after.append(')').append('\n');
+
+                J parent = next(cursor).getValue();
+                if (parent instanceof J.ClassDeclaration) {
+                    J.ClassDeclaration cd = (J.ClassDeclaration) parent;
+                    after.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
+                } else if (parent instanceof J.MethodDeclaration) {
+                    J.MethodDeclaration md = (J.MethodDeclaration) parent;
+                    after.append(md.withBody(null)
+                            .withLeadingAnnotations(emptyList())
+                            .withPrefix(Space.EMPTY)
+                            .printTrimmed(cursor).trim()).append("{}");
+                }
+                // TODO cover more cases where annotations can appear, ideally not by "inlining" template for parent
+            }
         } else if (j instanceof J.DoWhileLoop) {
             J.DoWhileLoop dw = (J.DoWhileLoop) j;
             if (referToSameElement(prior, dw.getWhileCondition())) {

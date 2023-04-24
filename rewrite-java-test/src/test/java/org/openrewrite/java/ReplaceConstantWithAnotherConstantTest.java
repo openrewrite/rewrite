@@ -32,6 +32,45 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     }
 
     @Test
+    void replaceConstantInAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.constant.B.UTF_8")),
+          java(
+            """
+              package com.constant;
+              public class B {
+                  public static final String UTF_8 = "UTF_8";
+              }
+              """
+          ),
+          java(
+            """
+              import com.google.common.base.Charsets;
+              
+              @SuppressWarnings(Charsets.UTF_8)
+              class Test {
+                  @SuppressWarnings(value = Charsets.UTF_8)
+                  void foo() {
+                      System.out.println("Annotation");
+                  }
+              }
+              """,
+            """
+              import com.constant.B;
+    
+              @SuppressWarnings(B.UTF_8)
+              class Test {
+                  @SuppressWarnings(value = B.UTF_8)
+                  void foo() {
+                      System.out.println("Annotation");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceConstant() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.constant.B.UTF_8")),
