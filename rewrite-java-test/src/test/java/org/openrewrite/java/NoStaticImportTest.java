@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -30,7 +29,6 @@ class NoStaticImportTest implements RewriteTest {
           java(
             """
               import static java.util.Collections.emptyList;
-
               class Test {
                   void test() {
                       Object o = emptyList();
@@ -43,29 +41,6 @@ class NoStaticImportTest implements RewriteTest {
               class Test {
                   void test() {
                       Object o = Collections.emptyList();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/pull/3161")
-    void verifyInnerCallsAreNotUpdated() {
-        rewriteRun(
-          spec -> spec.recipe(new NoStaticImport("*..* *(..)")),
-          java(
-            """
-              package org.openrewrite.java;
-
-              public class TestNoStaticImport {
-
-                  public static void method0() {
-                  }
-
-                  public static void method1() {
-                      method0();
                   }
               }
               """

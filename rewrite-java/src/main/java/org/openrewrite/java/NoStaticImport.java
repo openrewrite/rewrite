@@ -24,9 +24,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
-import java.util.HashSet;
-import java.util.Set;
-
 @ToString
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
@@ -61,40 +58,30 @@ public class NoStaticImport extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            final Set<String> typesWithStaticImports = new HashSet<>();
-
-            @Override
-            public J.Import visitImport(J.Import _import, ExecutionContext ctx) {
-                if (_import.isStatic()) {
-                    typesWithStaticImports.add(_import.getTypeName());
-                }
-                return _import;
-            }
-
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (m.getSelect() == null && methodMatcher.matches(m) && m.getMethodType() != null) {
-                    JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
-                    if (!typesWithStaticImports.contains(receiverType.getFullyQualifiedName())) {
-                        return m;
+                if (methodMatcher.matches(m) && m.getSelect() == null) {
+                    if (m.getMethodType() != null) {
+                        JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+
+                        RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(),
+                                true);
+                        if (!getAfterVisit().contains(op)) {
+                            doAfterVisit(op);
+                        }
+
+                        maybeAddImport(receiverType.getFullyQualifiedName());
+                        m = m.withSelect(new J.Identifier(Tree.randomId(),
+                                Space.EMPTY,
+                                Markers.EMPTY,
+                                receiverType.getClassName(),
+                                receiverType,
+                                null)
+                        );
                     }
 
-                    RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(),
-                            true);
-                    if (!getAfterVisit().contains(op)) {
-                        doAfterVisit(op);
-                    }
-
-                    maybeAddImport(receiverType.getFullyQualifiedName());
-                    m = m.withSelect(new J.Identifier(Tree.randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            receiverType.getClassName(),
-                            receiverType,
-                            null)
-                    );
                 }
 
                 return m;
