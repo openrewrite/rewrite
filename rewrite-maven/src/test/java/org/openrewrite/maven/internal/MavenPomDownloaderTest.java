@@ -28,6 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenParser;
@@ -132,6 +133,42 @@ class MavenPomDownloaderTest {
                 .hasMessageContaining("http://%s:%d/maven".formatted(repo2.getHostName(), repo2.getPort()));
           })
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3152")
+    void useSnapshotTimestampVersion() {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        var gav = new GroupArtifactVersion("fred", "fred", "2020.0.2-20210127.131051-2");
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    return !recordedRequest.getPath().endsWith("fred/fred/2020.0.2-SNAPSHOT/fred-2020.0.2-20210127.131051-2.pom") ?
+                      new MockResponse().setResponseCode(404).setBody("") :
+                      new MockResponse().setResponseCode(200).setBody(
+                        //language=xml
+                        """
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """);
+                }
+            });
+            mockRepo.start();
+            var repositories = List.of(MavenRepository.builder()
+              .id("id")
+              .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+              .username("user")
+              .password("pass")
+              .build());
+
+            assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test
@@ -270,6 +307,7 @@ class MavenPomDownloaderTest {
             snapshotRepo.start();
 
             MavenParser.builder().build().parse(ctx,
+              //language=xml
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
