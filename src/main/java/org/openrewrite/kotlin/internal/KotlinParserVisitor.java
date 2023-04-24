@@ -3798,6 +3798,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return createIdentifier(name, typeMapping.type(firElement, getCurrentFile()), null);
     }
 
+    private J.Identifier createIdentifier(String name, FirResolvedNamedReference namedReference) {
+        FirBasedSymbol<?> resolvedSymbol = namedReference.getResolvedSymbol();
+        if (resolvedSymbol instanceof FirVariableSymbol) {
+            FirVariableSymbol<?> propertySymbol = (FirVariableSymbol<?>) resolvedSymbol;
+            JavaType.FullyQualified owner = null;
+            ConeClassLikeLookupTag lookupTag = ClassMembersKt.containingClass(propertySymbol);
+            if (lookupTag != null) {
+                owner = (JavaType.FullyQualified) typeMapping.type(LookupTagUtilsKt.toFirRegularClassSymbol(lookupTag, firSession).getFir());
+            }
+            return createIdentifier(name, typeMapping.type(namedReference, getCurrentFile()),
+                typeMapping.variableType(propertySymbol, owner, getCurrentFile()));
+        }
+        return createIdentifier(name, (FirElement) namedReference);
+    }
+
     @SuppressWarnings("SameParameterValue")
     private J.Identifier createIdentifier(String name, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
         Space prefix = whitespace();

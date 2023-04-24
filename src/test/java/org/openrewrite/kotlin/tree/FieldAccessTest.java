@@ -27,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-
 class FieldAccessTest implements RewriteTest {
 
     @Test
@@ -140,6 +139,30 @@ class FieldAccessTest implements RewriteTest {
           kotlin(
             """
             val pattern = java.util.regex.Pattern.compile(".*")
+            """
+          )
+        );
+    }
+
+    @Test
+    void propertyFieldType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                  if (fieldAccess.getSimpleName().equals("MIN_VALUE")) {
+                      JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
+                      assertThat(fieldType).isNotNull();
+                      assertThat(fieldType.getName()).isEqualTo("MIN_VALUE");
+                      assertThat(fieldType.getType().toString()).isEqualTo("kotlin.Int");
+                      assertThat(fieldType.getOwner().toString()).isEqualTo("kotlin.Int$Companion");
+                  }
+                  return super.visitFieldAccess(fieldAccess, ctx);
+              }
+          })),
+          kotlin(
+            """
+            val i = Int.MIN_VALUE
             """
           )
         );
