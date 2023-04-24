@@ -16,10 +16,17 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.test.RewriteTest.toRecipe;
+
 
 class FieldAccessTest implements RewriteTest {
 
@@ -110,6 +117,29 @@ class FieldAccessTest implements RewriteTest {
             import java.nio.ByteBuffer
             
             private val crlf : ByteBuffer = ByteBuffer . wrap( "\\r\\n" . toByteArray ( ) )
+            """
+          )
+        );
+    }
+
+    @Test
+    void platformFieldType() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              @Override
+              public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                  if (variable.getSimpleName().equals("pattern")) {
+                      JavaType.Variable variableType = variable.getVariableType();
+                      assertThat(variableType).isNotNull();
+                      assertThat(variableType.getName()).isEqualTo("pattern");
+                      assertThat(variableType.getType().toString()).isEqualTo("java.util.regex.Pattern");
+                  }
+                  return super.visitVariable(variable, ctx);
+              }
+          })),
+          kotlin(
+            """
+            val pattern = java.util.regex.Pattern.compile(".*")
             """
           )
         );
