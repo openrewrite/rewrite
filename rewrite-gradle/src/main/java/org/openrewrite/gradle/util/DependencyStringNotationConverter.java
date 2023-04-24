@@ -19,13 +19,6 @@ import org.openrewrite.internal.lang.Nullable;
 
 public class DependencyStringNotationConverter {
 
-    /**
-     * Static utility class, no need to invoke this constructor. Temporarily maintaining for backwards compatibility.
-     */
-    @Deprecated
-    public DependencyStringNotationConverter() {
-    }
-
     public static Dependency parse(String notation) {
         int idx = notation.lastIndexOf('@');
         if (idx == -1) {
