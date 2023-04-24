@@ -231,18 +231,21 @@ public class ResolvedPom {
             case "pom.groupId":
                 return requested.getGroupId();
             case "project.parent.groupId":
+            case "parent.groupId":
                 return requested.getParent() != null ? requested.getParent().getGroupId() : null;
             case "artifactId":
             case "project.artifactId":
             case "pom.artifactId":
                 return requested.getArtifactId(); // cannot be inherited from parent
             case "project.parent.artifactId":
+            case "parent.artifactId":
                 return requested.getParent() == null ? null : requested.getParent().getArtifactId();
             case "version":
             case "project.version":
             case "pom.version":
                 return requested.getVersion();
             case "project.parent.version":
+            case "parent.version":
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
         }
 
