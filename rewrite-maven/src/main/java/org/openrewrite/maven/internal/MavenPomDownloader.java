@@ -573,17 +573,12 @@ public class MavenPomDownloader {
     }
 
     /**
-     *
      * Gets the base version from snapshot timestamp version.
-     *
-     * @param gav
-     * @return gav
      */
     private GroupArtifactVersion handleSnapshotTimestampVersion(GroupArtifactVersion gav) {
-
         Matcher m = SNAPSHOT_TIMESTAMP.matcher(gav.getVersion());
         if (m.matches()) {
-            String baseVersion;
+            final String baseVersion;
             if (m.group(1) != null) {
                 baseVersion = m.group(1) + SNAPSHOT;
             } else {

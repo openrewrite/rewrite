@@ -28,6 +28,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenParser;
@@ -135,6 +136,7 @@ class MavenPomDownloaderTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3152")
     void useSnapshotTimestampVersion() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         var gav = new GroupArtifactVersion("fred", "fred", "2020.0.2-20210127.131051-2");
@@ -305,6 +307,7 @@ class MavenPomDownloaderTest {
             snapshotRepo.start();
 
             MavenParser.builder().build().parse(ctx,
+              //language=xml
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
