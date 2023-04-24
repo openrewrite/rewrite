@@ -78,7 +78,7 @@ public class ExamplesExtractor extends JavaIsoVisitor<ExecutionContext> {
     private List<RecipeExample> recipeExamples;
     private String exampleDescription;
 
-    protected ExamplesExtractor() {
+    public ExamplesExtractor() {
         recipeType = "specs.openrewrite.org/v1beta/example";
         recipeExamples = new ArrayList<>();
     }
@@ -93,8 +93,12 @@ public class ExamplesExtractor extends JavaIsoVisitor<ExecutionContext> {
 
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-        if ( method.getMethodType().getDeclaringType().getInterfaces().get(0).getFullyQualifiedName().equals("org.openrewrite.test.RewriteTest") &&
-             method.getName().getSimpleName().equals("defaults")) {
+        if (method.getName().getSimpleName().equals("defaults") &&
+            method.getMethodType() != null &&
+            method.getMethodType().getDeclaringType() != null &&
+            !method.getMethodType().getDeclaringType().getInterfaces().isEmpty() &&
+            method.getMethodType().getDeclaringType().getInterfaces().get(0).getFullyQualifiedName().equals("org.openrewrite.test.RewriteTest")
+        ) {
             defaultRecipeName = findDefaultRecipeName(method);
             return method;
         }
