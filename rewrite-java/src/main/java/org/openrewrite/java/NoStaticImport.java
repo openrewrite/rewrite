@@ -66,8 +66,12 @@ public class NoStaticImport extends Recipe {
                     if (m.getMethodType() != null) {
                         JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
 
-                        RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(),
-                                true);
+                        // Do not replace if receiverType is the same as surrounding class
+                        if (getCursor().firstEnclosing(J.ClassDeclaration.class).getType().equals(receiverType)) {
+                            return m;
+                        }
+
+                        RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(), true);
                         if (!getAfterVisit().contains(op)) {
                             doAfterVisit(op);
                         }
