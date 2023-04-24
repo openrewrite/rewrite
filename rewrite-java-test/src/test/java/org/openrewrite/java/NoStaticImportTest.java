@@ -66,4 +66,20 @@ class NoStaticImportTest implements RewriteTest {
             }
             """));
     }
+
+    @Test
+    void superCallsNotChanged() {
+        rewriteRun(
+          spec -> spec.recipe(new NoStaticImport("*..* *(..)")),
+          java("""
+            package org.openrewrite.java;
+
+            public class TestNoStaticImport {
+
+                public TestNoStaticImport() {
+                    super();
+                }
+            }
+            """));
+    }
 }

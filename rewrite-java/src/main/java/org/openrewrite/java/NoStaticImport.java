@@ -71,6 +71,11 @@ public class NoStaticImport extends Recipe {
                             return m;
                         }
 
+                        // Do not replace calls to super() in constructors
+                        if (m.getName().getSimpleName().equals("super")) {
+                            return m;
+                        }
+
                         RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(), true);
                         if (!getAfterVisit().contains(op)) {
                             doAfterVisit(op);
