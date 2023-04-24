@@ -159,7 +159,7 @@ public class AddDependency extends Recipe {
                         if (dependencyDslMatcher.matches(m) && (StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName()))) {
                             if (m.getArguments().get(0) instanceof J.Literal) {
                                 //noinspection ConstantConditions
-                                Dependency dependency = new DependencyStringNotationConverter().parse((String) ((J.Literal) m.getArguments().get(0)).getValue());
+                                Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) m.getArguments().get(0)).getValue());
                                 if (groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
                                     getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
                                 }

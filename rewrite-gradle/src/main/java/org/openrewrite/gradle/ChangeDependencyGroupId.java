@@ -97,7 +97,7 @@ public class ChangeDependencyGroupId extends Recipe {
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        Dependency dependency = new DependencyStringNotationConverter().parse(gav);
+                        Dependency dependency = DependencyStringNotationConverter.parse(gav);
                         if (!newGroupId.equals(dependency.getGroupId()) &&
                                 ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
                                         (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
