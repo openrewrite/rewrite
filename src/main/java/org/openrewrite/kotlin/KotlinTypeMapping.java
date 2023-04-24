@@ -156,7 +156,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         if (classType instanceof FirResolvedTypeRef) {
             // The resolvedTypeRef is used to create parameterized types.
             resolvedTypeRef = (FirResolvedTypeRef) classType;
-            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(resolvedTypeRef.getType(), firSession);
+            ConeKotlinType type = resolvedTypeRef.getType();
+            if (type instanceof ConeFlexibleType) {
+                // for platform types the lower bound is the nullable type
+                type = ((ConeFlexibleType) type).getLowerBound();
+            }
+            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(type, firSession);
             if (symbol == null) {
                 typeCache.put(signature, JavaType.Unknown.getInstance());
                 return JavaType.Unknown.getInstance();
