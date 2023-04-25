@@ -57,7 +57,7 @@ class NoStaticImportTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java;
-              
+                            
               import static org.openrewrite.java.TestNoStaticImport.method0;
 
               public class TestNoStaticImport {
@@ -91,6 +91,47 @@ class NoStaticImportTest implements RewriteTest {
     class Retain {
 
         public static final NoStaticImport NO_STATIC_IMPORT = new NoStaticImport("*..* *(..)");
+
+        @Test
+        void interfaceDefaultMethodNotUpdated() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.springframework.data.domain;
+
+                public interface Window {
+                    default boolean isLast() {
+                        return !hasNext();
+                    }
+                    
+                    boolean hasNext();
+                }
+                """));
+        }
+
+        @Test
+        void methodFromSuperClassNotUpdated() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.example;
+                        
+                public abstract class AbstractClass {
+                    public static boolean foo() {
+                        return false;
+                    }
+                }
+                """),
+              java("""
+                package org.example;
+
+                public class SomeWindow extends AbstractClass {
+                    boolean bar() {
+                        return foo();
+                    }
+                }
+                """));
+        }
 
         @Test
         void verifyInnerCallsAreNotUpdated() {
@@ -217,27 +258,27 @@ class NoStaticImportTest implements RewriteTest {
               spec -> spec.recipe(NO_STATIC_IMPORT),
               java("""
                 package org.openrewrite.java;
-                
+                                
                 import static org.openrewrite.test.Test.Nested.foo;
-                
+                                
                 public class Test {
                     public static void m() {
                         foo();
                     }
-                
+                                
                     public static class Nested {
                         public static void foo() {
                         }
                     }
                 }
-                ""","""
+                """, """
                 package org.openrewrite.java;
-                
+                                
                 public class Test {
                     public static void m() {
                         Nested.foo();
                     }
-                
+                                
                     public static class Nested {
                         public static void foo() {
                         }
