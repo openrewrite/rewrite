@@ -99,7 +99,10 @@ class NoStaticImportTest implements RewriteTest {
               java("""
                 package org.openrewrite.java;
 
-                public class TestNoStaticImport {
+                public class TestNoStaticImport0 {
+                }
+
+                public class TestNoStaticImport1 extends TestNoStaticImport0 {
 
                   public void method(Object obj) {
                     if (getClass() != obj.getClass()) {
