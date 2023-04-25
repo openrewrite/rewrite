@@ -35,7 +35,7 @@ public class MethodMatcherTest implements RewriteTest {
             private final MethodMatcher methodMatcher = new MethodMatcher(pattern);
 
             @Override
-            public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                 if (methodMatcher.matches(method.getMethodType())) {
                     assertThat(method.getName().getSimpleName()).isEqualTo("function");
                 }

@@ -75,7 +75,7 @@ public class ChangeTypeAlias extends Recipe {
             }
 
             @Override
-            public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
                 if (isTypeAlias(multiVariable.getLeadingAnnotations()) && TypeUtils.isOfClassType(multiVariable.getType(), fullyQualifiedAliasedType)) {
                     return super.visitVariableDeclarations(multiVariable, executionContext);
                 }
@@ -83,7 +83,7 @@ public class ChangeTypeAlias extends Recipe {
             }
 
             @Override
-            public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
                 if (aliasName.equals(variable.getSimpleName())) {
                     getCursor().putMessageOnFirstEnclosing(K.CompilationUnit.class, "RENAME_VARIABLE", variable);
                 }

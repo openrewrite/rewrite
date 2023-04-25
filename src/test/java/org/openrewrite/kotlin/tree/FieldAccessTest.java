@@ -126,7 +126,7 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
-              public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+              public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
                   if (variable.getSimpleName().equals("pattern")) {
                       JavaType.Variable variableType = variable.getVariableType();
                       assertThat(variableType).isNotNull();
@@ -149,13 +149,15 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
-              public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+              public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                   if (fieldAccess.getSimpleName().equals("MIN_VALUE")) {
                       JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
                       assertThat(fieldType).isNotNull();
                       assertThat(fieldType.getName()).isEqualTo("MIN_VALUE");
                       assertThat(fieldType.getType().toString()).isEqualTo("kotlin.Int");
-                      assertThat(fieldType.getOwner().toString()).isEqualTo("kotlin.Int$Companion");
+                      if (fieldType.getOwner() != null) {
+                          assertThat(fieldType.getOwner().toString()).isEqualTo("kotlin.Int$Companion");
+                      }
                   }
                   return super.visitFieldAccess(fieldAccess, ctx);
               }

@@ -31,7 +31,7 @@ public class AssertionsTest implements RewriteTest {
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
             @Override
-            public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
                 if ("a".equals(variable.getSimpleName())) {
                     return variable.withName(variable.getName().withSimpleName("b"));
                 }
