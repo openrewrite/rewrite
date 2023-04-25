@@ -22,12 +22,10 @@ import org.gradle.api.Task
 import org.gradle.api.artifacts.Dependency
 import org.gradle.api.artifacts.ModuleDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
-import org.gradle.api.artifacts.dsl.RepositoryHandler
-import org.gradle.api.artifacts.repositories.IvyArtifactRepository
-import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileTree
 import org.gradle.api.file.FileTreeElement
+import org.gradle.api.initialization.dsl.ScriptHandler
 import org.gradle.api.specs.Spec
 import org.gradle.api.tasks.testing.TestFilter
 import org.gradle.api.tasks.testing.TestFrameworkOptions
@@ -36,8 +34,6 @@ import org.gradle.api.tasks.testing.junitplatform.JUnitPlatformOptions
 import org.gradle.api.tasks.testing.testng.TestNGOptions
 import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
-
-
 
 interface DependencyHandlerSpec extends DependencyHandler {
     Dependency annotationProcessor(String dependencyNotation)
@@ -92,15 +88,6 @@ interface DependencyHandlerSpec extends DependencyHandler {
     Dependency testRuntimeOnly(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
     Dependency testRuntimeOnly(Map<String, String> dependencyNotation)
     Dependency testRuntimeOnly(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-}
-
-interface RepositoryHandlerSpec extends RepositoryHandler {
-    MavenArtifactRepository maven(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=MavenArtifactRepositorySpec) Closure closure)
-    IvyArtifactRepository ivy(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=IvyArtifactRepository) Closure closure)
-}
-
-interface MavenArtifactRepositorySpec extends MavenArtifactRepository {
-    void url(Object url)
 }
 
 interface RewriteTestSpec {
@@ -183,10 +170,16 @@ interface RewriteTestSpec {
     void filter(Action<TestFilter> action)
 }
 
+interface ScriptHandlerSpec extends ScriptHandler {
+    void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
+    void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
+}
+
 abstract class RewriteGradleProject extends groovy.lang.Script implements Project {
     Map ext;
 
     // It would be more correct for ext to delegate to ExtraPropertiesExtension, but StaticTypeCheckingVisitor has problems with that
+    abstract void buildscript(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=ScriptHandlerSpec) Closure cl)
     abstract void ext(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=Map) Closure cl)
     abstract void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
