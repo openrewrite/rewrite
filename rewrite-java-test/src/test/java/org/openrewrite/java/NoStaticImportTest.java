@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -204,6 +205,42 @@ class NoStaticImportTest implements RewriteTest {
                                 method0();
                             }
                         }.run();
+                    }
+                }
+                """));
+        }
+
+        @Test
+        @ExpectedToFail("static import not yet replaced with Nested.foo()")
+        void localImport() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+                
+                import static org.openrewrite.test.Test.Nested.foo;
+                
+                public class Test {
+                    public static void m() {
+                        foo();
+                    }
+                
+                    public static class Nested {
+                        public static void foo() {
+                        }
+                    }
+                }
+                ""","""
+                package org.openrewrite.java;
+                
+                public class Test {
+                    public static void m() {
+                        Nested.foo();
+                    }
+                
+                    public static class Nested {
+                        public static void foo() {
+                        }
                     }
                 }
                 """));
