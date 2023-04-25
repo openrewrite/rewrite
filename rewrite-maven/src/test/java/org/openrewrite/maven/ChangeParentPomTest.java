@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -859,50 +860,50 @@ class ChangeParentPomTest implements RewriteTest {
     @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
     class MultiModule {
-        @Test
+        @RepeatedTest(10)
         void multiModule() {
-            rewriteRun(spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null,
-                "2.6.7", null, true, null)),
-              mavenProject("parent",
+            ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, true, null);
+            rewriteRun(spec -> spec.recipe(recipe), mavenProject("parent",
                 pomXml("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>org.sample</groupId>
-                    <artifactId>sample</artifactId>
-                    <version>1.0.0</version>
-                    
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.5.0</version>
-                    </parent>
-                    
-                    <modules>
-                      <module>module1</module>
-                      <module>module2</module>
-                    </modules>
-                  </project>
-                  """, """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-                    <groupId>org.sample</groupId>
-                    <artifactId>sample</artifactId>
-                    <version>1.0.0</version>
-                    
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.6.7</version>
-                    </parent>
-                    
-                    <modules>
-                      <module>module1</module>
-                      <module>module2</module>
-                    </modules>
-                  </project>
-                  """),
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                      
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.5.0</version>
+                      </parent>
+                      
+                      <modules>
+                        <module>module1</module>
+                        <module>module2</module>
+                      </modules>
+                    </project>
+                    """,
+                  """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.6.7</version>
+                      </parent>
+
+                      <modules>
+                        <module>module1</module>
+                        <module>module2</module>
+                      </modules>
+                    </project>
+                    """),
                 mavenProject("module1", pomXml("""
                   <?xml version="1.0" encoding="UTF-8"?>
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -925,366 +926,6 @@ class ChangeParentPomTest implements RewriteTest {
                       <version>1.0.0</version>
                     </parent>
                     <artifactId>module2</artifactId>
-                  </project>
-                  """))
-              )
-            );
-        }
-
-        @Test
-        void multiModuleSample() {
-            rewriteRun(spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null,
-                "2.6.7", null, true, null)),
-              mavenProject("openrewrite-test",
-                pomXml("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.6.5</version>
-                    </parent>
-
-                    <groupId>com.lora.testA</groupId>
-                    <artifactId>openrewrite-test</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                    <packaging>pom</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description />
-
-                    <modules>
-                      <module>domain</module>
-                      <module>infrastructure</module>
-                    </modules>
-
-                    <properties>
-                      <java.version>17</java.version>
-                    </properties>
-
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-domain</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-infrastructure</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                    <dependencies />
-
-                    <repositories />
-                    <pluginRepositories />
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                    </build>
-
-                    <reporting />
-
-                    <profiles />
-                  </project>
-                  """, """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-parent</artifactId>
-                      <version>2.6.7</version>
-                    </parent>
-
-                    <groupId>com.lora.testA</groupId>
-                    <artifactId>openrewrite-test</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                    <packaging>pom</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description />
-
-                    <modules>
-                      <module>domain</module>
-                      <module>infrastructure</module>
-                    </modules>
-
-                    <properties>
-                      <java.version>17</java.version>
-                    </properties>
-
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-domain</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-infrastructure</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                    <dependencies />
-
-                    <repositories />
-                    <pluginRepositories />
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                    </build>
-
-                    <reporting />
-
-                    <profiles />
-                  </project>
-                  """),
-                mavenProject("domain", pomXml("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                      <groupId>com.lora.testA</groupId>
-                      <artifactId>openrewrite-test</artifactId>
-                      <version>0.1.0-SNAPSHOT</version>
-                      <relativePath>..</relativePath>
-                    </parent>
-
-                    <artifactId>openrewrite-test-domain</artifactId>
-                    <packaging>jar</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description>Domain Module.</description>
-
-                    <dependencies>
-
-                    </dependencies>
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                      <plugins />
-                    </build>
-
-                    <reporting />
-                  </project>
-                  """)),
-                mavenProject("infrastructure", pomXml("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                      <groupId>com.lora.testA</groupId>
-                      <artifactId>openrewrite-test</artifactId>
-                      <version>0.1.0-SNAPSHOT</version>
-                      <relativePath>..</relativePath>
-                    </parent>
-
-                    <artifactId>openrewrite-test-infrastructure</artifactId>
-                    <packaging>jar</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description>Infrastructure Module.</description>
-
-                    <dependencies>
-
-                    </dependencies>
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                      <plugins />
-                    </build>
-
-                    <reporting />
-                  </project>
-                  """))
-              )
-            );
-        }
-
-        @Test
-        void multiModuleSampleWithTabsInParentBlock() {
-            rewriteRun(spec -> spec.recipe(new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null,
-                "2.6.7", null, true, null)),
-              mavenProject("openrewrite-test",
-                pomXml("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                  	<groupId>org.springframework.boot</groupId>
-                  	  <artifactId>spring-boot-starter-parent</artifactId>
-                  	  <version>2.6.5</version>
-                    </parent>
-
-                    <groupId>com.lora.testB</groupId>
-                    <artifactId>openrewrite-test</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                    <packaging>pom</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description />
-
-                    <modules>
-                      <module>domain</module>
-                      <module>infrastructure</module>
-                    </modules>
-
-                    <properties>
-                      <java.version>17</java.version>
-                    </properties>
-
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-domain</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-infrastructure</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                    <dependencies />
-
-                    <repositories />
-                    <pluginRepositories />
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                    </build>
-
-                    <reporting />
-
-                    <profiles />
-                  </project>
-                  """, """
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                  	<groupId>org.springframework.boot</groupId>
-                  	  <artifactId>spring-boot-starter-parent</artifactId>
-                  	  <version>2.6.7</version>
-                    </parent>
-
-                    <groupId>com.lora.testB</groupId>
-                    <artifactId>openrewrite-test</artifactId>
-                    <version>0.1.0-SNAPSHOT</version>
-                    <packaging>pom</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description />
-
-                    <modules>
-                      <module>domain</module>
-                      <module>infrastructure</module>
-                    </modules>
-
-                    <properties>
-                      <java.version>17</java.version>
-                    </properties>
-
-                    <dependencyManagement>
-                      <dependencies>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-domain</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                        <dependency>
-                          <groupId>${project.groupId}</groupId>
-                          <artifactId>openrewrite-test-infrastructure</artifactId>
-                          <version>${project.version}</version>
-                        </dependency>
-                      </dependencies>
-                    </dependencyManagement>
-                    <dependencies />
-
-                    <repositories />
-                    <pluginRepositories />
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                    </build>
-
-                    <reporting />
-
-                    <profiles />
-                  </project>
-                  """),
-                mavenProject("domain", pomXml("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                      <groupId>com.lora.testB</groupId>
-                      <artifactId>openrewrite-test</artifactId>
-                      <version>0.1.0-SNAPSHOT</version>
-                      <relativePath>..</relativePath>
-                    </parent>
-
-                    <artifactId>openrewrite-test-domain</artifactId>
-                    <packaging>jar</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description>Domain Module.</description>
-
-                    <dependencies>
-
-                    </dependencies>
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                      <plugins />
-                    </build>
-
-                    <reporting />
-                  </project>
-                  """)),
-                mavenProject("infrastructure", pomXml("""
-                  <?xml version="1.0" encoding="UTF-8"?>
-                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-                    <modelVersion>4.0.0</modelVersion>
-
-                    <parent>
-                      <groupId>com.lora.testB</groupId>
-                      <artifactId>openrewrite-test</artifactId>
-                      <version>0.1.0-SNAPSHOT</version>
-                      <relativePath>..</relativePath>
-                    </parent>
-
-                    <artifactId>openrewrite-test-infrastructure</artifactId>
-                    <packaging>jar</packaging>
-
-                    <name>${project.groupId}:${project.artifactId}</name>
-                    <description>Infrastructure Module.</description>
-
-                    <dependencies>
-
-                    </dependencies>
-
-                    <build>
-                      <finalName>${project.artifactId}-${project.version}</finalName>
-                      <plugins />
-                    </build>
-
-                    <reporting />
                   </project>
                   """))
               )
