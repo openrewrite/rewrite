@@ -90,7 +90,7 @@ class RemoveGradleDependency extends Recipe {
                             J.Literal stringLiteralArgument = (J.Literal) declArguments.get(0);
                             String argumentValue = (String) stringLiteralArgument.getValue();
 
-                            Dependency dependency = new DependencyStringNotationConverter().parse(argumentValue);
+                            Dependency dependency = DependencyStringNotationConverter.parse(argumentValue);
 
                             if (depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
                                 return null;

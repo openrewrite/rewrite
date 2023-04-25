@@ -135,7 +135,7 @@ public class InsertDependencyComparator implements Comparator<Statement> {
 
     private static Optional<String> getEntry(String entry, J.MethodInvocation invocation) {
         if (invocation.getArguments().get(0) instanceof J.Literal) {
-            Dependency dependency = new DependencyStringNotationConverter().parse((String) ((J.Literal) invocation.getArguments().get(0)).getValue());
+            Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) invocation.getArguments().get(0)).getValue());
             switch (entry) {
                 case "group":
                     return Optional.ofNullable(dependency.getGroupId());

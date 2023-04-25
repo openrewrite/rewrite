@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -106,25 +107,29 @@ public class MavenParser implements Parser<Xml.Document> {
                 MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
                         .resolveDependencies(downloader, ctx);
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
-            } catch (MavenDownloadingExceptions e) {
-                throw new UncheckedMavenDownloadingException(docToPom.getKey(), e);
-            } catch (MavenDownloadingException e) {
-                throw new UncheckedMavenDownloadingException(docToPom.getKey(), e);
+            } catch (MavenDownloadingExceptions | MavenDownloadingException e) {
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
+                ctx.getOnError().accept(e);
             }
         }
 
         for (int i = 0; i < parsed.size(); i++) {
             Xml.Document maven = parsed.get(i);
-            MavenResolutionResult resolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class)
-                    .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
-
+            Optional<MavenResolutionResult> maybeResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class);
+            if(!maybeResolutionResult.isPresent()) {
+                continue;
+            }
+            MavenResolutionResult resolutionResult = maybeResolutionResult.get();
             List<MavenResolutionResult> modules = new ArrayList<>(0);
             for (Xml.Document possibleModule : parsed) {
                 if (possibleModule == maven) {
                     continue;
                 }
-                MavenResolutionResult moduleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class)
-                        .orElseThrow(() -> new IllegalStateException("Expected to find a maven resolution marker"));
+                Optional<MavenResolutionResult> maybeModuleResolutionResult = possibleModule.getMarkers().findFirst(MavenResolutionResult.class);
+                if(!maybeModuleResolutionResult.isPresent()) {
+                    continue;
+                }
+                MavenResolutionResult moduleResolutionResult = maybeModuleResolutionResult.get();
                 Parent parent = moduleResolutionResult.getPom().getRequested().getParent();
                 if (parent != null &&
                     resolutionResult.getPom().getGroupId().equals(resolutionResult.getPom().getValue(parent.getGroupId())) &&

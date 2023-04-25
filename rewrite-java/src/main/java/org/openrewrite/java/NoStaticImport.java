@@ -74,13 +74,16 @@ public class NoStaticImport extends Recipe {
                         doAfterVisit(op);
                     }
 
-                    // Do not replace if receiverType is the same as surrounding class
-                    if (getCursor().firstEnclosing(J.ClassDeclaration.class).getType().equals(receiverType)) {
-                        return m;
-                    }
-                    // Do not replace if method is in a wrapping outer class; not looking up more than one level
-                    JavaType.FullyQualified owningClass = getCursor().firstEnclosing(J.ClassDeclaration.class).getType().getOwningClass();
-                    if (owningClass != null && owningClass.equals(receiverType)) {
+                    J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                    if (enclosingClass == null || enclosingClass.getType() == null ||
+                            // Do not replace if receiverType is the same as surrounding class
+                            enclosingClass.getType().equals(receiverType) ||
+                            // Do not replace if method is in a wrapping outer class; not looking up more than one level
+                            enclosingClass.getType().getOwningClass() != null && enclosingClass.getType().getOwningClass().equals(receiverType) ||
+                            // Do not replace if class extends receiverType
+                            enclosingClass.getType().getSupertype() != null && enclosingClass.getType().getSupertype().equals(receiverType)
+
+                    ) {
                         return m;
                     }
 

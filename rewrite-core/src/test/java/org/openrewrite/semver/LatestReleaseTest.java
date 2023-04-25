@@ -32,16 +32,21 @@ class LatestReleaseTest {
     @Test
     void nonNumericPartsValid() {
         assertThat(latestRelease.isValid("1.0", "1.1.1.1")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.0.RELEASE")).isTrue();
+        assertThat(latestRelease.isValid("1.0", "1.0.0.Final")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1.1")).isTrue();
         assertThat(latestRelease.isValid("1.0", "1")).isTrue();
-        assertThat(latestRelease.isValid("1.0", "1.1.a")).isTrue();
-        assertThat(latestRelease.compare(null, "1.0", "1.1.a")).isLessThan(0);
-        assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isTrue();
-        assertThat(latestRelease.compare(null, "1.0", "1.1.1.1.a")).isLessThan(0);
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1")).isTrue();
+
         assertThat(latestRelease.isValid("1.0", "1.1.1.1.1-SNAPSHOT")).isFalse();
         assertThat(latestRelease.isValid("1.0", "1.1.0-SNAPSHOT")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.a")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.1.1.a")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "2.0.0.Alpha2")).isFalse();
+
+        assertThat(latestRelease.compare(null, "1.0", "1.1.a")).isLessThan(0);
+        assertThat(latestRelease.compare(null, "1.0", "1.1.1.1.a")).isLessThan(0);
     }
 
     @Test
@@ -82,6 +87,15 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare("1.0", "1.1.1", "1.1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1.1", "1.1.1")).isLessThan(0);
         assertThat(latestRelease.compare("1.0", "1", "1.1")).isLessThan(0);
+    }
+
+    @Test
+    void preReleases() {
+        assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha1")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha.1")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha-1")).isFalse();
+        assertThat(latestRelease.isValid("1.0", "1.1.0-Alpha=1")).isFalse();
     }
 
     @Test

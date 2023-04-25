@@ -84,10 +84,20 @@ public class Environment {
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
-        for(ResourceLoader r : resourceLoaders) {
-            if(r instanceof YamlResourceLoader) {
+        for (ResourceLoader r : resourceLoaders) {
+            if (r instanceof YamlResourceLoader) {
                 recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
                 recipeToExamples.putAll(((YamlResourceLoader) r).listRecipeExamples());
+            } else if (r instanceof ClasspathScanningLoader) {
+                ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
+                Map<String, List<RecipeExample>> examplesMap = classpathScanningLoader.listRecipeExamples();
+                for (String key : examplesMap.keySet()) {
+                    if (recipeToExamples.containsKey(key)) {
+                        recipeToExamples.get(key).addAll(examplesMap.get(key));
+                    } else {
+                        recipeToExamples.put(key, examplesMap.get(key));
+                    }
+                }
             }
         }
 
@@ -96,7 +106,19 @@ public class Environment {
             if (r instanceof YamlResourceLoader) {
                 result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToContributors, recipeToExamples)));
             } else {
-                result.addAll(r.listRecipeDescriptors());
+                Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
+                for (RecipeDescriptor descriptor : descriptors) {
+                    if (descriptor.getContributors() != null &&
+                        recipeToContributors.containsKey(descriptor.getName())) {
+                        descriptor.getContributors().addAll(recipeToContributors.get(descriptor.getName()));
+                    }
+
+                    if (descriptor.getExamples() != null &&
+                        recipeToExamples.containsKey(descriptor.getName())) {
+                        descriptor.getExamples().addAll(recipeToExamples.get(descriptor.getName()));
+                    }
+                }
+                result.addAll(descriptors);
             }
         }
         return result;

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Recipe;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
@@ -31,9 +32,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -218,8 +219,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
     @Test
     void unresolvableDependency() {
-        assertThatThrownBy(() ->
           rewriteRun(
+            spec -> spec.executionContext(new InMemoryExecutionContext()),
             pomXml(
               """
                 <project>
@@ -243,40 +244,13 @@ class MavenDependencyFailuresTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </project>
-                """
+                """,
+              spec -> spec.afterRecipe(after -> {
+                  Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                  assertThat(maybeParseException).isPresent();
+              })
             )
-          ))
-          .isInstanceOf(UncheckedMavenDownloadingException.class)
-          .satisfies(t -> {
-              Xml.Document pom = ((UncheckedMavenDownloadingException) t).getPomWithWarnings();
-              //language=xml
-              assertThat(pom.printAllTrimmed()).isEqualTo(
-                """
-                  <project>
-                    <groupId>com.mycompany.app</groupId>
-                    <artifactId>my-app</artifactId>
-                    <version>1</version>
-                    <dependencies>
-                      <!--~~(Unable to download POM. Tried repositories:
-                  https://repo.maven.apache.org/maven2: HTTP 404)~~>--><dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>doesnotexist</version>
-                      </dependency>
-                      <!--~~(No version provided)~~>--><dependency>
-                        <groupId>com.google.another</groupId>
-                        <artifactId>${doesnotexist}</artifactId>
-                      </dependency>
-                      <!--~~(Could not resolve property)~~>--><dependency>
-                        <groupId>com.google.yetanother</groupId>
-                        <artifactId>${doesnotexist}</artifactId>
-                        <version>1</version>
-                      </dependency>
-                    </dependencies>
-                  </project>
-                  """.trim()
-              );
-          });
+          );
     }
 
     @Test

@@ -16,7 +16,6 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Recipe;
 import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,7 +28,7 @@ class ChainStringBuilderAppendCallsTest implements RewriteTest {
         spec.recipe(new ChainStringBuilderAppendCalls());
     }
 
-    @DocumentExample(value="Objects concatenation.")
+    @DocumentExample(value="Chain `StringBuilder.append()` calls instead of the '+' operator to efficiently concatenate strings and numbers.")
     @Test
     void objectsConcatenation() {
         rewriteRun(
