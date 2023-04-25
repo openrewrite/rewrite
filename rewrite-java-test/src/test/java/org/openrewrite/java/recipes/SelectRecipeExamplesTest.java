@@ -65,6 +65,20 @@ class SelectRecipeExamplesTest implements RewriteTest {
                         )
                       );
                   }
+
+                  @Test
+                  void test2() {
+                      rewriteRun(
+                        java(
+                          \"""
+                              BEFORE
+                          \""",
+                          \"""
+                              AFTER
+                          \"""
+                        )
+                      );
+                  }
               }
               """,
             """
@@ -90,12 +104,122 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   void test1() {
                       rewriteRun(
                         java(
-                          ""\"
+                          \"""
                               BEFORE
-                          ""\",
-                          ""\"
+                          \""",
+                          \"""
                               AFTER
-                          ""\"
+                          \"""
+                        )
+                      );
+                  }
+
+                  @Test
+                  void test2() {
+                      rewriteRun(
+                        java(
+                          \"""
+                              BEFORE
+                          \""",
+                          \"""
+                              AFTER
+                          \"""
+                        )
+                      );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void skipNotChangedTest() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.java.cleanup;
+             
+              import org.junit.jupiter.api.Test;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.test.RecipeSpec;
+              import org.openrewrite.test.RewriteTest;
+             
+              import static org.openrewrite.java.Assertions.java;
+              
+              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                  @Override
+                  public void defaults(RecipeSpec spec) {
+                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      spec.recipe(recipe);
+                  }
+
+                  @Test
+                  void test1() {
+                      rewriteRun(
+                        java(
+                          \"""
+                              BEFORE
+                          \"""
+                        )
+                      );
+                  }
+
+                  @Test
+                  void test2() {
+                      rewriteRun(
+                        java(
+                          \"""
+                              BEFORE
+                          \""",
+                          \"""
+                              AFTER
+                          \"""
+                        )
+                      );
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java.cleanup;
+             
+              import org.junit.jupiter.api.Test;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.internal.DocumentExample;
+              import org.openrewrite.test.RecipeSpec;
+              import org.openrewrite.test.RewriteTest;
+             
+              import static org.openrewrite.java.Assertions.java;
+              
+              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                  @Override
+                  public void defaults(RecipeSpec spec) {
+                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      spec.recipe(recipe);
+                  }
+
+                  @Test
+                  void test1() {
+                      rewriteRun(
+                        java(
+                          \"""
+                              BEFORE
+                          \"""
+                        )
+                      );
+                  }
+
+                  @DocumentExample
+                  @Test
+                  void test2() {
+                      rewriteRun(
+                        java(
+                          \"""
+                              BEFORE
+                          \""",
+                          \"""
+                              AFTER
+                          \"""
                         )
                       );
                   }

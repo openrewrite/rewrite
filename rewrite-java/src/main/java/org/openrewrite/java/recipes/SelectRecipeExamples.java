@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.*;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -40,8 +41,15 @@ public class SelectRecipeExamples extends Recipe {
                                                                                                ".api.Disabled");
     private static final AnnotationMatcher DOCUMENT_EXAMPLE_ANNOTATION_MATCHER =
         new AnnotationMatcher("@" + DOCUMENT_EXAMPLE_ANNOTATION_FQN);
-    private static final MethodMatcher REWRITE_RUN_METHOD_MATCHER =
+
+    private static final MethodMatcher REWRITE_RUN_METHOD_MATCHER_ALL =
         new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(..)");
+
+    private static final MethodMatcher REWRITE_RUN_METHOD_MATCHER_WITH_SPEC =
+        new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(java.util.function.Consumer, org.openrewrite.test.SourceSpecs[])");
+    private static final MethodMatcher REWRITE_RUN_METHOD_MATCHER =
+        new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(org.openrewrite.test.SourceSpecs[])");
+
     private static final String REWRITE_TEST_FQN = "org.openrewrite.test.RewriteTest";
 
     @Override
@@ -63,6 +71,8 @@ public class SelectRecipeExamples extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
+            private int selectedCount = 0;
+
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
                                                             ExecutionContext executionContext) {
@@ -71,12 +81,17 @@ public class SelectRecipeExamples extends Recipe {
                         return classDecl;
                     }
                 }
+                selectedCount = 0;
                 return super.visitClassDeclaration(classDecl, executionContext);
             }
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
                                                               ExecutionContext executionContext) {
+                if (selectedCount > 0) {
+                    return method;
+                }
+
                 List<J.Annotation> annotations = method.getLeadingAnnotations();
 
                 boolean isTest = annotations.stream().anyMatch(a -> TEST_ANNOTATION_MATCHER.matches(a));
@@ -94,18 +109,42 @@ public class SelectRecipeExamples extends Recipe {
                     return method;
                 }
 
-                boolean rewriteRunMethodCalled = new JavaIsoVisitor<AtomicBoolean>() {
+                // a good recipe example should have both before and after.
+                boolean isAGoodExample = new JavaIsoVisitor<AtomicBoolean>() {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
-                                                                    AtomicBoolean called) {
-                        if (REWRITE_RUN_METHOD_MATCHER.matches(method)) {
-                            called.set(true);
+                                                                    AtomicBoolean isGood) {
+                        if (REWRITE_RUN_METHOD_MATCHER_ALL.matches(method)) {
+
+                            int argIndex = 0;
+
+                            if (REWRITE_RUN_METHOD_MATCHER_WITH_SPEC.matches(method)) {
+                                argIndex = 1;
+                            } else if (REWRITE_RUN_METHOD_MATCHER.matches(method)) {
+                                argIndex = 0;
+                            }
+
+                            Expression arg = method.getArguments().get(argIndex);
+
+                            if (arg instanceof J.MethodInvocation) {
+
+                                J.MethodInvocation methodInvocation = (J.MethodInvocation) arg;
+                                if (methodInvocation.getArguments() != null && methodInvocation.getArguments().size() > 1) {
+
+                                    Expression arg0 = methodInvocation.getArguments().get(0);
+                                    Expression arg1 = methodInvocation.getArguments().get(1);
+
+                                    if (isStringLiteral(arg0) && isStringLiteral(arg1)) {
+                                        isGood.set(true);
+                                    }
+                                }
+                            }
                         }
                         return method;
                     }
                 }.reduce(method, new AtomicBoolean()).get();
 
-                if (!rewriteRunMethodCalled) {
+                if (!isAGoodExample) {
                     return method;
                 }
 
@@ -117,10 +156,16 @@ public class SelectRecipeExamples extends Recipe {
 
                 maybeAddImport(DOCUMENT_EXAMPLE_ANNOTATION_FQN);
 
+                selectedCount++;
                 return method.withTemplate(
                     t,
                     method.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
             }
         };
     }
+
+    private static boolean isStringLiteral(Expression expression) {
+        return expression instanceof J.Literal && TypeUtils.isString(((J.Literal) expression).getType());
+    }
+
 }

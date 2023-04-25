@@ -273,7 +273,7 @@ public class ExamplesExtractor extends JavaIsoVisitor<ExecutionContext> {
                 } else if (POM_XML_METHOD_MATCHER.matches(method)) {
                     recipeExample.setLanguage("xml");
                 } else {
-                    return method;
+                    recipeExample.setLanguage("");
                 }
 
                 List<Expression> args = method.getArguments();
