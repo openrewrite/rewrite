@@ -148,5 +148,28 @@ class NoStaticImportTest implements RewriteTest {
                 }
                 """));
         }
+
+        @Test
+        void runnableCallingOuterMethod() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                public class TestNoStaticImport {
+                    public static void method0() {
+                    }
+
+                    public void run() {
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                method0();
+                            }
+                        }.run();
+                    }
+                }
+                """));
+        }
     }
 }
