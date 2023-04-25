@@ -69,6 +69,11 @@ public class NoStaticImport extends Recipe {
                     }
 
                     JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+                    RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(), true);
+                    if (!getAfterVisit().contains(op)) {
+                        doAfterVisit(op);
+                    }
+
                     // Do not replace if receiverType is the same as surrounding class
                     if (getCursor().firstEnclosing(J.ClassDeclaration.class).getType().equals(receiverType)) {
                         return m;
@@ -79,19 +84,14 @@ public class NoStaticImport extends Recipe {
                         return m;
                     }
 
-                    RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(), true);
-                    if (!getAfterVisit().contains(op)) {
-                        doAfterVisit(op);
-                    }
-
+                    // Change method invocation to use fully qualified name
                     maybeAddImport(receiverType.getFullyQualifiedName());
                     m = m.withSelect(new J.Identifier(Tree.randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
                             receiverType.getClassName(),
                             receiverType,
-                            null)
-                    );
+                            null));
                 }
                 return m;
             }

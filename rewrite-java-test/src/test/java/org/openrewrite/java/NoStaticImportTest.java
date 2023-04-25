@@ -49,6 +49,43 @@ class NoStaticImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void removeLocalImports() {
+        rewriteRun(
+          spec -> spec.recipe(new NoStaticImport("*..* *(..)")),
+          java(
+            """
+              package org.openrewrite.java;
+              
+              import static org.openrewrite.java.TestNoStaticImport.method0;
+
+              public class TestNoStaticImport {
+
+                  public static void method0() {
+                  }
+
+                  public static void method1() {
+                      method0();
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java;
+
+              public class TestNoStaticImport {
+
+                  public static void method0() {
+                  }
+
+                  public static void method1() {
+                      method0();
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class Retain {
 
