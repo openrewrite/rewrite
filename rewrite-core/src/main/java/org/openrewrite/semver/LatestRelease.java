@@ -48,10 +48,12 @@ public class LatestRelease implements VersionComparator {
     }
 
     static String normalizeVersion(String version) {
-        if (version.endsWith(".RELEASE")) {
-            return version.substring(0, version.length() - ".RELEASE".length());
-        } else if (version.endsWith(".FINAL") || version.endsWith(".Final")) {
-            return version.substring(0, version.length() - ".FINAL".length());
+        int lastDotIdx = version.lastIndexOf('.');
+        for (String suffix : RELEASE_SUFFIXES) {
+            if (version.regionMatches(true, lastDotIdx, suffix, 0, suffix.length())) {
+                version = version.substring(0, lastDotIdx);
+                break;
+            }
         }
 
         long versionParts = countVersionParts(version);
