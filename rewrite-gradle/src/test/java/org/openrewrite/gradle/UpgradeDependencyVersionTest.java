@@ -100,12 +100,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               def guavaVersion = '29.0-jre'
+              def otherVersion = "latest.release"
               repositories {
                 mavenCentral()
               }
               
               dependencies {
                 implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.fasterxml.jackson.core:jackson-databind:$otherVersion"
               }
               """,
             """
@@ -114,12 +116,14 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               def guavaVersion = '30.1.1-jre'
+              def otherVersion = "latest.release"
               repositories {
                 mavenCentral()
               }
               
               dependencies {
                 implementation "com.google.guava:guava:$guavaVersion"
+                implementation "com.fasterxml.jackson.core:jackson-databind:$otherVersion"
               }
               """
           )
