@@ -26,7 +26,7 @@ class UnnecessaryCatchTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UnnecessaryCatch());
+        spec.recipe(new UnnecessaryCatch(false));
     }
 
     @Test
@@ -129,6 +129,25 @@ class UnnecessaryCatchTest implements RewriteTest {
                   public void fred() throws IOException {
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRemoveJavaLangException() {
+        rewriteRun(
+          java(
+            """
+                class Scratch {
+                    void method() {
+                        try {
+                            throw new RuntimeException();
+                        } catch (Exception e) {
+                            System.out.println("an exception!");
+                        }
+                    }
+                }
               """
           )
         );
