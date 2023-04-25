@@ -261,7 +261,7 @@ public abstract class Recipe implements Cloneable {
      * @return a list of the organization(s) responsible for maintaining this recipe.
      */
     public List<Maintainer> getMaintainers() {
-        return emptyList();
+        return new ArrayList<>();
     }
 
     @Setter
@@ -269,7 +269,7 @@ public abstract class Recipe implements Cloneable {
 
     public List<Contributor> getContributors() {
         if(contributors == null) {
-            return emptyList();
+            return new ArrayList<>();
         }
         return contributors;
     }
@@ -279,7 +279,7 @@ public abstract class Recipe implements Cloneable {
 
     public List<RecipeExample> getExamples() {
         if(examples == null) {
-            return emptyList();
+            return new ArrayList<>();
         }
         return examples;
     }
