@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -46,5 +48,202 @@ class NoStaticImportTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void removeLocalImports() {
+        rewriteRun(
+          spec -> spec.recipe(new NoStaticImport("*..* *(..)")),
+          java(
+            """
+              package org.openrewrite.java;
+              
+              import static org.openrewrite.java.TestNoStaticImport.method0;
+
+              public class TestNoStaticImport {
+
+                  public static void method0() {
+                  }
+
+                  public static void method1() {
+                      method0();
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java;
+
+              public class TestNoStaticImport {
+
+                  public static void method0() {
+                  }
+
+                  public static void method1() {
+                      method0();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Nested
+    class Retain {
+
+        public static final NoStaticImport NO_STATIC_IMPORT = new NoStaticImport("*..* *(..)");
+
+        @Test
+        void verifyInnerCallsAreNotUpdated() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                public class TestNoStaticImport {
+
+                    public static void method0() {
+                    }
+
+                    public static void method1() {
+                        method0();
+                    }
+                }
+                """));
+        }
+
+        @Test
+        void superCallsNotChanged() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                public class TestNoStaticImport {
+
+                    public TestNoStaticImport() {
+                        super();
+                    }
+                }
+                """));
+        }
+
+        @Test
+        void innerClassCallingOuterClassMethod() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                public class TestNoStaticImport {
+                    public static void method0() {
+                    }
+
+                    public class InnerClass {
+                        public void method1() {
+                            method0();
+                        }
+                    }
+                }
+                """));
+        }
+
+        @Test
+        void staticInnerClassCallingOuterClassMethod() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                public class TestNoStaticImport {
+                    public static void method0() {
+                    }
+
+                    public static class InnerClass {
+                        public void method1() {
+                            method0();
+                        }
+                    }
+                }
+                """));
+        }
+
+        @Test
+        void outerClassCallingInnerClassMethod() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                class TestNoStaticImport {
+                    public static void method0() {
+                        InnerClass.method1();
+                    }
+                            
+                    public class InnerClass {
+                        public static void method1() {
+                        }
+                    }
+                }
+                """));
+        }
+
+        @Test
+        void runnableCallingOuterMethod() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                public class TestNoStaticImport {
+                    public static void method0() {
+                    }
+
+                    public void run() {
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                method0();
+                            }
+                        }.run();
+                    }
+                }
+                """));
+        }
+
+        @Test
+        @ExpectedToFail("static import not yet replaced with Nested.foo()")
+        void localImport() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+                
+                import static org.openrewrite.test.Test.Nested.foo;
+                
+                public class Test {
+                    public static void m() {
+                        foo();
+                    }
+                
+                    public static class Nested {
+                        public static void foo() {
+                        }
+                    }
+                }
+                ""","""
+                package org.openrewrite.java;
+                
+                public class Test {
+                    public static void m() {
+                        Nested.foo();
+                    }
+                
+                    public static class Nested {
+                        public static void foo() {
+                        }
+                    }
+                }
+                """));
+        }
     }
 }
