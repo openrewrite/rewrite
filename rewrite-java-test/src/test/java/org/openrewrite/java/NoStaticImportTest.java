@@ -112,6 +112,23 @@ class NoStaticImportTest implements RewriteTest {
         }
 
         @Test
+        void getClassCallsNotChanged() {
+            rewriteRun(
+              spec -> spec.recipe(NO_STATIC_IMPORT),
+              java("""
+                package org.openrewrite.java;
+
+                public class TestNoStaticImport {
+
+                  public void method(Object obj) {
+                    if (getClass() != obj.getClass()) {
+                    }
+                  }
+                }
+                """));
+        }
+
+        @Test
         void superCallsNotChanged() {
             rewriteRun(
               spec -> spec.recipe(NO_STATIC_IMPORT),
