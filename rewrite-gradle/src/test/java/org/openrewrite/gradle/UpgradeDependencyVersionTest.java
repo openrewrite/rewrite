@@ -49,7 +49,10 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               dependencies {
-                implementation 'com.google.guava:guava:29.0-jre'
+                compileOnly 'com.google.guava:guava:29.0-jre'
+                runtimeOnly ('com.google.guava:guava:29.0-jre') {
+                    force = true
+                }
               }
               """,
             """
@@ -62,30 +65,31 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               dependencies {
-                implementation 'com.google.guava:guava:30.1.1-jre'
+                compileOnly 'com.google.guava:guava:30.1.1-jre'
+                runtimeOnly ('com.google.guava:guava:30.1.1-jre') {
+                    force = true
+                }
               }
               """,
-            spec -> {
-                spec.afterRecipe(after -> {
-                    Optional<GradleProject> maybeGp = after.getMarkers().findFirst(GradleProject.class);
-                    assertThat(maybeGp).isPresent();
-                    GradleProject gp = maybeGp.get();
-                    GradleDependencyConfiguration compileClasspath = gp.getConfiguration("compileClasspath");
-                    assertThat(compileClasspath).isNotNull();
-                    assertThat(
-                      compileClasspath.getRequested().stream()
-                        .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
-                        .findAny())
-                      .as("GradleProject requested dependencies should have been updated with the new version of guava")
-                      .isPresent();
-                    assertThat(
-                      compileClasspath.getResolved().stream()
-                        .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
-                        .findAny())
-                      .as("GradleProject requested dependencies should have been updated with the new version of guava")
-                      .isPresent();
-                });
-            }
+            spec -> spec.afterRecipe(after -> {
+                Optional<GradleProject> maybeGp = after.getMarkers().findFirst(GradleProject.class);
+                assertThat(maybeGp).isPresent();
+                GradleProject gp = maybeGp.get();
+                GradleDependencyConfiguration compileClasspath = gp.getConfiguration("compileClasspath");
+                assertThat(compileClasspath).isNotNull();
+                assertThat(
+                  compileClasspath.getRequested().stream()
+                    .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
+                    .findAny())
+                  .as("GradleProject requested dependencies should have been updated with the new version of guava")
+                  .isPresent();
+                assertThat(
+                  compileClasspath.getResolved().stream()
+                    .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
+                    .findAny())
+                  .as("GradleProject requested dependencies should have been updated with the new version of guava")
+                  .isPresent();
+            })
           )
         );
     }
@@ -106,7 +110,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               dependencies {
-                implementation "com.google.guava:guava:$guavaVersion"
+                implementation ("com.google.guava:guava:$guavaVersion") {
+                    force = true
+                }
                 implementation "com.fasterxml.jackson.core:jackson-databind:$otherVersion"
               }
               """,
@@ -122,7 +128,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               dependencies {
-                implementation "com.google.guava:guava:$guavaVersion"
+                implementation ("com.google.guava:guava:$guavaVersion") {
+                    force = true
+                }
                 implementation "com.fasterxml.jackson.core:jackson-databind:$otherVersion"
               }
               """
@@ -180,7 +188,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               dependencies {
-                implementation group: "com.google.guava", name: "guava", version: '29.0-jre'
+                implementation (group: "com.google.guava", name: "guava", version: '29.0-jre') {
+                  force = true
+                }
               }
               """,
             """
@@ -193,7 +203,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               }
               
               dependencies {
-                implementation group: "com.google.guava", name: "guava", version: '30.1.1-jre'
+                implementation (group: "com.google.guava", name: "guava", version: '30.1.1-jre') {
+                  force = true
+                }
               }
               """
           )

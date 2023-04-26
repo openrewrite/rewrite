@@ -206,7 +206,7 @@ public class UpgradeDependencyVersion extends Recipe {
                                 return e.warn(m);
                             }
                         }
-                    } else if (depArgs.size() == 3 && depArgs.get(0) instanceof G.MapEntry
+                    } else if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry
                             && depArgs.get(1) instanceof G.MapEntry
                             && depArgs.get(2) instanceof G.MapEntry) {
                         Expression groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
@@ -248,6 +248,7 @@ public class UpgradeDependencyVersion extends Recipe {
                                     versionLiteral
                                             .withValueSource(requireNonNull(versionLiteral.getValueSource()).replace(version, newVersion))
                                             .withValue(newVersion)));
+                            newArgs.addAll(depArgs.subList(3, depArgs.size()));
 
                             return m.withArguments(newArgs);
                         } else if(versionExp instanceof J.Identifier) {
