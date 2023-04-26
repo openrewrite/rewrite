@@ -17,7 +17,7 @@ package org.openrewrite.java.spring;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 
