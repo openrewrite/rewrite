@@ -22,7 +22,7 @@ import org.openrewrite.PathUtils;
 import org.openrewrite.RecipeRun;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.test.RecipeSpec;

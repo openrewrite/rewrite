@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.hcl.tree.Expression;
 import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Comparator;

@@ -18,7 +18,7 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.test.RewriteTest;
 

@@ -17,7 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.PathUtils;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;

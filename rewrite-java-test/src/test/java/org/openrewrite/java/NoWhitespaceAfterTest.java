@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.cleanup.NoWhitespaceAfter;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.style.Checkstyle;

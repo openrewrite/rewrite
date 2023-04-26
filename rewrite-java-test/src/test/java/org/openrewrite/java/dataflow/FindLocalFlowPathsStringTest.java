@@ -17,7 +17,7 @@ package org.openrewrite.java.dataflow;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.controlflow.Guard;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;

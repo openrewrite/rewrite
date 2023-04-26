@@ -17,7 +17,7 @@ package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.ChangeText;

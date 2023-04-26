@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.RewriteTest;

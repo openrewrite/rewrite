@@ -17,7 +17,7 @@ package org.openrewrite.table;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;

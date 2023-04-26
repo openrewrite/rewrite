@@ -18,7 +18,7 @@ package org.openrewrite.java;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.cleanup.TypecastParenPad;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.style.TypecastParenPadStyle;

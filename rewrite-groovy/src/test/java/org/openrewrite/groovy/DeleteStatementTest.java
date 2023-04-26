@@ -18,7 +18,7 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;

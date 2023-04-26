@@ -16,7 +16,7 @@
 package org.openrewrite.json.search;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;

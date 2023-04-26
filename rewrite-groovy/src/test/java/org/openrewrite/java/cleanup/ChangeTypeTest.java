@@ -18,7 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.DocumentExample;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;

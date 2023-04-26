@@ -33,7 +33,7 @@ import static java.util.Comparator.comparing;
 
 public class SelectRecipeExamples extends Recipe {
 
-    private static final String DOCUMENT_EXAMPLE_ANNOTATION_FQN = "org.openrewrite.internal.DocumentExample";
+    private static final String DOCUMENT_EXAMPLE_ANNOTATION_FQN = "org.openrewrite.DocumentExample";
     private static final AnnotationMatcher TEST_ANNOTATION_MATCHER = new AnnotationMatcher("@org.junit.jupiter.api" +
                                                                                            ".Test");
     private static final AnnotationMatcher ISSUE_ANNOTATION_MATCHER = new AnnotationMatcher("@org.openrewrite.Issue");
